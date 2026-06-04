@@ -406,6 +406,26 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           </div>
         )}
 
+        {/* Seen as */}
+        {(editing || concert.seenAs) && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={labelStyle}>Seen as</div>
+            {editing ? (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {["Headliner","Support","Guest","Festival"].map(opt => (
+                  <button key={opt} onClick={() => update("seenAs", form.seenAs === opt ? null : opt)} style={{
+                    padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
+                    background: form.seenAs === opt ? "#a78bfa" : "#13131f",
+                    color: form.seenAs === opt ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${form.seenAs === opt ? "#a78bfa" : "#2e2e50"}`,
+                    fontWeight: form.seenAs === opt ? 700 : 400
+                  }}>{opt}</button>
+                ))}
+              </div>
+            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.seenAs}</div>}
+          </div>
+        )}
+
         {/* Friends */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -1209,6 +1229,25 @@ function StatsView({ concerts, settings = {} }) {
             ))}
           </div>
 
+          {/* Seen as breakdown */}
+          {(() => {
+            const seenAsCounts = { Headliner: 0, Support: 0, Guest: 0, Festival: 0 };
+            past.forEach(c => { if (c.seenAs && seenAsCounts[c.seenAs] !== undefined) seenAsCounts[c.seenAs]++; });
+            const hasAny = Object.values(seenAsCounts).some(v => v > 0);
+            if (!hasAny) return null;
+            const colors = { Headliner: "#a78bfa", Support: "#38bdf8", Guest: "#f472b6", Festival: "#34d399" };
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 14px", marginBottom: 8, display: "flex", gap: 0 }}>
+                {Object.entries(seenAsCounts).filter(([,v]) => v > 0).map(([k, v], i, arr) => (
+                  <div key={k} style={{ flex: 1, textAlign: "center", borderRight: i < arr.length - 1 ? "1px solid #1a1a2e" : "none" }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: colors[k], lineHeight: 1 }}>{v}</div>
+                    <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 4 }}>{k}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Row 2: total spend / avg ticket all time / avg ticket this year */}
           {(() => {
             const thisYear = String(new Date().getFullYear());
@@ -1656,7 +1695,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
     artist: '', date: '', venue: '', room: '', city: '', country: '',
     type: 'concert', tour: '', support: [], friends: [], solo: false,
     rating: null, ticketPrice: null, merch: [], notes: '',
-    genre: null, language: null, venueSize: null
+    genre: null, language: null, venueSize: null, seenAs: null
   })
   const [supportInput, setSupportInput] = useState('')
   const [friendInput, setFriendInput] = useState('')
@@ -1855,6 +1894,21 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
                 border: `1px solid ${form.language===l ? '#a78bfa' : '#2e2e50'}`,
                 fontWeight: form.language===l ? 700 : 400
               }}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Seen as')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {['Headliner','Support','Guest','Festival'].map(opt => (
+              <button key={opt} onClick={() => update('seenAs', form.seenAs === opt ? null : opt)} style={{
+                padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: form.seenAs === opt ? '#a78bfa' : '#13131f',
+                color: form.seenAs === opt ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${form.seenAs === opt ? '#a78bfa' : '#2e2e50'}`,
+                fontWeight: form.seenAs === opt ? 700 : 400
+              }}>{opt}</button>
             ))}
           </div>
         </div>

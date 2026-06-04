@@ -97,7 +97,12 @@ export function useConcerts(userId) {
       .upsert({ id: concert.id, user_id: userId, data: concert, updated_at: new Date().toISOString() })
   }, [userId])
 
-  return { concerts, loaded, saveConcert, reload: loadConcerts }
+  const deleteConcert = useCallback(async (concertId) => {
+    setConcerts(prev => prev.filter(c => c.id !== concertId))
+    await supabase.from('concerts').delete().eq('id', concertId).eq('user_id', userId)
+  }, [userId])
+
+  return { concerts, loaded, saveConcert, deleteConcert, reload: loadConcerts }
 }
 
 export function useSettings(userId) {

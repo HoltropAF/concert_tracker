@@ -100,7 +100,30 @@ function ConcertCard({ concert, onOpen }) {
 }
 
 function SetlistSection({ concert }) {
+  const [setlist, setSetlist] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchSetlist = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query = encodeURIComponent(`${concert.artist} ${concert.venue} ${concert.date.slice(0,10)}`);
+      const dateFormatted = concert.date.replace(/-/g, "");
+      const res = await fetch(
+        `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(concert.artist)}&date=${concert.date.split("-").reverse().join("-")}`,
+        { headers: { "x-api-key": "undefined", Accept: "application/json" } }
+      );
+      // setlist.fm requires an API key — we'll link to it instead
+      throw new Error("API_KEY_NEEDED");
+    } catch (e) {
+      setError("api_key");
+    }
+    setLoading(false);
+  };
+
   const setlistUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
+
   return (
     <div>
       <a
@@ -120,11 +143,13 @@ function SetlistSection({ concert }) {
   );
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete }) {
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ ...concert });
   const [friendInput, setFriendInput] = useState('');
+  const [supportInput, setSupportInput] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
@@ -136,6 +161,13 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }
         : [...f.friends, name],
       solo: false
     }));
+  };
+
+  const addCustomFriend = () => {
+    const name = friendInput.trim();
+    if (!name || form.friends.includes(name)) return;
+    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }));
+    setFriendInput('');
   };
 
   const addMerchItem = () => {
@@ -155,17 +187,30 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }
     setForm(f => ({ ...f, merch: (f.merch || []).filter((_, i) => i !== idx) }));
   };
 
-  const addCustomFriend = () => {
-    const name = friendInput.trim();
-    if (!name || form.friends.includes(name)) return;
-    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }));
-    setFriendInput('');
+  const addSupport = () => {
+    const t = supportInput.trim();
+    if (!t || (form.support || []).includes(t)) return;
+    setForm(f => ({ ...f, support: [...(f.support || []), t] }));
+    setSupportInput('');
+  };
+  const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => x !== s) }));
+
+  const handleShare = () => {
+    const lines = [
+      `🎤 ${concert.artist}${concert.tour ? ` — ${concert.tour}` : ''}`,
+      `📅 ${formatDate(concert.date)} · ${concert.venue}${concert.room ? ` · ${concert.room}` : ''} · ${concert.city}`,
+      concert.friends.length > 0 ? `👥 w. ${concert.friends.join(', ')}` : '👤 solo',
+      concert.rating ? `⭐ ${'★'.repeat(concert.rating)}` : null,
+      concert.notes ? `📝 ${concert.notes}` : null,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard?.writeText(lines);
   };
 
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
-
   const isFestival = concert.type === "festival";
   const past = isPast(concert.date);
+
+  const labelStyle = { fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" };
 
   const inputStyle = {
     width: "100%", background: "#13131f", border: "1px solid #2a4a3a",
@@ -197,6 +242,13 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }
             {formatDate(concert.date)} · {concert.city}
           </div>
         </div>
+        {!editing && (
+          <button onClick={handleShare} style={{
+            background: "none", border: "1px solid #1f1f35", color: "#6b6a8f",
+            borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer",
+            fontFamily: "'DM Mono', monospace"
+          }}>Share</button>
+        )}
         <button
           onClick={() => {
             if (editing) { onSave(form); setEditing(false); }
@@ -212,38 +264,165 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }
       </div>
 
       <div style={{ padding: "20px" }}>
-        {/* Type badge */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          <Badge color={isFestival ? "#1a1a30" : "#13131f"}>{isFestival ? "🎪 Festival" : "🎤 Concert"}</Badge>
-          {!past && <Badge color="#1a1a30">📅 Upcoming</Badge>}
-          {concert.notes?.includes("first concert") && <Badge color="#1a1a30">⭐ First ever</Badge>}
-          {concert.notes?.includes("first festival") && <Badge color="#1a1a30">⭐ First festival</Badge>}
-        </div>
+        {/* Type badge / toggle */}
+        {editing ? (
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {[{id:"concert",label:"🎤 Concert"},{id:"festival",label:"🎪 Festival"}].map(t => (
+              <button key={t.id} onClick={() => update("type", t.id)} style={{
+                flex:1, padding:"8px", borderRadius:8, fontSize:13, cursor:"pointer",
+                background: form.type===t.id ? "#1a1a30" : "#13131f",
+                border: `1px solid ${form.type===t.id ? "#a78bfa" : "#2e2e50"}`,
+                color: form.type===t.id ? "#a78bfa" : "#6b6a8f",
+                fontWeight: form.type===t.id ? 700 : 400, fontFamily:"'DM Sans',sans-serif"
+              }}>{t.label}</button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <Badge color={isFestival ? "#1a1a30" : "#13131f"}>{isFestival ? "🎪 Festival" : "🎤 Concert"}</Badge>
+            {!past && <Badge color="#1a1a30">📅 Upcoming</Badge>}
+            {concert.notes?.includes("first concert") && <Badge color="#1a1a30">⭐ First ever</Badge>}
+            {concert.notes?.includes("first festival") && <Badge color="#1a1a30">⭐ First festival</Badge>}
+          </div>
+        )}
+
+        {/* Artist + Date — editable only in edit mode */}
+        {editing && (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <div style={labelStyle}>Artist</div>
+              <input value={form.artist} onChange={e=>update("artist",e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={labelStyle}>Date</div>
+              <input type="date" value={form.date} onChange={e=>update("date",e.target.value)} style={inputStyle} />
+            </div>
+          </>
+        )}
 
         {/* Tour */}
-        {concert.tour && (
+        {(editing || concert.tour) && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tour</div>
-            <div style={{ color: "#c4c2f0", fontSize: 14 }}>{concert.tour}</div>
+            <div style={labelStyle}>Tour</div>
+            {editing
+              ? <input value={form.tour || ""} onChange={e=>update("tour",e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />
+              : <div style={{ color: "#c4c2f0", fontSize: 14 }}>{concert.tour}</div>
+            }
           </div>
         )}
 
         {/* Venue */}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Venue</div>
-          <div style={{ color: "#c4c2f0", fontSize: 14 }}>
-            {concert.venue}{concert.room ? ` · ${concert.room}` : ""}
-          </div>
-          <div style={{ color: "#6b6a8f", fontSize: 12 }}>{concert.city}, {concert.country}</div>
+          <div style={labelStyle}>Venue</div>
+          {editing ? (
+            <>
+              <input value={form.venue} onChange={e=>update("venue",e.target.value)} placeholder="Venue name" style={{ ...inputStyle, marginBottom: 8 }} />
+              <input value={form.room||""} onChange={e=>update("room",e.target.value)} placeholder="Room / stage (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                <input value={form.city} onChange={e=>update("city",e.target.value)} placeholder="City" style={inputStyle} />
+                <input value={form.country} onChange={e=>update("country",e.target.value)} placeholder="Country" style={inputStyle} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ color: "#c4c2f0", fontSize: 14 }}>
+                {concert.venue}{concert.room ? ` · ${concert.room}` : ""}
+              </div>
+              <div style={{ color: "#6b6a8f", fontSize: 12 }}>{concert.city}, {concert.country}</div>
+            </>
+          )}
         </div>
 
         {/* Support acts */}
-        {concert.support?.length > 0 && (
+        {(editing || concert.support?.length > 0) && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Support Acts</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {concert.support.map(s => <Badge key={s}>{s}</Badge>)}
-            </div>
+            <div style={labelStyle}>Support Acts</div>
+            {editing ? (
+              <>
+                {(form.support || []).length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                    {(form.support || []).map(s => (
+                      <span key={s} style={{ display:"flex", alignItems:"center", gap:4, background:"#1a1a30", border:"1px solid #2e2e50", borderRadius:99, padding:"3px 10px", fontSize:12, color:"#a78bfa" }}>
+                        {s}
+                        <button onClick={() => removeSupport(s)} style={{ background:"none", border:"none", color:"#6b6a8f", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display:"flex", gap:8 }}>
+                  <input value={supportInput} onChange={e=>setSupportInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex:1 }} />
+                  <button onClick={addSupport} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {concert.support.map(s => <Badge key={s}>{s}</Badge>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Venue Size */}
+        {(editing || concert.venueSize) && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={labelStyle}>Venue size</div>
+            {editing ? (
+              <div style={{ display:"flex", gap:6 }}>
+                {[{id:"small",label:"Club"},{id:"mid",label:"Mid-size"},{id:"arena",label:"Arena"}].map(vs => (
+                  <button key={vs.id} onClick={()=>update("venueSize",form.venueSize===vs.id?null:vs.id)} style={{
+                    flex:1, padding:"6px 8px", borderRadius:99, fontSize:12, cursor:"pointer",
+                    background: form.venueSize===vs.id ? "#a78bfa" : "#13131f",
+                    color: form.venueSize===vs.id ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${form.venueSize===vs.id ? "#a78bfa" : "#2e2e50"}`,
+                    fontWeight: form.venueSize===vs.id ? 700 : 400
+                  }}>{vs.label}</button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color:"#c4c2f0", fontSize:14 }}>
+                {concert.venueSize === "small" ? "Club" : concert.venueSize === "mid" ? "Mid-size" : concert.venueSize === "arena" ? "Arena" : concert.venueSize}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Genre */}
+        {(editing || concert.genre) && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={labelStyle}>Genre</div>
+            {editing ? (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {(settings.genres||[]).map(g => (
+                  <button key={g} onClick={()=>update("genre",form.genre===g?null:g)} style={{
+                    padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
+                    background: form.genre===g ? "#a78bfa" : "#13131f",
+                    color: form.genre===g ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${form.genre===g ? "#a78bfa" : "#2e2e50"}`,
+                    fontWeight: form.genre===g ? 700 : 400
+                  }}>{g}</button>
+                ))}
+              </div>
+            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.genre}</div>}
+          </div>
+        )}
+
+        {/* Language */}
+        {(editing || concert.language) && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={labelStyle}>Language</div>
+            {editing ? (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {(settings.languages||[]).map(l => (
+                  <button key={l} onClick={()=>update("language",form.language===l?null:l)} style={{
+                    padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
+                    background: form.language===l ? "#a78bfa" : "#13131f",
+                    color: form.language===l ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${form.language===l ? "#a78bfa" : "#2e2e50"}`,
+                    fontWeight: form.language===l ? 700 : 400
+                  }}>{l}</button>
+                ))}
+              </div>
+            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.language}</div>}
           </div>
         )}
 
@@ -257,37 +436,27 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }
               {allFriendChoices.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {allFriendChoices.map(name => (
-                    <button
-                      key={name}
-                      onClick={() => toggleFriend(name)}
-                      style={{
-                        padding: "4px 10px", borderRadius: 99, fontSize: 12, cursor: "pointer",
-                        background: form.friends.includes(name) ? "#a78bfa" : "#13131f",
-                        color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f",
-                        border: `1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`,
-                        fontWeight: form.friends.includes(name) ? 700 : 400
-                      }}
-                    >{name}</button>
+                    <button key={name} onClick={() => toggleFriend(name)} style={{
+                      padding: "4px 10px", borderRadius: 99, fontSize: 12, cursor: "pointer",
+                      background: form.friends.includes(name) ? "#a78bfa" : "#13131f",
+                      color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f",
+                      border: `1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`,
+                      fontWeight: form.friends.includes(name) ? 700 : 400
+                    }}>{name}</button>
                   ))}
                 </div>
               )}
               <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={friendInput}
-                  onChange={e => setFriendInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addCustomFriend()}
-                  placeholder="Add friend..."
-                  style={{
-                    flex: 1, background: "#13131f", border: "1px solid #2a4a3a",
-                    borderRadius: 8, color: "#c4c2f0", padding: "6px 10px",
-                    fontFamily: "'DM Mono', monospace", fontSize: 12
-                  }}
-                />
-                <button onClick={addCustomFriend} style={{
-                  background: "none", border: "1px solid #2a4a3a", borderRadius: 6,
-                  color: "#a78bfa", fontSize: 11, padding: "0 12px", cursor: "pointer"
-                }}>+</button>
+                <input value={friendInput} onChange={e=>setFriendInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomFriend()} placeholder="Add friend..." style={{ flex:1, background:"#13131f", border:"1px solid #2a4a3a", borderRadius:8, color:"#c4c2f0", padding:"6px 10px", fontFamily:"'DM Mono',monospace", fontSize:12 }} />
+                <button onClick={addCustomFriend} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
               </div>
+              <button onClick={()=>setForm(f=>({...f,solo:!f.solo,friends:[]}))} style={{
+                marginTop:8, padding:"5px 12px", borderRadius:99, fontSize:12, cursor:"pointer",
+                background: form.solo ? "#a78bfa" : "#13131f",
+                color: form.solo ? "#0c0c14" : "#6b6a8f",
+                border: `1px solid ${form.solo ? "#a78bfa" : "#2e2e50"}`,
+                fontWeight: form.solo ? 700 : 400
+              }}>solo</button>
             </div>
           ) : (
             <div style={{ color: "#c4c2f0", fontSize: 14 }}>
@@ -422,6 +591,27 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }
             <SetlistSection concert={concert} />
           </div>
         )}
+
+        {/* Delete */}
+        {onDelete && (
+          <div style={{ marginTop: 8, paddingTop: 20, borderTop: "1px solid #1a1a2e" }}>
+            {!deleteConfirm ? (
+              <button onClick={()=>setDeleteConfirm(true)} style={{
+                width:"100%", padding:"10px", borderRadius:8, fontSize:12, cursor:"pointer",
+                background:"none", border:"1px solid #2e2e50", color:"#4a4870",
+                fontFamily:"'DM Mono',monospace"
+              }}>Delete concert</button>
+            ) : (
+              <div style={{ background:"#1a0a0a", border:"1px solid #4a1a1a", borderRadius:8, padding:"14px" }}>
+                <div style={{ fontSize:13, color:"#f472b6", marginBottom:12 }}>Delete this concert? This can't be undone.</div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={()=>setDeleteConfirm(false)} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"none", border:"1px solid #2e2e50", color:"#6b6a8f", fontFamily:"'DM Mono',monospace" }}>Cancel</button>
+                  <button onClick={()=>{ onDelete(concert.id); onClose(); }} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"#f472b6", border:"none", color:"#0c0c14", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>Delete</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -529,17 +719,22 @@ function StatsView({ concerts, settings = {} }) {
   const sortedPast = [...past].sort((a,b) => a.date.localeCompare(b.date));
   const cumulative = sortedPast.map((c, i) => ({ date: c.date.slice(0,7), count: i+1, artist: c.artist }));
 
-  // Venue size buckets
-  const smallVenues = ["TivoliVredenburg", "Melkweg", "013", "De Oosterpoort", "P60", "Central Park Festival"];
-  const midVenues = ["AFAS Live", "Ziggo Dome", "Rotterdam Ahoy"];
-  const arenaVenues = ["Johan Cruijff ArenA", "Sportpaleis", "AFAS Dome"];
+  // Venue size buckets (field-based)
   const venueSizes = { "Club / Small": 0, "Mid-size": 0, "Arena": 0, "Festival": 0 };
   past.forEach(c => {
     if (c.type === "festival") venueSizes["Festival"]++;
-    else if (arenaVenues.some(v => c.venue.includes(v))) venueSizes["Arena"]++;
-    else if (midVenues.some(v => c.venue.includes(v))) venueSizes["Mid-size"]++;
+    else if (c.venueSize === "arena") venueSizes["Arena"]++;
+    else if (c.venueSize === "mid") venueSizes["Mid-size"]++;
     else venueSizes["Club / Small"]++;
   });
+
+  // Avg shows per year
+  const avgPerYear = years.length ? (past.length / years.length).toFixed(1) : null;
+
+  // Genre breakdown
+  const genreCount = {};
+  past.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+  const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]);
 
   // Ratings
   const rated = past.filter(c => c.rating);
@@ -648,6 +843,7 @@ function StatsView({ concerts, settings = {} }) {
         { id: "year-count", label: "📅 Shows per year" },
         { id: "months",     label: "📆 Busiest months" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
+        ...(topGenres.length > 0 ? [{ id: "genres", label: "🎸 Genres" }] : []),
       ]
     },
     {
@@ -976,6 +1172,14 @@ function StatsView({ concerts, settings = {} }) {
           }
         </div>
       );
+      case "genres": return (
+        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+          {topGenres.length === 0
+            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No genre data yet</div>
+            : <ListStat title="" items={topGenres} suffix="x" />
+          }
+        </div>
+      );
       default: return null;
     }
   };
@@ -999,16 +1203,17 @@ function StatsView({ concerts, settings = {} }) {
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0" }}>
 
-          {/* Row 1: shows / festivals / countries */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
+          {/* Row 1: shows / festivals / countries / avg per year */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
             {[
               { label: "shows", value: shows.length },
               { label: "festivals", value: festivals.length },
               { label: "countries", value: Object.keys(countryCount).length },
+              { label: "avg / year", value: avgPerYear ?? "—" },
             ].map(b => (
-              <div key={b.label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
+              <div key={b.label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 4px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
+                <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
               </div>
             ))}
           </div>
@@ -1016,7 +1221,7 @@ function StatsView({ concerts, settings = {} }) {
           {/* Row 2: total spend / avg ticket all time / avg ticket this year */}
           {(() => {
             const thisYear = String(new Date().getFullYear());
-            const allTickets = past.filter(c => c.ticketPrice);
+            const allTickets = concerts.filter(c => c.ticketPrice);
             const thisYearTickets = allTickets.filter(c => getYear(c.date) === thisYear);
             const avgAll = allTickets.length ? allTickets.reduce((s,c) => s + c.ticketPrice, 0) / allTickets.length : null;
             const avgThisYear = thisYearTickets.length ? thisYearTickets.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTickets.length : null;
@@ -1432,14 +1637,243 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
+function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
+  const [form, setForm] = useState({
+    artist: '', date: '', venue: '', room: '', city: '', country: '',
+    type: 'concert', tour: '', support: [], friends: [], solo: false,
+    rating: null, ticketPrice: null, merch: [], notes: '',
+    genre: null, language: null, venueSize: null
+  })
+  const [supportInput, setSupportInput] = useState('')
+  const [friendInput, setFriendInput] = useState('')
+  const [errors, setErrors] = useState({})
+
+  const update = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const toggleFriend = (name) => setForm(f => ({
+    ...f,
+    friends: f.friends.includes(name) ? f.friends.filter(x => x !== name) : [...f.friends, name],
+    solo: false
+  }))
+
+  const addCustomFriend = () => {
+    const name = friendInput.trim()
+    if (!name || form.friends.includes(name)) return
+    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }))
+    setFriendInput('')
+  }
+
+  const addSupport = () => {
+    const t = supportInput.trim()
+    if (!t || form.support.includes(t)) return
+    setForm(f => ({ ...f, support: [...f.support, t] }))
+    setSupportInput('')
+  }
+
+  const validate = () => {
+    const e = {}
+    if (!form.artist.trim()) e.artist = true
+    if (!form.date) e.date = true
+    if (!form.venue.trim()) e.venue = true
+    if (!form.city.trim()) e.city = true
+    if (!form.country.trim()) e.country = true
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSave = () => {
+    if (!validate()) return
+    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    onSave({ ...form, id })
+  }
+
+  const inputStyle = {
+    width: '100%', background: '#13131f', border: '1px solid #2a4a3a',
+    borderRadius: 8, color: '#c4c2f0', padding: '8px 12px',
+    fontFamily: "'DM Mono', monospace", fontSize: 13, boxSizing: 'border-box'
+  }
+  const errStyle = { ...inputStyle, border: '1px solid #f472b6' }
+  const fieldLabel = (text) => (
+    <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{text}</div>
+  )
+
+  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort()
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#0c0c14', overflowY: 'auto', zIndex: 100 }}>
+      <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', flex: 1 }}>Add concert</div>
+        <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+      </div>
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Type')}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ id: 'concert', label: '🎤 Concert' }, { id: 'festival', label: '🎪 Festival' }].map(t => (
+              <button key={t.id} onClick={() => update('type', t.id)} style={{
+                flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                background: form.type === t.id ? '#1a1a30' : '#13131f',
+                border: `1px solid ${form.type === t.id ? '#a78bfa' : '#2e2e50'}`,
+                color: form.type === t.id ? '#a78bfa' : '#6b6a8f',
+                fontWeight: form.type === t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif"
+              }}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Artist *')}
+          <input value={form.artist} onChange={e => update('artist', e.target.value)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Date *')}
+          <input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Venue *')}
+          <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+          <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div>
+            {fieldLabel('City *')}
+            <input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} />
+          </div>
+          <div>
+            {fieldLabel('Country *')}
+            <input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Tour')}
+          <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Venue size')}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[{id:'small',label:'Club'},{id:'mid',label:'Mid-size'},{id:'arena',label:'Arena'}].map(vs => (
+              <button key={vs.id} onClick={() => update('venueSize', form.venueSize===vs.id ? null : vs.id)} style={{
+                flex: 1, padding: '6px 8px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: form.venueSize===vs.id ? '#a78bfa' : '#13131f',
+                color: form.venueSize===vs.id ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${form.venueSize===vs.id ? '#a78bfa' : '#2e2e50'}`,
+                fontWeight: form.venueSize===vs.id ? 700 : 400
+              }}>{vs.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Support acts')}
+          {form.support.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+              {form.support.map(s => (
+                <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 99, padding: '3px 10px', fontSize: 12, color: '#a78bfa' }}>
+                  {s}
+                  <button onClick={() => setForm(f => ({ ...f, support: f.support.filter(x => x !== s) }))} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Went with')}
+          {allFriendChoices.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {allFriendChoices.map(name => (
+                <button key={name} onClick={() => toggleFriend(name)} style={{
+                  padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: form.friends.includes(name) ? '#a78bfa' : '#13131f',
+                  color: form.friends.includes(name) ? '#0c0c14' : '#6b6a8f',
+                  border: `1px solid ${form.friends.includes(name) ? '#a78bfa' : '#2e2e50'}`,
+                  fontWeight: form.friends.includes(name) ? 700 : 400
+                }}>{name}</button>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={friendInput} onChange={e => setFriendInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomFriend()} placeholder="Add friend..." style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={addCustomFriend} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
+          </div>
+          <button onClick={() => setForm(f => ({ ...f, solo: !f.solo, friends: [] }))} style={{
+            marginTop: 8, padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+            background: form.solo ? '#a78bfa' : '#13131f',
+            color: form.solo ? '#0c0c14' : '#6b6a8f',
+            border: `1px solid ${form.solo ? '#a78bfa' : '#2e2e50'}`,
+            fontWeight: form.solo ? 700 : 400
+          }}>solo</button>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Genre')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(settings.genres||[]).map(g => (
+              <button key={g} onClick={() => update('genre', form.genre===g ? null : g)} style={{
+                padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: form.genre===g ? '#a78bfa' : '#13131f',
+                color: form.genre===g ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${form.genre===g ? '#a78bfa' : '#2e2e50'}`,
+                fontWeight: form.genre===g ? 700 : 400
+              }}>{g}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Language')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(settings.languages||[]).map(l => (
+              <button key={l} onClick={() => update('language', form.language===l ? null : l)} style={{
+                padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: form.language===l ? '#a78bfa' : '#13131f',
+                color: form.language===l ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${form.language===l ? '#a78bfa' : '#2e2e50'}`,
+                fontWeight: form.language===l ? 700 : 400
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Ticket price')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#6b6a8f' }}>€</span>
+            <input type="number" value={form.ticketPrice || ''} placeholder="0.00" onChange={e => update('ticketPrice', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          {fieldLabel('Notes')}
+          <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSignOut, userEmail }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState(null);
   const [newCategory, setNewCategory] = useState("");
+  const [newGenre, setNewGenre] = useState("");
+  const [newLanguage, setNewLanguage] = useState("");
 
   const categories = settings.merchCategories || [];
+  const genres = settings.genres || [];
+  const languages = settings.languages || [];
 
   const addCategory = () => {
     const trimmed = newCategory.trim();
@@ -1450,6 +1884,38 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 
   const removeCategory = (cat) => {
     onUpdate("merchCategories", categories.filter(c => c !== cat));
+  };
+
+  const addGenre = () => {
+    const trimmed = newGenre.trim();
+    if (!trimmed || genres.map(g=>g.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    onUpdate("genres", [...genres, trimmed]);
+    setNewGenre("");
+  };
+
+  const removeGenre = (g) => onUpdate("genres", genres.filter(x => x !== g));
+
+  const addLanguage = () => {
+    const trimmed = newLanguage.trim();
+    if (!trimmed || languages.map(l=>l.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    onUpdate("languages", [...languages, trimmed]);
+    setNewLanguage("");
+  };
+
+  const removeLanguage = (l) => onUpdate("languages", languages.filter(x => x !== l));
+
+  const handleCsvExport = () => {
+    const headers = ['Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','Language','Rating','TicketPrice','Friends','Solo','Notes'];
+    const rows = concerts.map(c => [
+      c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
+      c.genre||'', c.language||'', c.rating||'', c.ticketPrice||'',
+      (c.friends||[]).join('; '), c.solo?'yes':'', (c.notes||'').replace(/\n/g,' ')
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='settracker.csv'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleExport = async () => {
@@ -1599,11 +2065,53 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         </div>
       </div>
 
+      {/* Genres */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Genres</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {genres.map(g => (
+            <div key={g} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
+              {g}
+              <button onClick={() => removeGenre(g)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newGenre} onChange={e => setNewGenre(e.target.value)} onKeyDown={e => e.key === "Enter" && addGenre()} placeholder="Add genre..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
+          <button onClick={addGenre} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
+        </div>
+      </div>
+
+      {/* Languages */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Languages</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {languages.map(l => (
+            <div key={l} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
+              {l}
+              <button onClick={() => removeLanguage(l)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newLanguage} onChange={e => setNewLanguage(e.target.value)} onKeyDown={e => e.key === "Enter" && addLanguage()} placeholder="Add language..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
+          <button onClick={addLanguage} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
+        </div>
+      </div>
+
       {/* Data backup */}
       <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Data backup</div>
       <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 20 }}>
         <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12, lineHeight: 1.5 }}>
           Export your full concert database including ratings, merch, and notes. Save this JSON somewhere safe — you can use it to restore your data later.
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button onClick={handleCsvExport} style={{
+            flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
+            background: "none", border: "1px solid #2e2e50", color: "#c4c2f0",
+            fontFamily: "'DM Sans', sans-serif", fontWeight: 600
+          }}>Export CSV</button>
         </div>
 
         {!exportData ? (
@@ -1690,198 +2198,29 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   );
 }
 
-function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
-  const [form, setForm] = useState({
-    artist: '', date: '', venue: '', room: '', city: '', country: '',
-    type: 'concert', tour: '', support: [], friends: [], solo: false,
-    rating: null, ticketPrice: null, merch: [], notes: ''
-  })
-  const [supportInput, setSupportInput] = useState('')
-  const [friendInput, setFriendInput] = useState('')
-  const [errors, setErrors] = useState({})
-
-  const update = (key, val) => setForm(f => ({ ...f, [key]: val }))
-
-  const toggleFriend = (name) => setForm(f => ({
-    ...f,
-    friends: f.friends.includes(name) ? f.friends.filter(x => x !== name) : [...f.friends, name],
-    solo: false
-  }))
-
-  const addCustomFriend = () => {
-    const name = friendInput.trim()
-    if (!name || form.friends.includes(name)) return
-    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }))
-    setFriendInput('')
-  }
-
-  const addSupport = () => {
-    const t = supportInput.trim()
-    if (!t || form.support.includes(t)) return
-    setForm(f => ({ ...f, support: [...f.support, t] }))
-    setSupportInput('')
-  }
-
-  const validate = () => {
-    const e = {}
-    if (!form.artist.trim()) e.artist = true
-    if (!form.date) e.date = true
-    if (!form.venue.trim()) e.venue = true
-    if (!form.city.trim()) e.city = true
-    if (!form.country.trim()) e.country = true
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
-
-  const handleSave = () => {
-    if (!validate()) return
-    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    onSave({ ...form, id })
-  }
-
-  const inputStyle = {
-    width: '100%', background: '#13131f', border: '1px solid #2a4a3a',
-    borderRadius: 8, color: '#c4c2f0', padding: '8px 12px',
-    fontFamily: "'DM Mono', monospace", fontSize: 13, boxSizing: 'border-box'
-  }
-  const errStyle = { ...inputStyle, border: '1px solid #f472b6' }
-  const fieldLabel = (text) => (
-    <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{text}</div>
-  )
-
-  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort()
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0c0c14', overflowY: 'auto', zIndex: 100 }}>
-      <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', flex: 1 }}>Add concert</div>
-        <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
-      </div>
-      <div style={{ padding: '20px' }}>
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Type')}
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[{ id: 'concert', label: '🎤 Concert' }, { id: 'festival', label: '🎪 Festival' }].map(t => (
-              <button key={t.id} onClick={() => update('type', t.id)} style={{
-                flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                background: form.type === t.id ? '#1a1a30' : '#13131f',
-                border: `1px solid ${form.type === t.id ? '#a78bfa' : '#2e2e50'}`,
-                color: form.type === t.id ? '#a78bfa' : '#6b6a8f',
-                fontWeight: form.type === t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif"
-              }}>{t.label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Artist *')}
-          <input value={form.artist} onChange={e => update('artist', e.target.value)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Date *')}
-          <input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Venue *')}
-          <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
-          <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={inputStyle} />
-        </div>
-
-        <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div>
-            {fieldLabel('City *')}
-            <input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} />
-          </div>
-          <div>
-            {fieldLabel('Country *')}
-            <input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Tour')}
-          <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Support acts')}
-          {form.support.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
-              {form.support.map(s => (
-                <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 99, padding: '3px 10px', fontSize: 12, color: '#a78bfa' }}>
-                  {s}
-                  <button onClick={() => setForm(f => ({ ...f, support: f.support.filter(x => x !== s) }))} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} />
-            <button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Went with')}
-          {allFriendChoices.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-              {allFriendChoices.map(name => (
-                <button key={name} onClick={() => toggleFriend(name)} style={{
-                  padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-                  background: form.friends.includes(name) ? '#a78bfa' : '#13131f',
-                  color: form.friends.includes(name) ? '#0c0c14' : '#6b6a8f',
-                  border: `1px solid ${form.friends.includes(name) ? '#a78bfa' : '#2e2e50'}`,
-                  fontWeight: form.friends.includes(name) ? 700 : 400
-                }}>{name}</button>
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={friendInput} onChange={e => setFriendInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomFriend()} placeholder="Add friend..." style={{ ...inputStyle, flex: 1 }} />
-            <button onClick={addCustomFriend} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          {fieldLabel('Ticket price')}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#6b6a8f' }}>€</span>
-            <input type="number" value={form.ticketPrice || ''} placeholder="0.00" onChange={e => update('ticketPrice', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          {fieldLabel('Notes')}
-          <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ============================================================
 // MAIN APP
 // ============================================================
 
-export default function ConcertTracker({ concerts, settings, onSaveConcert, onUpdateSetting, onSignOut, userEmail }) {
+export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onSignOut, userEmail }) {
   const today = new Date()
   const isPastDate = (dateStr) => new Date(dateStr + 'T00:00:00') <= today
 
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [selected, setSelected] = useState(null)
+  const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
   const [filterYear, setFilterYear] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [filterFriend, setFilterFriend] = useState('all')
   const [filterVenue, setFilterVenue] = useState('all')
+  const [filterRating, setFilterRating] = useState(0)
+  const [filterSolo, setFilterSolo] = useState(false)
+  const [filterGenre, setFilterGenre] = useState('all')
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
-  const [showAdd, setShowAdd] = useState(false)
 
   const allFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
 
@@ -1900,7 +2239,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
 
   const activeFilterCount = [
     filterYear !== 'all', filterType !== 'all',
-    filterFriend !== 'all', filterVenue !== 'all', sortOrder !== 'newest'
+    filterFriend !== 'all', filterVenue !== 'all', sortOrder !== 'newest',
+    filterRating !== 0, filterSolo, filterGenre !== 'all'
   ].filter(Boolean).length
 
   const filtered = concerts.filter(c => {
@@ -1909,6 +2249,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
     if (filterType === 'festivals' && c.type !== 'festival') return false
     if (filterFriend !== 'all' && !c.friends.includes(filterFriend)) return false
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
+    if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
+    if (filterSolo && !(c.friends.length === 0 || c.solo)) return false
+    if (filterGenre !== 'all' && c.genre !== filterGenre) return false
     if (search) {
       const q = search.toLowerCase()
       return c.artist.toLowerCase().includes(q) ||
@@ -1967,7 +2310,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
 
   if (selected) return (
     <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} />
+      <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} />
     </div>
   )
 
@@ -2060,6 +2403,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
             </div>
             {filterFriend !== 'all' && <button onClick={() => setFilterFriend('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#f472b6', border: '1px solid #f472b6', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterFriend} ×</button>}
             {filterVenue !== 'all' && <button onClick={() => setFilterVenue('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#38bdf8', border: '1px solid #38bdf8', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterVenue} ×</button>}
+            {filterRating !== 0 && <button onClick={() => setFilterRating(0)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace" }}>{'★'.repeat(filterRating)}+ ×</button>}
+            {filterSolo && <button onClick={() => setFilterSolo(false)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace" }}>solo ×</button>}
+            {filterGenre !== 'all' && <button onClick={() => setFilterGenre('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace" }}>{filterGenre} ×</button>}
             {sortOrder !== 'newest' && <button onClick={() => setSortOrder('newest')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace" }}>↕ {sortOrder} ×</button>}
           </div>
         )}
@@ -2083,7 +2429,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Venue</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 <button onClick={() => setFilterVenue('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterVenue === 'all' ? '#38bdf8' : '#0c0c14', color: filterVenue === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterVenue === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
@@ -2092,8 +2438,32 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
                 ))}
               </div>
             </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Rating</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                <button onClick={() => setFilterRating(0)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === 0 ? '#a78bfa' : '#0c0c14', color: filterRating === 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === 0 ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Any</button>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{'★'.repeat(n)}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Solo only</div>
+              <button onClick={() => setFilterSolo(s => !s)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSolo ? '#a78bfa' : '#0c0c14', color: filterSolo ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSolo ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Solo</button>
+            </div>
+            {(settings.genres||[]).length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  <button onClick={() => setFilterGenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === 'all' ? '#a78bfa' : '#0c0c14', color: filterGenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {(settings.genres||[]).map(g => (
+                    <button key={g} onClick={() => setFilterGenre(filterGenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === g ? '#a78bfa' : '#0c0c14', color: filterGenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === g ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             {activeFilterCount > 0 && (
-              <button onClick={() => { setFilterYear('all'); setFilterType('all'); setFilterFriend('all'); setFilterVenue('all'); setSortOrder('newest'); setSearch('') }} style={{ width: '100%', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'none', border: '1px solid #2e2e50', color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>Reset all filters</button>
+              <button onClick={() => { setFilterYear('all'); setFilterType('all'); setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setSortOrder('newest'); setSearch('') }} style={{ width: '100%', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'none', border: '1px solid #2e2e50', color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>Reset all filters</button>
             )}
           </div>
         )}

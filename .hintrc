@@ -1,0 +1,6 @@
+{
+  "extends": ["development"],
+  "hints": {
+    "compat-api/html": "off"
+  }
+}

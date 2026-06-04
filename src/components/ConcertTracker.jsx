@@ -2010,16 +2010,68 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     try {
       const parsed = JSON.parse(importText);
       if (!Array.isArray(parsed)) throw new Error("not array");
-      // Save each concert via onSaveConcert
-      for (const concert of parsed) {
-        await onSaveConcert(concert);
-      }
+      for (const concert of parsed) await onSaveConcert(concert);
       setImportStatus("success");
       setImportText("");
       setTimeout(() => { setImportStatus(null); window.location.reload(); }, 1500);
     } catch (e) {
       setImportStatus("error");
     }
+  };
+
+  const parseCSV = (text) => {
+    const parseRow = (line) => {
+      const fields = []; let cur = ''; let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+        else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
+        else cur += ch;
+      }
+      fields.push(cur); return fields;
+    };
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const headers = parseRow(lines[0]);
+    return lines.slice(1).map(line => {
+      const vals = parseRow(line);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+      return {
+        id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        date: obj.Date, artist: obj.Artist, venue: obj.Venue, room: obj.Room || null,
+        city: obj.City, country: obj.Country, type: obj.Type || 'concert',
+        tour: obj.Tour || null, genre: obj.Genre || null, language: obj.Language || null,
+        rating: obj.Rating ? parseInt(obj.Rating) : null,
+        ticketPrice: obj.TicketPrice ? parseFloat(obj.TicketPrice) : null,
+        friends: obj.Friends ? obj.Friends.split('; ').filter(Boolean) : [],
+        solo: obj.Solo === 'yes', notes: obj.Notes || null, merch: [], support: [],
+      };
+    });
+  };
+
+  const handleFileImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        let concerts;
+        if (file.name.endsWith('.csv')) {
+          concerts = parseCSV(ev.target.result);
+        } else {
+          concerts = JSON.parse(ev.target.result);
+          if (!Array.isArray(concerts)) throw new Error();
+        }
+        for (const c of concerts) await onSaveConcert(c);
+        setImportStatus("success");
+        setTimeout(() => { setImportStatus(null); window.location.reload(); }, 1500);
+      } catch {
+        setImportStatus("error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const Row = ({ label, sub, children }) => (
@@ -2176,11 +2228,19 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
             </div>
           )}
           <div style={{ borderTop: "1px solid #1a1a2e", paddingTop: 14 }}>
-            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>Restore from backup</div>
-            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste JSON backup here..." rows={3} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
-            {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8 }}>Invalid JSON — check your backup and try again</div>}
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
             {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Restored! Reloading...</div>}
-            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore data</button>
+            {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8 }}>Could not read file — make sure it's a valid export</div>}
+            {/* File pickers */}
+            <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
+            <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Select JSON file</button>
+              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Select CSV file</button>
+            </div>
+            {/* Paste fallback */}
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
           </div>
         </div>
       </Collapsible>

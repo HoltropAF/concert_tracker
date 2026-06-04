@@ -53,8 +53,15 @@ export function useConcerts(userId) {
     }
 
     if (!data || data.length === 0) {
-      // First login — seed from built-in data
-      await seedConcerts(userId)
+      // First login — seed from built-in data if any
+      if (SEED_DATA.length > 0) await seedConcerts(userId)
+      setLoaded(true)
+      return
+    }
+
+    if (SEED_DATA.length === 0) {
+      // No hardcoded seed — concerts are self-contained in DB
+      setConcerts(data.map(r => r.data).sort((a, b) => b.date.localeCompare(a.date)))
     } else {
       // Merge: seed is source of truth for base fields, DB wins for user edits
       const userFields = ['rating', 'merch', 'notes', 'friends', 'solo']
@@ -81,7 +88,10 @@ export function useConcerts(userId) {
   }
 
   const saveConcert = useCallback(async (concert) => {
-    setConcerts(prev => prev.map(c => c.id === concert.id ? concert : c))
+    setConcerts(prev => {
+      const exists = prev.some(c => c.id === concert.id)
+      return exists ? prev.map(c => c.id === concert.id ? concert : c) : [...prev, concert]
+    })
     await supabase
       .from('concerts')
       .upsert({ id: concert.id, user_id: userId, data: concert, updated_at: new Date().toISOString() })

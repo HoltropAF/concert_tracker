@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FRIENDS } from '../lib/data'
 
 // ============================================================
 // HELPERS
@@ -101,30 +100,7 @@ function ConcertCard({ concert, onOpen }) {
 }
 
 function SetlistSection({ concert }) {
-  const [setlist, setSetlist] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const fetchSetlist = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const query = encodeURIComponent(`${concert.artist} ${concert.venue} ${concert.date.slice(0,10)}`);
-      const dateFormatted = concert.date.replace(/-/g, "");
-      const res = await fetch(
-        `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(concert.artist)}&date=${concert.date.split("-").reverse().join("-")}`,
-        { headers: { "x-api-key": "undefined", Accept: "application/json" } }
-      );
-      // setlist.fm requires an API key — we'll link to it instead
-      throw new Error("API_KEY_NEEDED");
-    } catch (e) {
-      setError("api_key");
-    }
-    setLoading(false);
-  };
-
   const setlistUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
-
   return (
     <div>
       <a
@@ -144,10 +120,11 @@ function SetlistSection({ concert }) {
   );
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [] }) {
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ ...concert });
+  const [friendInput, setFriendInput] = useState('');
 
   const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
@@ -177,6 +154,15 @@ function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
   const removeMerch = (idx) => {
     setForm(f => ({ ...f, merch: (f.merch || []).filter((_, i) => i !== idx) }));
   };
+
+  const addCustomFriend = () => {
+    const name = friendInput.trim();
+    if (!name || form.friends.includes(name)) return;
+    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }));
+    setFriendInput('');
+  };
+
+  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
 
   const isFestival = concert.type === "festival";
   const past = isPast(concert.date);
@@ -267,20 +253,41 @@ function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
             Went with
           </div>
           {editing ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {FRIENDS.map(name => (
-                <button
-                  key={name}
-                  onClick={() => toggleFriend(name)}
+            <div>
+              {allFriendChoices.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                  {allFriendChoices.map(name => (
+                    <button
+                      key={name}
+                      onClick={() => toggleFriend(name)}
+                      style={{
+                        padding: "4px 10px", borderRadius: 99, fontSize: 12, cursor: "pointer",
+                        background: form.friends.includes(name) ? "#a78bfa" : "#13131f",
+                        color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f",
+                        border: `1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`,
+                        fontWeight: form.friends.includes(name) ? 700 : 400
+                      }}
+                    >{name}</button>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={friendInput}
+                  onChange={e => setFriendInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addCustomFriend()}
+                  placeholder="Add friend..."
                   style={{
-                    padding: "4px 10px", borderRadius: 99, fontSize: 12, cursor: "pointer",
-                    background: form.friends.includes(name) ? "#a78bfa" : "#13131f",
-                    color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f",
-                    border: `1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`,
-                    fontWeight: form.friends.includes(name) ? 700 : 400
+                    flex: 1, background: "#13131f", border: "1px solid #2a4a3a",
+                    borderRadius: 8, color: "#c4c2f0", padding: "6px 10px",
+                    fontFamily: "'DM Mono', monospace", fontSize: 12
                   }}
-                >{name}</button>
-              ))}
+                />
+                <button onClick={addCustomFriend} style={{
+                  background: "none", border: "1px solid #2a4a3a", borderRadius: 6,
+                  color: "#a78bfa", fontSize: 11, padding: "0 12px", cursor: "pointer"
+                }}>+</button>
+              </div>
             </div>
           ) : (
             <div style={{ color: "#c4c2f0", fontSize: 14 }}>
@@ -1009,7 +1016,7 @@ function StatsView({ concerts, settings = {} }) {
           {/* Row 2: total spend / avg ticket all time / avg ticket this year */}
           {(() => {
             const thisYear = String(new Date().getFullYear());
-            const allTickets = concerts.filter(c => c.ticketPrice);
+            const allTickets = past.filter(c => c.ticketPrice);
             const thisYearTickets = allTickets.filter(c => getYear(c.date) === thisYear);
             const avgAll = allTickets.length ? allTickets.reduce((s,c) => s + c.ticketPrice, 0) / allTickets.length : null;
             const avgThisYear = thisYearTickets.length ? thisYearTickets.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTickets.length : null;
@@ -1240,12 +1247,10 @@ function StatsView({ concerts, settings = {} }) {
 function FriendsView({ concerts }) {
   const past = concerts.filter(c => isPast(c.date));
 
+  const allFriends = [...new Set(past.flatMap(c => c.friends))].sort();
   const friendStats = {};
-  FRIENDS.forEach(f => {
-    const together = past.filter(c => c.friends.includes(f));
-    if (together.length > 0) {
-      friendStats[f] = together;
-    }
+  allFriends.forEach(f => {
+    friendStats[f] = past.filter(c => c.friends.includes(f));
   });
 
   const sorted = Object.entries(friendStats).sort((a,b) => b[1].length - a[1].length);
@@ -1685,6 +1690,178 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   );
 }
 
+function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
+  const [form, setForm] = useState({
+    artist: '', date: '', venue: '', room: '', city: '', country: '',
+    type: 'concert', tour: '', support: [], friends: [], solo: false,
+    rating: null, ticketPrice: null, merch: [], notes: ''
+  })
+  const [supportInput, setSupportInput] = useState('')
+  const [friendInput, setFriendInput] = useState('')
+  const [errors, setErrors] = useState({})
+
+  const update = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const toggleFriend = (name) => setForm(f => ({
+    ...f,
+    friends: f.friends.includes(name) ? f.friends.filter(x => x !== name) : [...f.friends, name],
+    solo: false
+  }))
+
+  const addCustomFriend = () => {
+    const name = friendInput.trim()
+    if (!name || form.friends.includes(name)) return
+    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }))
+    setFriendInput('')
+  }
+
+  const addSupport = () => {
+    const t = supportInput.trim()
+    if (!t || form.support.includes(t)) return
+    setForm(f => ({ ...f, support: [...f.support, t] }))
+    setSupportInput('')
+  }
+
+  const validate = () => {
+    const e = {}
+    if (!form.artist.trim()) e.artist = true
+    if (!form.date) e.date = true
+    if (!form.venue.trim()) e.venue = true
+    if (!form.city.trim()) e.city = true
+    if (!form.country.trim()) e.country = true
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSave = () => {
+    if (!validate()) return
+    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    onSave({ ...form, id })
+  }
+
+  const inputStyle = {
+    width: '100%', background: '#13131f', border: '1px solid #2a4a3a',
+    borderRadius: 8, color: '#c4c2f0', padding: '8px 12px',
+    fontFamily: "'DM Mono', monospace", fontSize: 13, boxSizing: 'border-box'
+  }
+  const errStyle = { ...inputStyle, border: '1px solid #f472b6' }
+  const fieldLabel = (text) => (
+    <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{text}</div>
+  )
+
+  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort()
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#0c0c14', overflowY: 'auto', zIndex: 100 }}>
+      <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', flex: 1 }}>Add concert</div>
+        <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+      </div>
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Type')}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ id: 'concert', label: '🎤 Concert' }, { id: 'festival', label: '🎪 Festival' }].map(t => (
+              <button key={t.id} onClick={() => update('type', t.id)} style={{
+                flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                background: form.type === t.id ? '#1a1a30' : '#13131f',
+                border: `1px solid ${form.type === t.id ? '#a78bfa' : '#2e2e50'}`,
+                color: form.type === t.id ? '#a78bfa' : '#6b6a8f',
+                fontWeight: form.type === t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif"
+              }}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Artist *')}
+          <input value={form.artist} onChange={e => update('artist', e.target.value)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Date *')}
+          <input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Venue *')}
+          <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+          <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div>
+            {fieldLabel('City *')}
+            <input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} />
+          </div>
+          <div>
+            {fieldLabel('Country *')}
+            <input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Tour')}
+          <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Support acts')}
+          {form.support.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+              {form.support.map(s => (
+                <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 99, padding: '3px 10px', fontSize: 12, color: '#a78bfa' }}>
+                  {s}
+                  <button onClick={() => setForm(f => ({ ...f, support: f.support.filter(x => x !== s) }))} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Went with')}
+          {allFriendChoices.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {allFriendChoices.map(name => (
+                <button key={name} onClick={() => toggleFriend(name)} style={{
+                  padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: form.friends.includes(name) ? '#a78bfa' : '#13131f',
+                  color: form.friends.includes(name) ? '#0c0c14' : '#6b6a8f',
+                  border: `1px solid ${form.friends.includes(name) ? '#a78bfa' : '#2e2e50'}`,
+                  fontWeight: form.friends.includes(name) ? 700 : 400
+                }}>{name}</button>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={friendInput} onChange={e => setFriendInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomFriend()} placeholder="Add friend..." style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={addCustomFriend} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Ticket price')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#6b6a8f' }}>€</span>
+            <input type="number" value={form.ticketPrice || ''} placeholder="0.00" onChange={e => update('ticketPrice', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          {fieldLabel('Notes')}
+          <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ============================================================
 // MAIN APP
 // ============================================================
@@ -1704,6 +1881,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
+  const [showAdd, setShowAdd] = useState(false)
+
+  const allFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
 
   const handleSave = (updated) => {
     onSaveConcert(updated)
@@ -1774,9 +1954,20 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
     }}>{children}</button>
   )
 
+  if (showAdd) return (
+    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <AddConcertForm
+        onSave={c => { onSaveConcert(c); setShowAdd(false); setSelected(c) }}
+        onClose={() => setShowAdd(false)}
+        settings={settings}
+        friends={allFriends}
+      />
+    </div>
+  )
+
   if (selected) return (
     <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} />
+      <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} />
     </div>
   )
 
@@ -1793,21 +1984,28 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
             </div>
           </div>
           {view === 'home' && (
-            <button onClick={() => setShowFilters(f => !f)} style={{
-              position: 'relative', background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
-              border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
-              borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
-              color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 13
-            }}>
-              ⚙
-              {activeFilterCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: -4, right: -4, background: '#a78bfa',
-                  color: '#0c0c14', borderRadius: 99, fontSize: 9, fontWeight: 800,
-                  width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>{activeFilterCount}</span>
-              )}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowAdd(true)} style={{
+                background: '#1a1a30', border: '1px solid #a78bfa',
+                borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+                color: '#a78bfa', fontSize: 18, lineHeight: 1, fontWeight: 300
+              }}>+</button>
+              <button onClick={() => setShowFilters(f => !f)} style={{
+                position: 'relative', background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
+                border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
+                borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
+                color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 13
+              }}>
+                ⚙
+                {activeFilterCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4, background: '#a78bfa',
+                    color: '#0c0c14', borderRadius: 99, fontSize: 9, fontWeight: 800,
+                    width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>{activeFilterCount}</span>
+                )}
+              </button>
+            </div>
           )}
         </div>
 

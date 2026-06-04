@@ -797,29 +797,31 @@ function StatsView({ concerts, settings = {} }) {
   );
 
   // Donut chart (SVG)
-  const Donut = ({ segments, size = 120 }) => {
+  const Donut = ({ segments, size = 120, label = "total" }) => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total === 0) return null;
-    const cx = size/2, cy = size/2, r = size*0.38, stroke = size*0.14;
+    const cx = size / 2, cy = size / 2;
+    const r = size * 0.36, stroke = size * 0.15;
+    const GAP = segments.length > 1 ? 3 : 0;
     let angle = -90;
     const arcs = segments.map(seg => {
       const pct = seg.value / total;
-      const start = angle;
+      const segDeg = pct * 360 - GAP;
+      const s = ((angle + GAP / 2) * Math.PI) / 180;
+      const e = ((angle + GAP / 2 + Math.max(0.1, segDeg)) * Math.PI) / 180;
       angle += pct * 360;
-      const startRad = (start * Math.PI) / 180;
-      const endRad = ((angle-0.5) * Math.PI) / 180;
-      const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
-      const x2 = cx + r * Math.cos(endRad),   y2 = cy + r * Math.sin(endRad);
-      const large = pct > 0.5 ? 1 : 0;
-      return { ...seg, d: `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`, pct };
+      const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
+      const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
+      return { ...seg, pct, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
     });
     return (
       <svg width={size} height={size}>
-        {arcs.map((a, i) => (
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0d0d1a" strokeWidth={stroke} />
+        {arcs.map((a, i) => a.d && (
           <path key={i} d={a.d} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="butt" />
         ))}
-        <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.13} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
-        <text x={cx} y={cy+size*0.14} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.09} fontFamily="'DM Mono',monospace">total</text>
+        <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size * 0.15} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
+        <text x={cx} y={cy + size * 0.16} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size * 0.09} fontFamily="'DM Mono',monospace">{label}</text>
       </svg>
     );
   };
@@ -1249,7 +1251,7 @@ function StatsView({ concerts, settings = {} }) {
               const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
-              const W = 300, H = 80;
+              const W = 300, H = 90;
               const firstMs = new Date(allSorted[0].date).getTime();
               // extend x-axis to last upcoming show
               const lastMs = new Date(allSorted[n-1].date).getTime();
@@ -1286,6 +1288,10 @@ function StatsView({ concerts, settings = {} }) {
                 y, x: Math.max(8, Math.min(W-16, ((new Date(`${y}-01-01`).getTime() - firstMs) / rangeMs) * (W-6) + 3))
               }));
 
+              const yTickStep = Math.max(5, Math.round(Math.ceil(n / 4) / 5) * 5);
+              const yTicks = [];
+              for (let v = yTickStep; v < n; v += yTickStep) yTicks.push(v);
+
               return (
                 <svg width="100%" viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
                   <defs>
@@ -1294,6 +1300,16 @@ function StatsView({ concerts, settings = {} }) {
                       <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
                     </linearGradient>
                   </defs>
+                  {/* Y-axis grid lines + labels */}
+                  {yTicks.map(v => {
+                    const yp = H - 6 - (v / n) * (H - 14);
+                    return (
+                      <g key={v}>
+                        <line x1={0} y1={yp} x2={W} y2={yp} stroke="#1a1a2e" strokeWidth="1" strokeDasharray="2,4" />
+                        <text x={2} y={yp - 2} fill="#2e2e50" fontSize="7" fontFamily="DM Mono,monospace">{v}</text>
+                      </g>
+                    );
+                  })}
                   {yearLabels.map(({y, x}) => (
                     <g key={y}>
                       <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
@@ -1318,50 +1334,59 @@ function StatsView({ concerts, settings = {} }) {
           </div>
 
           {/* Two donuts side by side */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-            {/* Solo vs friends */}
-            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Solo vs friends</div>
-              <Donut segments={[
-                { value: withFriends.length, color: "#a78bfa" },
-                { value: solo.length, color: "#2e2e4a" },
-              ]} size={90} />
-              <div style={{ marginTop: 10, width: "100%" }}>
-                {[{ label: "w. friends", value: withFriends.length, color: "#a78bfa" }, { label: "solo", value: solo.length, color: "#4a4870" }].map(s => (
-                  <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, color: "#c4c2f0", flex: 1, fontFamily: "'DM Sans', sans-serif" }}>{s.label}</span>
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{s.value}</span>
-                  </div>
-                ))}
+          {(() => {
+            const GENRE_COLORS = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee"];
+            const genreCount = {};
+            past.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+            const genreEntries = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0, 6);
+            const hasGenres = genreEntries.length > 0;
+            const donutLegendRow = (color, label, value, total) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                <div style={{ width: 6, height: 6, borderRadius: 1, background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 9, color: "#c4c2f0", flex: 1, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+                <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{Math.round(value/Math.max(total,1)*100)}%</span>
               </div>
-            </div>
+            );
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                {/* Genres (or solo/friends fallback) */}
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>{hasGenres ? "Genre" : "Solo vs friends"}</div>
+                  <Donut size={90} label="shows" segments={hasGenres
+                    ? genreEntries.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))
+                    : [{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#2e2e4a" }]
+                  } />
+                  <div style={{ marginTop: 10, width: "100%" }}>
+                    {hasGenres
+                      ? genreEntries.map(([g, n], i) => donutLegendRow(GENRE_COLORS[i % GENRE_COLORS.length], g, n, past.length))
+                      : [{ label: "w. friends", value: withFriends.length, color: "#a78bfa" }, { label: "solo", value: solo.length, color: "#2e2e4a" }]
+                          .map(s => donutLegendRow(s.color, s.label, s.value, past.length))
+                    }
+                  </div>
+                </div>
 
-            {/* Venue size */}
-            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Venue size</div>
-              <Donut segments={[
-                { value: venueSizes["Arena"], color: "#a78bfa" },
-                { value: venueSizes["Mid-size"], color: "#f472b6" },
-                { value: venueSizes["Club / Small"], color: "#38bdf8" },
-                { value: venueSizes["Festival"], color: "#2e2e4a" },
-              ].filter(s => s.value > 0)} size={90} />
-              <div style={{ marginTop: 10, width: "100%" }}>
-                {[
-                  { label: "arena", color: "#a78bfa", key: "Arena" },
-                  { label: "mid-size", color: "#f472b6", key: "Mid-size" },
-                  { label: "club", color: "#38bdf8", key: "Club / Small" },
-                  { label: "festival", color: "#4a4870", key: "Festival" },
-                ].filter(s => venueSizes[s.key] > 0).map(s => (
-                  <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, color: "#c4c2f0", flex: 1, fontFamily: "'DM Sans', sans-serif" }}>{s.label}</span>
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{venueSizes[s.key]}</span>
+                {/* Venue size */}
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Venue size</div>
+                  <Donut size={90} label="shows" segments={[
+                    { value: venueSizes["Arena"], color: "#a78bfa" },
+                    { value: venueSizes["Mid-size"], color: "#f472b6" },
+                    { value: venueSizes["Club / Small"], color: "#38bdf8" },
+                    { value: venueSizes["Festival"], color: "#2e2e4a" },
+                  ].filter(s => s.value > 0)} />
+                  <div style={{ marginTop: 10, width: "100%" }}>
+                    {[
+                      { label: "arena", color: "#a78bfa", key: "Arena" },
+                      { label: "mid-size", color: "#f472b6", key: "Mid-size" },
+                      { label: "club", color: "#38bdf8", key: "Club / Small" },
+                      { label: "festival", color: "#2e2e4a", key: "Festival" },
+                    ].filter(s => venueSizes[s.key] > 0)
+                      .map(s => donutLegendRow(s.color, s.label, venueSizes[s.key], past.length))}
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Countdown — next 3 upcoming shows */}
           {(() => {

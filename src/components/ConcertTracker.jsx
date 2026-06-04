@@ -100,44 +100,24 @@ function ConcertCard({ concert, onOpen }) {
 }
 
 function SetlistSection({ concert }) {
-  const [setlist, setSetlist] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const fetchSetlist = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const query = encodeURIComponent(`${concert.artist} ${concert.venue} ${concert.date.slice(0,10)}`);
-      const dateFormatted = concert.date.replace(/-/g, "");
-      const res = await fetch(
-        `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(concert.artist)}&date=${concert.date.split("-").reverse().join("-")}`,
-        { headers: { "x-api-key": "undefined", Accept: "application/json" } }
-      );
-      // setlist.fm requires an API key — we'll link to it instead
-      throw new Error("API_KEY_NEEDED");
-    } catch (e) {
-      setError("api_key");
-    }
-    setLoading(false);
-  };
-
-  const setlistUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
-
+  const searchUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
+  const isSpotify = concert.setlistUrl?.includes("spotify");
+  const linkStyle = (primary) => ({
+    display: "inline-flex", alignItems: "center", gap: 6,
+    padding: "8px 14px", borderRadius: 8, fontSize: 12,
+    background: "#13131f", border: `1px solid ${primary ? "#2a4a3a" : "#1f1f35"}`,
+    color: primary ? "#a78bfa" : "#4a4870", textDecoration: "none",
+    fontFamily: "'DM Mono', monospace"
+  });
   return (
-    <div>
-      <a
-        href={setlistUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "8px 14px", borderRadius: 8, fontSize: 12,
-          background: "#13131f", border: "1px solid #2a4a3a",
-          color: "#a78bfa", textDecoration: "none", fontFamily: "'DM Mono', monospace"
-        }}
-      >
-        🎵 View on setlist.fm ↗
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {concert.setlistUrl && (
+        <a href={concert.setlistUrl} target="_blank" rel="noopener noreferrer" style={linkStyle(true)}>
+          {isSpotify ? "🎧 Spotify playlist ↗" : "🎵 Setlist ↗"}
+        </a>
+      )}
+      <a href={searchUrl} target="_blank" rel="noopener noreferrer" style={linkStyle(!concert.setlistUrl)}>
+        🔍 Search on setlist.fm ↗
       </a>
     </div>
   );
@@ -588,7 +568,16 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         {past && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Setlist</div>
-            <SetlistSection concert={concert} />
+            {editing ? (
+              <input
+                value={form.setlistUrl || ""}
+                onChange={e => update("setlistUrl", e.target.value)}
+                placeholder="Paste Spotify or setlist.fm URL..."
+                style={inputStyle}
+              />
+            ) : (
+              <SetlistSection concert={concert} />
+            )}
           </div>
         )}
 

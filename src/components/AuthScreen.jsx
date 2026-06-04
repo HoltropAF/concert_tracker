@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function AuthScreen({ onSignIn }) {
+export default function AuthScreen({ onSignIn, onGuest }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -75,6 +75,20 @@ export default function AuthScreen({ onSignIn }) {
             >
               {loading ? 'Sending...' : 'Send magic link'}
             </button>
+
+            {onGuest && (
+              <button
+                onClick={onGuest}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: 10, fontSize: 14,
+                  cursor: 'pointer', background: 'none', marginTop: 10,
+                  border: '1px solid #1f1f35', color: '#6b6a8f',
+                  fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s'
+                }}
+              >
+                Continue as guest
+              </button>
+            )}
           </>
         ) : (
           <div style={{

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
+import { DEFAULT_SETTINGS } from './lib/data'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
@@ -22,9 +23,53 @@ function InstallBanner({ onInstall, onDismiss }) {
   )
 }
 
+function useGuestMode() {
+  const [concerts, setConcerts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('guest_concerts') || '[]') } catch { return [] }
+  })
+  const [settings, setSettings] = useState(() => {
+    try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('guest_settings') || '{}') } } catch { return DEFAULT_SETTINGS }
+  })
+
+  const saveConcert = useCallback((concert) => {
+    setConcerts(prev => {
+      const next = prev.some(c => c.id === concert.id)
+        ? prev.map(c => c.id === concert.id ? concert : c)
+        : [...prev, concert]
+      localStorage.setItem('guest_concerts', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const deleteConcert = useCallback((id) => {
+    setConcerts(prev => {
+      const next = prev.filter(c => c.id !== id)
+      localStorage.setItem('guest_concerts', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const saveSetting = useCallback((key, value) => {
+    setSettings(prev => {
+      const next = { ...prev, [key]: value }
+      localStorage.setItem('guest_settings', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const clearGuest = () => {
+    localStorage.removeItem('guest_concerts')
+    localStorage.removeItem('guest_settings')
+    localStorage.removeItem('guest_mode')
+  }
+
+  return { concerts, settings, saveConcert, deleteConcert, saveSetting, clearGuest }
+}
+
 export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
+  const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }
@@ -40,11 +85,37 @@ export default function App() {
     setInstallPrompt(null); setShowBanner(false)
   }
 
+  const guest = useGuestMode()
   const { user, loading: authLoading, signIn, signOut } = useAuth()
-  const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(user?.id)
-  const { settings, saveSetting } = useSettings(user?.id)
+  const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
+  const { settings, saveSetting } = useSettings(guestMode ? null : user?.id)
+
+  const enterGuest = () => {
+    localStorage.setItem('guest_mode', 'true')
+    setGuestMode(true)
+  }
+
+  const exitGuest = () => {
+    guest.clearGuest()
+    setGuestMode(false)
+  }
 
   const banner = showBanner && <InstallBanner onInstall={handleInstall} onDismiss={() => setShowBanner(false)} />
+
+  if (guestMode) return (
+    <>
+      <ConcertTracker
+        concerts={guest.concerts}
+        settings={guest.settings}
+        onSaveConcert={guest.saveConcert}
+        onDeleteConcert={guest.deleteConcert}
+        onUpdateSetting={guest.saveSetting}
+        onSignOut={exitGuest}
+        userEmail="guest"
+      />
+      {banner}
+    </>
+  )
 
   if (authLoading) return (
     <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -53,7 +124,7 @@ export default function App() {
     </div>
   )
 
-  if (!user) return <><AuthScreen onSignIn={signIn} />{banner}</>
+  if (!user) return <><AuthScreen onSignIn={signIn} onGuest={enterGuest} />{banner}</>
 
   if (!loaded) return (
     <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

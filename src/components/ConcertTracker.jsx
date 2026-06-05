@@ -677,11 +677,13 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
   );
 }
 
-function Collapsible({ title, defaultOpen = true, children }) {
-  const [open, setOpen] = useState(defaultOpen);
+function Collapsible({ title, defaultOpen = true, children, open: controlledOpen, onToggle }) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const toggle = onToggle || (() => setInternalOpen(o => !o));
   return (
     <div style={{ marginBottom: 12 }}>
-      <button onClick={() => setOpen(o => !o)} style={{
+      <button onClick={toggle} style={{
         width: "100%", background: "none", border: "none", cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 0 8px", borderBottom: `1px solid ${open ? "#2e2e50" : "#1f1f35"}`
@@ -2662,6 +2664,8 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const [newVenueSize, setNewVenueSize] = useState("");
   const [local, setLocal] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
+  const [openSection, setOpenSection] = useState(null);
+  const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
 
   const lUpdate = (key, value) => { setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
   const handleSettingsSave = () => {
@@ -2879,8 +2883,21 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         }}>{saved ? "Saved" : "Save"}</button>
       </div>
 
-      <Collapsible title="Preferences" defaultOpen={false}>
+      <Collapsible title="◆  Preferences" {...sec("preferences")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+          <Row label="Color theme" sub="Changes instantly, no save needed">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
+                <button key={o.id} onClick={() => onUpdate('colorTheme', o.id)} style={{
+                  padding: "4px 10px", borderRadius: 99, fontSize: 11, cursor: "pointer",
+                  background: (settings.colorTheme||'purple') === o.id ? "#a78bfa" : "#13131f",
+                  color: (settings.colorTheme||'purple') === o.id ? "#0c0c14" : "#6b6a8f",
+                  border: `1px solid ${(settings.colorTheme||'purple') === o.id ? "#a78bfa" : "#1f1f35"}`,
+                  fontWeight: (settings.colorTheme||'purple') === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
+                }}>{o.label}</button>
+              ))}
+            </div>
+          </Row>
           <Row label="Opening tab" sub="Which tab opens on launch">
             <OptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => lUpdate("defaultTab", v)} />
           </Row>
@@ -2905,7 +2922,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         </div>
       </Collapsible>
 
-      <Collapsible title="Tags" defaultOpen={false}>
+      <Collapsible title="◈  Tags" {...sec("tags")}>
         {[
           { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
           { label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
@@ -2920,7 +2937,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         ))}
       </Collapsible>
 
-      <Collapsible title="Data" defaultOpen={false}>
+      <Collapsible title="◉  Account & Data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <button onClick={handleCsvExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Export CSV</button>
@@ -2948,10 +2965,16 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
             <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
             <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
           </div>
+          <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 14, paddingTop: 14 }}>
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
+              Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
+            </div>
+            <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Sign out</button>
+          </div>
         </div>
       </Collapsible>
 
-      <Collapsible title="Help" defaultOpen={false}>
+      <Collapsible title="◇  Help" {...sec("help")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           {[
             { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
@@ -2964,15 +2987,6 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
             Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Use the ⚙ in Stats to show/hide sections
           </div>
-        </div>
-      </Collapsible>
-
-      <Collapsible title="Account" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
-          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-            Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
-          </div>
-          <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Sign out</button>
         </div>
       </Collapsible>
     </div>
@@ -3005,6 +3019,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
 
   const allFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
+
+  const THEME_FILTER = { purple:'', blue:'hue-rotate(-50deg)', green:'hue-rotate(-145deg)', red:'hue-rotate(90deg)', orange:'hue-rotate(130deg)', mono:'grayscale(1)' };
+  const themeFilter = THEME_FILTER[settings.colorTheme] ?? '';
 
   const handleSave = (updated) => {
     onSaveConcert(updated)
@@ -3081,7 +3098,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   if (showAdd) return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined }}>
       <AddConcertForm
         onSave={c => { onSaveConcert(c); setShowAdd(false); setSelected(c) }}
         onClose={() => setShowAdd(false)}
@@ -3092,13 +3109,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   if (selected) return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined }}>
       <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} />
     </div>
   )
 
   return (
-    <div style={{ background: '#0c0c14', minHeight: '100vh', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ background: '#0c0c14', minHeight: '100vh', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined }}>
 
       {/* Header */}
       <div style={{ padding: '16px 16px 0', position: 'sticky', top: 0, background: '#0c0c14', zIndex: 50, borderBottom: '1px solid #0d1a14' }}>

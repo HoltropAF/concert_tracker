@@ -948,7 +948,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
       const arcLabel = (!labelTexts && rawLabel && rawLabel.length > 7) ? rawLabel.slice(0, 6) + '…' : rawLabel;
       return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
     });
-    const pad = showLabels ? size*0.42 : 0;
+    const pad = showLabels ? Math.max(size*0.1, labelR - size/2 + size*0.14) : 0;
     const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
     return (
       <svg overflow="visible" width={size + pad*2} height={size + pad*2} viewBox={vb} style={{ overflow: "visible", display: "block" }}>
@@ -2038,9 +2038,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
                         {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others"]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
                           </div>
                         ))}
                       </div>
@@ -2062,9 +2062,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
                         {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others"]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
                           </div>
                         ))}
                       </div>

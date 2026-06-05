@@ -108,7 +108,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         {/* Form card */}
         <div className="auth-block-3" style={{
           background: '#13131f', border: '1px solid #1f1f35',
-          borderRadius: 16, padding: '24px', marginBottom: 96
+          borderRadius: 16, padding: '24px', marginBottom: 20
         }}>
           {!sent ? (
             <>

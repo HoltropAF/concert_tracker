@@ -926,11 +926,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
   // Donut chart (SVG)
   // labelTexts: array of strings to show on arcs instead of %; null = show %
   // centerText: string to show in center; null = hide center; undefined = show total count
-  const Donut = ({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined }) => {
+  const Donut = ({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined, labelPad = 0.18 }) => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total === 0) return null;
     const cx = size/2, cy = size/2, r = size*0.36, stroke = size*0.15;
-    const labelR = r + stroke + size*0.18;
+    const labelR = r + stroke + size*labelPad;
     const GAP = segments.length > 1 ? 3 : 0;
     let angle = -90;
     const arcs = segments.map((seg, idx) => {
@@ -2023,24 +2023,24 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
               </div>
             );
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, marginBottom: 12, display: "flex", overflow: "hidden" }}>
                 {/* Genre */}
-                <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px", cursor: "pointer" }}>
+                <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer", borderRight: "1px solid #1f1f35" }}>
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={80} showLabels centerText="Genres" segments={[
+                        <Donut size={80} showLabels labelPad={0.06} centerText="Genres" segments={[
                           ...topGenres.slice(0,3).map(([g,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
                           ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "flex", flexWrap: "nowrap", gap: 6, marginTop: 6, overflow: "hidden" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
                         {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others"]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                           </div>
                         ))}
                       </div>
@@ -2049,22 +2049,22 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                 </div>
 
                 {/* Venue size */}
-                <div onClick={() => { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart("venue-size"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px", cursor: "pointer" }}>
+                <div onClick={() => { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart("venue-size"); window.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer" }}>
                   {venueEntries.length === 0 ? (
                     <div style={placeholderStyle}>set venue size on shows</div>
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={80} showLabels centerText={["VENUE", "SIZE"]} segments={[
+                        <Donut size={80} showLabels labelPad={0.06} centerText={["VENUE", "SIZE"]} segments={[
                           ...venueEntries.slice(0,3).map(([name,n],i) => ({ value: n, color: VENUE_COLORS[i] })),
                           ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "flex", flexWrap: "nowrap", gap: 6, marginTop: 6, overflow: "hidden" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
                         {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others"]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                           </div>
                         ))}
                       </div>

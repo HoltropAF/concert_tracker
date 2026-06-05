@@ -91,7 +91,7 @@ export default function App() {
   }
 
   const guest = useGuestMode()
-  const { user, loading: authLoading, signIn, signOut } = useAuth()
+  const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
   const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
   const { settings, saveSetting } = useSettings(guestMode ? null : user?.id)
 
@@ -123,6 +123,35 @@ export default function App() {
       />
       {banner}
     </>
+  )
+
+  if (dbSleeping) return (
+    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ maxWidth: 320, width: '100%', textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 20 }}>💤</div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: '#e2e0ff', marginBottom: 10 }}>database is napping</div>
+        <div style={{ fontSize: 13, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", lineHeight: 1.7, marginBottom: 28 }}>
+          Supabase pauses free projects after a week of inactivity. Your data is fine — it just needs a nudge.
+        </div>
+        <a
+          href="https://supabase.com/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'block', width: '100%', padding: '13px', borderRadius: 10, fontSize: 14, fontWeight: 700, background: '#a78bfa', color: '#0c0c14', textDecoration: 'none', fontFamily: "'Syne', sans-serif", marginBottom: 10, boxSizing: 'border-box' }}
+        >
+          wake it up →
+        </a>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ width: '100%', padding: '12px', borderRadius: 10, fontSize: 13, background: 'none', border: '1px solid #1f1f35', color: '#6b6a8f', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
+        >
+          try again
+        </button>
+        <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", marginTop: 16 }}>
+          go to your project → click restore → come back and try again
+        </div>
+      </div>
+    </div>
   )
 
   if (authLoading) return (

@@ -5,16 +5,31 @@ import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
 export function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [dbSleeping, setDbSleeping] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+    const timeout = setTimeout(() => {
+      setDbSleeping(true)
       setLoading(false)
-    })
+    }, 9000)
+
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        clearTimeout(timeout)
+        if (error) { setDbSleeping(true) }
+        else { setUser(session?.user ?? null) }
+        setLoading(false)
+      })
+      .catch(() => {
+        clearTimeout(timeout)
+        setDbSleeping(true)
+        setLoading(false)
+      })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
-    return () => subscription.unsubscribe()
+    return () => { clearTimeout(timeout); subscription.unsubscribe() }
   }, [])
 
   const signIn = async (email) => {
@@ -27,7 +42,7 @@ export function useAuth() {
 
   const signOut = () => supabase.auth.signOut()
 
-  return { user, loading, signIn, signOut }
+  return { user, loading, signIn, signOut, dbSleeping }
 }
 
 export function useConcerts(userId) {

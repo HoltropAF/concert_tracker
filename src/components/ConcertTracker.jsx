@@ -73,6 +73,16 @@ function ConcertCard({ concert, onOpen }) {
               fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700,
               color: "#e2e0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
             }}>{concert.artist}</span>
+            {concert.seenAs && !isFestival && (() => {
+              const cfg = {
+                Headliner: { bg: "#2a1f4a", color: "#a78bfa" },
+                Support:   { bg: "#1a2a3d", color: "#60a5fa" },
+                Guest:     { bg: "#2d2010", color: "#fbbf24" },
+              }[concert.seenAs];
+              return cfg ? (
+                <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: cfg.bg, color: cfg.color, flexShrink: 0 }}>{concert.seenAs.toUpperCase()}</span>
+              ) : null;
+            })()}
           </div>
           <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
             {formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
@@ -1108,7 +1118,7 @@ function StatsView({ concerts, settings = {} }) {
       );
       case "venue-size": return venueEntries.length === 0 ? (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No venue size data yet</div>
+          <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a venue size to see this</div>
         </div>
       ) : (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
@@ -1205,7 +1215,7 @@ function StatsView({ concerts, settings = {} }) {
       case "merch-types": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {topMerchTypes.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No merch data yet</div>
+            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see what you buy most</div>
             : topMerchTypes.map(([type, count], i) => (
               <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1224,7 +1234,7 @@ function StatsView({ concerts, settings = {} }) {
       case "merch-artists": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {topArtistMerch.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No merch data yet</div>
+            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see spending by artist</div>
             : topArtistMerch.map(([artist, spend], i) => (
               <div key={artist} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1243,7 +1253,7 @@ function StatsView({ concerts, settings = {} }) {
       case "genres": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           {topGenres.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No genre data yet</div>
+            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
             : <ListStat title="" items={topGenres} suffix="x" />
           }
         </div>
@@ -1251,7 +1261,7 @@ function StatsView({ concerts, settings = {} }) {
       case "genres-pie": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           {topGenres.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No genre data yet</div>
+            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
             : (
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <Donut size={140} showLabels label="shows" labelTexts={topGenres.map(([g], i) => i < 3 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
@@ -1279,7 +1289,7 @@ function StatsView({ concerts, settings = {} }) {
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             {languageEntries.length === 0
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No language data yet</div>
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a language to see this</div>
               : <ListStat title="" items={languageEntries} suffix="x" />
             }
           </div>

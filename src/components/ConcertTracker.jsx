@@ -814,6 +814,30 @@ function StatsView({ concerts, settings = {} }) {
   const maxYearSpend = Math.max(...Object.values(yearSpend), 1);
   const maxMonth = Math.max(...Object.values(monthCount), 1);
 
+  // Friends group-size distribution
+  const groupSizeDist = {};
+  past.forEach(c => {
+    const n = c.friends?.length || 0;
+    const key = n >= 6 ? "6+" : String(n);
+    groupSizeDist[key] = (groupSizeDist[key] || 0) + 1;
+  });
+
+  // Average rating per year
+  const ratingByYear = {};
+  rated.forEach(c => {
+    const y = getYear(c.date);
+    if (!ratingByYear[y]) ratingByYear[y] = { sum: 0, count: 0 };
+    ratingByYear[y].sum += c.rating;
+    ratingByYear[y].count++;
+  });
+
+  // Most expensive shows including merch cost
+  const topExpensiveIncMerch = [...past]
+    .filter(c => c.ticketPrice || c.merch?.length > 0)
+    .map(c => ({ ...c, totalCost: (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) }))
+    .sort((a,b) => b.totalCost - a.totalCost)
+    .slice(0, topExpensiveRows);
+
 
   const StatBox = ({ label, value, sub }) => (
     <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "16px", textAlign: "center" }}>
@@ -922,9 +946,8 @@ function StatsView({ concerts, settings = {} }) {
     {
       id: "artists", label: "Artists",
       charts: [
-        { id: "artists",    label: "🎤 Top artists" },
-        { id: "year-count", label: "📅 Shows per year" },
-        { id: "months",     label: "📆 Busiest months" },
+        { id: "artists",   label: "🎤 Top artists" },
+        { id: "shows",     label: "📅 Shows over time" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
         ...(topGenres.length > 0 ? [{ id: "genres", label: "🎸 Genres" }] : []),
         { id: "genres-pie", label: "🥧 Genres" },
@@ -957,8 +980,7 @@ function StatsView({ concerts, settings = {} }) {
       id: "merch", label: "Merch",
       charts: [
         { id: "merch-overview", label: "🛍️ Merch overview" },
-        { id: "merch-types",    label: "👕 What I buy most" },
-        { id: "merch-artists",  label: "🎤 By artist" },
+        { id: "merch-breakdown", label: "📦 What I buy" },
       ]
     },
   ];
@@ -976,6 +998,69 @@ function StatsView({ concerts, settings = {} }) {
 
   const renderChart = (id) => {
     switch(id) {
+      case "shows": {
+        const sView = chartOpt("shows", "bars");
+        const sortedYearsS = Object.keys(yearCount).sort();
+        const maxYCS = Math.max(...Object.values(yearCount), 1);
+        const hmYearsS = Object.keys(yearMonthCount).sort();
+        const hmMaxS = Math.max(...hmYearsS.flatMap(y => Array.from({length:12}, (_,m) => yearMonthCount[y]?.[m] || 0)), 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"},{id:"heatmap",label:"Heatmap"}]} value={sView} onChange={v => setChartOpt("shows", v)} />
+            {sView === "bars" && Object.entries(yearCount).sort((a,b) => b[0].localeCompare(a[0])).map(([y, count]) => (
+              <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                  <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / maxYCS) * 80) }} />
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}</span>
+                </div>
+              </div>
+            ))}
+            {sView === "line" && (() => {
+              const counts = sortedYearsS.map(y => yearCount[y]);
+              const n = sortedYearsS.length;
+              if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
+              const pts = sortedYearsS.map((y, i) => `${(i/(n-1))*274+3},${86-(counts[i]/maxYCS)*76}`);
+              const linePath = "M " + pts.join(" L ");
+              return (
+                <>
+                  <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
+                    <defs><linearGradient id="sGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
+                    <path d={linePath + ` L ${274+3},88 L 3,88 Z`} fill="url(#sGrad)" />
+                    <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    {sortedYearsS.map((y, i) => <circle key={y} cx={(i/(n-1))*274+3} cy={86-(counts[i]/maxYCS)*76} r="3" fill="#a78bfa" />)}
+                  </svg>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsS[0]}</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsS[sortedYearsS.length-1]}</span>
+                  </div>
+                </>
+              );
+            })()}
+            {sView === "heatmap" && (
+              <>
+                <div style={{ display: "flex", marginLeft: 30 }}>
+                  {monthNames.map((name, i) => <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>)}
+                </div>
+                {hmYearsS.map(y => (
+                  <div key={y} style={{ display: "flex", alignItems: "center", marginTop: 3 }}>
+                    <span style={{ width: 30, fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{y}</span>
+                    {Array.from({length:12}, (_, m) => {
+                      const count = yearMonthCount[y]?.[m] || 0;
+                      const intensity = count / hmMaxS;
+                      return (
+                        <div key={m} style={{ flex:1, aspectRatio:"1", borderRadius:2, margin:"0 1px", background: count > 0 ? `rgba(167,139,250,${0.15+intensity*0.85})` : "#0e0e1a", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          {count > 0 && <span style={{ fontSize:7, color: intensity>0.55?"#0c0c14":"#a78bfa", fontFamily:"'DM Mono',monospace", lineHeight:1 }}>{count}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        );
+      }
       case "year-count": {
         const ycView = chartOpt("year-count", "bars");
         const sortedYears = Object.keys(yearCount).sort();
@@ -1024,8 +1109,14 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         );
       }
-      case "year-spend": return (
+      case "year-spend": {
+        const ysView = chartOpt("year-spend", "bars");
+        const activeYearsYS = years.filter(y => yearSpend[y] > 0);
+        const maxSpendYS = Math.max(...activeYearsYS.map(y => yearSpend[y]), 1);
+        return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+          <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
+          {ysView === "bars" && <>
           {/* Legend */}
           <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -1086,26 +1177,60 @@ function StatsView({ concerts, settings = {} }) {
             <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total</span>
             <span style={{ color: "#f472b6", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(totalSpent)}</span>
           </div>
+          </>}
+          {ysView === "line" && (() => {
+            const n = activeYearsYS.length;
+            if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
+            const pts = activeYearsYS.map((y, i) => `${(i/(n-1))*274+3},${86-(yearSpend[y]/maxSpendYS)*76}`);
+            const linePath = "M " + pts.join(" L ");
+            return (
+              <>
+                <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
+                  <defs><linearGradient id="ysGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f472b6" stopOpacity="0.2"/><stop offset="100%" stopColor="#f472b6" stopOpacity="0"/></linearGradient></defs>
+                  <path d={linePath + ` L ${274+3},88 L 3,88 Z`} fill="url(#ysGrad)" />
+                  <path d={linePath} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {activeYearsYS.map((y, i) => <circle key={y} cx={(i/(n-1))*274+3} cy={86-(yearSpend[y]/maxSpendYS)*76} r="3" fill="#f472b6" />)}
+                </svg>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[0]}</span>
+                  <span style={{ fontSize: 10, color: "#f472b6", fontFamily: "'DM Mono', monospace" }}>€{Math.round(totalSpent)} total</span>
+                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[activeYearsYS.length-1]}</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
-      );
+        );
+      }
       case "avg-ticket": return null;
-      case "expensive": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {topExpensive.map((c, i) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#c4c2f0", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
-                <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)} · {c.venue}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(12, (c.ticketPrice / topExpensive[0].ticketPrice) * 50) }} />
-                <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 44, textAlign: "right" }}>€{c.ticketPrice}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      );
+      case "expensive": {
+        const exView = chartOpt("expensive", "ticket");
+        const exList = exView === "merch" ? topExpensiveIncMerch : topExpensive;
+        const exMax = exView === "merch"
+          ? (exList[0]?.totalCost || 1)
+          : (exList[0]?.ticketPrice || 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"ticket",label:"Ticket only"},{id:"merch",label:"Inc. merch"}]} value={exView} onChange={v => setChartOpt("expensive", v)} />
+            {exList.map((c, i) => {
+              const amount = exView === "merch" ? c.totalCost : c.ticketPrice;
+              return (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#c4c2f0", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
+                    <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)} · {c.venue}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(12, (amount / exMax) * 50) }} />
+                    <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 50, textAlign: "right" }}>€{amount?.toFixed(0)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
       case "over-time": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           <svg width="100%" height={120} viewBox="0 0 300 100" preserveAspectRatio="none">
@@ -1195,20 +1320,45 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         );
       }
-      case "solo": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
-          <Donut segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#1f1f35" }]} size={110} />
-          <div style={{ flex: 1 }}>
-            {[{ label: "With friends", value: withFriends.length, color: "#a78bfa" }, { label: "Solo", value: solo.length, color: "#6b6a8f" }].map(s => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{s.label}</span>
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{s.value} ({Math.round(s.value/Math.max(past.length,1)*100)}%)</span>
+      case "solo": {
+        const soloView = chartOpt("solo", "overview");
+        const groupSizeLabels = ["0","1","2","3","4","5","6+"];
+        const groupSizeColors = ["#6b6a8f","#a78bfa","#818cf8","#60a5fa","#34d399","#fbbf24","#f472b6"];
+        const maxGroupSize = Math.max(...groupSizeLabels.map(k => groupSizeDist[k] || 0), 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"overview",label:"Overview"},{id:"group",label:"Group size"}]} value={soloView} onChange={v => setChartOpt("solo", v)} />
+            {soloView === "overview" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <Donut segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#1f1f35" }]} size={110} />
+                <div style={{ flex: 1 }}>
+                  {[{ label: "With friends", value: withFriends.length, color: "#a78bfa" }, { label: "Solo", value: solo.length, color: "#6b6a8f" }].map(s => (
+                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                      <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{s.label}</span>
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{s.value} ({Math.round(s.value/Math.max(past.length,1)*100)}%)</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            ) : (
+              groupSizeLabels.map((k, i) => {
+                const count = groupSizeDist[k] || 0;
+                const label = k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`;
+                return (
+                  <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 62, flexShrink: 0 }}>{label}</span>
+                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: groupSizeColors[i], width: `${(count/maxGroupSize)*100}%` }} />
+                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}</span>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
-      );
+        );
+      }
       case "venue-size": return venueEntries.length === 0 ? (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a venue size to see this</div>
@@ -1240,23 +1390,47 @@ function StatsView({ concerts, settings = {} }) {
           ))}
         </div>
       );
-      case "ratings": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {[5,4,3,2,1].map(n => (
-            <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <span style={{ color: "#a78bfa", fontSize: 12, width: 36, flexShrink: 0 }}>{"★".repeat(n)}</span>
-              <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingDist[n]/Math.max(...Object.values(ratingDist),1))*100}%` }} />
-              </div>
-              <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 16, textAlign: "right" }}>{ratingDist[n]}</span>
-            </div>
-          ))}
-          <div style={{ borderTop: "1px solid #1e3028", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
-            <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
+      case "ratings": {
+        const rView = chartOpt("ratings", "dist");
+        const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
+        const ratingYears = Object.keys(ratingByYear).sort();
+        const maxAvgRating = 5;
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
+            {rView === "dist" ? (
+              <>
+                {[5,4,3,2,1].map(n => (
+                  <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#a78bfa", fontSize: 11, width: 56, flexShrink: 0, letterSpacing: "-1px" }}>{"★".repeat(n)}</span>
+                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingDist[n]/maxRatingDist)*100}%` }} />
+                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{ratingDist[n]}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop: "1px solid #1e3028", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
+                  <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
+                </div>
+              </>
+            ) : (
+              ratingYears.map(y => {
+                const avg = ratingByYear[y].sum / ratingByYear[y].count;
+                return (
+                  <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(avg / maxAvgRating) * 100}%` }} />
+                    </div>
+                    <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{avg.toFixed(1)} ★</span>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
-      );
+        );
+      }
       case "artists": {
         const aView = chartOpt("artists", "count");
         const artistItems = aView === "alpha"
@@ -1294,62 +1468,73 @@ function StatsView({ concerts, settings = {} }) {
               </div>
             ))}
           </div>
-          {/* Top 3 most expensive items */}
-          {topMerchItems.length > 0 && (
-            <>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Top 3 most expensive</div>
-              {topMerchItems.map((m, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: "#e2e0ff" }}>{m.item}</div>
-                    <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{m.artist}</div>
+          {/* Top 3 list with toggle */}
+          {(topMerchItems.length > 0 || topMerchTypes.length > 0) && (() => {
+            const moView = chartOpt("merch-overview", "price");
+            return (
+              <>
+                <ChartToggle options={[{id:"price",label:"Top 3 by price"},{id:"count",label:"Top 3 by count"}]} value={moView} onChange={v => setChartOpt("merch-overview", v)} />
+                {moView === "price"
+                  ? topMerchItems.map((m, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: "#e2e0ff" }}>{m.item}</div>
+                        <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{m.artist}</div>
+                      </div>
+                      <span style={{ color: "#f472b6", fontSize: 13, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>€{parseFloat(m.price).toFixed(2)}</span>
+                    </div>
+                  ))
+                  : topMerchTypes.slice(0, 3).map(([type, count], i) => (
+                    <div key={type} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                      <span style={{ fontSize: 13, color: "#e2e0ff", flex: 1, textTransform: "capitalize" }}>{type}</span>
+                      <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}x</span>
+                    </div>
+                  ))
+                }
+              </>
+            );
+          })()}
+        </div>
+      );
+      case "merch-breakdown": {
+        const mbView = chartOpt("merch-breakdown", "types");
+        const noMerch = topMerchTypes.length === 0 && topArtistMerch.length === 0;
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"types",label:"By type"},{id:"artists",label:"By artist"}]} value={mbView} onChange={v => setChartOpt("merch-breakdown", v)} />
+            {noMerch
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see this</div>
+              : mbView === "types"
+                ? topMerchTypes.map(([type, count], i) => (
+                  <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>{type}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / topMerchTypes[0][1]) * 80) }} />
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}x</span>
+                    </div>
                   </div>
-                  <span style={{ color: "#f472b6", fontSize: 13, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>€{parseFloat(m.price).toFixed(2)}</span>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      );
-      case "merch-types": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {topMerchTypes.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see what you buy most</div>
-            : topMerchTypes.map(([type, count], i) => (
-              <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                  <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>{type}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / topMerchTypes[0][1]) * 80) }} />
-                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}x</span>
-                </div>
-              </div>
-            ))
-          }
-        </div>
-      );
-      case "merch-artists": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {topArtistMerch.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see spending by artist</div>
-            : topArtistMerch.map(([artist, spend], i) => (
-              <div key={artist} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                  <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{artist}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ height: 4, borderRadius: 2, background: "#f472b6", width: Math.max(16, (spend / topArtistMerch[0][1]) * 80) }} />
-                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 40, textAlign: "right" }}>€{spend.toFixed(0)}</span>
-                </div>
-              </div>
-            ))
-          }
-        </div>
-      );
+                ))
+                : topArtistMerch.map(([artist, spend], i) => (
+                  <div key={artist} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{artist}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ height: 4, borderRadius: 2, background: "#f472b6", width: Math.max(16, (spend / topArtistMerch[0][1]) * 80) }} />
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 40, textAlign: "right" }}>€{spend.toFixed(0)}</span>
+                    </div>
+                  </div>
+                ))
+            }
+          </div>
+        );
+      }
       case "genres": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           {topGenres.length === 0
@@ -1358,27 +1543,34 @@ function StatsView({ concerts, settings = {} }) {
           }
         </div>
       );
-      case "genres-pie": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {topGenres.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
-            : (
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <Donut size={140} showLabels label="shows" labelTexts={topGenres.map(([g], i) => i < 3 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
-                <div style={{ flex: 1 }}>
-                  {topGenres.map(([g, n], i) => (
-                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: GENRE_COLORS[i % GENRE_COLORS.length], flexShrink: 0 }} />
-                      <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{g}</span>
-                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{n}</span>
-                    </div>
-                  ))}
+      case "genres-pie": {
+        const top5Genres = topGenres.slice(0, 5);
+        const othersCount = topGenres.slice(5).reduce((s, [,n]) => s + n, 0);
+        const genreLegend = [...top5Genres.map(([g,n],i) => ({name:g, count:n, color:GENRE_COLORS[i]})),
+                            ...(othersCount > 0 ? [{name:"Others", count:othersCount, color:"#4a4870"}] : [])];
+        const genreTotal = topGenres.reduce((s,[,n]) => s+n, 0);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            {topGenres.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
+              : (
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <Donut size={140} showLabels label="shows" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                  <div style={{ flex: 1 }}>
+                    {genreLegend.map(({ name, count, color }) => (
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 13, flex: 1 }}>{name}</span>
+                        <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{Math.round(count/genreTotal*100)}%</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          }
-        </div>
-      );
+              )
+            }
+          </div>
+        );
+      }
       case "language": {
         const languageCount = {};
         past.forEach(c => {

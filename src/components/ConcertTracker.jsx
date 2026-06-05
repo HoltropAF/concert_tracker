@@ -3243,12 +3243,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
       {/* Header */}
       <div style={{ padding: '16px 16px 0', position: 'sticky', top: 0, background: '#0c0c14', zIndex: 50, borderBottom: '1px solid #0d1a14' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
-            <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-              {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
-            </div>
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
+          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+            {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
           </div>
         </div>
 

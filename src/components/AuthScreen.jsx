@@ -112,10 +112,6 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         }}>
           {!sent ? (
             <>
-              <div style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 14, lineHeight: 1.6 }}>
-                enter email (max twice an hour) → get an email → click link
-              </div>
-
               <input
                 className="auth-input"
                 type="email"
@@ -128,9 +124,12 @@ export default function AuthScreen({ onSignIn, onGuest }) {
                   width: '100%', background: '#0c0c14', border: '1px solid #2e2e50',
                   borderRadius: 10, color: '#e2e0ff', padding: '12px 16px',
                   fontFamily: "'DM Sans', sans-serif", fontSize: 15,
-                  boxSizing: 'border-box', marginBottom: 10, transition: 'border-color 0.15s'
+                  boxSizing: 'border-box', marginBottom: 6, transition: 'border-color 0.15s'
                 }}
               />
+              <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>
+                max twice an hour
+              </div>
 
               {error && (
                 <div style={{ fontSize: 12, color: '#f472b6', marginBottom: 10 }}>{error}</div>
@@ -152,19 +151,15 @@ export default function AuthScreen({ onSignIn, onGuest }) {
               </button>
 
               {onGuest && (
-                <button
-                  onClick={onGuest}
-                  style={{
-                    width: '100%', padding: '11px', borderRadius: 10, fontSize: 12,
-                    cursor: 'pointer', background: 'none', marginTop: 8,
-                    border: '1px solid #1f1f35', color: '#6b6a8f',
-                    fontFamily: "'DM Mono', monospace", transition: 'all 0.2s',
-                    lineHeight: 1.5
-                  }}
-                >
-                  want to see if you like it? just try it out<br />
-                  <span style={{ color: '#4a4870', fontSize: 11 }}>(no saving anything)</span>
-                </button>
+                <div style={{ textAlign: 'center', marginTop: 14 }}>
+                  <button onClick={onGuest} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, color: '#4a4870', fontFamily: "'DM Sans', sans-serif",
+                    fontStyle: 'italic'
+                  }}>
+                    or try out as a guest
+                  </button>
+                </div>
               )}
             </>
           ) : (
@@ -200,7 +195,9 @@ export default function AuthScreen({ onSignIn, onGuest }) {
           )}
         </div>
         {/* Social links */}
-        <div className="auth-block-3" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="auth-block-3" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", letterSpacing: '0.08em', marginBottom: 10 }}>find me on</div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {[
             {
               href: 'https://github.com/HoltropAF/concert_tracker',
@@ -237,6 +234,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
               }}
             >{icon}</a>
           ))}
+          </div>
         </div>
 
       </div>

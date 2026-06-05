@@ -9,7 +9,8 @@ export const DEFAULT_SETTINGS = {
   defaultShowPast: 'closed',
   defaultStatsTab: 'summary',
   merchCategories: ['T-shirt','Hoodie','Crewneck','Tank top','Tote bag','Poster','Print','Hat / Cap','Beanie','Keychain','Pin / Badge','Wristband','Lightstick','Album','Vinyl','Other'],
-  genres: ['Pop','Rock','Indie','Electronic','Hip-Hop','R&B','K-Pop','Metal','Folk','Country','Latin','Jazz','Classical','Other'],
+  genres: ['Pop','K-pop','Rock','Electronic','Country','Hip-Hop','R&B','Metal','Folk','Jazz','Classical','Other'],
+  subgenres: ['Indie pop','Dutch pop','Latin pop','Pop punk','Indie rock','Alternative rock','Folk rock','Drum & Bass','EDM','Dance','Singer-songwriter'],
   languages: ['English','Dutch','Spanish','French','German','Korean','Japanese','Portuguese','Other'],
   venueSizes: ['Club', 'Small hall', 'Mid-venue', 'Arena', 'Stadium'],
 }

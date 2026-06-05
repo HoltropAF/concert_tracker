@@ -416,7 +416,27 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
                   }}>{g}</button>
                 ))}
               </div>
-            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.genre}</div>}
+            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.genre}{concert.subgenre && <span style={{ color:"#6b6a8f" }}> · {concert.subgenre}</span>}</div>}
+          </div>
+        )}
+
+        {/* Subgenre */}
+        {(editing || concert.subgenre) && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={labelStyle}>Subgenre</div>
+            {editing ? (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {(settings.subgenres||[]).map(g => (
+                  <button key={g} onClick={()=>update("subgenre",form.subgenre===g?null:g)} style={{
+                    padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
+                    background: form.subgenre===g ? "#38bdf8" : "#13131f",
+                    color: form.subgenre===g ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${form.subgenre===g ? "#38bdf8" : "#2e2e50"}`,
+                    fontWeight: form.subgenre===g ? 700 : 400
+                  }}>{g}</button>
+                ))}
+              </div>
+            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.subgenre}</div>}
           </div>
         )}
 
@@ -785,6 +805,9 @@ function StatsView({ concerts, settings = {} }) {
   const genreCount = {};
   past.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
   const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]);
+  const subgenreCount = {};
+  past.forEach(c => { if (c.subgenre) subgenreCount[c.subgenre] = (subgenreCount[c.subgenre] || 0) + 1; });
+  const topSubgenres = Object.entries(subgenreCount).sort((a,b) => b[1]-a[1]);
 
   // Ratings
   const rated = past.filter(c => c.rating);
@@ -1188,20 +1211,50 @@ function StatsView({ concerts, settings = {} }) {
           {ysView === "line" && (() => {
             const n = activeYearsYS.length;
             if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
-            const pts = activeYearsYS.map((y, i) => `${(i/(n-1))*274+3},${86-(yearSpend[y]/maxSpendYS)*76}`);
-            const linePath = "M " + pts.join(" L ");
+            const xOf = i => (i / (n - 1)) * 274 + 3;
+            const yOf = v => 86 - (v / maxSpendYS) * 76;
+            const spendPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearSpend[y] || 0) }));
+            const spendPath = "M " + spendPts.map(p => `${p.x},${p.y}`).join(" L ");
+            const avgPts = activeYearsYS.map((y, i) => {
+              const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
+              return avg !== null ? { x: xOf(i), y: yOf(avg) } : null;
+            });
+            const avgPath = avgPts.reduce((acc, pt, i) => {
+              if (!pt) return acc;
+              if (i === 0 || !avgPts[i - 1]) return acc + `M ${pt.x},${pt.y}`;
+              return acc + ` L ${pt.x},${pt.y}`;
+            }, '');
+            const merchPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearMerchSpend[y] || 0) }));
+            const merchPath = "M " + merchPts.map(p => `${p.x},${p.y}`).join(" L ");
             return (
               <>
+                <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 16, height: 2, background: "#f472b6", borderRadius: 1 }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Total spend</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 16, height: 2, background: "#38bdf8", borderRadius: 1 }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Avg ticket</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 16, height: 2, background: "#34d399", borderRadius: 1 }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
+                  </div>
+                </div>
                 <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
                   <defs><linearGradient id="ysGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f472b6" stopOpacity="0.2"/><stop offset="100%" stopColor="#f472b6" stopOpacity="0"/></linearGradient></defs>
-                  <path d={linePath + ` L ${274+3},88 L 3,88 Z`} fill="url(#ysGrad)" />
-                  <path d={linePath} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  {activeYearsYS.map((y, i) => <circle key={y} cx={(i/(n-1))*274+3} cy={86-(yearSpend[y]/maxSpendYS)*76} r="3" fill="#f472b6" />)}
+                  <path d={spendPath + ` L ${spendPts[n-1].x},88 L ${spendPts[0].x},88 Z`} fill="url(#ysGrad)" />
+                  <path d={spendPath} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {spendPts.map((pt, i) => <circle key={activeYearsYS[i]} cx={pt.x} cy={pt.y} r="3" fill="#f472b6" />)}
+                  {avgPath && <path d={avgPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {avgPts.map((pt, i) => pt && <circle key={activeYearsYS[i] + 'a'} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />)}
+                  <path d={merchPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {merchPts.map((pt, i) => <circle key={activeYearsYS[i] + 'm'} cx={pt.x} cy={pt.y} r="3" fill="#34d399" />)}
                 </svg>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
                   <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[0]}</span>
-                  <span style={{ fontSize: 10, color: "#f472b6", fontFamily: "'DM Mono', monospace" }}>€{Math.round(totalSpent)} total</span>
-                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[activeYearsYS.length-1]}</span>
+                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[activeYearsYS.length - 1]}</span>
                 </div>
               </>
             );
@@ -1554,24 +1607,32 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         );
       }
-      case "genres": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {topGenres.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
-            : <ListStat title="" items={topGenres} suffix="x" />
-          }
-        </div>
-      );
-      case "genres-pie": {
-        const top5Genres = topGenres.slice(0, 5);
-        const othersCount = topGenres.slice(5).reduce((s, [,n]) => s + n, 0);
-        const genreLegend = [...top5Genres.map(([g,n],i) => ({name:g, count:n, color:GENRE_COLORS[i]})),
-                            ...(othersCount > 0 ? [{name:"Others", count:othersCount, color:"#4a4870"}] : [])];
-        const genreTotal = topGenres.reduce((s,[,n]) => s+n, 0);
+      case "genres": {
+        const glView = chartOpt("genres", "main");
+        const glItems = glView === "sub" ? topSubgenres : topGenres;
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            {topGenres.length === 0
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
+            <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={glView} onChange={v => setChartOpt("genres", v)} />
+            {glItems.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {glView === "sub" ? "subgenres" : "genres"} to see this</div>
+              : <ListStat title="" items={glItems} suffix="x" />
+            }
+          </div>
+        );
+      }
+      case "genres-pie": {
+        const gpView = chartOpt("genres-pie", "main");
+        const gpSource = gpView === "sub" ? topSubgenres : topGenres;
+        const top5Genres = gpSource.slice(0, 5);
+        const othersCount = gpSource.slice(5).reduce((s, [,n]) => s + n, 0);
+        const genreLegend = [...top5Genres.map(([g,n],i) => ({name:g, count:n, color:GENRE_COLORS[i]})),
+                            ...(othersCount > 0 ? [{name:"Others", count:othersCount, color:"#4a4870"}] : [])];
+        const genreTotal = gpSource.reduce((s,[,n]) => s+n, 0);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={gpView} onChange={v => setChartOpt("genres-pie", v)} />
+            {gpSource.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {gpView === "sub" ? "subgenres" : "genres"} to see this</div>
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                   <Donut size={140} showLabels label="shows" segments={[
@@ -2064,7 +2125,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
     artist: '', date: '', venue: '', room: '', city: '', country: '',
     type: 'concert', tour: '', support: [], friends: [], solo: false,
     rating: null, ticketPrice: null, merch: [], notes: '',
-    genre: null, language: [], venueSize: null, seenAs: null
+    genre: null, subgenre: null, language: [], venueSize: null, seenAs: null
   })
   const [supportInput, setSupportInput] = useState('')
   const [friendInput, setFriendInput] = useState('')
@@ -2253,6 +2314,21 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
         </div>
 
         <div style={{ marginBottom: 16 }}>
+          {fieldLabel('Subgenre')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(settings.subgenres||[]).map(g => (
+              <button key={g} onClick={() => update('subgenre', form.subgenre===g ? null : g)} style={{
+                padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: form.subgenre===g ? '#38bdf8' : '#13131f',
+                color: form.subgenre===g ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`,
+                fontWeight: form.subgenre===g ? 700 : 400
+              }}>{g}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
           {fieldLabel('Language')}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {(() => {
@@ -2312,6 +2388,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const [importStatus, setImportStatus] = useState(null);
   const [newCategory, setNewCategory] = useState("");
   const [newGenre, setNewGenre] = useState("");
+  const [newSubgenre, setNewSubgenre] = useState("");
   const [newLanguage, setNewLanguage] = useState("");
   const [newVenueSize, setNewVenueSize] = useState("");
   const [local, setLocal] = useState({ ...settings });
@@ -2326,6 +2403,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 
   const categories = local.merchCategories || [];
   const genres = local.genres || [];
+  const subgenres = local.subgenres || [];
   const languages = local.languages || [];
   const venueSizes = local.venueSizes || [];
 
@@ -2343,6 +2421,13 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   };
   const removeGenre = (g) => lUpdate("genres", genres.filter(x => x !== g));
 
+  const addSubgenre = () => {
+    const t = newSubgenre.trim();
+    if (!t || subgenres.map(g=>g.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("subgenres", [...subgenres, t]); setNewSubgenre("");
+  };
+  const removeSubgenre = (g) => lUpdate("subgenres", subgenres.filter(x => x !== g));
+
   const addLanguage = () => {
     const t = newLanguage.trim();
     if (!t || languages.map(l=>l.toLowerCase()).includes(t.toLowerCase())) return;
@@ -2358,10 +2443,10 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const removeVenueSize = (v) => lUpdate("venueSizes", venueSizes.filter(x => x !== v));
 
   const handleCsvExport = () => {
-    const headers = ['Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','Language','Rating','TicketPrice','Friends','Solo','Notes'];
+    const headers = ['Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','Notes'];
     const rows = concerts.map(c => [
       c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
-      c.genre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
+      c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
       (c.friends||[]).join('; '), c.solo?'yes':'', (c.notes||'').replace(/\n/g,' ')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
@@ -2425,7 +2510,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         date: obj.Date, artist: obj.Artist, venue: obj.Venue, room: obj.Room || null,
         city: obj.City, country: obj.Country, type: obj.Type || 'concert',
-        tour: obj.Tour || null, genre: obj.Genre || null,
+        tour: obj.Tour || null, genre: obj.Genre || null, subgenre: obj.SubGenre || null,
         language: obj.Language ? obj.Language.split('; ').filter(Boolean) : [],
         rating: obj.Rating ? parseInt(obj.Rating) : null,
         ticketPrice: obj.TicketPrice ? parseFloat(obj.TicketPrice) : null,
@@ -2564,6 +2649,10 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         <TagManager items={genres} onRemove={removeGenre} input={newGenre} onInput={setNewGenre} onAdd={addGenre} placeholder="Add genre..." />
       </Collapsible>
 
+      <Collapsible title="Subgenres" defaultOpen={false}>
+        <TagManager items={subgenres} onRemove={removeSubgenre} input={newSubgenre} onInput={setNewSubgenre} onAdd={addSubgenre} placeholder="Add subgenre..." />
+      </Collapsible>
+
       <Collapsible title="Languages" defaultOpen={false}>
         <TagManager items={languages} onRemove={removeLanguage} input={newLanguage} onInput={setNewLanguage} onAdd={addLanguage} placeholder="Add language..." />
       </Collapsible>
@@ -2635,6 +2724,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [filterRating, setFilterRating] = useState(0)
   const [filterSolo, setFilterSolo] = useState(false)
   const [filterGenre, setFilterGenre] = useState('all')
+  const [filterSubgenre, setFilterSubgenre] = useState('all')
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
@@ -2657,7 +2747,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const activeFilterCount = [
     filterYear !== 'all', filterType !== 'all',
     filterFriend !== 'all', filterVenue !== 'all', sortOrder !== 'newest',
-    filterRating !== 0, filterSolo, filterGenre !== 'all'
+    filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all'
   ].filter(Boolean).length
 
   const filtered = concerts.filter(c => {
@@ -2669,6 +2759,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
     if (filterSolo && !(c.friends.length === 0 || c.solo)) return false
     if (filterGenre !== 'all' && c.genre !== filterGenre) return false
+    if (filterSubgenre !== 'all' && c.subgenre !== filterSubgenre) return false
     if (search) {
       const q = search.toLowerCase()
       return c.artist.toLowerCase().includes(q) ||
@@ -2879,8 +2970,19 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 </div>
               </div>
             )}
+            {(settings.subgenres||[]).length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Subgenre</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  <button onClick={() => setFilterSubgenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === 'all' ? '#38bdf8' : '#0c0c14', color: filterSubgenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {(settings.subgenres||[]).map(g => (
+                    <button key={g} onClick={() => setFilterSubgenre(filterSubgenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === g ? '#38bdf8' : '#0c0c14', color: filterSubgenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === g ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             {activeFilterCount > 0 && (
-              <button onClick={() => { setFilterYear('all'); setFilterType('all'); setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setSortOrder('newest'); setSearch('') }} style={{ width: '100%', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'none', border: '1px solid #2e2e50', color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>Reset all filters</button>
+              <button onClick={() => { setFilterYear('all'); setFilterType('all'); setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setSortOrder('newest'); setSearch('') }} style={{ width: '100%', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'none', border: '1px solid #2e2e50', color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>Reset all filters</button>
             )}
           </div>
         )}

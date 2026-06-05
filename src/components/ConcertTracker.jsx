@@ -3374,20 +3374,32 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     }}>{children}</button>
   )
 
+  const BottomNav = () => (
+    <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))', zIndex: 100 }}>
+      <TabBtn id="home" icon="♪" label="Shows" />
+      <TabBtn id="artists" icon="★" label="Artists" />
+      <TabBtn id="stats" icon="◎" label="Stats" />
+      <TabBtn id="friends" icon="◉" label="Friends" />
+      <TabBtn id="settings" icon="⚙" label="Settings" />
+    </div>
+  )
+
   if (showAdd) return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined }}>
+    <div style={{ background: '#0c0c14', minHeight: '100vh', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined, paddingBottom: 70 }}>
       <AddConcertForm
         onSave={c => { onSaveConcert(c); setShowAdd(false); setSelected(c) }}
         onClose={() => setShowAdd(false)}
         settings={settings}
         friends={allFriends}
       />
+      <BottomNav />
     </div>
   )
 
   if (selected) return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined }}>
+    <div style={{ background: '#0c0c14', minHeight: '100vh', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined, paddingBottom: 70 }}>
       <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} />
+      <BottomNav />
     </div>
   )
 
@@ -3576,14 +3588,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
       </div>
 
-      {/* Bottom nav */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))', zIndex: 100 }}>
-        <TabBtn id="home" icon="♪" label="Shows" />
-        <TabBtn id="artists" icon="★" label="Artists" />
-        <TabBtn id="stats" icon="◎" label="Stats" />
-        <TabBtn id="friends" icon="◉" label="Friends" />
-        <TabBtn id="settings" icon="⚙" label="Settings" />
-      </div>
+      <BottomNav />
     </div>
   )
 }

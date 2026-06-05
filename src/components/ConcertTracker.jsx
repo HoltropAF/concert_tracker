@@ -843,7 +843,7 @@ function StatsView({ concerts, settings = {} }) {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total === 0) return null;
     const cx = size/2, cy = size/2, r = size*0.36, stroke = size*0.15;
-    const labelR = r + stroke + size*0.06;
+    const labelR = r + stroke + size*0.18;
     const GAP = segments.length > 1 ? 3 : 0;
     let angle = -90;
     const arcs = segments.map((seg, idx) => {
@@ -861,7 +861,7 @@ function StatsView({ concerts, settings = {} }) {
       const arcLabel = (!labelTexts && rawLabel && rawLabel.length > 7) ? rawLabel.slice(0, 6) + '…' : rawLabel;
       return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
     });
-    const pad = showLabels ? size*0.28 : 0;
+    const pad = showLabels ? size*0.42 : 0;
     const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
     return (
       <svg overflow="visible" width={size + pad*2} height={size + pad*2} viewBox={vb} style={{ overflow: "visible", display: "block" }}>
@@ -1253,8 +1253,17 @@ function StatsView({ concerts, settings = {} }) {
           {topGenres.length === 0
             ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No genre data yet</div>
             : (
-              <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <Donut size={140} showLabels label="shows" labelTexts={topGenres.map(([g], i) => i < 3 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                <div style={{ flex: 1 }}>
+                  {topGenres.map(([g, n], i) => (
+                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: GENRE_COLORS[i % GENRE_COLORS.length], flexShrink: 0 }} />
+                      <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{g}</span>
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{n}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )
           }
@@ -1442,7 +1451,7 @@ function StatsView({ concerts, settings = {} }) {
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "center", cursor: "pointer" }} onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); }}>
+                    <div style={{ display: "flex", justifyContent: "center", cursor: "pointer" }} onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0, 0); }}>
                       <Donut size={100} centerText="Genres" showLabels labelTexts={topGenres.map(([g], i) => i < 4 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
                     </div>
                   )}

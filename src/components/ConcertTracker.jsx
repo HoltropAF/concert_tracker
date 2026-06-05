@@ -3229,10 +3229,10 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
             <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
           </div>
           <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 14, paddingTop: 14 }}>
-            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-              Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
+            <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>
+              signed in as <span style={{ color: "#6b6a8f" }}>{userEmail}</span>
             </div>
-            <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Sign out</button>
+            <button onClick={onSignOut} style={{ width: "100%", padding: "11px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", background: "none", border: "1px solid #f472b6", color: "#f472b6", fontFamily: "'DM Mono', monospace" }}>log out</button>
           </div>
         </div>
       </Collapsible>
@@ -3563,7 +3563,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       {/* Bottom nav */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 8 }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))', zIndex: 100 }}>
         <TabBtn id="home" icon="♪" label="Shows" />
         <TabBtn id="artists" icon="★" label="Artists" />
         <TabBtn id="stats" icon="◎" label="Stats" />

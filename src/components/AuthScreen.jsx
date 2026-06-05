@@ -90,7 +90,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
           </div>
 
           <div style={{ fontSize: 13, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em' }}>
-            every show, remembered.
+            Every. Show. Remembered.
           </div>
         </div>
 
@@ -108,7 +108,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         {/* Form card */}
         <div className="auth-block-3" style={{
           background: '#13131f', border: '1px solid #1f1f35',
-          borderRadius: 16, padding: '24px', marginBottom: 48
+          borderRadius: 16, padding: '24px', marginBottom: 96
         }}>
           {!sent ? (
             <>

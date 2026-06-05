@@ -2341,7 +2341,7 @@ function ArtistsView({ concerts, onOpen }) {
   return (
     <div style={{ padding: "0 0 100px" }}>
       {/* Search + controls */}
-      <div style={{ padding: "12px 16px 0" }}>
+      <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
         <div style={{ position: "relative", marginBottom: 8 }}>
           <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
           <input

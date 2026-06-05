@@ -2203,44 +2203,206 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   );
 }
 
-function FriendsView({ concerts }) {
-  const past = concerts.filter(c => isPast(c.date));
+function FriendsView({ concerts, onOpen }) {
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('most-shows');
+  const [showSortPanel, setShowSortPanel] = useState(false);
 
+  const past = concerts.filter(c => isPast(c.date));
   const allFriends = [...new Set(past.flatMap(c => c.friends))].sort();
-  const friendStats = {};
-  allFriends.forEach(f => {
-    friendStats[f] = past.filter(c => c.friends.includes(f));
+
+  const friendEntries = allFriends.map(name => {
+    const shows = past.filter(c => c.friends.includes(name));
+    const sortedShows = [...shows].sort((a, b) => a.date.localeCompare(b.date));
+    const firstShow = sortedShows[0] || null;
+    const lastShow = sortedShows[sortedShows.length - 1] || null;
+    const upcoming = concerts.filter(c => !isPast(c.date) && c.friends.includes(name));
+    const genreCount = {};
+    shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+    const topGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
+    const artistCount = {};
+    shows.forEach(c => { artistCount[c.artist] = (artistCount[c.artist] || 0) + 1; });
+    const topArtists = Object.entries(artistCount).sort((a, b) => b[1] - a[1]);
+    const concertCount = shows.filter(c => c.type === 'concert').length;
+    const festivalCount = shows.filter(c => c.type === 'festival').length;
+    return { name, shows, sortedShows, firstShow, lastShow, upcoming, topGenres, topArtists, concertCount, festivalCount };
   });
 
-  const sorted = Object.entries(friendStats).sort((a,b) => b[1].length - a[1].length);
+  const filtered = friendEntries
+    .filter(f => !search || f.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'most-shows') return b.shows.length - a.shows.length;
+      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
+      if (sortBy === 'recent') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
+      return 0;
+    });
 
-  return (
-    <div style={{ padding: "0 20px 100px" }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#e2e0ff", marginBottom: 20, paddingTop: 8 }}>
-        Friends
-      </div>
-      {sorted.map(([name, shows]) => (
-        <div key={name} style={{
-          background: "#13131f", border: "1px solid #1e3028", borderRadius: 12,
-          padding: "14px 16px", marginBottom: 10
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#a78bfa" }}>{shows.length} show{shows.length !== 1 ? "s" : ""}</span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {shows.slice(0,6).map(c => (
-              <span key={c.id} style={{
-                fontSize: 11, padding: "2px 7px", borderRadius: 99,
-                background: "#17172a", color: "#6b6a8f", border: "1px solid #1e3028"
-              }}>{c.artist}</span>
-            ))}
-            {shows.length > 6 && (
-              <span style={{ fontSize: 11, color: "#4a4870" }}>+{shows.length - 6} more</span>
-            )}
+  if (selectedFriend) {
+    const f = friendEntries.find(fd => fd.name === selectedFriend);
+    if (!f) return null;
+    const yearSpan = f.firstShow && f.lastShow && f.firstShow.date.slice(0,4) !== f.lastShow.date.slice(0,4)
+      ? `${f.firstShow.date.slice(0,4)} – ${f.lastShow.date.slice(0,4)}`
+      : f.firstShow ? f.firstShow.date.slice(0,4) : '';
+    const sectionLabel = { fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 };
+    const card = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
+
+    return (
+      <div style={{ padding: "0 0 100px" }}>
+        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{f.name}</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
+              {f.shows.length} show{f.shows.length !== 1 ? 's' : ''} together{yearSpan ? ` · ${yearSpan}` : ''}
+            </div>
           </div>
         </div>
-      ))}
+
+        <div style={{ padding: "16px 20px" }}>
+          {/* Timeline */}
+          <div style={card}>
+            <div style={sectionLabel}>Timeline</div>
+            <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
+              {f.firstShow && (
+                <div>
+                  <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: 3 }}>First together</div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0" }}>{formatDate(f.firstShow.date)}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f" }}>{f.firstShow.artist}</div>
+                </div>
+              )}
+              {f.lastShow && f.firstShow && f.lastShow.id !== f.firstShow.id && (
+                <div>
+                  <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: 3 }}>Most recent</div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0" }}>{formatDate(f.lastShow.date)}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f" }}>{f.lastShow.artist}</div>
+                </div>
+              )}
+            </div>
+            {(f.concertCount > 0 || f.festivalCount > 0) && (
+              <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
+                {f.concertCount > 0 && `${f.concertCount} concert${f.concertCount !== 1 ? 's' : ''}`}
+                {f.concertCount > 0 && f.festivalCount > 0 && ' · '}
+                {f.festivalCount > 0 && `${f.festivalCount} festival${f.festivalCount !== 1 ? 's' : ''}`}
+              </div>
+            )}
+          </div>
+
+          {/* Taste profile */}
+          {f.topGenres.length > 0 && (
+            <div style={card}>
+              <div style={sectionLabel}>Taste profile</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {f.topGenres.map(([genre, count]) => (
+                  <div key={genre} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#c4c2f0", minWidth: 90 }}>{genre}</span>
+                    <div style={{ flex: 1, height: 6, background: "#0c0c14", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(count / f.topGenres[0][1]) * 100}%` }} />
+                    </div>
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top artists together */}
+          {f.topArtists.length > 0 && (
+            <div style={card}>
+              <div style={sectionLabel}>Top artists together</div>
+              {f.topArtists.slice(0, 6).map(([artist, count], i) => (
+                <div key={artist} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < Math.min(f.topArtists.length, 6) - 1 ? 8 : 0 }}>
+                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: "#c4c2f0" }}>{artist}</span>
+                  <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{count}×</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upcoming together */}
+          {f.upcoming.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ ...sectionLabel, marginBottom: 8 }}>Upcoming together</div>
+              {f.upcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+            </div>
+          )}
+
+          {/* All shows */}
+          <div>
+            <div style={{ ...sectionLabel, marginBottom: 8 }}>All shows together</div>
+            {[...f.sortedShows].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "0 0 100px" }}>
+      {/* Search + sort */}
+      <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
+        <div style={{ position: "relative", marginBottom: 8 }}>
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search friend..."
+            style={{ width: "100%", background: "#13131f", border: `1px solid ${search ? "#a78bfa" : "#1f1f35"}`, borderRadius: 10, color: "#c4c2f0", padding: "9px 32px 9px 32px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }} />
+          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>}
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingBottom: 10, alignItems: "center" }}>
+          <button onClick={() => setShowSortPanel(p => !p)} style={{
+            background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none',
+            border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`,
+            borderRadius: 99, padding: '5px 11px', cursor: 'pointer',
+            color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12,
+            fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0
+          }}>Filters</button>
+          {sortBy !== 'most-shows' && <button onClick={() => setSortBy('most-shows')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>↕ {sortBy === 'alpha' ? 'A–Z' : 'Recent'} ×</button>}
+        </div>
+        {showSortPanel && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Sort</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[{id:'most-shows',label:'Most shows'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Most recent'}].map(s => (
+                <button key={s.id} onClick={() => { setSortBy(s.id); setShowSortPanel(false); }} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Friend list */}
+      <div style={{ padding: "0 16px" }}>
+        {filtered.map(({ name, shows, lastShow, topGenres, upcoming }) => (
+          <button key={name} onClick={() => setSelectedFriend(name)} style={{
+            width: "100%", textAlign: "left", background: "#13131f",
+            border: "1px solid #1f1f35", borderLeft: "3px solid #2e2e4a",
+            borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{name}</div>
+              {lastShow && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: topGenres.length ? 4 : 0 }}>last: {formatDate(lastShow.date)}</div>}
+              {topGenres.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {topGenres.slice(0, 3).map(([g]) => (
+                    <span key={g} style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", padding: "2px 6px", borderRadius: 99, background: "#1a1a30", color: "#6b6a8f" }}>{g}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#6b6a8f" }}>{shows.length}</span>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>shows</span>
+              </div>
+              {upcoming.length > 0 && <div style={{ fontSize: 9, color: "#818cf8", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>+{upcoming.length} soon</div>}
+            </div>
+          </button>
+        ))}
+        {filtered.length === 0 && (
+          <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no friends found</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -3395,7 +3557,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} />}
-        {view === 'friends' && <FriendsView concerts={concerts} />}
+        {view === 'friends' && <FriendsView concerts={concerts} onOpen={setSelected} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={setSelected} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
       </div>

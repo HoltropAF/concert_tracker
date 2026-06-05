@@ -1950,32 +1950,34 @@ function StatsView({ concerts, settings = {} }) {
               }));
 
               return (
-                <svg width="100%" viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
-                  <defs>
-                    <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
-                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
-                    </linearGradient>
-                  </defs>
-                  {yearLabels.map(({y, x}) => (
-                    <g key={y}>
-                      <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
-                      <text x={x} y={H+10} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Sans,sans-serif">{y}</text>
-                    </g>
-                  ))}
-                  {/* Today line */}
-                  <line x1={todayX} y1={0} x2={todayX} y2={H-4} stroke="#2e2e50" strokeWidth="1" />
-                  {/* Past area fill */}
-                  {areaPath && <path d={areaPath} fill="url(#cumGrad)" />}
-                  {/* Past line — purple */}
-                  {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                  {/* Upcoming line — light blue dashed */}
-                  {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,3" opacity="0.8" />}
-                  {/* Dots */}
-                  {pastCoords.length > 0 && <circle cx={pastCoords[0].x} cy={pastCoords[0].y} r="3" fill="#a78bfa" />}
-                  {pastCoords.length > 0 && <circle cx={todayX} cy={todayY} r="3" fill="#a78bfa" />}
-                  {upcomingCoords.length > 0 && <circle cx={upcomingCoords[upcomingCoords.length-1].x} cy={upcomingCoords[upcomingCoords.length-1].y} r="3" fill="#38bdf8" opacity="0.8" />}
-                </svg>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 14, flexShrink: 0 }}>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{n}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{Math.round(n/2)}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>0</span>
+                  </div>
+                  <svg style={{ flex: 1 }} viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
+                    <defs>
+                      <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    {yearLabels.map(({y, x}) => (
+                      <g key={y}>
+                        <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
+                        <text x={x} y={H+10} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Sans,sans-serif">{y}</text>
+                      </g>
+                    ))}
+                    <line x1={todayX} y1={0} x2={todayX} y2={H-4} stroke="#2e2e50" strokeWidth="1" />
+                    {areaPath && <path d={areaPath} fill="url(#cumGrad)" />}
+                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,3" opacity="0.8" />}
+                    {pastCoords.length > 0 && <circle cx={pastCoords[0].x} cy={pastCoords[0].y} r="3" fill="#a78bfa" />}
+                    {pastCoords.length > 0 && <circle cx={todayX} cy={todayY} r="3" fill="#a78bfa" />}
+                    {upcomingCoords.length > 0 && <circle cx={upcomingCoords[upcomingCoords.length-1].x} cy={upcomingCoords[upcomingCoords.length-1].y} r="3" fill="#38bdf8" opacity="0.8" />}
+                  </svg>
+                </div>
               );
             })()}
           </div>
@@ -1991,28 +1993,48 @@ function StatsView({ concerts, settings = {} }) {
               </div>
             );
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                 {/* Genre */}
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
+                <div style={{ flex: "1 1 140px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
                   <div style={titleStyle}>Genre</div>
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "center", cursor: "pointer" }} onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0, 0); }}>
-                      <Donut size={100} centerText="Genres" showLabels labelTexts={topGenres.map(([g], i) => i < 4 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
-                    </div>
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center", cursor: "pointer" }} onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0, 0); }}>
+                        <Donut size={90} centerText="Genres" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others", topGenres.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name, count], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ fontSize: 9, color: name === "Others" ? "#4a4870" : "#c4c2f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
 
                 {/* Venue size */}
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
+                <div style={{ flex: "1 1 140px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
                   <div style={titleStyle}>Venue size</div>
                   {venueEntries.length === 0 ? (
                     <div style={placeholderStyle}>set venue size on shows</div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "center" }}>
-                      <Donut size={100} centerText={["VENUE", "SIZE"]} showLabels labelTexts={venueEntries.map(([name], i) => i < 4 ? name : null)} segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} />
-                    </div>
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <Donut size={90} centerText={["VENUE", "SIZE"]} segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} />
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others", venueEntries.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name, count], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ fontSize: 9, color: name === "Others" ? "#4a4870" : "#c4c2f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

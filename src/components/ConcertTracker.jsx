@@ -1043,7 +1043,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
-  const visibleChartGroups = CHART_GROUPS.filter(g => !hiddenChartGroups.includes(g.id));
+  const hiddenCharts = settings.hiddenCharts || [];
+  const visibleChartGroups = CHART_GROUPS
+    .filter(g => !hiddenChartGroups.includes(g.id))
+    .map(g => ({ ...g, charts: g.charts.filter(c => !hiddenCharts.includes(c.id)) }))
+    .filter(g => g.charts.length > 0);
   const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0];
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
@@ -1892,18 +1896,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           { id: "cumulative", label: "Cumulative" }, { id: "pies", label: "Genres & Venues" },
           { id: "upnext", label: "Up next" },
         ];
-        const chartGroups = [
-          { id: "artists", label: "Artists" }, { id: "friends", label: "Friends" },
-          { id: "venues", label: "Venues" }, { id: "financial", label: "Financial" },
-          { id: "merch", label: "Merch" },
-        ];
         const hiddenBlocks = settings.hiddenSummaryBlocks || [];
         const hiddenGroups = settings.hiddenChartGroups || [];
+        const hiddenChts = settings.hiddenCharts || [];
         const toggleBlock = id => onUpdateSetting("hiddenSummaryBlocks", hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]);
         const toggleGroup = id => onUpdateSetting("hiddenChartGroups", hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]);
-        const pill = (label, active, onClick) => (
+        const toggleChart = id => onUpdateSetting("hiddenCharts", hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]);
+        const pill = (label, active, onClick, small = false) => (
           <button onClick={onClick} style={{
-            padding: "3px 10px", borderRadius: 99, fontSize: 10, cursor: "pointer",
+            padding: small ? "2px 8px" : "3px 10px", borderRadius: 99, fontSize: small ? 9 : 10, cursor: "pointer",
             fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
             background: active ? "#1a1a30" : "none", color: active ? "#a78bfa" : "#4a4870",
           }}>{label}</button>
@@ -1915,9 +1916,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               {summaryBlocks.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
             </div>
             <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Charts</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {chartGroups.map(g => pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id)))}
-            </div>
+            {CHART_GROUPS.map(g => (
+              <div key={g.id} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
+                </div>
+                {!hiddenGroups.includes(g.id) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 10, borderLeft: "2px solid #1f1f35" }}>
+                    {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         );
       })()}

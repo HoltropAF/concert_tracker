@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   languages: ['English','Dutch','Spanish','French','German','Korean','Japanese','Portuguese','Other'],
   venueSizes: ['Club', 'Small hall', 'Mid-venue', 'Arena', 'Stadium'],
   hiddenChartGroups: [],
+  hiddenCharts: [],
   hiddenSummaryBlocks: [],
 }
 

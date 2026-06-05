@@ -749,6 +749,25 @@ function StatsView({ concerts, settings = {} }) {
   });
   const years = Object.keys(yearCount).sort();
 
+  // Year counts including upcoming
+  const allYearCount = {};
+  const upcomingYearCount = {};
+  concerts.forEach(c => {
+    const y = getYear(c.date);
+    allYearCount[y] = (allYearCount[y] || 0) + 1;
+    if (!isPast(c.date)) upcomingYearCount[y] = (upcomingYearCount[y] || 0) + 1;
+  });
+  const allYears = Object.keys(allYearCount).sort();
+
+  // Month counts including upcoming
+  const allYearMonthCount = {};
+  concerts.forEach(c => {
+    const m = parseInt(c.date.split("-")[1]) - 1;
+    const y = getYear(c.date);
+    if (!allYearMonthCount[y]) allYearMonthCount[y] = {};
+    allYearMonthCount[y][m] = (allYearMonthCount[y][m] || 0) + 1;
+  });
+
   // Avg ticket price per year
   const yearTicketSum = {};
   const yearTicketCount = {};
@@ -976,11 +995,10 @@ function StatsView({ concerts, settings = {} }) {
     {
       id: "artists", label: "Artists",
       charts: [
+        { id: "genres-pie", label: "🥧 Genres" },
         { id: "artists",    label: "🎤 Top artists" },
         { id: "shows",      label: "📅 Shows over time" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
-        { id: "genres-pie", label: "🥧 Genres" },
-        ...(topGenres.length > 0 ? [{ id: "genres", label: "🎸 Genres (list)" }] : []),
         { id: "language",   label: "🗣️ Language" },
       ]
     },
@@ -1030,39 +1048,68 @@ function StatsView({ concerts, settings = {} }) {
     switch(id) {
       case "shows": {
         const sView = chartOpt("shows", "bars");
-        const sortedYearsS = Object.keys(yearCount).sort();
-        const maxYCS = Math.max(...Object.values(yearCount), 1);
-        const hmYearsS = Object.keys(yearMonthCount).sort();
-        const hmMaxS = Math.max(...hmYearsS.flatMap(y => Array.from({length:12}, (_,m) => yearMonthCount[y]?.[m] || 0)), 1);
+        const maxAll = Math.max(...Object.values(allYearCount), 1);
+        const hmAllYears = Object.keys(allYearMonthCount).sort();
+        const hmMax = Math.max(...hmAllYears.flatMap(y => Array.from({length:12}, (_,m) => allYearMonthCount[y]?.[m] || 0)), 1);
+        const todayYear = new Date().getFullYear().toString();
         return (
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"},{id:"heatmap",label:"Heatmap"}]} value={sView} onChange={v => setChartOpt("shows", v)} />
-            {sView === "bars" && Object.entries(yearCount).sort((a,b) => b[0].localeCompare(a[0])).map(([y, count]) => (
-              <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
-                  <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / maxYCS) * 80) }} />
-                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}</span>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"},{id:"heatmap",label:"Heatmap"},{id:"cumulative",label:"Cumulative"}]} value={sView} onChange={v => setChartOpt("shows", v)} />
+            {sView === "bars" && (() => (
+              <>
+                <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 4, borderRadius: 1, background: "#a78bfa" }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 4, borderRadius: 1, background: "#38bdf8" }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+                {Object.keys(allYearCount).sort((a,b) => b.localeCompare(a)).map(y => {
+                  const total = allYearCount[y];
+                  const upcoming = upcomingYearCount[y] || 0;
+                  const pastCount = total - upcoming;
+                  return (
+                    <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                        <div style={{ display: "flex", height: 4, borderRadius: 2, overflow: "hidden", width: Math.max(16, (total / maxAll) * 80) }}>
+                          {pastCount > 0 && <div style={{ flex: pastCount, background: "#a78bfa" }} />}
+                          {upcoming > 0 && <div style={{ flex: upcoming, background: "#38bdf8", opacity: 0.85 }} />}
+                        </div>
+                        <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{total}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            ))()}
             {sView === "line" && (() => {
-              const counts = sortedYearsS.map(y => yearCount[y]);
-              const n = sortedYearsS.length;
+              const n = allYears.length;
               if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
-              const pts = sortedYearsS.map((y, i) => `${(i/(n-1))*274+3},${86-(counts[i]/maxYCS)*76}`);
-              const linePath = "M " + pts.join(" L ");
+              const xOf = i => (i/(n-1))*274+3;
+              const yOf = v => 86-(v/maxAll)*76;
+              const splitIdx = allYears.findIndex(y => y >= todayYear);
+              const pastYears = splitIdx === -1 ? allYears : allYears.slice(0, splitIdx + 1);
+              const futureYears = splitIdx === -1 ? [] : allYears.slice(splitIdx);
+              const pastPath = pastYears.length > 1 ? "M " + pastYears.map((y,i) => `${xOf(allYears.indexOf(y))},${yOf(allYearCount[y])}`).join(" L ") : null;
+              const futurePath = futureYears.length > 1 ? "M " + futureYears.map(y => `${xOf(allYears.indexOf(y))},${yOf(allYearCount[y])}`).join(" L ") : null;
+              const firstPastX = pastYears.length ? xOf(0) : 3;
+              const lastPastX = pastYears.length ? xOf(pastYears.length - 1) : 3;
               return (
                 <>
                   <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
                     <defs><linearGradient id="sGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
-                    <path d={linePath + ` L ${274+3},88 L 3,88 Z`} fill="url(#sGrad)" />
-                    <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    {sortedYearsS.map((y, i) => <circle key={y} cx={(i/(n-1))*274+3} cy={86-(counts[i]/maxYCS)*76} r="3" fill="#a78bfa" />)}
+                    {pastPath && <path d={pastPath + ` L ${lastPastX},88 L ${firstPastX},88 Z`} fill="url(#sGrad)" />}
+                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {futurePath && <path d={futurePath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {allYears.map((y, i) => <circle key={y} cx={xOf(i)} cy={yOf(allYearCount[y])} r="3" fill={y >= todayYear ? "#38bdf8" : "#a78bfa"} />)}
                   </svg>
                   <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsS[0]}</span>
-                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsS[sortedYearsS.length-1]}</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allYears[0]}</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allYears[allYears.length-1]}</span>
                   </div>
                 </>
               );
@@ -1072,15 +1119,19 @@ function StatsView({ concerts, settings = {} }) {
                 <div style={{ display: "flex", marginLeft: 30 }}>
                   {monthNames.map((name, i) => <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>)}
                 </div>
-                {hmYearsS.map(y => (
+                {hmAllYears.map(y => (
                   <div key={y} style={{ display: "flex", alignItems: "center", marginTop: 3 }}>
                     <span style={{ width: 30, fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{y}</span>
                     {Array.from({length:12}, (_, m) => {
-                      const count = yearMonthCount[y]?.[m] || 0;
-                      const intensity = count / hmMaxS;
+                      const count = allYearMonthCount[y]?.[m] || 0;
+                      const pastC = yearMonthCount[y]?.[m] || 0;
+                      const isUpcoming = count > 0 && pastC === 0;
+                      const intensity = count / hmMax;
+                      const color = isUpcoming ? `rgba(56,189,248,${0.15+intensity*0.85})` : `rgba(167,139,250,${0.15+intensity*0.85})`;
+                      const textColor = isUpcoming ? (intensity>0.55?"#0c0c14":"#38bdf8") : (intensity>0.55?"#0c0c14":"#a78bfa");
                       return (
-                        <div key={m} style={{ flex:1, aspectRatio:"1", borderRadius:2, margin:"0 1px", background: count > 0 ? `rgba(167,139,250,${0.15+intensity*0.85})` : "#0e0e1a", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                          {count > 0 && <span style={{ fontSize:7, color: intensity>0.55?"#0c0c14":"#a78bfa", fontFamily:"'DM Mono',monospace", lineHeight:1 }}>{count}</span>}
+                        <div key={m} style={{ flex:1, aspectRatio:"1", borderRadius:2, margin:"0 1px", background: count > 0 ? color : "#0e0e1a", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          {count > 0 && <span style={{ fontSize:7, color: textColor, fontFamily:"'DM Mono',monospace", lineHeight:1 }}>{count}</span>}
                         </div>
                       );
                     })}
@@ -1088,6 +1139,60 @@ function StatsView({ concerts, settings = {} }) {
                 ))}
               </>
             )}
+            {sView === "cumulative" && (() => {
+              const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
+              if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+              const n = allSorted.length;
+              const W = 300, H = 80;
+              const firstMs = new Date(allSorted[0].date).getTime();
+              const lastMs = new Date(allSorted[n-1].date).getTime();
+              const rangeMs = lastMs - firstMs || 1;
+              const todayMs = new Date().getTime();
+              const todayX = Math.min(W - 3, ((todayMs - firstMs) / rangeMs) * (W - 6) + 3);
+              const coords = allSorted.map((c, i) => ({
+                x: ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3,
+                y: H - 6 - ((i + 1) / n) * (H - 14),
+                isPast: isPast(c.date),
+              }));
+              const pastCoords = coords.filter(p => p.isPast);
+              const upcomingCoords = coords.filter(p => !p.isPast);
+              const todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : coords[0].y;
+              const pastPath = pastCoords.length > 0 ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+              const upcomingPath = upcomingCoords.length > 0 ? `M ${todayX},${todayY} L ` + upcomingCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+              const areaPath = pastCoords.length > 0 ? pastPath + ` L ${todayX},${H-4} L ${pastCoords[0].x},${H-4} Z` : null;
+              return (
+                <>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 10, height: 2, background: "#a78bfa", borderRadius: 1 }} />
+                      <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>past</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 10, height: 2, background: "#38bdf8", borderRadius: 1, opacity: 0.7 }} />
+                      <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>upcoming</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 100, paddingTop: 2, paddingBottom: 6 }}>
+                      <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{n}</span>
+                      <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{Math.round(n/2)}</span>
+                      <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
+                    </div>
+                    <svg style={{ flex: 1 }} height={100} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                      <defs><linearGradient id="cumGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
+                      {areaPath && <path d={areaPath} fill="url(#cumGrad2)" />}
+                      {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                      {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />}
+                    </svg>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[0].date.slice(0,7)}</span>
+                    <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} past · {concerts.length - past.length} upcoming</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[n-1].date.slice(0,7)}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         );
       }
@@ -1635,11 +1740,16 @@ function StatsView({ concerts, settings = {} }) {
         const genreLegend = [...top5Genres.map(([g,n],i) => ({name:g, count:n, color:GENRE_COLORS[i]})),
                             ...(othersCount > 0 ? [{name:"Others", count:othersCount, color:"#4a4870"}] : [])];
         const genreTotal = gpSource.reduce((s,[,n]) => s+n, 0);
+        const emptyMsg = gpView === "sub" ? "subgenres" : gpView === "list" ? "genres" : "genres";
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={gpView} onChange={v => setChartOpt("genres-pie", v)} />
-            {gpSource.length === 0
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {gpView === "sub" ? "subgenres" : "genres"} to see this</div>
+            <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("genres-pie", v)} />
+            {gpView === "list" ? (
+              topGenres.length === 0
+                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
+                : <ListStat title="" items={topGenres} suffix="x" />
+            ) : gpSource.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyMsg} to see this</div>
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                   <Donut size={140} showLabels label="shows" segments={[

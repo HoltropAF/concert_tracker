@@ -2253,7 +2253,6 @@ function ArtistsView({ concerts, onOpen }) {
   const [filterMinSeen, setFilterMinSeen] = useState(0);
   const [filterUpcoming, setFilterUpcoming] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [showSortDd, setShowSortDd] = useState(false);
 
   // Group all concerts by artist
   const artistMap = {};
@@ -2362,32 +2361,8 @@ function ArtistsView({ concerts, onOpen }) {
           )}
         </div>
 
-        {/* Sort + filter pills */}
+        {/* Filter pills row */}
         <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center', overflowX: 'auto' }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button
-              onClick={() => setShowSortDd(d => !d)}
-              style={{
-                padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-                background: sortBy !== 'most-seen' ? '#a78bfa' : '#13131f',
-                color: sortBy !== 'most-seen' ? '#0c0c14' : '#6b6a8f',
-                border: `1px solid ${sortBy !== 'most-seen' ? '#a78bfa' : '#1f1f35'}`,
-                fontWeight: sortBy !== 'most-seen' ? 700 : 400, fontFamily: "'DM Mono', monospace",
-                display: 'flex', alignItems: 'center', gap: 4
-              }}
-            >
-              {sortBy === 'most-seen' ? 'Most seen' : sortBy === 'alpha' ? 'A–Z' : sortBy === 'recently-seen' ? 'Recent' : 'Rating'}
-              <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
-            </button>
-            {showSortDd && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 140 }}>
-                {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map((s, i, arr) => (
-                  <button key={s.id} onClick={() => { setSortBy(s.id); setShowSortDd(false); }} style={{ width: '100%', background: sortBy === s.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: sortBy === s.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{s.label}</button>
-                ))}
-              </div>
-            )}
-          </div>
-
           <button onClick={() => setShowFilters(f => !f)} style={{
             background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
             border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
@@ -2397,26 +2372,28 @@ function ArtistsView({ concerts, onOpen }) {
           }}>
             {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
           </button>
-
+          {sortBy !== 'most-seen' && <button onClick={() => setSortBy('most-seen')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>↕ {sortBy === 'alpha' ? 'A–Z' : sortBy === 'recently-seen' ? 'Recent' : 'Rating'} ×</button>}
           {filterGenre !== 'all' && <button onClick={() => setFilterGenre('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterGenre} ×</button>}
           {filterMinSeen > 0 && <button onClick={() => setFilterMinSeen(0)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterMinSeen}+ seen ×</button>}
           {filterUpcoming && <button onClick={() => setFilterUpcoming(false)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#818cf8', border: '1px solid #818cf8', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>upcoming ×</button>}
         </div>
 
-        {/* Filter panel */}
+        {/* Filter + sort panel */}
         {showFilters && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Sort</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map(s => (
+                  <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+                ))}
+              </div>
+            </div>
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Times seen</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[{v:0,label:'All'},{v:2,label:'2+'},{v:3,label:'3+'},{v:5,label:'5+'}].map(opt => (
-                  <button key={opt.v} onClick={() => setFilterMinSeen(opt.v)} style={{
-                    padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer',
-                    background: filterMinSeen === opt.v ? '#a78bfa' : '#0c0c14',
-                    color: filterMinSeen === opt.v ? '#0c0c14' : '#6b6a8f',
-                    border: `1px solid ${filterMinSeen === opt.v ? '#a78bfa' : '#1f1f35'}`,
-                    fontFamily: "'DM Mono', monospace"
-                  }}>{opt.label}</button>
+                  <button key={opt.v} onClick={() => setFilterMinSeen(opt.v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterMinSeen === opt.v ? '#a78bfa' : '#0c0c14', color: filterMinSeen === opt.v ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterMinSeen === opt.v ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{opt.label}</button>
                 ))}
               </div>
             </div>

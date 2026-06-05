@@ -95,7 +95,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         </div>
 
         {/* Feature pills */}
-        <div className="auth-block-2" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 160 }}>
+        <div className="auth-block-2" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 128 }}>
           {['track shows', 'rate nights', 'find patterns', 'friend profiles'].map(label => (
             <span key={label} style={{
               fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em',

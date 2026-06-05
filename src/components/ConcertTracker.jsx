@@ -1983,49 +1983,48 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const [newGenre, setNewGenre] = useState("");
   const [newLanguage, setNewLanguage] = useState("");
   const [newVenueSize, setNewVenueSize] = useState("");
+  const [local, setLocal] = useState({ ...settings });
+  const [saved, setSaved] = useState(false);
 
-  const categories = settings.merchCategories || [];
-  const genres = settings.genres || [];
-  const languages = settings.languages || [];
-  const venueSizes = settings.venueSizes || [];
+  const lUpdate = (key, value) => { setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
+  const handleSettingsSave = () => {
+    Object.entries(local).forEach(([k, v]) => onUpdate(k, v));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const categories = local.merchCategories || [];
+  const genres = local.genres || [];
+  const languages = local.languages || [];
+  const venueSizes = local.venueSizes || [];
 
   const addCategory = () => {
-    const trimmed = newCategory.trim();
-    if (!trimmed || categories.map(c=>c.toLowerCase()).includes(trimmed.toLowerCase())) return;
-    onUpdate("merchCategories", [...categories, trimmed]);
-    setNewCategory("");
+    const t = newCategory.trim();
+    if (!t || categories.map(c=>c.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("merchCategories", [...categories, t]); setNewCategory("");
   };
-
-  const removeCategory = (cat) => {
-    onUpdate("merchCategories", categories.filter(c => c !== cat));
-  };
+  const removeCategory = (cat) => lUpdate("merchCategories", categories.filter(c => c !== cat));
 
   const addGenre = () => {
-    const trimmed = newGenre.trim();
-    if (!trimmed || genres.map(g=>g.toLowerCase()).includes(trimmed.toLowerCase())) return;
-    onUpdate("genres", [...genres, trimmed]);
-    setNewGenre("");
+    const t = newGenre.trim();
+    if (!t || genres.map(g=>g.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("genres", [...genres, t]); setNewGenre("");
   };
-
-  const removeGenre = (g) => onUpdate("genres", genres.filter(x => x !== g));
+  const removeGenre = (g) => lUpdate("genres", genres.filter(x => x !== g));
 
   const addLanguage = () => {
-    const trimmed = newLanguage.trim();
-    if (!trimmed || languages.map(l=>l.toLowerCase()).includes(trimmed.toLowerCase())) return;
-    onUpdate("languages", [...languages, trimmed]);
-    setNewLanguage("");
+    const t = newLanguage.trim();
+    if (!t || languages.map(l=>l.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("languages", [...languages, t]); setNewLanguage("");
   };
-
-  const removeLanguage = (l) => onUpdate("languages", languages.filter(x => x !== l));
+  const removeLanguage = (l) => lUpdate("languages", languages.filter(x => x !== l));
 
   const addVenueSize = () => {
-    const trimmed = newVenueSize.trim();
-    if (!trimmed || venueSizes.map(v=>v.toLowerCase()).includes(trimmed.toLowerCase())) return;
-    onUpdate("venueSizes", [...venueSizes, trimmed]);
-    setNewVenueSize("");
+    const t = newVenueSize.trim();
+    if (!t || venueSizes.map(v=>v.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("venueSizes", [...venueSizes, t]); setNewVenueSize("");
   };
-
-  const removeVenueSize = (v) => onUpdate("venueSizes", venueSizes.filter(x => x !== v));
+  const removeVenueSize = (v) => lUpdate("venueSizes", venueSizes.filter(x => x !== v));
 
   const handleCsvExport = () => {
     const headers = ['Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','Language','Rating','TicketPrice','Friends','Solo','Notes'];
@@ -2162,213 +2161,125 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     </div>
   );
 
+  const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" };
+  const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
+  const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
+
+  const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => (
+    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 4 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: items.length ? 10 : 0 }}>
+        {items.map(item => (
+          <div key={item} style={tagStyle}>{item}
+            <button onClick={() => onRemove(item)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={input} onChange={e => onInput(e.target.value)} onKeyDown={e => e.key === "Enter" && onAdd()} placeholder={placeholder} style={tagInput} />
+        <button onClick={onAdd} style={addBtn}>Add</button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ padding: "16px 20px 100px" }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff", marginBottom: 20 }}>Settings</div>
-
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Charts</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 20 }}>
-        <Row label="Top artists rows" sub="How many artists to show in charts">
-          <Stepper value={settings.topArtistsRows} onChange={v => onUpdate("topArtistsRows", v)} />
-        </Row>
-        <Row label="Top friends rows" sub="How many friends to show in charts">
-          <Stepper value={settings.topFriendsRows} onChange={v => onUpdate("topFriendsRows", v)} />
-        </Row>
-        <Row label="Top venues rows" sub="How many venues to show in charts">
-          <Stepper value={settings.topVenuesRows} onChange={v => onUpdate("topVenuesRows", v)} />
-        </Row>
-        <Row label="Most expensive rows" sub="How many shows in expensive list">
-          <Stepper value={settings.topExpensiveRows} onChange={v => onUpdate("topExpensiveRows", v)} min={3} max={20} />
-        </Row>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
+        <button onClick={handleSettingsSave} style={{
+          background: saved ? "#a78bfa" : "#1a1a30",
+          border: `1px solid ${saved ? "#a78bfa" : "#2e2e50"}`,
+          color: saved ? "#0c0c14" : "#a78bfa",
+          borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700,
+          cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s"
+        }}>{saved ? "Saved" : "Save"}</button>
       </div>
 
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Defaults</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 20 }}>
-        <Row label="Opening tab" sub="Which tab opens on launch">
-          <OptionPills value={settings.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => onUpdate("defaultTab", v)} />
-        </Row>
-        <Row label="Past shows" sub="Show past concerts by default">
-          <OptionPills value={settings.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => onUpdate("defaultShowPast", v)} />
-        </Row>
-        <Row label="Stats tab" sub="Which stats view opens first">
-          <OptionPills value={settings.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => onUpdate("defaultStatsTab", v)} />
-        </Row>
-      </div>
+      <Collapsible title="Charts" defaultOpen={false}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+          <Row label="Top artists rows" sub="How many artists to show in charts">
+            <Stepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
+          </Row>
+          <Row label="Top friends rows" sub="How many friends to show in charts">
+            <Stepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
+          </Row>
+          <Row label="Top venues rows" sub="How many venues to show in charts">
+            <Stepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
+          </Row>
+          <Row label="Most expensive rows" sub="How many shows in expensive list">
+            <Stepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
+          </Row>
+        </div>
+      </Collapsible>
 
-      {/* Merch categories */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Merch categories</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-          These appear in the dropdown when adding merch to a show.
+      <Collapsible title="Defaults" defaultOpen={false}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+          <Row label="Opening tab" sub="Which tab opens on launch">
+            <OptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => lUpdate("defaultTab", v)} />
+          </Row>
+          <Row label="Past shows" sub="Show past concerts by default">
+            <OptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowPast", v)} />
+          </Row>
+          <Row label="Stats tab" sub="Which stats view opens first">
+            <OptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
+          </Row>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {categories.map(cat => (
-            <div key={cat} style={{
-              display: "flex", alignItems: "center", gap: 4,
-              background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99,
-              padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif"
-            }}>
-              {cat}
-              <button onClick={() => removeCategory(cat)} style={{
-                background: "none", border: "none", color: "#4a4870", cursor: "pointer",
-                fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2
-              }}>×</button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            value={newCategory}
-            onChange={e => setNewCategory(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addCategory()}
-            placeholder="Add category..."
-            style={{
-              flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8,
-              color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif",
-              fontSize: 13
-            }}
-          />
-          <button onClick={addCategory} style={{
-            background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8,
-            color: "#a78bfa", padding: "8px 14px", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600
-          }}>Add</button>
-        </div>
-      </div>
+      </Collapsible>
 
-      {/* Genres */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Genres</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {genres.map(g => (
-            <div key={g} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
-              {g}
-              <button onClick={() => removeGenre(g)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={newGenre} onChange={e => setNewGenre(e.target.value)} onKeyDown={e => e.key === "Enter" && addGenre()} placeholder="Add genre..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
-          <button onClick={addGenre} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
-        </div>
-      </div>
+      <Collapsible title="Merch categories" defaultOpen={false}>
+        <TagManager items={categories} onRemove={removeCategory} input={newCategory} onInput={setNewCategory} onAdd={addCategory} placeholder="Add category..." />
+      </Collapsible>
 
-      {/* Languages */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Languages</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {languages.map(l => (
-            <div key={l} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
-              {l}
-              <button onClick={() => removeLanguage(l)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={newLanguage} onChange={e => setNewLanguage(e.target.value)} onKeyDown={e => e.key === "Enter" && addLanguage()} placeholder="Add language..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
-          <button onClick={addLanguage} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
-        </div>
-      </div>
+      <Collapsible title="Genres" defaultOpen={false}>
+        <TagManager items={genres} onRemove={removeGenre} input={newGenre} onInput={setNewGenre} onAdd={addGenre} placeholder="Add genre..." />
+      </Collapsible>
 
-      {/* Venue sizes */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Venue sizes</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {venueSizes.map(v => (
-            <div key={v} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
-              {v}
-              <button onClick={() => removeVenueSize(v)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={newVenueSize} onChange={e => setNewVenueSize(e.target.value)} onKeyDown={e => e.key === "Enter" && addVenueSize()} placeholder="Add venue size..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
-          <button onClick={addVenueSize} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
-        </div>
-      </div>
+      <Collapsible title="Languages" defaultOpen={false}>
+        <TagManager items={languages} onRemove={removeLanguage} input={newLanguage} onInput={setNewLanguage} onAdd={addLanguage} placeholder="Add language..." />
+      </Collapsible>
 
-      {/* Data backup */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Data backup</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12, lineHeight: 1.5 }}>
-          Export your full concert database including ratings, merch, and notes. Save this JSON somewhere safe — you can use it to restore your data later.
-        </div>
+      <Collapsible title="Venue sizes" defaultOpen={false}>
+        <TagManager items={venueSizes} onRemove={removeVenueSize} input={newVenueSize} onInput={setNewVenueSize} onAdd={addVenueSize} placeholder="Add venue size..." />
+      </Collapsible>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={handleCsvExport} style={{
-            flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-            background: "none", border: "1px solid #2e2e50", color: "#c4c2f0",
-            fontFamily: "'DM Sans', sans-serif", fontWeight: 600
-          }}>Export CSV</button>
-        </div>
-
-        {!exportData ? (
-          <button onClick={handleExport} style={{
-            width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-            background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa",
-            fontFamily: "'DM Sans', sans-serif", fontWeight: 600
-          }}>Export data</button>
-        ) : (
-          <div>
-            <textarea
-              readOnly
-              value={exportData}
-              rows={5}
-              style={{
-                width: "100%", background: "#0c0c14", border: "1px solid #1f1f35",
-                borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10,
-                fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box",
-                marginBottom: 8
-              }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleCopy} style={{
-                flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30",
-                border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`,
-                color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa",
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 600
-              }}>{exportStatus === "copied" ? "✓ Copied!" : "Copy to clipboard"}</button>
-              <button onClick={() => setExportData(null)} style={{
-                padding: "9px 14px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                background: "none", border: "1px solid #1f1f35", color: "#6b6a8f",
-                fontFamily: "'DM Sans', sans-serif"
-              }}>×</button>
-            </div>
-          </div>
-        )}
-
-        <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 16, paddingTop: 16 }}>
-          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
-          {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Restored! Reloading...</div>}
-          {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8 }}>Could not read file — make sure it's a valid export</div>}
-          <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
-          <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
+      <Collapsible title="Data backup" defaultOpen={false}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Select JSON file</button>
-            <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Select CSV file</button>
+            <button onClick={handleCsvExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Export CSV</button>
+            {!exportData
+              ? <button onClick={handleExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Export JSON</button>
+              : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Close</button>
+            }
           </div>
-          <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
-          <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
+          {exportData && (
+            <div style={{ marginBottom: 10 }}>
+              <textarea readOnly value={exportData} rows={4} style={{ width: "100%", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
+              <button onClick={handleCopy} style={{ width: "100%", padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied!" : "Copy to clipboard"}</button>
+            </div>
+          )}
+          <div style={{ borderTop: "1px solid #1a1a2e", paddingTop: 14 }}>
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
+            {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Restored! Reloading...</div>}
+            {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8 }}>Could not read file — make sure it's a valid export</div>}
+            <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
+            <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Select JSON file</button>
+              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Select CSV file</button>
+            </div>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
+          </div>
         </div>
-      </div>
+      </Collapsible>
 
-      <div style={{ fontSize: 11, color: "#2e2e4a", fontFamily: "'DM Mono', monospace", textAlign: "center", marginBottom: 20 }}>
-        settings saved automatically
-      </div>
-
-      {/* Account */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Account</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-          Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
+      <Collapsible title="Account" defaultOpen={false}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
+            Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
+          </div>
+          <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Sign out</button>
         </div>
-        <button onClick={onSignOut} style={{
-          width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-          background: "none", border: "1px solid #2e2e50", color: "#6b6a8f",
-          fontFamily: "'DM Sans', sans-serif"
-        }}>Sign out</button>
-      </div>
+      </Collapsible>
     </div>
   );
 }

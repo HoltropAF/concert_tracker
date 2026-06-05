@@ -22,16 +22,16 @@ const VENUE_COLORS = DONUT_PALETTE;
 // COMPONENTS
 // ============================================================
 
-function StarRating({ value, onChange }) {
+function StarRating({ value, onChange, max = 5 }) {
   return (
-    <div style={{ display: "flex", gap: 6 }}>
-      {[1,2,3,4,5].map(n => (
+    <div style={{ display: "flex", gap: max === 10 ? 3 : 6 }}>
+      {Array.from({ length: max }, (_, i) => i + 1).map(n => (
         <button
           key={n}
           onClick={() => onChange(value === n ? null : n)}
           style={{
             background: "none", border: "none", cursor: "pointer",
-            fontSize: 22, color: n <= (value || 0) ? "#a78bfa" : "#2e2e4a",
+            fontSize: max === 10 ? 18 : 22, color: n <= (value || 0) ? "#a78bfa" : "#2e2e4a",
             padding: 0, lineHeight: 1
           }}
         >★</button>
@@ -530,10 +530,10 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Rating</div>
             {editing ? (
-              <StarRating value={form.rating} onChange={v => update("rating", v)} />
+              <StarRating value={form.rating} onChange={v => update("rating", v)} max={settings.ratingSystem || 5} />
             ) : (
               <div style={{ color: "#a78bfa", fontSize: 18 }}>
-                {concert.rating ? "★".repeat(concert.rating) + "☆".repeat(5 - concert.rating) : <span style={{ color: "#2e2e4a" }}>Not rated yet</span>}
+                {concert.rating ? "★".repeat(concert.rating) + "☆".repeat((settings.ratingSystem || 5) - concert.rating) : <span style={{ color: "#2e2e4a" }}>Not rated yet</span>}
               </div>
             )}
           </div>
@@ -2253,6 +2253,7 @@ function ArtistsView({ concerts, onOpen }) {
   const [filterMinSeen, setFilterMinSeen] = useState(0);
   const [filterUpcoming, setFilterUpcoming] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showSortDd, setShowSortDd] = useState(false);
 
   // Group all concerts by artist
   const artistMap = {};
@@ -2365,7 +2366,7 @@ function ArtistsView({ concerts, onOpen }) {
         <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center', overflowX: 'auto' }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button
-              onClick={() => { const dd = document.getElementById('art-sort-dd'); if (dd) dd.style.display = dd.style.display === 'block' ? 'none' : 'block'; }}
+              onClick={() => setShowSortDd(d => !d)}
               style={{
                 padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
                 background: sortBy !== 'most-seen' ? '#a78bfa' : '#13131f',
@@ -2378,11 +2379,13 @@ function ArtistsView({ concerts, onOpen }) {
               {sortBy === 'most-seen' ? 'Most seen' : sortBy === 'alpha' ? 'A–Z' : sortBy === 'recently-seen' ? 'Recent' : 'Rating'}
               <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
             </button>
-            <div id="art-sort-dd" style={{ display: 'none', position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 140 }}>
-              {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map((s, i, arr) => (
-                <button key={s.id} onClick={() => { setSortBy(s.id); document.getElementById('art-sort-dd').style.display = 'none'; }} style={{ width: '100%', background: sortBy === s.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: sortBy === s.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{s.label}</button>
-              ))}
-            </div>
+            {showSortDd && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 140 }}>
+                {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map((s, i, arr) => (
+                  <button key={s.id} onClick={() => { setSortBy(s.id); setShowSortDd(false); }} style={{ width: '100%', background: sortBy === s.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: sortBy === s.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{s.label}</button>
+                ))}
+              </div>
+            )}
           </div>
 
           <button onClick={() => setShowFilters(f => !f)} style={{
@@ -2458,14 +2461,10 @@ function ArtistsView({ concerts, onOpen }) {
                   : lastShow ? formatDate(lastShow.date) : ''}
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-              <div style={{
-                background: pastCount >= 3 ? '#a78bfa' : '#1a1a30',
-                color: pastCount >= 3 ? '#0c0c14' : '#a78bfa',
-                borderRadius: 99, padding: '3px 10px',
-                fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, lineHeight: 1.4
-              }}>
-                {pastCount}×
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: pastCount >= 3 ? '#a78bfa' : '#6b6a8f', lineHeight: 1 }}>{pastCount}</span>
+                <span style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>show{pastCount !== 1 ? 's' : ''}</span>
               </div>
               {avgRating != null && (
                 <div style={{ fontSize: 10, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>
@@ -3041,6 +3040,9 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
           <Row label="Most expensive" sub="Rows shown in list">
             <Stepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
           </Row>
+          <Row label="Rating system" sub="Stars used when rating shows">
+            <OptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
+          </Row>
         </div>
       </Collapsible>
 
@@ -3356,8 +3358,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Rating</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 <button onClick={() => setFilterRating(0)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === 0 ? '#a78bfa' : '#0c0c14', color: filterRating === 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === 0 ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Any</button>
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{'★'.repeat(n)}</button>
+                {Array.from({ length: settings.ratingSystem || 5 }, (_, i) => i + 1).map(n => (
+                  <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n}★</button>
                 ))}
               </div>
             </div>

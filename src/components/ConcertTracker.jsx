@@ -2248,19 +2248,59 @@ function FriendsView({ concerts }) {
 function ArtistsView({ concerts, onOpen }) {
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("most-seen");
+  const [filterGenre, setFilterGenre] = useState("all");
+  const [filterMinSeen, setFilterMinSeen] = useState(0);
+  const [filterUpcoming, setFilterUpcoming] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const past = concerts.filter(c => isPast(c.date));
-
-  // Group all concerts (past + upcoming) by artist
+  // Group all concerts by artist
   const artistMap = {};
   concerts.forEach(c => {
     if (!artistMap[c.artist]) artistMap[c.artist] = [];
     artistMap[c.artist].push(c);
   });
 
-  const artists = Object.entries(artistMap)
-    .sort((a, b) => b[1].filter(c => isPast(c.date)).length - a[1].filter(c => isPast(c.date)).length || a[0].localeCompare(b[0]))
-    .filter(([name]) => !search || name.toLowerCase().includes(search.toLowerCase()));
+  const allGenres = [...new Set(concerts.map(c => c.genre).filter(Boolean))].sort();
+
+  const artistEntries = Object.entries(artistMap).map(([name, shows]) => {
+    const pastShows = shows.filter(c => isPast(c.date));
+    const upcomingShows = shows.filter(c => !isPast(c.date));
+    const rated = pastShows.filter(c => c.rating);
+    const avgRating = rated.length ? rated.reduce((s, c) => s + c.rating, 0) / rated.length : null;
+    const sortedPast = [...pastShows].sort((a, b) => a.date.localeCompare(b.date));
+    const firstShow = sortedPast[0] || null;
+    const lastShow = sortedPast[sortedPast.length - 1] || null;
+    const genreCount = {};
+    shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+    const topGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    return { name, shows, pastShows, upcomingShows, pastCount: pastShows.length, avgRating, firstShow, lastShow, topGenre };
+  });
+
+  const activeFilterCount = [filterGenre !== 'all', filterMinSeen > 0, filterUpcoming].filter(Boolean).length;
+
+  const sorted = artistEntries
+    .filter(a => {
+      if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterGenre !== 'all' && a.topGenre !== filterGenre) return false;
+      if (filterMinSeen > 0 && a.pastCount < filterMinSeen) return false;
+      if (filterUpcoming && a.upcomingShows.length === 0) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'most-seen') return b.pastCount - a.pastCount || a.name.localeCompare(b.name);
+      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
+      if (sortBy === 'recently-seen') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
+      if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0) || b.pastCount - a.pastCount;
+      return 0;
+    });
+
+  const getBorderColor = (count) => {
+    if (count >= 5) return '#a78bfa';
+    if (count >= 3) return '#6d5fa8';
+    if (count >= 2) return '#3d3564';
+    return '#2e2e4a';
+  };
 
   if (selectedArtist) {
     const shows = artistMap[selectedArtist].sort((a,b) => b.date.localeCompare(a.date));
@@ -2268,7 +2308,6 @@ function ArtistsView({ concerts, onOpen }) {
     const upcomingShows = shows.filter(c => !isPast(c.date));
     return (
       <div style={{ padding: "0 0 100px" }}>
-        {/* Artist header */}
         <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => setSelectedArtist(null)} style={{
             background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1
@@ -2300,9 +2339,9 @@ function ArtistsView({ concerts, onOpen }) {
 
   return (
     <div style={{ padding: "0 0 100px" }}>
-      {/* Search */}
-      <div style={{ padding: "12px 16px 8px" }}>
-        <div style={{ position: "relative" }}>
+      {/* Search + controls */}
+      <div style={{ padding: "12px 16px 0" }}>
+        <div style={{ position: "relative", marginBottom: 8 }}>
           <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
           <input
             value={search}
@@ -2321,42 +2360,125 @@ function ArtistsView({ concerts, onOpen }) {
             }}>×</button>
           )}
         </div>
+
+        {/* Sort + filter pills */}
+        <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center', overflowX: 'auto' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => { const dd = document.getElementById('art-sort-dd'); if (dd) dd.style.display = dd.style.display === 'block' ? 'none' : 'block'; }}
+              style={{
+                padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: sortBy !== 'most-seen' ? '#a78bfa' : '#13131f',
+                color: sortBy !== 'most-seen' ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${sortBy !== 'most-seen' ? '#a78bfa' : '#1f1f35'}`,
+                fontWeight: sortBy !== 'most-seen' ? 700 : 400, fontFamily: "'DM Mono', monospace",
+                display: 'flex', alignItems: 'center', gap: 4
+              }}
+            >
+              {sortBy === 'most-seen' ? 'Most seen' : sortBy === 'alpha' ? 'A–Z' : sortBy === 'recently-seen' ? 'Recent' : 'Rating'}
+              <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
+            </button>
+            <div id="art-sort-dd" style={{ display: 'none', position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 140 }}>
+              {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map((s, i, arr) => (
+                <button key={s.id} onClick={() => { setSortBy(s.id); document.getElementById('art-sort-dd').style.display = 'none'; }} style={{ width: '100%', background: sortBy === s.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: sortBy === s.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => setShowFilters(f => !f)} style={{
+            background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
+            border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
+            borderRadius: 99, padding: '5px 11px', cursor: 'pointer',
+            color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12,
+            fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0
+          }}>
+            {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
+          </button>
+
+          {filterGenre !== 'all' && <button onClick={() => setFilterGenre('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterGenre} ×</button>}
+          {filterMinSeen > 0 && <button onClick={() => setFilterMinSeen(0)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterMinSeen}+ seen ×</button>}
+          {filterUpcoming && <button onClick={() => setFilterUpcoming(false)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#818cf8', border: '1px solid #818cf8', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>upcoming ×</button>}
+        </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Times seen</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[{v:0,label:'All'},{v:2,label:'2+'},{v:3,label:'3+'},{v:5,label:'5+'}].map(opt => (
+                  <button key={opt.v} onClick={() => setFilterMinSeen(opt.v)} style={{
+                    padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer',
+                    background: filterMinSeen === opt.v ? '#a78bfa' : '#0c0c14',
+                    color: filterMinSeen === opt.v ? '#0c0c14' : '#6b6a8f',
+                    border: `1px solid ${filterMinSeen === opt.v ? '#a78bfa' : '#1f1f35'}`,
+                    fontFamily: "'DM Mono', monospace"
+                  }}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
+            {allGenres.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <button onClick={() => setFilterGenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === 'all' ? '#a78bfa' : '#0c0c14', color: filterGenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {allGenres.map(g => (
+                    <button key={g} onClick={() => setFilterGenre(filterGenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === g ? '#a78bfa' : '#0c0c14', color: filterGenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === g ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Upcoming only</div>
+              <button onClick={() => setFilterUpcoming(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterUpcoming ? '#818cf8' : '#0c0c14', color: filterUpcoming ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterUpcoming ? '#818cf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Has upcoming</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Artist list */}
-      <div style={{ padding: "4px 16px" }}>
-        {artists.map(([name, shows]) => {
-          const pastCount = shows.filter(c => isPast(c.date)).length;
-          const upcomingCount = shows.filter(c => !isPast(c.date)).length;
-          const lastShow = shows.filter(c => isPast(c.date)).sort((a,b) => b.date.localeCompare(a.date))[0];
-          const tours = [...new Set(shows.map(c => c.tour).filter(Boolean))];
-          return (
-            <button key={name} onClick={() => setSelectedArtist(name)} style={{
-              width: "100%", textAlign: "left", background: "#13131f",
-              border: "1px solid #1f1f35", borderLeft: `3px solid ${upcomingCount > 0 ? "#a78bfa" : "#2e2e4a"}`,
-              borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{name}</div>
-                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-                  {lastShow ? `last: ${formatDate(lastShow.date)}` : upcomingCount > 0 ? `upcoming: ${formatDate(shows[0].date)}` : ""}
-                </div>
-                {tours.length > 0 && (
-                  <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {tours.join(" · ")}
-                  </div>
+      <div style={{ padding: "0 16px" }}>
+        {sorted.map(({ name, pastCount, upcomingShows, firstShow, lastShow, avgRating, topGenre }) => (
+          <button key={name} onClick={() => setSelectedArtist(name)} style={{
+            width: "100%", textAlign: "left", background: "#13131f",
+            border: "1px solid #1f1f35", borderLeft: `3px solid ${getBorderColor(pastCount)}`,
+            borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
+                {topGenre && (
+                  <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 99, background: '#1a1a30', color: '#6b6a8f', flexShrink: 0 }}>{topGenre}</span>
                 )}
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{pastCount}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase" }}>show{pastCount !== 1 ? "s" : ""}</div>
-                {upcomingCount > 0 && <div style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>+{upcomingCount} soon</div>}
+              <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+                {firstShow && lastShow && firstShow.date !== lastShow.date
+                  ? `${firstShow.date.slice(0,4)} – ${lastShow.date.slice(0,4)} · last ${formatDate(lastShow.date)}`
+                  : lastShow ? formatDate(lastShow.date) : ''}
               </div>
-            </button>
-          );
-        })}
-        {artists.length === 0 && (
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+              <div style={{
+                background: pastCount >= 3 ? '#a78bfa' : '#1a1a30',
+                color: pastCount >= 3 ? '#0c0c14' : '#a78bfa',
+                borderRadius: 99, padding: '3px 10px',
+                fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, lineHeight: 1.4
+              }}>
+                {pastCount}×
+              </div>
+              {avgRating != null && (
+                <div style={{ fontSize: 10, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>
+                  {'★'.repeat(Math.round(avgRating))} {avgRating.toFixed(1)}
+                </div>
+              )}
+              {upcomingShows.length > 0 && (
+                <div style={{ fontSize: 9, color: '#818cf8', fontFamily: "'DM Mono', monospace" }}>+{upcomingShows.length} soon</div>
+              )}
+            </div>
+          </button>
+        ))}
+        {sorted.length === 0 && (
           <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no artists found</div>
         )}
       </div>
@@ -3079,7 +3201,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <button onClick={() => setView(id)} style={{
       flex: 1, background: 'none', border: 'none', cursor: 'pointer',
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-      padding: '8px 0', color: view === id ? '#a78bfa' : '#2e2e50',
+      padding: '8px 0', color: view === id ? '#a78bfa' : '#5a5880',
     }}>
       <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
       <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.05em', fontWeight: view === id ? 700 : 400 }}>{label}</span>

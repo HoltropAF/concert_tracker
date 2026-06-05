@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   subgenres: ['Indie pop','Dutch pop','Latin pop','Pop punk','Indie rock','Alternative rock','Folk rock','Drum & Bass','EDM','Dance','Singer-songwriter'],
   languages: ['English','Dutch','Spanish','French','German','Korean','Japanese','Portuguese','Other'],
   venueSizes: ['Club', 'Small hall', 'Mid-venue', 'Arena', 'Stadium'],
+  hiddenChartGroups: [],
 }
 
 export const FRIENDS = []

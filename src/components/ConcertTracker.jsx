@@ -996,8 +996,8 @@ function StatsView({ concerts, settings = {} }) {
       id: "artists", label: "Artists",
       charts: [
         { id: "genres-pie", label: "🥧 Genres" },
-        { id: "artists",    label: "🎤 Top artists" },
         { id: "shows",      label: "📅 Shows over time" },
+        { id: "artists",    label: "🎤 Top artists" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
         { id: "language",   label: "🗣️ Language" },
       ]
@@ -1041,13 +1041,15 @@ function StatsView({ concerts, settings = {} }) {
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
 
-  const activeGroup = CHART_GROUPS.find(g => g.id === chartGroup);
+  const hiddenChartGroups = settings.hiddenChartGroups || [];
+  const visibleChartGroups = CHART_GROUPS.filter(g => !hiddenChartGroups.includes(g.id));
+  const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0];
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
   const renderChart = (id) => {
     switch(id) {
       case "shows": {
-        const sView = chartOpt("shows", "bars");
+        const sView = chartOpt("shows", "cumulative");
         const maxAll = Math.max(...Object.values(allYearCount), 1);
         const hmAllYears = Object.keys(allYearMonthCount).sort();
         const hmMax = Math.max(...hmAllYears.flatMap(y => Array.from({length:12}, (_,m) => allYearMonthCount[y]?.[m] || 0)), 1);
@@ -1501,14 +1503,14 @@ function StatsView({ concerts, settings = {} }) {
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             <ChartToggle options={[{id:"overview",label:"Overview"},{id:"group",label:"Group size"}]} value={soloView} onChange={v => setChartOpt("solo", v)} />
             {soloView === "overview" ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                <Donut segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#1f1f35" }]} size={110} />
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <Donut segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#1f1f35" }]} size={100} />
                 <div style={{ flex: 1 }}>
                   {[{ label: "With friends", value: withFriends.length, color: "#a78bfa" }, { label: "Solo", value: solo.length, color: "#6b6a8f" }].map(s => (
-                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                      <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{s.label}</span>
-                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{s.value} ({Math.round(s.value/Math.max(past.length,1)*100)}%)</span>
+                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                      <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1 }}>{s.label}</span>
+                      <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{s.value} ({Math.round(s.value/Math.max(past.length,1)*100)}%)</span>
                     </div>
                   ))}
                 </div>
@@ -1575,9 +1577,10 @@ function StatsView({ concerts, settings = {} }) {
         const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
         const ratingYears = Object.keys(ratingByYear).sort();
         const maxAvgRating = 5;
+        const ratingColors = { 5:"#a78bfa", 4:"#818cf8", 3:"#38bdf8", 2:"#34d399", 1:"#6b6a8f" };
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
+            <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"pie",label:"Pie"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
             {rView === "dist" ? (
               <>
                 {[5,4,3,2,1].map(n => (
@@ -1594,6 +1597,19 @@ function StatsView({ concerts, settings = {} }) {
                   <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
                 </div>
               </>
+            ) : rView === "pie" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Donut size={110} segments={[5,4,3,2,1].filter(n => ratingDist[n]).map(n => ({ value: ratingDist[n], color: ratingColors[n] }))} centerText={`${avgRating}★`} />
+                <div style={{ flex: 1 }}>
+                  {[5,4,3,2,1].filter(n => ratingDist[n]).map(n => (
+                    <div key={n} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: 2, background: ratingColors[n], flexShrink: 0 }} />
+                      <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1 }}>{"★".repeat(n)}</span>
+                      <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{Math.round(ratingDist[n]/rated.length*100)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               ratingYears.map(y => {
                 const avg = ratingByYear[y].sum / ratingByYear[y].count;
@@ -1625,7 +1641,15 @@ function StatsView({ concerts, settings = {} }) {
       }
       case "friends-chart": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <ListStat title="" items={topFriends} suffix=" shows" />
+          {topFriends.map(([name, count], i) => (
+            <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
+              </div>
+              <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count} shows</span>
+            </div>
+          ))}
         </div>
       );
       case "venues": {
@@ -1751,17 +1775,17 @@ function StatsView({ concerts, settings = {} }) {
             ) : gpSource.length === 0
               ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyMsg} to see this</div>
               : (
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <Donut size={140} showLabels label="shows" segments={[
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Donut size={110} showLabels label="shows" segments={[
                     ...top5Genres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
                     ...(othersCount > 0 ? [{ value: othersCount, color: "#2e2e4a" }] : []),
                   ]} />
                   <div style={{ flex: 1 }}>
                     {genreLegend.map(({ name, count, color }) => (
-                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 13, flex: 1 }}>{name}</span>
-                        <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{Math.round(count/genreTotal*100)}%</span>
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: 2, background: color, flexShrink: 0 }} />
+                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 12, flex: 1 }}>{name}</span>
+                        <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{Math.round(count/genreTotal*100)}%</span>
                       </div>
                     ))}
                   </div>
@@ -1778,11 +1802,32 @@ function StatsView({ concerts, settings = {} }) {
           langs.forEach(l => { if (l) languageCount[l] = (languageCount[l] || 0) + 1; });
         });
         const languageEntries = Object.entries(languageCount).sort((a,b) => b[1]-a[1]);
+        const langView = chartOpt("language", "list");
+        const langTotal = languageEntries.reduce((s,[,n]) => s+n, 0);
+        const top5Lang = languageEntries.slice(0, 5);
+        const langOthers = languageEntries.slice(5).reduce((s,[,n]) => s+n, 0);
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             {languageEntries.length === 0
               ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a language to see this</div>
-              : <ListStat title="" items={languageEntries} suffix="x" />
+              : <>
+                  <ChartToggle options={[{id:"list",label:"List"},{id:"pie",label:"Pie"}]} value={langView} onChange={v => setChartOpt("language", v)} />
+                  {langView === "list"
+                    ? <ListStat title="" items={languageEntries} suffix="x" />
+                    : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <Donut size={110} segments={[...top5Lang.map(([,n],i) => ({ value: n, color: GENRE_COLORS[i] })), ...(langOthers > 0 ? [{ value: langOthers, color: "#2e2e4a" }] : [])]} />
+                        <div style={{ flex: 1 }}>
+                          {[...top5Lang, ...(langOthers > 0 ? [["Others", langOthers]] : [])].map(([name, count], i) => (
+                            <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                              <div style={{ width: 7, height: 7, borderRadius: 2, background: i < 5 ? GENRE_COLORS[i] : "#2e2e4a", flexShrink: 0 }} />
+                              <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 12, flex: 1 }}>{name}</span>
+                              <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{Math.round(count/langTotal*100)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                  }
+                </>
             }
           </div>
         );
@@ -2022,7 +2067,7 @@ function StatsView({ concerts, settings = {} }) {
         <div style={{ padding: "0" }}>
           {/* Category grid — 1 row, no scrolling */}
           <div style={{ display: "flex", gap: 5, padding: "10px 16px", borderBottom: "1px solid #0d1a14" }}>
-            {CHART_GROUPS.map(g => (
+            {visibleChartGroups.map(g => (
               <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
                 flex: 1, background: chartGroup === g.id ? "#1a1a30" : "none",
                 border: `1px solid ${chartGroup === g.id ? "#a78bfa" : "#1f1f35"}`,
@@ -2776,6 +2821,29 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 
       <Collapsible title="Venue sizes" defaultOpen={false}>
         <TagManager items={venueSizes} onRemove={removeVenueSize} input={newVenueSize} onInput={setNewVenueSize} onAdd={addVenueSize} placeholder="Add venue size..." />
+      </Collapsible>
+
+      <Collapsible title="Chart sections" defaultOpen={false}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+          {[{id:"artists",label:"Artists"},{id:"friends",label:"Friends"},{id:"venues",label:"Venues"},{id:"financial",label:"Financial"},{id:"merch",label:"Merch"}].map(g => {
+            const hidden = (local.hiddenChartGroups||[]).includes(g.id);
+            return (
+              <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ color: hidden ? "#4a4870" : "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{g.label}</span>
+                <button onClick={() => {
+                  const cur = local.hiddenChartGroups || [];
+                  lUpdate("hiddenChartGroups", hidden ? cur.filter(x => x !== g.id) : [...cur, g.id]);
+                }} style={{
+                  padding: "3px 12px", borderRadius: 99, fontSize: 11, cursor: "pointer",
+                  background: hidden ? "#13131f" : "#1a1a30",
+                  color: hidden ? "#4a4870" : "#a78bfa",
+                  border: `1px solid ${hidden ? "#2e2e50" : "#a78bfa"}`,
+                  fontFamily: "'DM Mono', monospace"
+                }}>{hidden ? "Hidden" : "Visible"}</button>
+              </div>
+            );
+          })}
+        </div>
       </Collapsible>
 
       <Collapsible title="Data backup" defaultOpen={false}>

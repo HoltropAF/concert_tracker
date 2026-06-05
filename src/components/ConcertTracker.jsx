@@ -707,6 +707,13 @@ function StatsView({ concerts, settings = {} }) {
   past.forEach(c => { venueCount[c.venue] = (venueCount[c.venue] || 0) + 1; });
   const topVenues = Object.entries(venueCount).sort((a,b) => b[1]-a[1]).slice(0, topVenuesRows);
 
+  const venueRoomCount = {};
+  past.forEach(c => {
+    const key = c.room ? `${c.venue} · ${c.room}` : c.venue;
+    venueRoomCount[key] = (venueRoomCount[key] || 0) + 1;
+  });
+  const topVenuesByRoom = Object.entries(venueRoomCount).sort((a,b) => b[1]-a[1]).slice(0, topVenuesRows);
+
   // Countries
   const countryCount = {};
   past.forEach(c => { countryCount[c.country] = (countryCount[c.country] || 0) + 1; });
@@ -946,11 +953,11 @@ function StatsView({ concerts, settings = {} }) {
     {
       id: "artists", label: "Artists",
       charts: [
-        { id: "artists",   label: "🎤 Top artists" },
-        { id: "shows",     label: "📅 Shows over time" },
+        { id: "artists",    label: "🎤 Top artists" },
+        { id: "shows",      label: "📅 Shows over time" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
-        ...(topGenres.length > 0 ? [{ id: "genres", label: "🎸 Genres" }] : []),
         { id: "genres-pie", label: "🥧 Genres" },
+        ...(topGenres.length > 0 ? [{ id: "genres", label: "🎸 Genres (list)" }] : []),
         { id: "language",   label: "🗣️ Language" },
       ]
     },
@@ -1341,21 +1348,29 @@ function StatsView({ concerts, settings = {} }) {
                   ))}
                 </div>
               </div>
-            ) : (
-              groupSizeLabels.map((k, i) => {
-                const count = groupSizeDist[k] || 0;
-                const label = k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`;
-                return (
-                  <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 62, flexShrink: 0 }}>{label}</span>
-                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", borderRadius: 3, background: groupSizeColors[i], width: `${(count/maxGroupSize)*100}%` }} />
-                    </div>
-                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}</span>
+            ) : (() => {
+              const gsSegments = groupSizeLabels.map((k, i) => ({ value: groupSizeDist[k] || 0, color: groupSizeColors[i] })).filter(s => s.value > 0);
+              const gsTotal = gsSegments.reduce((s, x) => s + x.value, 0);
+              const gsLegendLabels = groupSizeLabels.map(k => k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`);
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                  <Donut segments={gsSegments} size={110} centerText={null} />
+                  <div style={{ flex: 1 }}>
+                    {groupSizeLabels.map((k, i) => {
+                      const count = groupSizeDist[k] || 0;
+                      if (!count) return null;
+                      return (
+                        <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: 2, background: groupSizeColors[i], flexShrink: 0 }} />
+                          <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{gsLegendLabels[i]}</span>
+                          <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{count} ({Math.round(count/gsTotal*100)}%)</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })
-            )}
+                </div>
+              );
+            })()}
           </div>
         );
       }
@@ -1448,11 +1463,15 @@ function StatsView({ concerts, settings = {} }) {
           <ListStat title="" items={topFriends} suffix=" shows" />
         </div>
       );
-      case "venues": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <ListStat title="" items={topVenues} suffix="x" />
-        </div>
-      );
+      case "venues": {
+        const vView = chartOpt("venues", "venue");
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
+            <ListStat title="" items={vView === "room" ? topVenuesByRoom : topVenues} suffix="x" />
+          </div>
+        );
+      }
       case "merch-overview": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {/* Summary row */}
@@ -1555,7 +1574,10 @@ function StatsView({ concerts, settings = {} }) {
               ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <Donut size={140} showLabels label="shows" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                  <Donut size={140} showLabels label="shows" segments={[
+                    ...top5Genres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
+                    ...(othersCount > 0 ? [{ value: othersCount, color: "#2e2e4a" }] : []),
+                  ]} />
                   <div style={{ flex: 1 }}>
                     {genreLegend.map(({ name, count, color }) => (
                       <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>

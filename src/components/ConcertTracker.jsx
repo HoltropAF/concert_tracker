@@ -1325,8 +1325,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {ysView === "line" && (() => {
             const n = activeYearsYS.length;
             if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
-            const xOf = i => (i / (n - 1)) * 274 + 3;
-            const yOf = v => 86 - (v / maxSpendYS) * 76;
+            const leftPad = 40;
+            const chartW = 280;
+            const totalW = leftPad + chartW;
+            const xOf = i => leftPad + (i / (n - 1)) * (chartW - 6) + 3;
+            const yTop = 8; const yBot = 86;
+            const yOf = v => yBot - (v / maxSpendYS) * (yBot - yTop);
+            const mid = maxSpendYS / 2;
             const spendPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearSpend[y] || 0) }));
             const spendPath = "M " + spendPts.map(p => `${p.x},${p.y}`).join(" L ");
             const avgPts = activeYearsYS.map((y, i) => {
@@ -1356,9 +1361,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
                   </div>
                 </div>
-                <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
+                <svg width="100%" height={100} viewBox={`0 0 ${totalW} 92`} preserveAspectRatio="none">
                   <defs><linearGradient id="ysGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f472b6" stopOpacity="0.2"/><stop offset="100%" stopColor="#f472b6" stopOpacity="0"/></linearGradient></defs>
-                  <path d={spendPath + ` L ${spendPts[n-1].x},88 L ${spendPts[0].x},88 Z`} fill="url(#ysGrad)" />
+                  {/* Gridlines */}
+                  <line x1={leftPad} y1={yTop} x2={totalW} y2={yTop} stroke="#1f1f35" strokeWidth="1" />
+                  <line x1={leftPad} y1={yOf(mid)} x2={totalW} y2={yOf(mid)} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
+                  <line x1={leftPad} y1={yBot} x2={totalW} y2={yBot} stroke="#1f1f35" strokeWidth="1" />
+                  {/* Y axis labels */}
+                  <text x={leftPad - 4} y={yTop + 3} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€{Math.round(maxSpendYS)}</text>
+                  <text x={leftPad - 4} y={yOf(mid) + 3} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€{Math.round(mid)}</text>
+                  <text x={leftPad - 4} y={yBot + 1} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€0</text>
+                  {/* Chart lines */}
+                  <path d={spendPath + ` L ${spendPts[n-1].x},${yBot} L ${spendPts[0].x},${yBot} Z`} fill="url(#ysGrad)" />
                   <path d={spendPath} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   {spendPts.map((pt, i) => <circle key={activeYearsYS[i]} cx={pt.x} cy={pt.y} r="3" fill="#f472b6" />)}
                   {avgPath && <path d={avgPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
@@ -1366,7 +1380,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   <path d={merchPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   {merchPts.map((pt, i) => <circle key={activeYearsYS[i] + 'm'} cx={pt.x} cy={pt.y} r="3" fill="#34d399" />)}
                 </svg>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, paddingLeft: leftPad }}>
                   <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[0]}</span>
                   <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[activeYearsYS.length - 1]}</span>
                 </div>
@@ -1946,9 +1960,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               { label: "countries", value: Object.keys(countryCount).length, nav: null },
               { label: "avg / year", value: avgPerYear ?? "—", nav: null },
             ].map(b => (
-              <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
+              <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
+                <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
               </div>
             ))}
           </div>}
@@ -1967,9 +1981,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   { label: "avg ticket", value: avgAll ? `€${avgAll.toFixed(0)}` : "—", color: "#f472b6" },
                   { label: `avg ${thisYear}`, value: avgThisYear ? `€${avgThisYear.toFixed(0)}` : "—", color: "#38bdf8" },
                 ].map(b => (
-                  <div key={b.label} onClick={() => { setStatsTab("charts"); setChartGroup("financial"); setSelectedChart("year-spend"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 6px", textAlign: "center", cursor: "pointer" }}>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
-                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
+                  <div key={b.label} onClick={() => { setStatsTab("charts"); setChartGroup("financial"); setSelectedChart("year-spend"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 6px", textAlign: "center", cursor: "pointer" }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
+                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
                   </div>
                 ))}
               </div>

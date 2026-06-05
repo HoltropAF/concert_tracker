@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
 
@@ -122,6 +122,7 @@ export function useConcerts(userId) {
 
 export function useSettings(userId) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const settingsRef = useRef(DEFAULT_SETTINGS)
 
   useEffect(() => {
     if (!userId) return
@@ -131,16 +132,19 @@ export function useSettings(userId) {
       .eq('user_id', userId)
       .single()
       .then(({ data }) => {
-        if (data?.data) setSettings({ ...DEFAULT_SETTINGS, ...data.data })
+        if (data?.data) {
+          const merged = { ...DEFAULT_SETTINGS, ...data.data }
+          settingsRef.current = merged
+          setSettings(merged)
+        }
       })
   }, [userId])
 
   const saveSetting = useCallback(async (key, value) => {
-    setSettings(prev => {
-      const next = { ...prev, [key]: value }
-      supabase.from('settings').upsert({ user_id: userId, data: next, updated_at: new Date().toISOString() })
-      return next
-    })
+    const next = { ...settingsRef.current, [key]: value }
+    settingsRef.current = next
+    setSettings(next)
+    await supabase.from('settings').upsert({ user_id: userId, data: next, updated_at: new Date().toISOString() })
   }, [userId])
 
   return { settings, saveSetting }

@@ -99,7 +99,7 @@ function ConcertCard({ concert, onOpen }) {
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           {concert.rating && (
             <div style={{ color: "#a78bfa", fontSize: 13 }}>
-              {"★".repeat(concert.rating)}
+              {"★".repeat(Math.min(concert.rating, 10))}
             </div>
           )}
           {!past && (
@@ -533,7 +533,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
               <StarRating value={form.rating} onChange={v => update("rating", v)} max={settings.ratingSystem || 5} />
             ) : (
               <div style={{ color: "#a78bfa", fontSize: 18 }}>
-                {concert.rating ? "★".repeat(concert.rating) + "☆".repeat((settings.ratingSystem || 5) - concert.rating) : <span style={{ color: "#2e2e4a" }}>Not rated yet</span>}
+                {concert.rating ? "★".repeat(Math.min(concert.rating, 10)) + "☆".repeat(Math.max(0, (settings.ratingSystem || 5) - concert.rating)) : <span style={{ color: "#2e2e4a" }}>Not rated yet</span>}
               </div>
             )}
           </div>
@@ -2655,7 +2655,7 @@ function ArtistShowRow({ concert, onOpen }) {
         </div>
         {concert.tour && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>{concert.tour}</div>}
         {concert.friends.length > 0 && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>w. {concert.friends.join(", ")}</div>}
-        {concert.rating && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(concert.rating)}</div>}
+        {concert.rating && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(Math.min(concert.rating, 10))}</div>}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         {concert.ticketPrice && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{concert.ticketPrice}</div>}

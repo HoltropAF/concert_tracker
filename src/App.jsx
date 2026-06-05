@@ -63,7 +63,12 @@ function useGuestMode() {
     localStorage.removeItem('guest_mode')
   }
 
-  return { concerts, settings, saveConcert, deleteConcert, saveSetting, clearGuest }
+  const initWithSamples = useCallback((samples) => {
+    localStorage.setItem('guest_concerts', JSON.stringify(samples))
+    setConcerts(samples)
+  }, [])
+
+  return { concerts, settings, saveConcert, deleteConcert, saveSetting, clearGuest, initWithSamples }
 }
 
 export default function App() {
@@ -93,7 +98,7 @@ export default function App() {
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')
     if (!localStorage.getItem('guest_concerts')) {
-      localStorage.setItem('guest_concerts', JSON.stringify(SAMPLE_CONCERTS))
+      guest.initWithSamples(SAMPLE_CONCERTS)
     }
     setGuestMode(true)
   }

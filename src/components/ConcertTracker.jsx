@@ -3126,43 +3126,26 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
             </div>
           </div>
-          {view === 'home' && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setShowAdd(true)} style={{
-                background: '#1a1a30', border: '1px solid #a78bfa',
-                borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
-                color: '#a78bfa', fontSize: 18, lineHeight: 1, fontWeight: 300
-              }}>+</button>
-              <button onClick={() => setShowFilters(f => !f)} style={{
-                position: 'relative', background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
-                border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
-                borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
-                color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 13
-              }}>
-                ⚙
-                {activeFilterCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: -4, right: -4, background: '#a78bfa',
-                    color: '#0c0c14', borderRadius: 99, fontSize: 9, fontWeight: 800,
-                    width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>{activeFilterCount}</span>
-                )}
-              </button>
-            </div>
-          )}
         </div>
 
         {view === 'home' && (
-          <div style={{ position: 'relative', marginBottom: 10 }}>
-            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Artist, venue, friend, tour..."
-              style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`,
-                borderRadius: 10, color: '#c4c2f0', padding: '9px 36px 9px 32px',
-                fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
-            {search && (
-              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
-            )}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Artist, venue, friend, tour..."
+                style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`,
+                  borderRadius: 10, color: '#c4c2f0', padding: '9px 36px 9px 32px',
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
+              )}
+            </div>
+            <button onClick={() => setShowAdd(true)} style={{
+              background: '#1a1a30', border: '1px solid #a78bfa',
+              borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+              color: '#a78bfa', fontSize: 18, lineHeight: 1, fontWeight: 300, flexShrink: 0
+            }}>+</button>
           </div>
         )}
 
@@ -3201,6 +3184,15 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 </div>
               )}
             </div>
+            <button onClick={() => setShowFilters(f => !f)} style={{
+              background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
+              border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
+              borderRadius: 99, padding: '5px 11px', cursor: 'pointer',
+              color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12,
+              fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0
+            }}>
+              {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
+            </button>
             {filterFriend !== 'all' && <button onClick={() => setFilterFriend('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#f472b6', border: '1px solid #f472b6', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterFriend} ×</button>}
             {filterVenue !== 'all' && <button onClick={() => setFilterVenue('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#38bdf8', border: '1px solid #38bdf8', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterVenue} ×</button>}
             {filterRating !== 0 && <button onClick={() => setFilterRating(0)} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace" }}>{'★'.repeat(filterRating)}+ ×</button>}

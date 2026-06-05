@@ -2879,24 +2879,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         }}>{saved ? "Saved" : "Save"}</button>
       </div>
 
-      <Collapsible title="Charts" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
-          <Row label="Top artists rows" sub="How many artists to show in charts">
-            <Stepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
-          </Row>
-          <Row label="Top friends rows" sub="How many friends to show in charts">
-            <Stepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
-          </Row>
-          <Row label="Top venues rows" sub="How many venues to show in charts">
-            <Stepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
-          </Row>
-          <Row label="Most expensive rows" sub="How many shows in expensive list">
-            <Stepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
-          </Row>
-        </div>
-      </Collapsible>
-
-      <Collapsible title="Defaults" defaultOpen={false}>
+      <Collapsible title="Preferences" defaultOpen={false}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
           <Row label="Opening tab" sub="Which tab opens on launch">
             <OptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => lUpdate("defaultTab", v)} />
@@ -2907,31 +2890,37 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
           <Row label="Stats tab" sub="Which stats view opens first">
             <OptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
           </Row>
+          <Row label="Top artists" sub="Rows shown in charts">
+            <Stepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
+          </Row>
+          <Row label="Top friends" sub="Rows shown in charts">
+            <Stepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
+          </Row>
+          <Row label="Top venues" sub="Rows shown in charts">
+            <Stepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
+          </Row>
+          <Row label="Most expensive" sub="Rows shown in list">
+            <Stepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
+          </Row>
         </div>
       </Collapsible>
 
-      <Collapsible title="Merch categories" defaultOpen={false}>
-        <TagManager items={categories} onRemove={removeCategory} input={newCategory} onInput={setNewCategory} onAdd={addCategory} placeholder="Add category..." />
+      <Collapsible title="Tags" defaultOpen={false}>
+        {[
+          { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
+          { label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
+          { label: "Languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
+          { label: "Venue sizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
+          { label: "Merch items", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        ].map(({ label, ...props }) => (
+          <div key={label} style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}</div>
+            <TagManager {...props} />
+          </div>
+        ))}
       </Collapsible>
 
-      <Collapsible title="Genres" defaultOpen={false}>
-        <TagManager items={genres} onRemove={removeGenre} input={newGenre} onInput={setNewGenre} onAdd={addGenre} placeholder="Add genre..." />
-      </Collapsible>
-
-      <Collapsible title="Subgenres" defaultOpen={false}>
-        <TagManager items={subgenres} onRemove={removeSubgenre} input={newSubgenre} onInput={setNewSubgenre} onAdd={addSubgenre} placeholder="Add subgenre..." />
-      </Collapsible>
-
-      <Collapsible title="Languages" defaultOpen={false}>
-        <TagManager items={languages} onRemove={removeLanguage} input={newLanguage} onInput={setNewLanguage} onAdd={addLanguage} placeholder="Add language..." />
-      </Collapsible>
-
-      <Collapsible title="Venue sizes" defaultOpen={false}>
-        <TagManager items={venueSizes} onRemove={removeVenueSize} input={newVenueSize} onInput={setNewVenueSize} onAdd={addVenueSize} placeholder="Add venue size..." />
-      </Collapsible>
-
-
-      <Collapsible title="Data backup" defaultOpen={false}>
+      <Collapsible title="Data" defaultOpen={false}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <button onClick={handleCsvExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Export CSV</button>
@@ -2958,6 +2947,22 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
             </div>
             <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
             <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
+          </div>
+        </div>
+      </Collapsible>
+
+      <Collapsible title="Help" defaultOpen={false}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
+          {[
+            { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+            { label: "📋 View all issues & requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+            { label: "📦 Releases & changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+            { label: "📖 Documentation (wiki)", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+          ].map(({ label, url }) => (
+            <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "#a78bfa", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textDecoration: "none", paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #1a1a2e" }}>{label} ↗</a>
+          ))}
+          <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
+            Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Use the ⚙ in Stats to show/hide sections
           </div>
         </div>
       </Collapsible>

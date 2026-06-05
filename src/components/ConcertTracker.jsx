@@ -1005,8 +1005,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
     {
       id: "friends", label: "Friends",
       charts: [
-        { id: "friends-chart", label: "👥 Most shows with" },
         { id: "solo",          label: "👯 Solo vs with friends" },
+        { id: "friends-chart", label: "👥 Most shows with" },
       ]
     },
     {
@@ -1549,7 +1549,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
           </div>
         ) : (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 14 }}>
-            <Donut segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} size={110} />
+            <Donut showLabels segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} size={110} />
             <div style={{ flex: 1 }}>
               {venueEntries.map(([name, n], i) => (
                 <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
@@ -1635,10 +1635,21 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
         const artistItems = aView === "alpha"
           ? [...topArtists].sort((a, b) => a[0].localeCompare(b[0]))
           : topArtists;
+        const medals = ["🥇","🥈","🥉"];
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
-            <ListStat title="" items={artistItems} suffix="x" />
+            {artistItems.map(([name, count], i) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: aView === "count" && i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
+                    {aView === "count" && i < 3 ? medals[i] : `#${i+1}`}
+                  </span>
+                  <span style={{ color: "#c4c2f0", fontSize: 13 }}>{name}</span>
+                </div>
+                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}x</span>
+              </div>
+            ))}
           </div>
         );
       }
@@ -1777,8 +1788,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
         const emptyLabel = gpData === "sub" ? "subgenres" : "genres";
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
               <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={gpData} onChange={v => setChartOpt("gp-data", v)} />
+              <div style={{ width: 1, height: 18, background: "#2e2e50", flexShrink: 0 }} />
               <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("gp-view", v)} />
             </div>
             {gpView === "list" ? (
@@ -1789,15 +1801,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
               ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <Donut size={110} label="shows" segments={[
+                  <Donut size={110} showLabels label="shows" segments={[
                     ...top4.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
                     ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
                   ]} />
                   <div style={{ flex: 1 }}>
                     {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
-                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: 2, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 12 }}>{name}</span>
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
                       </div>
                     ))}
                   </div>
@@ -2013,16 +2025,16 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={90} centerText="Genres" segments={[
+                        <Donut size={80} showLabels centerText="Genres" segments={[
                           ...topGenres.slice(0,3).map(([g,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
                           ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", marginTop: 8 }}>
-                        {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others", topGenres.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                      <div style={{ display: "flex", flexWrap: "nowrap", gap: 6, marginTop: 6, overflow: "hidden" }}>
+                        {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others"]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
                           </div>
                         ))}
                       </div>
@@ -2037,16 +2049,16 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={90} centerText={["VENUE", "SIZE"]} segments={[
+                        <Donut size={80} showLabels centerText={["VENUE", "SIZE"]} segments={[
                           ...venueEntries.slice(0,3).map(([name,n],i) => ({ value: n, color: VENUE_COLORS[i] })),
                           ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", marginTop: 8 }}>
-                        {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others", venueEntries.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                      <div style={{ display: "flex", flexWrap: "nowrap", gap: 6, marginTop: 6, overflow: "hidden" }}>
+                        {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others"]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
                           </div>
                         ))}
                       </div>

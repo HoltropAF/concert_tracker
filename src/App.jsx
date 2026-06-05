@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
-import { DEFAULT_SETTINGS } from './lib/data'
+import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
@@ -92,6 +92,9 @@ export default function App() {
 
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')
+    if (!localStorage.getItem('guest_concerts')) {
+      localStorage.setItem('guest_concerts', JSON.stringify(SAMPLE_CONCERTS))
+    }
     setGuestMode(true)
   }
 

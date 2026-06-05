@@ -60,7 +60,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
       <div style={{ maxWidth: 360, width: '100%' }}>
 
         {/* Hero: wave + title */}
-        <div className="auth-block-1" style={{ textAlign: 'center', marginBottom: 36 }}>
+        <div className="auth-block-1" style={{ textAlign: 'center', marginBottom: 36, paddingTop: 48 }}>
           {/* Animated sound wave bars */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 5, height: 40, marginBottom: 24 }}>
             {bars.map((b, i) => (
@@ -95,7 +95,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         </div>
 
         {/* Feature pills */}
-        <div className="auth-block-2" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 96 }}>
+        <div className="auth-block-2" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 160 }}>
           {['track shows', 'rate nights', 'find patterns', 'friend profiles'].map(label => (
             <span key={label} style={{
               fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em',

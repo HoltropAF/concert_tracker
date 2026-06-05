@@ -744,9 +744,13 @@ function StatsView({ concerts, settings = {} }) {
 
   const monthCount = {};
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const yearMonthCount = {};
   past.forEach(c => {
     const m = parseInt(c.date.split("-")[1]) - 1;
+    const y = getYear(c.date);
     monthCount[m] = (monthCount[m] || 0) + 1;
+    if (!yearMonthCount[y]) yearMonthCount[y] = {};
+    yearMonthCount[y][m] = (yearMonthCount[y][m] || 0) + 1;
   });
 
   // Top 10 most expensive
@@ -900,6 +904,20 @@ function StatsView({ concerts, settings = {} }) {
     );
   };
 
+  const ChartToggle = ({ options, value, onChange }) => (
+    <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+      {options.map(o => (
+        <button key={o.id} onClick={() => onChange(o.id)} style={{
+          padding: "3px 10px", borderRadius: 99, fontSize: 10, cursor: "pointer",
+          fontFamily: "'DM Mono', monospace", fontWeight: 600,
+          background: value === o.id ? "#a78bfa" : "none",
+          color: value === o.id ? "#0c0c14" : "#5a5880",
+          border: `1px solid ${value === o.id ? "#a78bfa" : "#1f1f35"}`,
+        }}>{o.label}</button>
+      ))}
+    </div>
+  );
+
   const CHART_GROUPS = [
     {
       id: "artists", label: "Artists",
@@ -949,26 +967,63 @@ function StatsView({ concerts, settings = {} }) {
   const [chartGroup, setChartGroup] = useState("artists");
   const [selectedChart, setSelectedChart] = useState("artists");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [chartOptions, setChartOptions] = useState({});
+  const chartOpt = (id, def) => chartOptions[id] ?? def;
+  const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
 
   const activeGroup = CHART_GROUPS.find(g => g.id === chartGroup);
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
   const renderChart = (id) => {
     switch(id) {
-      case "year-count": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {years.map(([y, count], i) => null) && null}
-          {Object.entries(yearCount).sort((a,b) => b[0].localeCompare(a[0])).map(([y, count], i, arr) => (
-            <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
-                <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / Math.max(...Object.values(yearCount))) * 80) }} />
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      );
+      case "year-count": {
+        const ycView = chartOpt("year-count", "bars");
+        const sortedYears = Object.keys(yearCount).sort();
+        const maxYC = Math.max(...Object.values(yearCount), 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ycView} onChange={v => setChartOpt("year-count", v)} />
+            {ycView === "bars" ? (
+              Object.entries(yearCount).sort((a,b) => b[0].localeCompare(a[0])).map(([y, count]) => (
+                <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                    <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / maxYC) * 80) }} />
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}</span>
+                  </div>
+                </div>
+              ))
+            ) : (() => {
+              const counts = sortedYears.map(y => yearCount[y]);
+              const n = sortedYears.length;
+              if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
+              const pts = sortedYears.map((y, i) => `${(i / (n - 1)) * 274 + 3},${86 - (counts[i] / maxYC) * 76}`);
+              const linePath = "M " + pts.join(" L ");
+              return (
+                <>
+                  <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="ycGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    <path d={linePath + ` L ${(n-1)/(n-1)*274+3},88 L 3,88 Z`} fill="url(#ycGrad)" />
+                    <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    {sortedYears.map((y, i) => (
+                      <circle key={y} cx={(i / (n - 1)) * 274 + 3} cy={86 - (counts[i] / maxYC) * 76} r="3" fill="#a78bfa" />
+                    ))}
+                  </svg>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYears[0]}</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYears[sortedYears.length - 1]}</span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        );
+      }
       case "year-spend": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {/* Legend */}
@@ -1082,26 +1137,64 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         </div>
       );
-      case "months": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80, marginBottom: 6 }}>
-            {monthNames.map((name, i) => {
-              const count = monthCount[i] || 0;
-              return (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ fontSize: 9, color: count > 0 ? "#a78bfa" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2 }}>{count || ""}</div>
-                  <div style={{ width: "100%", background: count > 0 ? "#a78bfa" : "#0e0e1a", borderRadius: "2px 2px 0 0", height: `${Math.max(3, (count/Math.max(maxMonth,1))*60)}px` }} />
+      case "months": {
+        const mView = chartOpt("months", "bars");
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"heatmap",label:"Heatmap"}]} value={mView} onChange={v => setChartOpt("months", v)} />
+            {mView === "bars" ? (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80, marginBottom: 6 }}>
+                  {monthNames.map((name, i) => {
+                    const count = monthCount[i] || 0;
+                    return (
+                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <div style={{ fontSize: 9, color: count > 0 ? "#a78bfa" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2 }}>{count || ""}</div>
+                        <div style={{ width: "100%", background: count > 0 ? "#a78bfa" : "#0e0e1a", borderRadius: "2px 2px 0 0", height: `${Math.max(3, (count / Math.max(maxMonth, 1)) * 60)}px` }} />
+                      </div>
+                    );
+                  })}
                 </div>
+                <div style={{ display: "flex", gap: 3 }}>
+                  {monthNames.map((name, i) => (
+                    <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>
+                  ))}
+                </div>
+              </>
+            ) : (() => {
+              const hmYears = Object.keys(yearMonthCount).sort();
+              const hmMax = Math.max(...hmYears.flatMap(y => Array.from({length:12}, (_,m) => yearMonthCount[y]?.[m] || 0)), 1);
+              return (
+                <>
+                  <div style={{ display: "flex", marginLeft: 30 }}>
+                    {monthNames.map((name, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>
+                    ))}
+                  </div>
+                  {hmYears.map(y => (
+                    <div key={y} style={{ display: "flex", alignItems: "center", marginTop: 3 }}>
+                      <span style={{ width: 30, fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{y}</span>
+                      {Array.from({length: 12}, (_, m) => {
+                        const count = yearMonthCount[y]?.[m] || 0;
+                        const intensity = count / hmMax;
+                        return (
+                          <div key={m} style={{
+                            flex: 1, aspectRatio: "1", borderRadius: 2, margin: "0 1px",
+                            background: count > 0 ? `rgba(167,139,250,${0.15 + intensity * 0.85})` : "#0e0e1a",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {count > 0 && <span style={{ fontSize: 7, color: intensity > 0.55 ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{count}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </>
               );
-            })}
+            })()}
           </div>
-          <div style={{ display: "flex", gap: 3 }}>
-            {monthNames.map((name, i) => (
-              <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>
-            ))}
-          </div>
-        </div>
-      );
+        );
+      }
       case "solo": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
           <Donut segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#1f1f35" }]} size={110} />
@@ -1164,11 +1257,18 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         </div>
       );
-      case "artists": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <ListStat title="" items={topArtists} suffix="x" />
-        </div>
-      );
+      case "artists": {
+        const aView = chartOpt("artists", "count");
+        const artistItems = aView === "alpha"
+          ? [...topArtists].sort((a, b) => a[0].localeCompare(b[0]))
+          : topArtists;
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
+            <ListStat title="" items={artistItems} suffix="x" />
+          </div>
+        );
+      }
       case "friends-chart": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           <ListStat title="" items={topFriends} suffix=" shows" />

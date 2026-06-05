@@ -2888,12 +2888,12 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
           <Row label="Color theme" sub="Changes instantly, no save needed">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
-                <button key={o.id} onClick={() => onUpdate('colorTheme', o.id)} style={{
+                <button key={o.id} onClick={() => { onUpdate('colorTheme', o.id); lUpdate('colorTheme', o.id); }} style={{
                   padding: "4px 10px", borderRadius: 99, fontSize: 11, cursor: "pointer",
-                  background: (settings.colorTheme||'purple') === o.id ? "#a78bfa" : "#13131f",
-                  color: (settings.colorTheme||'purple') === o.id ? "#0c0c14" : "#6b6a8f",
-                  border: `1px solid ${(settings.colorTheme||'purple') === o.id ? "#a78bfa" : "#1f1f35"}`,
-                  fontWeight: (settings.colorTheme||'purple') === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
+                  background: (local.colorTheme||'purple') === o.id ? "#a78bfa" : "#13131f",
+                  color: (local.colorTheme||'purple') === o.id ? "#0c0c14" : "#6b6a8f",
+                  border: `1px solid ${(local.colorTheme||'purple') === o.id ? "#a78bfa" : "#1f1f35"}`,
+                  fontWeight: (local.colorTheme||'purple') === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
                 }}>{o.label}</button>
               ))}
             </div>

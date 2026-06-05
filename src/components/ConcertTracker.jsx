@@ -2355,7 +2355,7 @@ function FriendsView({ concerts, onOpen }) {
             borderRadius: 99, padding: '5px 11px', cursor: 'pointer',
             color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12,
             fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0
-          }}>Filters</button>
+          }}>Sort</button>
           {sortBy !== 'most-shows' && <button onClick={() => setSortBy('most-shows')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>↕ {sortBy === 'alpha' ? 'A–Z' : 'Recent'} ×</button>}
         </div>
         {showSortPanel && (

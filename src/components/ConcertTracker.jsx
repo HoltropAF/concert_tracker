@@ -858,7 +858,7 @@ function StatsView({ concerts, settings = {} }) {
       const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
       const lx = cx + labelR * Math.cos(midRad), ly = cy + labelR * Math.sin(midRad);
       const rawLabel = labelTexts ? labelTexts[idx] : `${Math.round(pct*100)}%`;
-      const arcLabel = rawLabel && rawLabel.length > 7 ? rawLabel.slice(0, 6) + '…' : rawLabel;
+      const arcLabel = (!labelTexts && rawLabel && rawLabel.length > 7) ? rawLabel.slice(0, 6) + '…' : rawLabel;
       return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
     });
     const pad = showLabels ? size*0.28 : 0;
@@ -1253,17 +1253,8 @@ function StatsView({ concerts, settings = {} }) {
           {topGenres.length === 0
             ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No genre data yet</div>
             : (
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <Donut size={140} showLabels label="shows" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
-                <div style={{ flex: 1 }}>
-                  {topGenres.map(([g, n], i) => (
-                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: GENRE_COLORS[i % GENRE_COLORS.length], flexShrink: 0 }} />
-                      <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{g}</span>
-                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{n}</span>
-                    </div>
-                  ))}
-                </div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Donut size={140} showLabels label="shows" labelTexts={topGenres.map(([g], i) => i < 3 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
               </div>
             )
           }
@@ -1451,8 +1442,8 @@ function StatsView({ concerts, settings = {} }) {
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "center" }}>
-                      <Donut size={100} centerText="GENRE" showLabels labelTexts={topGenres.map(([g], i) => i < 4 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                    <div style={{ display: "flex", justifyContent: "center", cursor: "pointer" }} onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); }}>
+                      <Donut size={100} centerText="Genres" showLabels labelTexts={topGenres.map(([g], i) => i < 4 ? g : null)} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
                     </div>
                   )}
                 </div>

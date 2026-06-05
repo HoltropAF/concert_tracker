@@ -14,6 +14,10 @@ const getYear = (dateStr) => dateStr.slice(0, 4);
 const today = new Date();
 const isPast = (dateStr) => new Date(dateStr + "T00:00:00") <= today;
 
+const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee","#facc15","#fb7185"];
+const GENRE_COLORS = DONUT_PALETTE;
+const VENUE_COLORS = DONUT_PALETTE;
+
 // ============================================================
 // COMPONENTS
 // ============================================================
@@ -100,24 +104,44 @@ function ConcertCard({ concert, onOpen }) {
 }
 
 function SetlistSection({ concert }) {
-  const searchUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
-  const isSpotify = concert.setlistUrl?.includes("spotify");
-  const linkStyle = (primary) => ({
-    display: "inline-flex", alignItems: "center", gap: 6,
-    padding: "8px 14px", borderRadius: 8, fontSize: 12,
-    background: "#13131f", border: `1px solid ${primary ? "#2a4a3a" : "#1f1f35"}`,
-    color: primary ? "#a78bfa" : "#4a4870", textDecoration: "none",
-    fontFamily: "'DM Mono', monospace"
-  });
+  const [setlist, setSetlist] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchSetlist = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query = encodeURIComponent(`${concert.artist} ${concert.venue} ${concert.date.slice(0,10)}`);
+      const dateFormatted = concert.date.replace(/-/g, "");
+      const res = await fetch(
+        `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(concert.artist)}&date=${concert.date.split("-").reverse().join("-")}`,
+        { headers: { "x-api-key": "undefined", Accept: "application/json" } }
+      );
+      // setlist.fm requires an API key — we'll link to it instead
+      throw new Error("API_KEY_NEEDED");
+    } catch (e) {
+      setError("api_key");
+    }
+    setLoading(false);
+  };
+
+  const setlistUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {concert.setlistUrl && (
-        <a href={concert.setlistUrl} target="_blank" rel="noopener noreferrer" style={linkStyle(true)}>
-          {isSpotify ? "🎧 Spotify playlist ↗" : "🎵 Setlist ↗"}
-        </a>
-      )}
-      <a href={searchUrl} target="_blank" rel="noopener noreferrer" style={linkStyle(!concert.setlistUrl)}>
-        🔍 Search on setlist.fm ↗
+    <div>
+      <a
+        href={setlistUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "8px 14px", borderRadius: 8, fontSize: 12,
+          background: "#13131f", border: "1px solid #2a4a3a",
+          color: "#a78bfa", textDecoration: "none", fontFamily: "'DM Mono', monospace"
+        }}
+      >
+        🎵 View on setlist.fm ↗
       </a>
     </div>
   );
@@ -347,20 +371,20 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           <div style={{ marginBottom: 16 }}>
             <div style={labelStyle}>Venue size</div>
             {editing ? (
-              <div style={{ display:"flex", gap:6 }}>
-                {[{id:"small",label:"Club"},{id:"mid",label:"Mid-size"},{id:"arena",label:"Arena"}].map(vs => (
-                  <button key={vs.id} onClick={()=>update("venueSize",form.venueSize===vs.id?null:vs.id)} style={{
-                    flex:1, padding:"6px 8px", borderRadius:99, fontSize:12, cursor:"pointer",
-                    background: form.venueSize===vs.id ? "#a78bfa" : "#13131f",
-                    color: form.venueSize===vs.id ? "#0c0c14" : "#6b6a8f",
-                    border: `1px solid ${form.venueSize===vs.id ? "#a78bfa" : "#2e2e50"}`,
-                    fontWeight: form.venueSize===vs.id ? 700 : 400
-                  }}>{vs.label}</button>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {(settings.venueSizes||[]).map(vs => (
+                  <button key={vs} onClick={()=>update("venueSize",form.venueSize===vs?null:vs)} style={{
+                    padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
+                    background: form.venueSize===vs ? "#a78bfa" : "#13131f",
+                    color: form.venueSize===vs ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${form.venueSize===vs ? "#a78bfa" : "#2e2e50"}`,
+                    fontWeight: form.venueSize===vs ? 700 : 400
+                  }}>{vs}</button>
                 ))}
               </div>
             ) : (
               <div style={{ color:"#c4c2f0", fontSize:14 }}>
-                {concert.venueSize === "small" ? "Club" : concert.venueSize === "mid" ? "Mid-size" : concert.venueSize === "arena" ? "Arena" : concert.venueSize}
+                {concert.venueSize}
               </div>
             )}
           </div>
@@ -387,22 +411,28 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         )}
 
         {/* Language */}
-        {(editing || concert.language) && (
+        {(editing || (Array.isArray(concert.language) ? concert.language.length : concert.language)) && (
           <div style={{ marginBottom: 16 }}>
             <div style={labelStyle}>Language</div>
             {editing ? (
               <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                {(settings.languages||[]).map(l => (
-                  <button key={l} onClick={()=>update("language",form.language===l?null:l)} style={{
-                    padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
-                    background: form.language===l ? "#a78bfa" : "#13131f",
-                    color: form.language===l ? "#0c0c14" : "#6b6a8f",
-                    border: `1px solid ${form.language===l ? "#a78bfa" : "#2e2e50"}`,
-                    fontWeight: form.language===l ? 700 : 400
-                  }}>{l}</button>
-                ))}
+                {(() => {
+                  const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : [];
+                  return (settings.languages||[]).map(l => {
+                    const on = langs.includes(l);
+                    return (
+                      <button key={l} onClick={()=>update("language", on ? langs.filter(x=>x!==l) : [...langs, l])} style={{
+                        padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer",
+                        background: on ? "#a78bfa" : "#13131f",
+                        color: on ? "#0c0c14" : "#6b6a8f",
+                        border: `1px solid ${on ? "#a78bfa" : "#2e2e50"}`,
+                        fontWeight: on ? 700 : 400
+                      }}>{l}</button>
+                    );
+                  });
+                })()}
               </div>
-            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{concert.language}</div>}
+            ) : <div style={{ color:"#c4c2f0", fontSize:14 }}>{(Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : []).join(', ')}</div>}
           </div>
         )}
 
@@ -588,16 +618,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         {past && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Setlist</div>
-            {editing ? (
-              <input
-                value={form.setlistUrl || ""}
-                onChange={e => update("setlistUrl", e.target.value)}
-                placeholder="Paste Spotify or setlist.fm URL..."
-                style={inputStyle}
-              />
-            ) : (
-              <SetlistSection concert={concert} />
-            )}
+            <SetlistSection concert={concert} />
           </div>
         )}
 
@@ -728,14 +749,13 @@ function StatsView({ concerts, settings = {} }) {
   const sortedPast = [...past].sort((a,b) => a.date.localeCompare(b.date));
   const cumulative = sortedPast.map((c, i) => ({ date: c.date.slice(0,7), count: i+1, artist: c.artist }));
 
-  // Venue size buckets (field-based)
-  const venueSizes = { "Club / Small": 0, "Mid-size": 0, "Arena": 0, "Festival": 0 };
+  // Venue size buckets (field-based, dynamic)
+  const venueSizeCount = {};
   past.forEach(c => {
-    if (c.type === "festival") venueSizes["Festival"]++;
-    else if (c.venueSize === "arena") venueSizes["Arena"]++;
-    else if (c.venueSize === "mid") venueSizes["Mid-size"]++;
-    else venueSizes["Club / Small"]++;
+    const sz = c.type === "festival" ? "Festival" : c.venueSize;
+    if (sz) venueSizeCount[sz] = (venueSizeCount[sz] || 0) + 1;
   });
+  const venueEntries = Object.entries(venueSizeCount).sort((a,b) => b[1]-a[1]);
 
   // Avg shows per year
   const avgPerYear = years.length ? (past.length / years.length).toFixed(1) : null;
@@ -817,31 +837,37 @@ function StatsView({ concerts, settings = {} }) {
   );
 
   // Donut chart (SVG)
-  const Donut = ({ segments, size = 120, label = "total" }) => {
+  const Donut = ({ segments, size = 120, label = "total", showLabels = false }) => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total === 0) return null;
-    const cx = size / 2, cy = size / 2;
-    const r = size * 0.36, stroke = size * 0.15;
-    const GAP = segments.length > 1 ? 3 : 0;
+    const cx = size/2, cy = size/2, r = size*0.38, stroke = size*0.14;
+    const labelR = r + stroke/2 + size*0.12;
     let angle = -90;
     const arcs = segments.map(seg => {
       const pct = seg.value / total;
-      const segDeg = pct * 360 - GAP;
-      const s = ((angle + GAP / 2) * Math.PI) / 180;
-      const e = ((angle + GAP / 2 + Math.max(0.1, segDeg)) * Math.PI) / 180;
+      const start = angle;
       angle += pct * 360;
-      const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
-      const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
-      return { ...seg, pct, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
+      const startRad = (start * Math.PI) / 180;
+      const endRad = ((angle-0.5) * Math.PI) / 180;
+      const midRad = ((start + (pct*360)/2) * Math.PI) / 180;
+      const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
+      const x2 = cx + r * Math.cos(endRad),   y2 = cy + r * Math.sin(endRad);
+      const lx = cx + labelR * Math.cos(midRad), ly = cy + labelR * Math.sin(midRad);
+      const large = pct > 0.5 ? 1 : 0;
+      return { ...seg, d: `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`, pct, lx, ly };
     });
+    const pad = showLabels ? size*0.22 : 0;
+    const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
     return (
-      <svg width={size} height={size}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0d0d1a" strokeWidth={stroke} />
-        {arcs.map((a, i) => a.d && (
+      <svg width={size + pad*2} height={size + pad*2} viewBox={vb}>
+        {arcs.map((a, i) => (
           <path key={i} d={a.d} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="butt" />
         ))}
-        <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size * 0.15} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
-        <text x={cx} y={cy + size * 0.16} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size * 0.09} fontFamily="'DM Mono',monospace">{label}</text>
+        {showLabels && arcs.map((a, i) => a.pct > 0.05 && (
+          <text key={`l${i}`} x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="middle" fill={a.color} fontSize={size*0.09} fontFamily="'DM Mono',monospace">{Math.round(a.pct*100)}%</text>
+        ))}
+        <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.13} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
+        <text x={cx} y={cy+size*0.14} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
       </svg>
     );
   };
@@ -855,6 +881,8 @@ function StatsView({ concerts, settings = {} }) {
         { id: "months",     label: "📆 Busiest months" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
         ...(topGenres.length > 0 ? [{ id: "genres", label: "🎸 Genres" }] : []),
+        { id: "genres-pie", label: "🥧 Genres" },
+        { id: "language",   label: "🗣️ Language" },
       ]
     },
     {
@@ -925,6 +953,10 @@ function StatsView({ concerts, settings = {} }) {
               <div style={{ width: 10, height: 10, borderRadius: 2, background: "#38bdf8" }} />
               <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Avg ticket</span>
             </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#34d399" }} />
+              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
+            </div>
           </div>
           {/* Grouped bars */}
           {(() => {
@@ -935,8 +967,10 @@ function StatsView({ concerts, settings = {} }) {
             return activeYears.map(y => {
               const spend = yearSpend[y] || 0;
               const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
+              const merch = yearMerchSpend[y] || 0;
               const spendW = Math.max(4, (spend / maxSpend) * 100);
               const avgW = avg ? Math.max(4, (avg / maxSpend) * 100) : 0;
+              const merchW = merch > 0 ? Math.max(4, (merch / maxSpend) * 100) : 0;
               return (
                 <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
@@ -951,6 +985,13 @@ function StatsView({ concerts, settings = {} }) {
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <div style={{ height: 7, borderRadius: 3, background: "#38bdf8", width: `${avgW}%`, opacity: 0.8, transition: "width 0.5s ease" }} />
                         <span style={{ fontSize: 10, color: "#38bdf8", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{avg.toFixed(0)}</span>
+                      </div>
+                    )}
+                    {/* Merch bar */}
+                    {merch > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ height: 7, borderRadius: 3, background: "#34d399", width: `${merchW}%`, opacity: 0.85, transition: "width 0.5s ease" }} />
+                        <span style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(merch)}</span>
                       </div>
                     )}
                   </div>
@@ -1047,21 +1088,19 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         </div>
       );
-      case "venue-size": return (
+      case "venue-size": return venueEntries.length === 0 ? (
+        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+          <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No venue size data yet</div>
+        </div>
+      ) : (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
-          <Donut segments={[
-            { value: venueSizes["Arena"], color: "#a78bfa" },
-            { value: venueSizes["Mid-size"], color: "#f472b6" },
-            { value: venueSizes["Club / Small"], color: "#7c3aed" },
-            { value: venueSizes["Festival"], color: "#4f46e5" },
-          ].filter(s=>s.value>0)} size={110} />
+          <Donut segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} size={110} />
           <div style={{ flex: 1 }}>
-            {[{ label: "Arena", color: "#a78bfa" }, { label: "Mid-size", color: "#f472b6" }, { label: "Club / Small", color: "#7c3aed" }, { label: "Festival", color: "#4f46e5" }]
-              .filter(s => venueSizes[s.label] > 0).map(s => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{s.label}</span>
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{venueSizes[s.label]}</span>
+            {venueEntries.map(([name, n], i) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: VENUE_COLORS[i % VENUE_COLORS.length], flexShrink: 0 }} />
+                <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{name}</span>
+                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{n}</span>
               </div>
             ))}
           </div>
@@ -1191,6 +1230,43 @@ function StatsView({ concerts, settings = {} }) {
           }
         </div>
       );
+      case "genres-pie": return (
+        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+          {topGenres.length === 0
+            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No genre data yet</div>
+            : (
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <Donut size={140} showLabels label="shows" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                <div style={{ flex: 1 }}>
+                  {topGenres.map(([g, n], i) => (
+                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: GENRE_COLORS[i % GENRE_COLORS.length], flexShrink: 0 }} />
+                      <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{g}</span>
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          }
+        </div>
+      );
+      case "language": {
+        const languageCount = {};
+        past.forEach(c => {
+          const langs = Array.isArray(c.language) ? c.language : c.language ? [c.language] : [];
+          langs.forEach(l => { if (l) languageCount[l] = (languageCount[l] || 0) + 1; });
+        });
+        const languageEntries = Object.entries(languageCount).sort((a,b) => b[1]-a[1]);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            {languageEntries.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No language data yet</div>
+              : <ListStat title="" items={languageEntries} suffix="x" />
+            }
+          </div>
+        );
+      }
       default: return null;
     }
   };
@@ -1228,25 +1304,6 @@ function StatsView({ concerts, settings = {} }) {
               </div>
             ))}
           </div>
-
-          {/* Seen as breakdown */}
-          {(() => {
-            const seenAsCounts = { Headliner: 0, Support: 0, Guest: 0, Festival: 0 };
-            past.forEach(c => { if (c.seenAs && seenAsCounts[c.seenAs] !== undefined) seenAsCounts[c.seenAs]++; });
-            const hasAny = Object.values(seenAsCounts).some(v => v > 0);
-            if (!hasAny) return null;
-            const colors = { Headliner: "#a78bfa", Support: "#38bdf8", Guest: "#f472b6", Festival: "#34d399" };
-            return (
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 14px", marginBottom: 8, display: "flex", gap: 0 }}>
-                {Object.entries(seenAsCounts).filter(([,v]) => v > 0).map(([k, v], i, arr) => (
-                  <div key={k} style={{ flex: 1, textAlign: "center", borderRight: i < arr.length - 1 ? "1px solid #1a1a2e" : "none" }}>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: colors[k], lineHeight: 1 }}>{v}</div>
-                    <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 4 }}>{k}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
 
           {/* Row 2: total spend / avg ticket all time / avg ticket this year */}
           {(() => {
@@ -1290,7 +1347,7 @@ function StatsView({ concerts, settings = {} }) {
               const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
-              const W = 300, H = 90;
+              const W = 300, H = 80;
               const firstMs = new Date(allSorted[0].date).getTime();
               // extend x-axis to last upcoming show
               const lastMs = new Date(allSorted[n-1].date).getTime();
@@ -1327,10 +1384,6 @@ function StatsView({ concerts, settings = {} }) {
                 y, x: Math.max(8, Math.min(W-16, ((new Date(`${y}-01-01`).getTime() - firstMs) / rangeMs) * (W-6) + 3))
               }));
 
-              const yTickStep = Math.max(5, Math.round(Math.ceil(n / 4) / 5) * 5);
-              const yTicks = [];
-              for (let v = yTickStep; v < n; v += yTickStep) yTicks.push(v);
-
               return (
                 <svg width="100%" viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
                   <defs>
@@ -1339,16 +1392,6 @@ function StatsView({ concerts, settings = {} }) {
                       <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
                     </linearGradient>
                   </defs>
-                  {/* Y-axis grid lines + labels */}
-                  {yTicks.map(v => {
-                    const yp = H - 6 - (v / n) * (H - 14);
-                    return (
-                      <g key={v}>
-                        <line x1={0} y1={yp} x2={W} y2={yp} stroke="#1a1a2e" strokeWidth="1" strokeDasharray="2,4" />
-                        <text x={2} y={yp - 2} fill="#2e2e50" fontSize="7" fontFamily="DM Mono,monospace">{v}</text>
-                      </g>
-                    );
-                  })}
                   {yearLabels.map(({y, x}) => (
                     <g key={y}>
                       <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
@@ -1372,58 +1415,53 @@ function StatsView({ concerts, settings = {} }) {
             })()}
           </div>
 
-          {/* Two donuts side by side */}
+          {/* Donut cards — stacked full width */}
           {(() => {
-            const GENRE_COLORS = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee"];
-            const genreCount = {};
-            past.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
-            const genreEntries = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0, 6);
-            const hasGenres = genreEntries.length > 0;
-            const donutLegendRow = (color, label, value, total) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+            const cardStyle = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
+            const titleStyle = { fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 };
+            const placeholderStyle = { color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "8px 0" };
+            const legendStyle = { display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 10 };
+            const legendItem = (color, name, value, total) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 6, height: 6, borderRadius: 1, background: color, flexShrink: 0 }} />
-                <span style={{ fontSize: 9, color: "#c4c2f0", flex: 1, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-                <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{Math.round(value/Math.max(total,1)*100)}%</span>
+                <span style={{ fontSize: 10, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{name}</span>
+                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{Math.round(value / Math.max(total, 1) * 100)}%</span>
               </div>
             );
+            const genreTotal = topGenres.reduce((s, [, n]) => s + n, 0);
+            const venueTotal = venueEntries.reduce((s, [, n]) => s + n, 0);
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-                {/* Genres (or solo/friends fallback) */}
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>{hasGenres ? "Genre" : "Solo vs friends"}</div>
-                  <Donut size={90} label="shows" segments={hasGenres
-                    ? genreEntries.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))
-                    : [{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#2e2e4a" }]
-                  } />
-                  <div style={{ marginTop: 10, width: "100%" }}>
-                    {hasGenres
-                      ? genreEntries.map(([g, n], i) => donutLegendRow(GENRE_COLORS[i % GENRE_COLORS.length], g, n, past.length))
-                      : [{ label: "w. friends", value: withFriends.length, color: "#a78bfa" }, { label: "solo", value: solo.length, color: "#2e2e4a" }]
-                          .map(s => donutLegendRow(s.color, s.label, s.value, past.length))
-                    }
-                  </div>
+              <>
+                {/* Genre */}
+                <div style={cardStyle}>
+                  <div style={titleStyle}>Genre</div>
+                  {topGenres.length === 0 ? (
+                    <div style={placeholderStyle}>add genres to your shows</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <Donut size={130} showLabels label="shows" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                      <div style={legendStyle}>
+                        {topGenres.map(([g, n], i) => legendItem(GENRE_COLORS[i % GENRE_COLORS.length], g, n, genreTotal))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Venue size */}
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Venue size</div>
-                  <Donut size={90} label="shows" segments={[
-                    { value: venueSizes["Arena"], color: "#a78bfa" },
-                    { value: venueSizes["Mid-size"], color: "#f472b6" },
-                    { value: venueSizes["Club / Small"], color: "#38bdf8" },
-                    { value: venueSizes["Festival"], color: "#2e2e4a" },
-                  ].filter(s => s.value > 0)} />
-                  <div style={{ marginTop: 10, width: "100%" }}>
-                    {[
-                      { label: "arena", color: "#a78bfa", key: "Arena" },
-                      { label: "mid-size", color: "#f472b6", key: "Mid-size" },
-                      { label: "club", color: "#38bdf8", key: "Club / Small" },
-                      { label: "festival", color: "#2e2e4a", key: "Festival" },
-                    ].filter(s => venueSizes[s.key] > 0)
-                      .map(s => donutLegendRow(s.color, s.label, venueSizes[s.key], past.length))}
-                  </div>
+                <div style={cardStyle}>
+                  <div style={titleStyle}>Venue size</div>
+                  {venueEntries.length === 0 ? (
+                    <div style={placeholderStyle}>set venue size on your shows</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <Donut size={130} showLabels label="shows" segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} />
+                      <div style={legendStyle}>
+                        {venueEntries.map(([name, n], i) => legendItem(VENUE_COLORS[i % VENUE_COLORS.length], name, n, venueTotal))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </>
             );
           })()}
 
@@ -1695,7 +1733,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
     artist: '', date: '', venue: '', room: '', city: '', country: '',
     type: 'concert', tour: '', support: [], friends: [], solo: false,
     rating: null, ticketPrice: null, merch: [], notes: '',
-    genre: null, language: null, venueSize: null, seenAs: null
+    genre: null, language: [], venueSize: null, seenAs: null
   })
   const [supportInput, setSupportInput] = useState('')
   const [friendInput, setFriendInput] = useState('')
@@ -1809,15 +1847,15 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
 
         <div style={{ marginBottom: 16 }}>
           {fieldLabel('Venue size')}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[{id:'small',label:'Club'},{id:'mid',label:'Mid-size'},{id:'arena',label:'Arena'}].map(vs => (
-              <button key={vs.id} onClick={() => update('venueSize', form.venueSize===vs.id ? null : vs.id)} style={{
-                flex: 1, padding: '6px 8px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-                background: form.venueSize===vs.id ? '#a78bfa' : '#13131f',
-                color: form.venueSize===vs.id ? '#0c0c14' : '#6b6a8f',
-                border: `1px solid ${form.venueSize===vs.id ? '#a78bfa' : '#2e2e50'}`,
-                fontWeight: form.venueSize===vs.id ? 700 : 400
-              }}>{vs.label}</button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(settings.venueSizes||[]).map(vs => (
+              <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{
+                padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                background: form.venueSize===vs ? '#a78bfa' : '#13131f',
+                color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f',
+                border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`,
+                fontWeight: form.venueSize===vs ? 700 : 400
+              }}>{vs}</button>
             ))}
           </div>
         </div>
@@ -1886,15 +1924,21 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
         <div style={{ marginBottom: 16 }}>
           {fieldLabel('Language')}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {(settings.languages||[]).map(l => (
-              <button key={l} onClick={() => update('language', form.language===l ? null : l)} style={{
-                padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-                background: form.language===l ? '#a78bfa' : '#13131f',
-                color: form.language===l ? '#0c0c14' : '#6b6a8f',
-                border: `1px solid ${form.language===l ? '#a78bfa' : '#2e2e50'}`,
-                fontWeight: form.language===l ? 700 : 400
-              }}>{l}</button>
-            ))}
+            {(() => {
+              const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : [];
+              return (settings.languages||[]).map(l => {
+                const on = langs.includes(l);
+                return (
+                  <button key={l} onClick={() => update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{
+                    padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                    background: on ? '#a78bfa' : '#13131f',
+                    color: on ? '#0c0c14' : '#6b6a8f',
+                    border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`,
+                    fontWeight: on ? 700 : 400
+                  }}>{l}</button>
+                );
+              });
+            })()}
           </div>
         </div>
 
@@ -1931,8 +1975,6 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [] }) {
 }
 
 function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSignOut, userEmail }) {
-  const [local, setLocal] = useState({ ...settings });
-  const [saved, setSaved] = useState(false);
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
@@ -1940,44 +1982,56 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const [newCategory, setNewCategory] = useState("");
   const [newGenre, setNewGenre] = useState("");
   const [newLanguage, setNewLanguage] = useState("");
+  const [newVenueSize, setNewVenueSize] = useState("");
 
-  const update = (key, value) => { setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
-
-  const handleSave = () => {
-    Object.entries(local).forEach(([key, value]) => onUpdate(key, value));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+  const categories = settings.merchCategories || [];
+  const genres = settings.genres || [];
+  const languages = settings.languages || [];
+  const venueSizes = settings.venueSizes || [];
 
   const addCategory = () => {
-    const t = newCategory.trim();
-    if (!t || (local.merchCategories||[]).map(c=>c.toLowerCase()).includes(t.toLowerCase())) return;
-    update("merchCategories", [...(local.merchCategories||[]), t]);
+    const trimmed = newCategory.trim();
+    if (!trimmed || categories.map(c=>c.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    onUpdate("merchCategories", [...categories, trimmed]);
     setNewCategory("");
   };
-  const removeCategory = (cat) => update("merchCategories", (local.merchCategories||[]).filter(c => c !== cat));
+
+  const removeCategory = (cat) => {
+    onUpdate("merchCategories", categories.filter(c => c !== cat));
+  };
 
   const addGenre = () => {
-    const t = newGenre.trim();
-    if (!t || (local.genres||[]).map(g=>g.toLowerCase()).includes(t.toLowerCase())) return;
-    update("genres", [...(local.genres||[]), t]);
+    const trimmed = newGenre.trim();
+    if (!trimmed || genres.map(g=>g.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    onUpdate("genres", [...genres, trimmed]);
     setNewGenre("");
   };
-  const removeGenre = (g) => update("genres", (local.genres||[]).filter(x => x !== g));
+
+  const removeGenre = (g) => onUpdate("genres", genres.filter(x => x !== g));
 
   const addLanguage = () => {
-    const t = newLanguage.trim();
-    if (!t || (local.languages||[]).map(l=>l.toLowerCase()).includes(t.toLowerCase())) return;
-    update("languages", [...(local.languages||[]), t]);
+    const trimmed = newLanguage.trim();
+    if (!trimmed || languages.map(l=>l.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    onUpdate("languages", [...languages, trimmed]);
     setNewLanguage("");
   };
-  const removeLanguage = (l) => update("languages", (local.languages||[]).filter(x => x !== l));
+
+  const removeLanguage = (l) => onUpdate("languages", languages.filter(x => x !== l));
+
+  const addVenueSize = () => {
+    const trimmed = newVenueSize.trim();
+    if (!trimmed || venueSizes.map(v=>v.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    onUpdate("venueSizes", [...venueSizes, trimmed]);
+    setNewVenueSize("");
+  };
+
+  const removeVenueSize = (v) => onUpdate("venueSizes", venueSizes.filter(x => x !== v));
 
   const handleCsvExport = () => {
     const headers = ['Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','Language','Rating','TicketPrice','Friends','Solo','Notes'];
     const rows = concerts.map(c => [
       c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
-      c.genre||'', c.language||'', c.rating||'', c.ticketPrice||'',
+      c.genre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
       (c.friends||[]).join('; '), c.solo?'yes':'', (c.notes||'').replace(/\n/g,' ')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
@@ -2041,7 +2095,8 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         date: obj.Date, artist: obj.Artist, venue: obj.Venue, room: obj.Room || null,
         city: obj.City, country: obj.Country, type: obj.Type || 'concert',
-        tour: obj.Tour || null, genre: obj.Genre || null, language: obj.Language || null,
+        tour: obj.Tour || null, genre: obj.Genre || null,
+        language: obj.Language ? obj.Language.split('; ').filter(Boolean) : [],
         rating: obj.Rating ? parseInt(obj.Rating) : null,
         ticketPrice: obj.TicketPrice ? parseFloat(obj.TicketPrice) : null,
         friends: obj.Friends ? obj.Friends.split('; ').filter(Boolean) : [],
@@ -2056,19 +2111,14 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        let concerts;
-        if (file.name.endsWith('.csv')) {
-          concerts = parseCSV(ev.target.result);
-        } else {
-          concerts = JSON.parse(ev.target.result);
-          if (!Array.isArray(concerts)) throw new Error();
-        }
+        const concerts = file.name.endsWith('.csv')
+          ? parseCSV(ev.target.result)
+          : JSON.parse(ev.target.result);
+        if (!Array.isArray(concerts)) throw new Error();
         for (const c of concerts) await onSaveConcert(c);
         setImportStatus("success");
         setTimeout(() => { setImportStatus(null); window.location.reload(); }, 1500);
-      } catch {
-        setImportStatus("error");
-      }
+      } catch { setImportStatus("error"); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -2112,147 +2162,213 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     </div>
   );
 
-  const tagListStyle = { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 };
-  const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" };
-  const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
-  const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
-
   return (
     <div style={{ padding: "16px 20px 100px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
-        <button onClick={handleSave} style={{
-          background: saved ? "#a78bfa" : "#1a1a30",
-          border: `1px solid ${saved ? "#a78bfa" : "#2e2e50"}`,
-          color: saved ? "#0c0c14" : "#a78bfa",
-          borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700,
-          cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s"
-        }}>{saved ? "Saved" : "Save"}</button>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff", marginBottom: 20 }}>Settings</div>
+
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Charts</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 20 }}>
+        <Row label="Top artists rows" sub="How many artists to show in charts">
+          <Stepper value={settings.topArtistsRows} onChange={v => onUpdate("topArtistsRows", v)} />
+        </Row>
+        <Row label="Top friends rows" sub="How many friends to show in charts">
+          <Stepper value={settings.topFriendsRows} onChange={v => onUpdate("topFriendsRows", v)} />
+        </Row>
+        <Row label="Top venues rows" sub="How many venues to show in charts">
+          <Stepper value={settings.topVenuesRows} onChange={v => onUpdate("topVenuesRows", v)} />
+        </Row>
+        <Row label="Most expensive rows" sub="How many shows in expensive list">
+          <Stepper value={settings.topExpensiveRows} onChange={v => onUpdate("topExpensiveRows", v)} min={3} max={20} />
+        </Row>
       </div>
 
-      <Collapsible title="Charts" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 8 }}>
-          <Row label="Top artists rows" sub="How many artists to show in charts">
-            <Stepper value={local.topArtistsRows} onChange={v => update("topArtistsRows", v)} />
-          </Row>
-          <Row label="Top friends rows" sub="How many friends to show in charts">
-            <Stepper value={local.topFriendsRows} onChange={v => update("topFriendsRows", v)} />
-          </Row>
-          <Row label="Top venues rows" sub="How many venues to show in charts">
-            <Stepper value={local.topVenuesRows} onChange={v => update("topVenuesRows", v)} />
-          </Row>
-          <Row label="Most expensive rows" sub="How many shows in expensive list">
-            <Stepper value={local.topExpensiveRows} onChange={v => update("topExpensiveRows", v)} min={3} max={20} />
-          </Row>
-        </div>
-      </Collapsible>
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Defaults</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 20 }}>
+        <Row label="Opening tab" sub="Which tab opens on launch">
+          <OptionPills value={settings.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => onUpdate("defaultTab", v)} />
+        </Row>
+        <Row label="Past shows" sub="Show past concerts by default">
+          <OptionPills value={settings.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => onUpdate("defaultShowPast", v)} />
+        </Row>
+        <Row label="Stats tab" sub="Which stats view opens first">
+          <OptionPills value={settings.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => onUpdate("defaultStatsTab", v)} />
+        </Row>
+      </div>
 
-      <Collapsible title="Defaults" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 8 }}>
-          <Row label="Opening tab" sub="Which tab opens on launch">
-            <OptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => update("defaultTab", v)} />
-          </Row>
-          <Row label="Past shows" sub="Show past concerts by default">
-            <OptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => update("defaultShowPast", v)} />
-          </Row>
-          <Row label="Stats tab" sub="Which stats view opens first">
-            <OptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => update("defaultStatsTab", v)} />
-          </Row>
+      {/* Merch categories */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Merch categories</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
+          These appear in the dropdown when adding merch to a show.
         </div>
-      </Collapsible>
-
-      <Collapsible title="Merch categories" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
-          <div style={tagListStyle}>
-            {(local.merchCategories||[]).map(cat => (
-              <div key={cat} style={tagStyle}>{cat}
-                <button onClick={() => removeCategory(cat)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={newCategory} onChange={e => setNewCategory(e.target.value)} onKeyDown={e => e.key === "Enter" && addCategory()} placeholder="Add category..." style={tagInput} />
-            <button onClick={addCategory} style={addBtn}>Add</button>
-          </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {categories.map(cat => (
+            <div key={cat} style={{
+              display: "flex", alignItems: "center", gap: 4,
+              background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99,
+              padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif"
+            }}>
+              {cat}
+              <button onClick={() => removeCategory(cat)} style={{
+                background: "none", border: "none", color: "#4a4870", cursor: "pointer",
+                fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2
+              }}>×</button>
+            </div>
+          ))}
         </div>
-      </Collapsible>
-
-      <Collapsible title="Genres" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
-          <div style={tagListStyle}>
-            {(local.genres||[]).map(g => (
-              <div key={g} style={tagStyle}>{g}
-                <button onClick={() => removeGenre(g)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={newGenre} onChange={e => setNewGenre(e.target.value)} onKeyDown={e => e.key === "Enter" && addGenre()} placeholder="Add genre..." style={tagInput} />
-            <button onClick={addGenre} style={addBtn}>Add</button>
-          </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={newCategory}
+            onChange={e => setNewCategory(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addCategory()}
+            placeholder="Add category..."
+            style={{
+              flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8,
+              color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif",
+              fontSize: 13
+            }}
+          />
+          <button onClick={addCategory} style={{
+            background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8,
+            color: "#a78bfa", padding: "8px 14px", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600
+          }}>Add</button>
         </div>
-      </Collapsible>
+      </div>
 
-      <Collapsible title="Languages" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
-          <div style={tagListStyle}>
-            {(local.languages||[]).map(l => (
-              <div key={l} style={tagStyle}>{l}
-                <button onClick={() => removeLanguage(l)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={newLanguage} onChange={e => setNewLanguage(e.target.value)} onKeyDown={e => e.key === "Enter" && addLanguage()} placeholder="Add language..." style={tagInput} />
-            <button onClick={addLanguage} style={addBtn}>Add</button>
-          </div>
+      {/* Genres */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Genres</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {genres.map(g => (
+            <div key={g} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
+              {g}
+              <button onClick={() => removeGenre(g)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+            </div>
+          ))}
         </div>
-      </Collapsible>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newGenre} onChange={e => setNewGenre(e.target.value)} onKeyDown={e => e.key === "Enter" && addGenre()} placeholder="Add genre..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
+          <button onClick={addGenre} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
+        </div>
+      </div>
 
-      <Collapsible title="Data backup" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 8 }}>
-          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12, lineHeight: 1.5 }}>
-            Export your full concert database including ratings, merch, and notes.
+      {/* Languages */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Languages</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {languages.map(l => (
+            <div key={l} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
+              {l}
+              <button onClick={() => removeLanguage(l)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newLanguage} onChange={e => setNewLanguage(e.target.value)} onKeyDown={e => e.key === "Enter" && addLanguage()} placeholder="Add language..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
+          <button onClick={addLanguage} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
+        </div>
+      </div>
+
+      {/* Venue sizes */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Venue sizes</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {venueSizes.map(v => (
+            <div key={v} style={{ display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>
+              {v}
+              <button onClick={() => removeVenueSize(v)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newVenueSize} onChange={e => setNewVenueSize(e.target.value)} onKeyDown={e => e.key === "Enter" && addVenueSize()} placeholder="Add venue size..." style={{ flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }} />
+          <button onClick={addVenueSize} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>Add</button>
+        </div>
+      </div>
+
+      {/* Data backup */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Data backup</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12, lineHeight: 1.5 }}>
+          Export your full concert database including ratings, merch, and notes. Save this JSON somewhere safe — you can use it to restore your data later.
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button onClick={handleCsvExport} style={{
+            flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
+            background: "none", border: "1px solid #2e2e50", color: "#c4c2f0",
+            fontFamily: "'DM Sans', sans-serif", fontWeight: 600
+          }}>Export CSV</button>
+        </div>
+
+        {!exportData ? (
+          <button onClick={handleExport} style={{
+            width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
+            background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa",
+            fontFamily: "'DM Sans', sans-serif", fontWeight: 600
+          }}>Export data</button>
+        ) : (
+          <div>
+            <textarea
+              readOnly
+              value={exportData}
+              rows={5}
+              style={{
+                width: "100%", background: "#0c0c14", border: "1px solid #1f1f35",
+                borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10,
+                fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box",
+                marginBottom: 8
+              }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleCopy} style={{
+                flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+                background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30",
+                border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`,
+                color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa",
+                fontFamily: "'DM Sans', sans-serif", fontWeight: 600
+              }}>{exportStatus === "copied" ? "✓ Copied!" : "Copy to clipboard"}</button>
+              <button onClick={() => setExportData(null)} style={{
+                padding: "9px 14px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+                background: "none", border: "1px solid #1f1f35", color: "#6b6a8f",
+                fontFamily: "'DM Sans', sans-serif"
+              }}>×</button>
+            </div>
           </div>
+        )}
+
+        <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 16, paddingTop: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
+          {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Restored! Reloading...</div>}
+          {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8 }}>Could not read file — make sure it's a valid export</div>}
+          <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
+          <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={handleCsvExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Export CSV</button>
-            {!exportData
-              ? <button onClick={handleExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Export JSON</button>
-              : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Close</button>
-            }
+            <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Select JSON file</button>
+            <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Select CSV file</button>
           </div>
-          {exportData && (
-            <div style={{ marginBottom: 10 }}>
-              <textarea readOnly value={exportData} rows={4} style={{ width: "100%", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
-              <button onClick={handleCopy} style={{ width: "100%", padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied!" : "Copy to clipboard"}</button>
-            </div>
-          )}
-          <div style={{ borderTop: "1px solid #1a1a2e", paddingTop: 14 }}>
-            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
-            {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Restored! Reloading...</div>}
-            {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8 }}>Could not read file — make sure it's a valid export</div>}
-            {/* File pickers */}
-            <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
-            <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Select JSON file</button>
-              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Select CSV file</button>
-            </div>
-            {/* Paste fallback */}
-            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
-            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
-          </div>
+          <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+          <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
         </div>
-      </Collapsible>
+      </div>
 
-      <Collapsible title="Account" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 8 }}>
-          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-            Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
-          </div>
-          <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Sign out</button>
+      <div style={{ fontSize: 11, color: "#2e2e4a", fontFamily: "'DM Mono', monospace", textAlign: "center", marginBottom: 20 }}>
+        settings saved automatically
+      </div>
+
+      {/* Account */}
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Account</div>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px" }}>
+        <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
+          Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
         </div>
-      </Collapsible>
+        <button onClick={onSignOut} style={{
+          width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
+          background: "none", border: "1px solid #2e2e50", color: "#6b6a8f",
+          fontFamily: "'DM Sans', sans-serif"
+        }}>Sign out</button>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS = {
   merchCategories: ['T-shirt','Hoodie','Crewneck','Tank top','Tote bag','Poster','Print','Hat / Cap','Beanie','Keychain','Pin / Badge','Wristband','Lightstick','Album','Vinyl','Other'],
   genres: ['Pop','Rock','Indie','Electronic','Hip-Hop','R&B','K-Pop','Metal','Folk','Country','Latin','Jazz','Classical','Other'],
   languages: ['English','Dutch','Spanish','French','German','Korean','Japanese','Portuguese','Other'],
+  venueSizes: ['Club', 'Small hall', 'Mid-venue', 'Arena', 'Stadium'],
 }
 
 export const FRIENDS = []

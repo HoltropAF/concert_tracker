@@ -2440,14 +2440,9 @@ function ArtistsView({ concerts, onOpen }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
               <div style={{ textAlign: 'right' }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: pastCount >= 3 ? '#a78bfa' : '#6b6a8f', lineHeight: 1 }}>{pastCount}</span>
-                <span style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>show{pastCount !== 1 ? 's' : ''}</span>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#6b6a8f', lineHeight: 1 }}>{pastCount}</span>
+                <span style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>time{pastCount !== 1 ? 's' : ''}</span>
               </div>
-              {avgRating != null && (
-                <div style={{ fontSize: 10, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>
-                  {'★'.repeat(Math.round(avgRating))} {avgRating.toFixed(1)}
-                </div>
-              )}
               {upcomingShows.length > 0 && (
                 <div style={{ fontSize: 9, color: '#818cf8', fontFamily: "'DM Mono', monospace" }}>+{upcomingShows.length} soon</div>
               )}
@@ -2464,24 +2459,29 @@ function ArtistsView({ concerts, onOpen }) {
 
 function ArtistShowRow({ concert, onOpen }) {
   const past = isPast(concert.date);
+  const isFestival = concert.type === "festival";
   return (
     <button onClick={() => onOpen(concert)} style={{
-      width: "100%", textAlign: "left", background: past ? "#0e0e1a" : "#13131f",
-      border: "1px solid #1f1f35", borderRadius: 10, padding: "11px 14px",
+      width: "100%", textAlign: "left",
+      background: isFestival ? "#0e0e16" : past ? "#0e0e1a" : "#13131f",
+      border: `1px solid ${isFestival ? "#2a1f35" : "#1f1f35"}`,
+      borderLeft: `3px solid ${isFestival ? "#f472b6" : "#2e2e4a"}`,
+      borderRadius: 10, padding: "11px 14px",
       cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", gap: 12
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500, marginBottom: 2 }}>
-          {formatDate(concert.date)}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+          {isFestival && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: "#1a1030", color: "#f472b6" }}>FEST</span>}
+          <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(concert.date)}</span>
         </div>
         <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
           {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
         </div>
         {concert.tour && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>{concert.tour}</div>}
         {concert.friends.length > 0 && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>w. {concert.friends.join(", ")}</div>}
+        {concert.rating && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(concert.rating)}</div>}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {concert.rating && <div style={{ color: "#a78bfa", fontSize: 12 }}>{"★".repeat(concert.rating)}</div>}
         {concert.ticketPrice && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{concert.ticketPrice}</div>}
         {!past && <div style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>upcoming</div>}
       </div>

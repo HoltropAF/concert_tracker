@@ -694,7 +694,7 @@ function Collapsible({ title, defaultOpen = true, children }) {
   );
 }
 
-function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
+function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {} }) {
   const {
     topArtistsRows = 5, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -1034,6 +1034,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
   ];
 
   const [statsTab, setStatsTab] = useState(defaultStatsTab);
+  const [showStatsSettings, setShowStatsSettings] = useState(false);
   const [chartGroup, setChartGroup] = useState("artists");
   const [selectedChart, setSelectedChart] = useState("artists");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -1869,7 +1870,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
   return (
     <div style={{ padding: "0 0 100px" }}>
       {/* Tab switcher */}
-      <div style={{ display: "flex", borderBottom: "1px solid #0d1a14", marginBottom: 0 }}>
+      <div style={{ display: "flex", borderBottom: "1px solid #0d1a14", marginBottom: 0, alignItems: "stretch" }}>
         {[{ id: "summary", label: "Summary" }, { id: "charts", label: "Charts" }].map(t => (
           <button key={t.id} onClick={() => setStatsTab(t.id)} style={{
             flex: 1, background: "none", border: "none", cursor: "pointer",
@@ -1879,14 +1880,54 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
             marginBottom: -1
           }}>{t.label}</button>
         ))}
+        <button onClick={() => setShowStatsSettings(s => !s)} style={{
+          background: showStatsSettings ? "#1a1a30" : "none", border: "none",
+          borderLeft: "1px solid #1f1f35", cursor: "pointer", padding: "0 16px",
+          color: showStatsSettings ? "#a78bfa" : "#4a4870", fontSize: 16, lineHeight: 1
+        }}>⚙</button>
       </div>
+      {showStatsSettings && (() => {
+        const summaryBlocks = [
+          { id: "stats1", label: "Stats" }, { id: "stats2", label: "Financial" },
+          { id: "cumulative", label: "Cumulative" }, { id: "pies", label: "Genres & Venues" },
+          { id: "upnext", label: "Up next" },
+        ];
+        const chartGroups = [
+          { id: "artists", label: "Artists" }, { id: "friends", label: "Friends" },
+          { id: "venues", label: "Venues" }, { id: "financial", label: "Financial" },
+          { id: "merch", label: "Merch" },
+        ];
+        const hiddenBlocks = settings.hiddenSummaryBlocks || [];
+        const hiddenGroups = settings.hiddenChartGroups || [];
+        const toggleBlock = id => onUpdateSetting("hiddenSummaryBlocks", hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]);
+        const toggleGroup = id => onUpdateSetting("hiddenChartGroups", hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]);
+        const pill = (label, active, onClick) => (
+          <button onClick={onClick} style={{
+            padding: "3px 10px", borderRadius: 99, fontSize: 10, cursor: "pointer",
+            fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
+            background: active ? "#1a1a30" : "none", color: active ? "#a78bfa" : "#4a4870",
+          }}>{label}</button>
+        );
+        return (
+          <div style={{ background: "#0f0f1e", borderBottom: "1px solid #0d1a14", padding: "12px 16px" }}>
+            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Summary</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
+              {summaryBlocks.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
+            </div>
+            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Charts</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {chartGroups.map(g => pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id)))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── SUMMARY ── */}
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0" }}>
 
           {/* Row 1: shows / festivals / countries / avg per year */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
+          {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
             {[
               { label: "shows", value: shows.length, nav: { view: 'home', filterType: 'concerts' } },
               { label: "festivals", value: festivals.length, nav: { view: 'home', filterType: 'festivals' } },
@@ -1898,10 +1939,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                 <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
               </div>
             ))}
-          </div>
+          </div>}
 
           {/* Row 2: total spend / avg ticket all time / avg ticket this year */}
-          {(() => {
+          {!(settings.hiddenSummaryBlocks||[]).includes("stats2") && (() => {
             const thisYear = String(new Date().getFullYear());
             const allTickets = concerts.filter(c => c.ticketPrice);
             const thisYearTickets = allTickets.filter(c => getYear(c.date) === thisYear);
@@ -1924,7 +1965,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
           })()}
 
           {/* Cumulative line chart */}
-          <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
+          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>cumulative shows</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -2010,10 +2051,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
                 </div>
               );
             })()}
-          </div>
+          </div>}
 
           {/* Donut cards — stacked full width */}
-          {(() => {
+          {!(settings.hiddenSummaryBlocks||[]).includes("pies") && (() => {
             const titleStyle = { fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 };
             const placeholderStyle = { color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "20px 0" };
             const legendItem = (color, name) => (
@@ -2076,7 +2117,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
           })()}
 
           {/* Countdown — next 3 upcoming shows */}
-          {(() => {
+          {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && (() => {
             const upcoming = concerts
               .filter(c => !isPast(c.date))
               .sort((a,b) => a.date.localeCompare(b.date))
@@ -2879,28 +2920,6 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         <TagManager items={venueSizes} onRemove={removeVenueSize} input={newVenueSize} onInput={setNewVenueSize} onAdd={addVenueSize} placeholder="Add venue size..." />
       </Collapsible>
 
-      <Collapsible title="Chart sections" defaultOpen={false}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {[{id:"artists",label:"Artists"},{id:"friends",label:"Friends"},{id:"venues",label:"Venues"},{id:"financial",label:"Financial"},{id:"merch",label:"Merch"}].map(g => {
-            const hidden = (local.hiddenChartGroups||[]).includes(g.id);
-            return (
-              <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <span style={{ color: hidden ? "#4a4870" : "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{g.label}</span>
-                <button onClick={() => {
-                  const cur = local.hiddenChartGroups || [];
-                  lUpdate("hiddenChartGroups", hidden ? cur.filter(x => x !== g.id) : [...cur, g.id]);
-                }} style={{
-                  padding: "3px 12px", borderRadius: 99, fontSize: 11, cursor: "pointer",
-                  background: hidden ? "#13131f" : "#1a1a30",
-                  color: hidden ? "#4a4870" : "#a78bfa",
-                  border: `1px solid ${hidden ? "#2e2e50" : "#a78bfa"}`,
-                  fontFamily: "'DM Mono', monospace"
-                }}>{hidden ? "Hidden" : "Visible"}</button>
-              </div>
-            );
-          })}
-        </div>
-      </Collapsible>
 
       <Collapsible title="Data backup" defaultOpen={false}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
@@ -3252,7 +3271,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             </div>
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} />}
         {view === 'friends' && <FriendsView concerts={concerts} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={setSelected} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}

@@ -694,7 +694,7 @@ function Collapsible({ title, defaultOpen = true, children }) {
   );
 }
 
-function StatsView({ concerts, settings = {} }) {
+function StatsView({ concerts, settings = {}, onNavigate = () => {} }) {
   const {
     topArtistsRows = 5, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -1541,24 +1541,27 @@ function StatsView({ concerts, settings = {} }) {
           </div>
         );
       }
-      case "venue-size": return venueEntries.length === 0 ? (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a venue size to see this</div>
-        </div>
-      ) : (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
-          <Donut segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} size={110} />
-          <div style={{ flex: 1 }}>
-            {venueEntries.map(([name, n], i) => (
-              <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: VENUE_COLORS[i % VENUE_COLORS.length], flexShrink: 0 }} />
-                <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{name}</span>
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{n}</span>
-              </div>
-            ))}
+      case "venue-size": {
+        const vsTotal = venueEntries.reduce((s,[,n])=>s+n,0);
+        return venueEntries.length === 0 ? (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a venue size to see this</div>
           </div>
-        </div>
-      );
+        ) : (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 14 }}>
+            <Donut segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} size={110} />
+            <div style={{ flex: 1 }}>
+              {venueEntries.map(([name, n], i) => (
+                <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: 2, background: VENUE_COLORS[i % VENUE_COLORS.length], flexShrink: 0 }} />
+                  <span style={{ color: "#c4c2f0", fontSize: 11, flex: 1 }}>{name}</span>
+                  <span style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{Math.round(n/vsTotal*100)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
       case "countries": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {Object.entries(countryCount).sort((a,b)=>b[1]-a[1]).map(([country, count]) => (
@@ -1654,10 +1657,19 @@ function StatsView({ concerts, settings = {} }) {
       );
       case "venues": {
         const vView = chartOpt("venues", "venue");
+        const vItems = vView === "room" ? topVenuesByRoom : topVenues;
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
-            <ListStat title="" items={vView === "room" ? topVenuesByRoom : topVenues} suffix="x" />
+            {vItems.map(([name, count], i) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
+                </div>
+                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}x</span>
+              </div>
+            ))}
           </div>
         );
       }
@@ -1757,35 +1769,35 @@ function StatsView({ concerts, settings = {} }) {
         );
       }
       case "genres-pie": {
-        const gpView = chartOpt("genres-pie", "main");
-        const gpSource = gpView === "sub" ? topSubgenres : topGenres;
-        const top5Genres = gpSource.slice(0, 5);
-        const othersCount = gpSource.slice(5).reduce((s, [,n]) => s + n, 0);
-        const genreLegend = [...top5Genres.map(([g,n],i) => ({name:g, count:n, color:GENRE_COLORS[i]})),
-                            ...(othersCount > 0 ? [{name:"Others", count:othersCount, color:"#4a4870"}] : [])];
-        const genreTotal = gpSource.reduce((s,[,n]) => s+n, 0);
-        const emptyMsg = gpView === "sub" ? "subgenres" : gpView === "list" ? "genres" : "genres";
+        const gpData = chartOpt("gp-data", "main");
+        const gpView = chartOpt("gp-view", "pie");
+        const gpSource = gpData === "sub" ? topSubgenres : topGenres;
+        const top4 = gpSource.slice(0, 4);
+        const othersCount = gpSource.slice(4).reduce((s, [,n]) => s + n, 0);
+        const emptyLabel = gpData === "sub" ? "subgenres" : "genres";
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("genres-pie", v)} />
+            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={gpData} onChange={v => setChartOpt("gp-data", v)} />
+              <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("gp-view", v)} />
+            </div>
             {gpView === "list" ? (
-              topGenres.length === 0
-                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with genres to see this</div>
-                : <ListStat title="" items={topGenres} suffix="x" />
+              gpSource.length === 0
+                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
+                : <ListStat title="" items={gpSource} suffix="x" />
             ) : gpSource.length === 0
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyMsg} to see this</div>
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
               : (
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <Donut size={110} showLabels label="shows" segments={[
-                    ...top5Genres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
-                    ...(othersCount > 0 ? [{ value: othersCount, color: "#2e2e4a" }] : []),
+                  <Donut size={110} label="shows" segments={[
+                    ...top4.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
+                    ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
                   ]} />
                   <div style={{ flex: 1 }}>
-                    {genreLegend.map(({ name, count, color }) => (
+                    {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
                       <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: 2, background: color, flexShrink: 0 }} />
-                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 12, flex: 1 }}>{name}</span>
-                        <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{Math.round(count/genreTotal*100)}%</span>
+                        <div style={{ width: 7, height: 7, borderRadius: 2, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 12 }}>{name}</span>
                       </div>
                     ))}
                   </div>
@@ -1858,12 +1870,12 @@ function StatsView({ concerts, settings = {} }) {
           {/* Row 1: shows / festivals / countries / avg per year */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
             {[
-              { label: "shows", value: shows.length },
-              { label: "festivals", value: festivals.length },
-              { label: "countries", value: Object.keys(countryCount).length },
-              { label: "avg / year", value: avgPerYear ?? "—" },
+              { label: "shows", value: shows.length, nav: { view: 'home', filterType: 'concerts' } },
+              { label: "festivals", value: festivals.length, nav: { view: 'home', filterType: 'festivals' } },
+              { label: "countries", value: Object.keys(countryCount).length, nav: null },
+              { label: "avg / year", value: avgPerYear ?? "—", nav: null },
             ].map(b => (
-              <div key={b.label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 4px", textAlign: "center" }}>
+              <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
                 <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
                 <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
               </div>
@@ -1884,7 +1896,7 @@ function StatsView({ concerts, settings = {} }) {
                   { label: "avg ticket", value: avgAll ? `€${avgAll.toFixed(0)}` : "—", color: "#f472b6" },
                   { label: `avg ${thisYear}`, value: avgThisYear ? `€${avgThisYear.toFixed(0)}` : "—", color: "#38bdf8" },
                 ].map(b => (
-                  <div key={b.label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 6px", textAlign: "center" }}>
+                  <div key={b.label} onClick={() => { setStatsTab("charts"); setChartGroup("financial"); setSelectedChart("year-spend"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 6px", textAlign: "center", cursor: "pointer" }}>
                     <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
                     <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
                   </div>
@@ -1894,7 +1906,7 @@ function StatsView({ concerts, settings = {} }) {
           })()}
 
           {/* Cumulative line chart */}
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+          <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); window.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>cumulative shows</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1995,20 +2007,22 @@ function StatsView({ concerts, settings = {} }) {
             return (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                 {/* Genre */}
-                <div style={{ flex: "1 1 140px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
-                  <div style={titleStyle}>Genre</div>
+                <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0,0); }} style={{ flex: "1 1 140px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px", cursor: "pointer" }}>
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
                     <>
-                      <div style={{ display: "flex", justifyContent: "center", cursor: "pointer" }} onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); window.scrollTo(0, 0); }}>
-                        <Donut size={90} centerText="Genres" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <Donut size={90} centerText="Genres" segments={[
+                          ...topGenres.slice(0,3).map(([g,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
+                          ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
+                        ]} />
                       </div>
-                      <div style={{ marginTop: 8 }}>
-                        {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others", topGenres.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name, count], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
-                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 9, color: name === "Others" ? "#4a4870" : "#c4c2f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", marginTop: 8 }}>
+                        {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others", topGenres.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                            <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap" }}>{name}</span>
                           </div>
                         ))}
                       </div>
@@ -2017,20 +2031,22 @@ function StatsView({ concerts, settings = {} }) {
                 </div>
 
                 {/* Venue size */}
-                <div style={{ flex: "1 1 140px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
-                  <div style={titleStyle}>Venue size</div>
+                <div onClick={() => { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart("venue-size"); window.scrollTo(0,0); }} style={{ flex: "1 1 140px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px", cursor: "pointer" }}>
                   {venueEntries.length === 0 ? (
                     <div style={placeholderStyle}>set venue size on shows</div>
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={90} centerText={["VENUE", "SIZE"]} segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} />
+                        <Donut size={90} centerText={["VENUE", "SIZE"]} segments={[
+                          ...venueEntries.slice(0,3).map(([name,n],i) => ({ value: n, color: VENUE_COLORS[i] })),
+                          ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
+                        ]} />
                       </div>
-                      <div style={{ marginTop: 8 }}>
-                        {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others", venueEntries.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name, count], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
-                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 9, color: name === "Others" ? "#4a4870" : "#c4c2f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", marginTop: 8 }}>
+                        {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others", venueEntries.slice(3).reduce((s,[,n])=>s+n,0)]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                            <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap" }}>{name}</span>
                           </div>
                         ))}
                       </div>
@@ -3036,7 +3052,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       <div style={{ padding: '16px 16px 0', position: 'sticky', top: 0, background: '#0c0c14', zIndex: 50, borderBottom: '1px solid #0d1a14' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>settracker</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
             <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
               {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
             </div>
@@ -3218,7 +3234,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             </div>
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} />}
         {view === 'friends' && <FriendsView concerts={concerts} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={setSelected} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}

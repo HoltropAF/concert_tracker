@@ -837,37 +837,49 @@ function StatsView({ concerts, settings = {} }) {
   );
 
   // Donut chart (SVG)
-  const Donut = ({ segments, size = 120, label = "total", showLabels = false }) => {
+  // labelTexts: array of strings to show on arcs instead of %; null = show %
+  // centerText: string to show in center; null = hide center; undefined = show total count
+  const Donut = ({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined }) => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total === 0) return null;
-    const cx = size/2, cy = size/2, r = size*0.38, stroke = size*0.14;
-    const labelR = r + stroke/2 + size*0.12;
+    const cx = size/2, cy = size/2, r = size*0.36, stroke = size*0.15;
+    const labelR = r + stroke + size*0.06;
+    const GAP = segments.length > 1 ? 3 : 0;
     let angle = -90;
-    const arcs = segments.map(seg => {
+    const arcs = segments.map((seg, idx) => {
       const pct = seg.value / total;
-      const start = angle;
+      const segDeg = pct * 360 - GAP;
+      const midDeg = angle + GAP/2 + Math.max(0.1, segDeg)/2;
+      const s = ((angle + GAP/2) * Math.PI) / 180;
+      const e = ((angle + GAP/2 + Math.max(0.1, segDeg)) * Math.PI) / 180;
+      const midRad = (midDeg * Math.PI) / 180;
       angle += pct * 360;
-      const startRad = (start * Math.PI) / 180;
-      const endRad = ((angle-0.5) * Math.PI) / 180;
-      const midRad = ((start + (pct*360)/2) * Math.PI) / 180;
-      const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
-      const x2 = cx + r * Math.cos(endRad),   y2 = cy + r * Math.sin(endRad);
+      const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
+      const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
       const lx = cx + labelR * Math.cos(midRad), ly = cy + labelR * Math.sin(midRad);
-      const large = pct > 0.5 ? 1 : 0;
-      return { ...seg, d: `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`, pct, lx, ly };
+      const rawLabel = labelTexts ? labelTexts[idx] : `${Math.round(pct*100)}%`;
+      const arcLabel = rawLabel && rawLabel.length > 7 ? rawLabel.slice(0, 6) + '…' : rawLabel;
+      return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
     });
-    const pad = showLabels ? size*0.22 : 0;
+    const pad = showLabels ? size*0.28 : 0;
     const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
     return (
-      <svg width={size + pad*2} height={size + pad*2} viewBox={vb}>
-        {arcs.map((a, i) => (
+      <svg overflow="visible" width={size + pad*2} height={size + pad*2} viewBox={vb} style={{ overflow: "visible", display: "block" }}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0d0d1a" strokeWidth={stroke} />
+        {arcs.map((a, i) => a.d && (
           <path key={i} d={a.d} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="butt" />
         ))}
-        {showLabels && arcs.map((a, i) => a.pct > 0.05 && (
-          <text key={`l${i}`} x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="middle" fill={a.color} fontSize={size*0.09} fontFamily="'DM Mono',monospace">{Math.round(a.pct*100)}%</text>
+        {showLabels && arcs.map((a, i) => a.pct > 0.05 && a.d && (
+          <text key={`l${i}`} x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="middle" fill={a.color} fontSize={size*0.09} fontFamily="'DM Mono',monospace" fontWeight="600">{a.arcLabel}</text>
         ))}
-        <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.13} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
-        <text x={cx} y={cy+size*0.14} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
+        {centerText === undefined ? (
+          <>
+            <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.14} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
+            <text x={cx} y={cy+size*0.16} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
+          </>
+        ) : centerText !== null ? (
+          <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{centerText}</text>
+        ) : null}
       </svg>
     );
   };
@@ -1417,51 +1429,56 @@ function StatsView({ concerts, settings = {} }) {
 
           {/* Donut cards — stacked full width */}
           {(() => {
-            const cardStyle = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
-            const titleStyle = { fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 };
-            const placeholderStyle = { color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "8px 0" };
-            const legendStyle = { display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 10 };
-            const legendItem = (color, name, value, total) => (
-              <div key={name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            const titleStyle = { fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 };
+            const placeholderStyle = { color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "20px 0" };
+            const legendItem = (color, name) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
                 <div style={{ width: 6, height: 6, borderRadius: 1, background: color, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{name}</span>
-                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{Math.round(value / Math.max(total, 1) * 100)}%</span>
+                <span style={{ fontSize: 9, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
               </div>
             );
-            const genreTotal = topGenres.reduce((s, [, n]) => s + n, 0);
-            const venueTotal = venueEntries.reduce((s, [, n]) => s + n, 0);
             return (
-              <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
                 {/* Genre */}
-                <div style={cardStyle}>
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
                   <div style={titleStyle}>Genre</div>
                   {topGenres.length === 0 ? (
-                    <div style={placeholderStyle}>add genres to your shows</div>
+                    <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <Donut size={130} showLabels label="shows" segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
-                      <div style={legendStyle}>
-                        {topGenres.map(([g, n], i) => legendItem(GENRE_COLORS[i % GENRE_COLORS.length], g, n, genreTotal))}
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                        <Donut size={100} segments={topGenres.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i % GENRE_COLORS.length] }))} />
                       </div>
-                    </div>
+                      {topGenres.map(([g, n], i) => (
+                        <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: 1, background: GENRE_COLORS[i % GENRE_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ fontSize: 9, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.3 }}>{g}</span>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
 
                 {/* Venue size */}
-                <div style={cardStyle}>
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px" }}>
                   <div style={titleStyle}>Venue size</div>
                   {venueEntries.length === 0 ? (
-                    <div style={placeholderStyle}>set venue size on your shows</div>
+                    <div style={placeholderStyle}>set venue size on shows</div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <Donut size={130} showLabels label="shows" segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} />
-                      <div style={legendStyle}>
-                        {venueEntries.map(([name, n], i) => legendItem(VENUE_COLORS[i % VENUE_COLORS.length], name, n, venueTotal))}
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                        <Donut size={100} segments={venueEntries.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i % VENUE_COLORS.length] }))} />
                       </div>
-                    </div>
+                      {venueEntries.map(([name, n], i) => (
+                        <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: 1, background: VENUE_COLORS[i % VENUE_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ fontSize: 9, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.3 }}>{name}</span>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
-              </>
+              </div>
             );
           })()}
 

@@ -1293,33 +1293,40 @@ function StatsView({ concerts, settings = {} }) {
       }
       case "over-time": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <svg width="100%" height={120} viewBox="0 0 300 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/>
-                <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
-              </linearGradient>
-            </defs>
-            {(() => {
-              if (cumulative.length < 2) return null;
-              const n = cumulative.length;
-              const maxC = cumulative[n-1].count;
-              const pts = cumulative.map((d, i) => `${(i/(n-1))*294+3},${96-(d.count/maxC)*88}`);
-              const linePath = "M " + pts.join(" L ");
-              const areaPath = linePath + ` L 297,96 L 3,96 Z`;
-              return (<>
-                <path d={areaPath} fill="url(#lineGrad)" />
-                <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx={3} cy={96-(cumulative[0].count/maxC)*88} r="3" fill="#a78bfa" />
-                <circle cx={297} cy={96-(cumulative[cumulative.length-1].count/maxC)*88} r="3" fill="#a78bfa" />
-              </>);
-            })()}
-          </svg>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[0]?.date.slice(0,7)}</span>
-            <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} total</span>
-            <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[sortedPast.length-1]?.date.slice(0,7)}</span>
-          </div>
+          {(() => {
+            if (cumulative.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+            const n = cumulative.length;
+            const maxC = cumulative[n-1].count;
+            const pts = cumulative.map((d, i) => `${(i/(n-1))*294+3},${96-(d.count/maxC)*88}`);
+            const linePath = "M " + pts.join(" L ");
+            const areaPath = linePath + ` L 297,96 L 3,96 Z`;
+            return (<>
+              <div style={{ display: "flex", gap: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 120, paddingTop: 2, paddingBottom: 6 }}>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxC}</span>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{Math.round(maxC / 2)}</span>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
+                </div>
+                <svg style={{ flex: 1 }} height={120} viewBox="0 0 300 100" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/>
+                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d={areaPath} fill="url(#lineGrad)" />
+                  <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx={3} cy={96-(cumulative[0].count/maxC)*88} r="3" fill="#a78bfa" />
+                  <circle cx={297} cy={96-(cumulative[n-1].count/maxC)*88} r="3" fill="#a78bfa" />
+                </svg>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[0]?.date.slice(0,7)}</span>
+                <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} total</span>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[sortedPast.length-1]?.date.slice(0,7)}</span>
+              </div>
+            </>);
+          })()}
         </div>
       );
       case "months": {
@@ -2443,11 +2450,11 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const removeVenueSize = (v) => lUpdate("venueSizes", venueSizes.filter(x => x !== v));
 
   const handleCsvExport = () => {
-    const headers = ['Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','Notes'];
+    const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','Notes'];
     const rows = concerts.map(c => [
-      c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
+      c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
       c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
-      (c.friends||[]).join('; '), c.solo?'yes':'', (c.notes||'').replace(/\n/g,' ')
+      (c.friends||[]).join('; '), c.solo?'yes':'', c.venueSize||'', (c.notes||'').replace(/\n/g,' ')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -2507,7 +2514,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
       const obj = {};
       headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
       return {
-        id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: obj.ID || `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         date: obj.Date, artist: obj.Artist, venue: obj.Venue, room: obj.Room || null,
         city: obj.City, country: obj.Country, type: obj.Type || 'concert',
         tour: obj.Tour || null, genre: obj.Genre || null, subgenre: obj.SubGenre || null,
@@ -2515,7 +2522,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         rating: obj.Rating ? parseInt(obj.Rating) : null,
         ticketPrice: obj.TicketPrice ? parseFloat(obj.TicketPrice) : null,
         friends: obj.Friends ? obj.Friends.split('; ').filter(Boolean) : [],
-        solo: obj.Solo === 'yes', notes: obj.Notes || null, merch: [], support: [],
+        solo: obj.Solo === 'yes', venueSize: obj.VenueSize || null, notes: obj.Notes || null, merch: [], support: [],
       };
     });
   };

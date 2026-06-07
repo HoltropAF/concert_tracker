@@ -1,9 +1,34 @@
-import { useState, useEffect, useCallback } from 'react'
-import { FRIENDS } from '../lib/data'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import * as XLSX from 'xlsx'
 
 // ============================================================
 // HELPERS
 // ============================================================
+
+const CHART_GROUP_IDS = [
+  { id: "artists",  label: "Artists"   },
+  { id: "friends",  label: "Friends"   },
+  { id: "venues",   label: "Venues"    },
+  { id: "financial",label: "Financial" },
+  { id: "merch",    label: "Merch"     },
+];
+
+function useBackButton(onBack, enabled = true) {
+  const cb = useRef(onBack);
+  const pushed = useRef(false);
+  cb.current = onBack;
+  useEffect(() => {
+    if (!enabled) {
+      if (pushed.current) { pushed.current = false; history.go(-1); }
+      return;
+    }
+    history.pushState({ appBack: true }, '');
+    pushed.current = true;
+    const handler = () => { pushed.current = false; cb.current(); };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, [enabled]);
+}
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr + "T00:00:00");
@@ -15,20 +40,30 @@ const getYear = (dateStr) => dateStr.slice(0, 4);
 const today = new Date();
 const isPast = (dateStr) => new Date(dateStr + "T00:00:00") <= today;
 
+const getSupportName = s => typeof s === 'string' ? s : s.name;
+const getSupportRole = s => typeof s === 'string' ? 'support' : (s.role || 'support');
+
+const getSongName = s => typeof s === 'string' ? s : s.name;
+const getSongInfo = s => typeof s === 'string' ? null : (s.info || null);
+
+const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee","#facc15","#fb7185"];
+const GENRE_COLORS = DONUT_PALETTE;
+const VENUE_COLORS = DONUT_PALETTE;
+
 // ============================================================
 // COMPONENTS
 // ============================================================
 
-function StarRating({ value, onChange }) {
+function StarRating({ value, onChange, max = 5 }) {
   return (
-    <div style={{ display: "flex", gap: 6 }}>
-      {[1,2,3,4,5].map(n => (
+    <div style={{ display: "flex", gap: max === 10 ? 3 : 6 }}>
+      {Array.from({ length: max }, (_, i) => i + 1).map(n => (
         <button
           key={n}
           onClick={() => onChange(value === n ? null : n)}
           style={{
             background: "none", border: "none", cursor: "pointer",
-            fontSize: 22, color: n <= (value || 0) ? "#a78bfa" : "#2e2e4a",
+            fontSize: max === 10 ? 18 : 22, color: n <= (value || 0) ? "#a78bfa" : "#2e2e4a",
             padding: 0, lineHeight: 1
           }}
         >★</button>
@@ -47,9 +82,166 @@ function Badge({ children, color = "#1a2e26" }) {
   );
 }
 
-function ConcertCard({ concert, onOpen }) {
+function festivalDays(startDate, endDate) {
+  if (!startDate) return 1;
+  if (!endDate || endDate <= startDate) return 1;
+  return Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1);
+}
+
+function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly = false, ratingMax = 5 }) {
+  const [input, setInput] = useState('');
+  const [day, setDay] = useState(1);
+  const [urlInput, setUrlInput] = useState('');
+  const [importState, setImportState] = useState('idle');
+  const [importError, setImportError] = useState('');
+  const numDays = festivalDays(startDate, endDate);
+
+  const add = () => {
+    const name = input.trim();
+    if (!name || acts.some(a => a.name.toLowerCase() === name.toLowerCase())) return;
+    onChange([...acts, { name, day: numDays > 1 ? day : null, highlight: false, rating: null }]);
+    setInput('');
+  };
+
+  const update = (i, patch) => onChange(acts.map((a, j) => j === i ? { ...a, ...patch } : a));
+  const remove = (i) => onChange(acts.filter((_, j) => j !== i));
+
+  const importFromUrl = async () => {
+    const url = urlInput.trim();
+    if (!url.includes('setlist.fm/festival/')) { setImportError('Paste a setlist.fm/festival/ URL'); setImportState('error'); return; }
+    setImportState('loading'); setImportError('');
+    try {
+      const r = await fetch(`/api/festival?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { setImportError(data.error || 'Could not load the page'); setImportState('error'); return; }
+
+      // Map each day's date to a day number using startDate
+      const newActs = [...acts];
+      const seen = new Set(acts.map(a => a.name.toLowerCase()));
+      for (const { date, artists } of data.days) {
+        let dayNum = null;
+        if (startDate && date) {
+          const diff = Math.round((new Date(date) - new Date(startDate)) / 86400000);
+          if (diff >= 0) dayNum = diff + 1;
+        }
+        for (const name of artists) {
+          if (!seen.has(name.toLowerCase())) {
+            seen.add(name.toLowerCase());
+            newActs.push({ name, day: numDays > 1 ? dayNum : null, highlight: false, rating: null });
+          }
+        }
+      }
+      onChange(newActs);
+      setUrlInput(''); setImportState('idle');
+    } catch (e) {
+      setImportError('Something went wrong. Try again.'); setImportState('error');
+    }
+  };
+
+  const days = numDays > 1 ? Array.from({ length: numDays }, (_, i) => i + 1) : [];
+  const byDay = numDays > 1
+    ? days.map(d => ({ d, list: acts.filter(a => a.day === d) })).concat(acts.filter(a => !a.day).length ? [{ d: null, list: acts.filter(a => !a.day) }] : [])
+    : [{ d: null, list: acts }];
+
+  const inputStyle = { background: '#13131f', border: '1px solid #2a4a3a', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12 };
+  const labelStyle = { fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 };
+
+  return (
+    <div>
+      {!readOnly && (
+        <div style={{ marginBottom: acts.length ? 12 : 10 }}>
+          {importState === 'error' && (
+            <div style={{ fontSize: 11, color: '#f472b6', fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>
+              {importError} <button onClick={() => setImportState('idle')} style={{ background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer' }}>dismiss</button>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && urlInput && importFromUrl()} placeholder="Paste setlist.fm/festival/… URL to import lineup" style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={importFromUrl} disabled={!urlInput.trim() || importState === 'loading'} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer', opacity: !urlInput.trim() ? 0.4 : 1, flexShrink: 0 }}>
+              {importState === 'loading' ? '…' : 'Import'}
+            </button>
+          </div>
+        </div>
+      )}
+      {byDay.map(({ d, list }) => (
+        <div key={d ?? 'none'}>
+          {numDays > 1 && <div style={{ ...labelStyle, marginTop: d ? 10 : 0 }}>{d ? `Day ${d}` : 'Untagged'}</div>}
+          {list.map((act) => {
+            const i = acts.indexOf(act);
+            return (
+              <div key={act.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                {numDays > 1 && !readOnly && (
+                  <select value={act.day ?? ''} onChange={e => update(i, { day: e.target.value ? parseInt(e.target.value) : null })}
+                    style={{ ...inputStyle, padding: '4px 6px', width: 62, flexShrink: 0 }}>
+                    <option value=''>—</option>
+                    {days.map(d2 => <option key={d2} value={d2}>Day {d2}</option>)}
+                  </select>
+                )}
+                <span style={{ flex: 1, fontSize: 13, color: act.highlight ? '#f472b6' : '#c4c2f0', fontWeight: act.highlight ? 600 : 400 }}>{act.name}</span>
+                {!readOnly && (
+                  <button onClick={() => update(i, { highlight: !act.highlight })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: act.highlight ? '#f472b6' : '#2e2e4a', padding: 0, lineHeight: 1 }}>♥</button>
+                )}
+                {readOnly && act.highlight && <span style={{ fontSize: 12, color: '#f472b6' }}>♥</span>}
+                {!readOnly ? (
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    {Array.from({ length: ratingMax }, (_, ri) => (
+                      <button key={ri} onClick={() => update(i, { rating: act.rating === ri + 1 ? null : ri + 1 })}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: act.rating >= ri + 1 ? '#a78bfa' : '#2e2e4a', padding: 0, lineHeight: 1 }}>★</button>
+                    ))}
+                  </div>
+                ) : act.rating ? (
+                  <span style={{ fontSize: 11, color: '#a78bfa' }}>{'★'.repeat(act.rating)}</span>
+                ) : null}
+                {!readOnly && <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {!readOnly && (
+        <div style={{ display: 'flex', gap: 6, marginTop: acts.length ? 10 : 0 }}>
+          {numDays > 1 && (
+            <select value={day} onChange={e => setDay(parseInt(e.target.value))} style={{ ...inputStyle, padding: '6px 8px', width: 72, flexShrink: 0 }}>
+              {days.map(d => <option key={d} value={d}>Day {d}</option>)}
+            </select>
+          )}
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Or add artist manually…" style={{ ...inputStyle, flex: 1 }} />
+          <button onClick={add} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer', flexShrink: 0 }}>+</button>
+        </div>
+      )}
+      {readOnly && acts.length === 0 && <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace" }}>no acts logged</div>}
+    </div>
+  );
+}
+
+function ConcertCard({ concert, onOpen, compact = false }) {
   const past = isPast(concert.date);
   const isFestival = concert.type === "festival";
+  const accentColor = isFestival ? "#f472b6" : past ? "#a78bfa" : "#818cf8";
+
+  if (compact) {
+    return (
+      <button onClick={() => onOpen(concert)} style={{
+        width: "100%", textAlign: "left", background: past ? "#17172a" : "#0d1a15",
+        border: `1px solid ${past ? "#1f1f35" : "#2e2e50"}`,
+        borderLeft: `3px solid ${accentColor}`,
+        borderRadius: 8, padding: "7px 12px", cursor: "pointer", marginBottom: 4,
+        display: "flex", alignItems: "center", gap: 10,
+      }}>
+        <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#e2e0ff", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {concert.artist}
+        </span>
+        <span style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
+          {formatDate(concert.date)}
+        </span>
+        {concert.rating ? (
+          <span style={{ color: "#a78bfa", fontSize: 11, flexShrink: 0 }}>{"★".repeat(Math.min(concert.rating, 10))}</span>
+        ) : !past ? (
+          <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>upcoming</span>
+        ) : null}
+      </button>
+    );
+  }
 
   return (
     <button
@@ -57,7 +249,7 @@ function ConcertCard({ concert, onOpen }) {
       style={{
         width: "100%", textAlign: "left", background: past ? "#17172a" : "#0d1a15",
         border: `1px solid ${past ? "#1f1f35" : "#2e2e50"}`,
-        borderLeft: `3px solid ${isFestival ? "#f472b6" : past ? "#a78bfa" : "#818cf8"}`,
+        borderLeft: `3px solid ${accentColor}`,
         borderRadius: 12, padding: "14px 16px", cursor: "pointer",
         transition: "all 0.15s ease", marginBottom: 8
       }}
@@ -70,6 +262,16 @@ function ConcertCard({ concert, onOpen }) {
               fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700,
               color: "#e2e0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
             }}>{concert.artist}</span>
+            {concert.seenAs && !isFestival && (() => {
+              const cfg = {
+                Headliner: { bg: "#2a1f4a", color: "#a78bfa" },
+                Support:   { bg: "#1a2a3d", color: "#60a5fa" },
+                Guest:     { bg: "#2d2010", color: "#fbbf24" },
+              }[concert.seenAs];
+              return cfg ? (
+                <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: cfg.bg, color: cfg.color, flexShrink: 0 }}>{concert.seenAs.toUpperCase()}</span>
+              ) : null;
+            })()}
           </div>
           <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
             {formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
@@ -86,7 +288,7 @@ function ConcertCard({ concert, onOpen }) {
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           {concert.rating && (
             <div style={{ color: "#a78bfa", fontSize: 13 }}>
-              {"★".repeat(concert.rating)}
+              {"★".repeat(Math.min(concert.rating, 10))}
             </div>
           )}
           {!past && (
@@ -94,60 +296,150 @@ function ConcertCard({ concert, onOpen }) {
               upcoming
             </div>
           )}
+          {(concert.setlist?.length > 0 || Object.values(concert.supportSetlists || {}).some(s => s.length > 0)) && (
+            <div style={{ fontSize: 11, color: "#4a4870", marginTop: 4 }}>♪</div>
+          )}
         </div>
       </div>
     </button>
   );
 }
 
-function SetlistSection({ concert }) {
-  const [setlist, setSetlist] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [] }) {
+  const effectKey = concert.id + (overrideArtist || '');
+  const [songs, setSongs] = useState(overrideSongs ?? concert.setlist ?? []);
+  const [songInput, setSongInput] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [fetchState, setFetchState] = useState('idle');
+  const [fetchError, setFetchError] = useState('');
 
-  const fetchSetlist = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const query = encodeURIComponent(`${concert.artist} ${concert.venue} ${concert.date.slice(0,10)}`);
-      const dateFormatted = concert.date.replace(/-/g, "");
-      const res = await fetch(
-        `https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(concert.artist)}&date=${concert.date.split("-").reverse().join("-")}`,
-        { headers: { "x-api-key": "undefined", Accept: "application/json" } }
-      );
-      // setlist.fm requires an API key — we'll link to it instead
-      throw new Error("API_KEY_NEEDED");
-    } catch (e) {
-      setError("api_key");
-    }
-    setLoading(false);
+  useEffect(() => { setSongs(overrideSongs ?? concert.setlist ?? []); }, [effectKey]);
+
+  const save = (newSongs) => { setSongs(newSongs); onSaveSetlist?.(newSongs); };
+
+  const addSong = () => {
+    const t = songInput.trim();
+    if (!t || songs.includes(t)) return;
+    save([...songs, t]);
+    setSongInput('');
   };
 
-  const setlistUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(concert.artist)}+${concert.date.split("-")[0]}`;
+  const fetchByUrl = async () => {
+    const url = urlInput.trim();
+    if (!url.includes('setlist.fm/setlist/')) { setFetchError('bad_url'); setFetchState('error'); return; }
+    setFetchState('loading');
+    setFetchError('');
+    try {
+      const r = await fetch(`/api/setlist?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 422) { if (data.debug) console.warn('[setlist] parse failed:', data.debug); throw new Error('parse_error'); }
+      if (!r.ok) throw new Error('fetch_error');
+      if (!data.songs?.length) throw new Error('parse_error');
+      save(data.songs);
+      setUrlInput('');
+      setFetchState('idle');
+    } catch (e) {
+      setFetchError(e.message);
+      setFetchState('error');
+    }
+  };
+
+  const errorMsg = {
+    bad_url: 'Paste a full setlist.fm show URL (setlist.fm/setlist/…)',
+    fetch_error: 'Could not load the page — check your connection.',
+    parse_error: 'Could not read the songs from that page. Try adding them manually.',
+  };
+
+  const searchArtist = overrideArtist || concert.artist;
+  const searchUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(searchArtist)}${concert.venue ? '+' + encodeURIComponent(concert.venue) : ''}+${concert.date.slice(0, 4)}`;
+  const inputStyle = { flex: 1, background: '#13131f', border: '1px solid #2a4a3a', borderRadius: 8, color: '#c4c2f0', padding: '7px 12px', fontFamily: "'DM Mono', monospace", fontSize: 13 };
 
   return (
     <div>
-      <a
-        href={setlistUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "8px 14px", borderRadius: 8, fontSize: 12,
-          background: "#13131f", border: "1px solid #2a4a3a",
-          color: "#a78bfa", textDecoration: "none", fontFamily: "'DM Mono', monospace"
-        }}
-      >
-        🎵 View on setlist.fm ↗
-      </a>
+      {songs.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {songs.map((song, i) => {
+            const name = getSongName(song);
+            const info = getSongInfo(song);
+            return (
+              <div key={`${name}-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: info ? 6 : 4 }}>
+                <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</div>
+                  {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
+                </div>
+                {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!readOnly && headlinerSongs.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pick from headliner setlist</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {headlinerSongs.map(s => {
+              const name = getSongName(s);
+              const active = songs.some(x => getSongName(x) === name);
+              return (
+                <button key={name} onClick={() => save(active ? songs.filter(x => getSongName(x) !== name) : [...songs, s])}
+                  style={{ padding: '3px 9px', borderRadius: 99, fontSize: 11, cursor: 'pointer',
+                    background: active ? '#f472b6' : '#13131f',
+                    color: active ? '#0c0c14' : '#6b6a8f',
+                    border: `1px solid ${active ? '#f472b6' : '#2e2e50'}`,
+                    fontWeight: active ? 700 : 400, fontFamily: "'DM Mono', monospace" }}>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!readOnly && (
+        <>
+          {fetchState === 'error' && (
+            <div style={{ marginBottom: 8, fontSize: 11, color: '#f472b6', fontFamily: "'DM Mono', monospace" }}>
+              {errorMsg[fetchError] || 'Something went wrong.'}
+              <button onClick={() => setFetchState('idle')} style={{ marginLeft: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer' }}>dismiss</button>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && urlInput && fetchByUrl()} placeholder="Paste setlist.fm show URL…" style={inputStyle} />
+            <button onClick={fetchByUrl} disabled={!urlInput.trim() || fetchState === 'loading'} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer', opacity: !urlInput.trim() ? 0.4 : 1 }}>
+              {fetchState === 'loading' ? '…' : 'Import'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={songInput} onChange={e => setSongInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSong()} placeholder="Or add song manually…" style={inputStyle} />
+            <button onClick={addSong} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button>
+          </div>
+          <a href={searchUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#4a4870', textDecoration: 'none', fontFamily: "'DM Mono', monospace" }}>
+            Find on setlist.fm ↗
+          </a>
+        </>
+      )}
     </div>
   );
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete }) {
+  useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ ...concert });
+  useEffect(() => { setForm({ ...concert }); setEditing(false); }, [concert.id]);
+  const [friendInput, setFriendInput] = useState('');
+  const [supportInput, setSupportInput] = useState('');
+  const [supportRole, setSupportRole] = useState('support');
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [expandedSupportSetlists, setExpandedSupportSetlists] = useState(new Set());
+  const toggleSupportSetlist = (name) => setExpandedSupportSetlists(prev => {
+    const next = new Set(prev);
+    next.has(name) ? next.delete(name) : next.add(name);
+    return next;
+  });
 
   const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
@@ -159,6 +451,13 @@ function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
         : [...f.friends, name],
       solo: false
     }));
+  };
+
+  const addCustomFriend = () => {
+    const name = friendInput.trim();
+    if (!name || form.friends.includes(name)) return;
+    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }));
+    setFriendInput('');
   };
 
   const addMerchItem = () => {
@@ -178,8 +477,30 @@ function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
     setForm(f => ({ ...f, merch: (f.merch || []).filter((_, i) => i !== idx) }));
   };
 
+  const addSupport = () => {
+    const t = supportInput.trim();
+    if (!t || (form.support || []).some(x => getSupportName(x) === t)) return;
+    setForm(f => ({ ...f, support: [...(f.support || []), { name: t, role: supportRole }] }));
+    setSupportInput('');
+  };
+  const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => getSupportName(x) !== getSupportName(s)) }));
+
+  const handleShare = () => {
+    const lines = [
+      `🎤 ${concert.artist}${concert.tour ? ` — ${concert.tour}` : ''}`,
+      `📅 ${formatDate(concert.date)} · ${concert.venue}${concert.room ? ` · ${concert.room}` : ''} · ${concert.city}`,
+      concert.friends.length > 0 ? `👥 w. ${concert.friends.join(', ')}` : '👤 solo',
+      concert.rating ? `⭐ ${'★'.repeat(concert.rating)}` : null,
+      concert.notes ? `📝 ${concert.notes}` : null,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard?.writeText(lines);
+  };
+
+  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
   const isFestival = concert.type === "festival";
   const past = isPast(concert.date);
+
+  const labelStyle = { fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" };
 
   const inputStyle = {
     width: "100%", background: "#13131f", border: "1px solid #2a4a3a",
@@ -187,232 +508,478 @@ function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
     fontFamily: "'DM Mono', monospace", fontSize: 13, boxSizing: "border-box"
   };
 
+  const sec = (label) => (
+    <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{label}</div>
+  );
+
+  if (!editing) {
+    const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
+    const merchTotal = (concert.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
+    const totalCost = (concert.ticketPrice || 0) + merchTotal + (concert.otherCost || 0);
+    const statCards = [
+      past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—" },
+      concert.ticketPrice ? { label: "Ticket", value: `€${concert.ticketPrice}` } : null,
+      merchTotal > 0 ? { label: "Merch", value: `€${merchTotal.toFixed(0)}` } : null,
+      concert.otherCost ? { label: isFestival ? "Travel" : "Other", value: `€${concert.otherCost}` } : null,
+      isFestival && totalCost > 0 && (concert.otherCost || merchTotal > 0) ? { label: "Total", value: `€${Math.round(totalCost)}` } : null,
+    ].filter(Boolean);
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
+        {/* Header */}
+        <div style={{ position: "sticky", top: 0, background: "#0c0c14", borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{concert.artist}</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {concert.city}</div>
+          </div>
+          <button onClick={handleShare} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
+          <button onClick={() => setEditing(true)} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Edit</button>
+        </div>
+
+        {/* Venue + tour hero */}
+        <div style={{ padding: "20px 20px 0" }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 16, color: "#c4c2f0", fontWeight: 600 }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""}</div>
+            <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
+            {concert.tour && <div style={{ fontSize: 12, color: "#4a4870", marginTop: 4 }}>{concert.tour}</div>}
+          </div>
+
+          {/* Stat cards */}
+          {statCards.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
+              {statCards.map(({ label, value }) => (
+                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: label === "Rating" ? 13 : 15, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tag pills */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+            {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
+            {!past && <Badge color="#0d1a15">upcoming</Badge>}
+            {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
+            {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
+            {concert.genre && <Badge color="#13131f">{concert.genre}</Badge>}
+            {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
+            {langs.map(l => <Badge key={l} color="#13131f">{l}</Badge>)}
+          </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid #1a1a2e" }} />
+
+        <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Went with */}
+          <div>
+            {sec("Went with")}
+            {concert.friends.length > 0
+              ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{concert.friends.map(f => <Badge key={f} color="#1a1a30">{f}</Badge>)}</div>
+              : <div style={{ color: "#6b6a8f", fontSize: 13, fontStyle: "italic" }}>solo</div>}
+          </div>
+
+          {/* Notes */}
+          {concert.notes && (
+            <div>
+              {sec("Notes")}
+              <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
+            </div>
+          )}
+
+          {/* Merch */}
+          {(concert.merch || []).length > 0 && (
+            <div>
+              {sec("Merch")}
+              {concert.merch.map((m, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < concert.merch.length - 1 ? "1px solid #1a1a2e" : "none" }}>
+                  <span style={{ color: "#c4c2f0", fontSize: 13 }}>{m.item}</span>
+                  {m.price && <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{parseFloat(m.price).toFixed(2)}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Acts — festivals */}
+          {isFestival && (concert.acts || []).length > 0 && (
+            <div>
+              {sec("Acts seen")}
+              <FestivalActsSection
+                acts={concert.acts || []}
+                onChange={() => {}}
+                startDate={concert.date}
+                endDate={concert.endDate}
+                readOnly
+                ratingMax={settings.ratingSystem || 5}
+              />
+            </div>
+          )}
+
+          {/* Setlist — headliner + support + guests, all as collapsible colour-coded rows */}
+          {past && !isFestival && (() => {
+            const roleConfig = {
+              headliner: { color: '#a78bfa', bg: '#1a1a30' },
+              support:   { color: '#818cf8', bg: '#131328' },
+              guest:     { color: '#f472b6', bg: '#1a1030' },
+            };
+            const performers = [
+              { key: '__headliner__', name: concert.artist, role: 'headliner',
+                songs: concert.setlist || [],
+                onSaveSetlist: (s) => onSave({ ...concert, setlist: s }) },
+              ...(concert.support || []).map(s => {
+                const name = getSupportName(s); const role = getSupportRole(s);
+                return { key: name, name, role,
+                  songs: (concert.supportSetlists || {})[name] || [],
+                  onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
+              }),
+            ];
+            return (
+              <div>
+                {sec("Setlist")}
+                {performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
+                  const { color, bg } = roleConfig[role] || roleConfig.support;
+                  const isOpen = expandedSupportSetlists.has(key);
+                  return (
+                    <div key={key} style={{ marginBottom: 6 }}>
+                      <button onClick={() => toggleSupportSetlist(key)} style={{
+                        width: '100%', textAlign: 'left', background: '#13131f',
+                        border: '1px solid #1f1f35', borderLeft: `3px solid ${color}`,
+                        borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 9, color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>{role}</span>
+                          <span style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 500 }}>{name}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                          {songs.length > 0
+                            ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {songs.length}</span>
+                            : <span style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>+ setlist</span>}
+                          <span style={{ color: '#4a4870', fontSize: 10, lineHeight: 1 }}>{isOpen ? '▴' : '▾'}</span>
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `2px solid ${color}44` }}>
+                          {songs.length > 0
+                            ? <SetlistSection
+                                concert={concert} settings={settings}
+                                overrideSongs={key === '__headliner__' ? undefined : songs}
+                                overrideArtist={key === '__headliner__' ? undefined : name}
+                                onSaveSetlist={save}
+                                readOnly
+                              />
+                            : <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
+                          }
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       position: "fixed", inset: 0, background: "#0c0c14",
       overflowY: "auto", zIndex: 100
     }}>
-      {/* Header */}
+      {/* Edit mode header */}
       <div style={{
         position: "sticky", top: 0, background: "#0c0c14",
         borderBottom: "1px solid #1e3028", padding: "16px 20px",
         display: "flex", alignItems: "center", gap: 12, zIndex: 10
       }}>
-        <button onClick={onClose} style={{
+        <button onClick={() => setEditing(false)} style={{
           background: "none", border: "none", color: "#a78bfa",
           fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1
         }}>←</button>
         <div style={{ flex: 1 }}>
-          <div style={{
-            fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800,
-            color: "#e2e0ff"
-          }}>{concert.artist}</div>
-          <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-            {formatDate(concert.date)} · {concert.city}
-          </div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>{concert.artist}</div>
+          <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)} · {concert.city}</div>
         </div>
-        <button
-          onClick={() => {
-            if (editing) { onSave(form); setEditing(false); }
-            else setEditing(true);
-          }}
-          style={{
-            background: editing ? "#a78bfa" : "#1a1a30", border: `1px solid ${editing ? "#a78bfa" : "#2e2e50"}`,
-            color: editing ? "#0c0c14" : "#a78bfa", borderRadius: 8,
-            padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-            fontFamily: "'DM Mono', monospace"
-          }}
-        >{editing ? "Save" : "Edit"}</button>
+        <button onClick={() => { onSave(form); setEditing(false); }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
       </div>
 
       <div style={{ padding: "20px" }}>
-        {/* Type badge */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          <Badge color={isFestival ? "#1a1a30" : "#13131f"}>{isFestival ? "🎪 Festival" : "🎤 Concert"}</Badge>
-          {!past && <Badge color="#1a1a30">📅 Upcoming</Badge>}
-          {concert.notes?.includes("first concert") && <Badge color="#1a1a30">⭐ First ever</Badge>}
-          {concert.notes?.includes("first festival") && <Badge color="#1a1a30">⭐ First festival</Badge>}
-        </div>
 
-        {/* Tour */}
-        {concert.tour && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tour</div>
-            <div style={{ color: "#c4c2f0", fontSize: 14 }}>{concert.tour}</div>
-          </div>
-        )}
+        {/* Cards */}
+        {[
 
-        {/* Venue */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Venue</div>
-          <div style={{ color: "#c4c2f0", fontSize: 14 }}>
-            {concert.venue}{concert.room ? ` · ${concert.room}` : ""}
-          </div>
-          <div style={{ color: "#6b6a8f", fontSize: 12 }}>{concert.city}, {concert.country}</div>
-        </div>
-
-        {/* Support acts */}
-        {concert.support?.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Support Acts</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {concert.support.map(s => <Badge key={s}>{s}</Badge>)}
-            </div>
-          </div>
-        )}
-
-        {/* Friends */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            Went with
-          </div>
-          {editing ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {FRIENDS.map(name => (
-                <button
-                  key={name}
-                  onClick={() => toggleFriend(name)}
-                  style={{
-                    padding: "4px 10px", borderRadius: 99, fontSize: 12, cursor: "pointer",
-                    background: form.friends.includes(name) ? "#a78bfa" : "#13131f",
-                    color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f",
-                    border: `1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`,
-                    fontWeight: form.friends.includes(name) ? 700 : 400
-                  }}
-                >{name}</button>
+          /* ── SHOW ── */
+          { title: form.type === 'festival' ? 'Festival' : 'Show', content: <>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              {[{id:"concert",label:"🎤 Concert"},{id:"festival",label:"🎪 Festival"}].map(t => (
+                <button key={t.id} onClick={() => update("type", t.id)} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:13, cursor:"pointer", background: form.type===t.id ? "#1a1a30" : "#0c0c14", border: `1px solid ${form.type===t.id ? "#a78bfa" : "#2e2e50"}`, color: form.type===t.id ? "#a78bfa" : "#6b6a8f", fontWeight: form.type===t.id ? 700 : 400, fontFamily:"'DM Sans',sans-serif" }}>{t.label}</button>
               ))}
             </div>
-          ) : (
-            <div style={{ color: "#c4c2f0", fontSize: 14 }}>
-              {concert.friends.length > 0 ? concert.friends.join(", ") : "solo"}
-            </div>
-          )}
-        </div>
-
-        {/* Rating */}
-        {past && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Rating</div>
-            {editing ? (
-              <StarRating value={form.rating} onChange={v => update("rating", v)} />
+            <div style={labelStyle}>{form.type === 'festival' ? 'Festival name' : 'Artist'}</div>
+            <input value={form.artist} onChange={e=>update("artist",e.target.value)} style={{ ...inputStyle, marginBottom: 10 }} />
+            {form.type === 'festival' ? (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom: 10 }}>
+                <div><div style={labelStyle}>Start date</div><input type="date" value={form.date} onChange={e=>update("date",e.target.value)} style={inputStyle} /></div>
+                <div><div style={labelStyle}>End date</div><input type="date" value={form.endDate||""} onChange={e=>update("endDate",e.target.value)} style={inputStyle} /></div>
+              </div>
             ) : (
-              <div style={{ color: "#a78bfa", fontSize: 18 }}>
-                {concert.rating ? "★".repeat(concert.rating) + "☆".repeat(5 - concert.rating) : <span style={{ color: "#2e2e4a" }}>Not rated yet</span>}
+              <><div style={labelStyle}>Date</div><input type="date" value={form.date} onChange={e=>update("date",e.target.value)} style={{ ...inputStyle, marginBottom: 10 }} /></>
+            )}
+            <div style={labelStyle}>{form.type === 'festival' ? 'Edition / year' : 'Tour'}</div>
+            <input value={form.tour || ""} onChange={e=>update("tour",e.target.value)} placeholder={form.type === 'festival' ? 'e.g. Lowlands 2024 (optional)' : 'Tour name (optional)'} style={inputStyle} />
+          </> },
+
+          /* ── VENUE ── */
+          { title: 'Venue', content: <>
+            {(settings.savedVenues || []).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                {(settings.savedVenues || []).map((v, i) => {
+                  const active = form.venue === v.name && form.city === v.city && form.country === v.country;
+                  return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, room: v.room || f.room, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</button>;
+                })}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Ticket price */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Ticket Price</div>
-          {editing ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: "#6b6a8f" }}>€</span>
-              <input
-                type="number" value={form.ticketPrice || ""} placeholder="0.00"
-                onChange={e => update("ticketPrice", e.target.value ? parseFloat(e.target.value) : null)}
-                style={{ ...inputStyle, width: 100 }}
-              />
+            <div style={labelStyle}>Location</div>
+            <input value={form.venue} onChange={e=>update("venue",e.target.value)} placeholder="Venue name" style={{ ...inputStyle, marginBottom: 8 }} />
+            <input value={form.room||""} onChange={e=>update("room",e.target.value)} placeholder="Room / stage (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom: 14 }}>
+              <input value={form.city} onChange={e=>update("city",e.target.value)} placeholder="City" style={inputStyle} />
+              <input value={form.country} onChange={e=>update("country",e.target.value)} placeholder="Country" style={inputStyle} />
             </div>
-          ) : (
-            <div style={{ color: "#c4c2f0", fontSize: 14 }}>
-              {concert.ticketPrice ? `€${concert.ticketPrice.toFixed(2)}` : <span style={{ color: "#2e2e4a" }}>—</span>}
+            <div style={labelStyle}>Venue size</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
+              {(settings.venueSizes||[]).map(vs => (
+                <button key={vs} onClick={()=>update("venueSize",form.venueSize===vs?null:vs)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.venueSize===vs ? "#a78bfa" : "#0c0c14", color: form.venueSize===vs ? "#0c0c14" : "#6b6a8f", border: `1px solid ${form.venueSize===vs ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>
+              ))}
             </div>
-          )}
-        </div>
+          </> },
 
-        {/* Merch */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Merch</div>
-            {editing && (
-              <button onClick={addMerchItem} style={{
-                background: "none", border: "1px solid #2a4a3a", borderRadius: 6,
-                color: "#a78bfa", fontSize: 11, padding: "3px 8px", cursor: "pointer"
-              }}>+ Add</button>
+          /* ── LINEUP ── */
+          { title: 'Lineup', content: <>
+            <div style={labelStyle}>Seen as</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom: 14 }}>
+              {["Headliner","Support","Guest","Festival"].map(opt => (
+                <button key={opt} onClick={() => update("seenAs", form.seenAs === opt ? null : opt)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.seenAs === opt ? "#a78bfa" : "#0c0c14", color: form.seenAs === opt ? "#0c0c14" : "#6b6a8f", border: `1px solid ${form.seenAs === opt ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.seenAs === opt ? 700 : 400 }}>{opt}</button>
+              ))}
+            </div>
+            <div style={labelStyle}>Support acts</div>
+            {(form.support || []).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                {(form.support || []).map(s => {
+                  const name = getSupportName(s); const role = getSupportRole(s);
+                  const toggleRole = () => setForm(f => ({ ...f, support: f.support.map(x => getSupportName(x) === name ? { name, role: getSupportRole(x) === 'guest' ? 'support' : 'guest' } : x) }));
+                  return (
+                    <span key={name} style={{ display:"flex", alignItems:"center", gap:4, background:"#1a1a30", border:"1px solid #2e2e50", borderRadius:99, padding:"3px 10px", fontSize:12, color:"#a78bfa" }}>
+                      {name}
+                      <button onClick={toggleRole} style={{ fontSize:9, color: role==='guest' ? "#f472b6" : "#4a4870", fontFamily:"'DM Mono',monospace", padding:"1px 4px", background: role==='guest' ? "#1a1030" : "none", borderRadius:99, border:`1px solid ${role==='guest' ? "#f472b6" : "#2e2e50"}`, cursor:"pointer", lineHeight:1.4 }}>{role}</button>
+                      <button onClick={() => removeSupport(s)} style={{ background:"none", border:"none", color:"#6b6a8f", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}>×</button>
+                    </span>
+                  );
+                })}
+              </div>
             )}
-          </div>
-          {editing ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+              {['support','guest'].map(r => (
+                <button key={r} onClick={() => setSupportRole(r)} style={{ padding:"3px 10px", borderRadius:99, fontSize:11, cursor:"pointer", background: supportRole===r ? "#a78bfa" : "#0c0c14", color: supportRole===r ? "#0c0c14" : "#6b6a8f", border:`1px solid ${supportRole===r ? "#a78bfa" : "#2e2e50"}`, fontWeight: supportRole===r ? 700 : 400, fontFamily:"'DM Mono',monospace" }}>{r}</button>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:8, marginBottom: 14 }}>
+              <input value={supportInput} onChange={e=>setSupportInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex:1 }} />
+              <button onClick={addSupport} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
+            </div>
+            <div style={labelStyle}>Genre</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom: 12 }}>
+              {(settings.genres||[]).map(g => (
+                <button key={g} onClick={()=>update("genre",form.genre===g?null:g)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.genre===g ? "#a78bfa" : "#0c0c14", color: form.genre===g ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.genre===g ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.genre===g ? 700 : 400 }}>{g}</button>
+              ))}
+            </div>
+            <div style={labelStyle}>Subgenre</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom: 12 }}>
+              {(settings.subgenres||[]).map(g => (
+                <button key={g} onClick={()=>update("subgenre",form.subgenre===g?null:g)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.subgenre===g ? "#38bdf8" : "#0c0c14", color: form.subgenre===g ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.subgenre===g ? "#38bdf8" : "#2e2e50"}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>
+              ))}
+            </div>
+            <div style={labelStyle}>Language</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
+              {(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : [];
+                return (settings.languages||[]).map(l => { const on = langs.includes(l); return (
+                  <button key={l} onClick={()=>update("language", on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: on ? "#a78bfa" : "#0c0c14", color: on ? "#0c0c14" : "#6b6a8f", border:`1px solid ${on ? "#a78bfa" : "#2e2e50"}`, fontWeight: on ? 700 : 400 }}>{l}</button>
+                );});
+              })()}
+            </div>
+          </> },
+
+          /* ── YOUR EXPERIENCE ── */
+          { title: 'Your experience', content: <>
+            <div style={labelStyle}>Went with</div>
+            {(settings.friendGroups || []).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {(settings.friendGroups || []).map((g, i) => {
+                  const active = g.friends.every(f => form.friends.includes(f));
+                  return <button key={i} onClick={() => setForm(f => ({ ...f, friends: [...new Set([...f.friends, ...g.friends])], solo: false }))} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: active ? "#818cf8" : "#0c0c14", color: active ? "#0c0c14" : "#6b6a8f", border:`1px solid ${active ? "#818cf8" : "#2e2e50"}`, fontWeight: active ? 700 : 400 }}>{g.name}</button>;
+                })}
+              </div>
+            )}
+            {allFriendChoices.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {allFriendChoices.map(name => (
+                  <button key={name} onClick={() => toggleFriend(name)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.friends.includes(name) ? "#a78bfa" : "#0c0c14", color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.friends.includes(name) ? 700 : 400 }}>{name}</button>
+                ))}
+              </div>
+            )}
+            <div style={{ display:"flex", gap:8, marginBottom: 8 }}>
+              <input value={friendInput} onChange={e=>setFriendInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomFriend()} placeholder="Add friend..." style={{ flex:1, background:"#0c0c14", border:"1px solid #2a4a3a", borderRadius:8, color:"#c4c2f0", padding:"6px 10px", fontFamily:"'DM Mono',monospace", fontSize:12 }} />
+              <button onClick={addCustomFriend} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
+            </div>
+            <button onClick={()=>setForm(f=>({...f,solo:!f.solo,friends:[]}))} style={{ padding:"5px 12px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.solo ? "#a78bfa" : "#0c0c14", color: form.solo ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.solo ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.solo ? 700 : 400 }}>solo</button>
+            {past && <div style={{ marginTop: 14 }}>
+              <div style={labelStyle}>Rating</div>
+              <StarRating value={form.rating} onChange={v => update("rating", v)} max={settings.ratingSystem || 5} />
+            </div>}
+          </> },
+
+          /* ── FINANCIAL ── */
+          { title: 'Financial', content: <>
+            <div style={labelStyle}>Ticket price</div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: 14 }}>
+              <span style={{ color:"#6b6a8f" }}>€</span>
+              <input type="number" value={form.ticketPrice || ""} placeholder="0.00" onChange={e => update("ticketPrice", e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8 }}>
+              <div style={labelStyle}>Merch</div>
+              <button onClick={addMerchItem} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"3px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>+ Add item</button>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {(form.merch || []).map((m, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div style={{ flex: 1, position: "relative" }}>
-                    <select
-                      value={merchCategories.includes(m.item) ? m.item : "__custom__"}
-                      onChange={e => {
-                        if (e.target.value !== "__custom__") updateMerch(i, "item", e.target.value);
-                      }}
-                      style={{ ...inputStyle, flex: 1, width: "100%", appearance: "none", paddingRight: 24 }}
-                    >
-                      {merchCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
+                <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <div style={{ flex:1, position:"relative" }}>
+                    <select value={merchCategories.includes(m.item) ? m.item : "__custom__"} onChange={e => { if (e.target.value !== "__custom__") updateMerch(i, "item", e.target.value); }} style={{ ...inputStyle, width:"100%", appearance:"none", paddingRight:24 }}>
+                      {merchCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       <option value="__custom__">Custom...</option>
                     </select>
-                    <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: "#6b6a8f", fontSize: 10, pointerEvents: "none" }}>▾</span>
+                    <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", color:"#6b6a8f", fontSize:10, pointerEvents:"none" }}>▾</span>
                   </div>
                   {(!merchCategories.includes(m.item) || m.item === "") && (
-                    <input
-                      value={m.item === "__custom__" ? "" : m.item}
-                      placeholder="Custom item..."
-                      onChange={e => updateMerch(i, "item", e.target.value)}
-                      style={{ ...inputStyle, flex: 1 }}
-                      autoFocus
-                    />
+                    <input value={m.item === "__custom__" ? "" : m.item} placeholder="Custom item..." onChange={e => updateMerch(i, "item", e.target.value)} style={{ ...inputStyle, flex:1 }} autoFocus />
                   )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ color: "#6b6a8f", fontSize: 12 }}>€</span>
-                    <input
-                      type="number" value={m.price} placeholder="0"
-                      onChange={e => updateMerch(i, "price", e.target.value)}
-                      style={{ ...inputStyle, width: 70 }}
-                    />
+                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ color:"#6b6a8f", fontSize:12 }}>€</span>
+                    <input type="number" value={m.price} placeholder="0" onChange={e => updateMerch(i, "price", e.target.value)} style={{ ...inputStyle, width:70 }} />
                   </div>
-                  <button onClick={() => removeMerch(i)} style={{
-                    background: "none", border: "none", color: "#4a6a5a",
-                    fontSize: 16, cursor: "pointer", padding: 0
-                  }}>×</button>
+                  <button onClick={() => removeMerch(i)} style={{ background:"none", border:"none", color:"#4a6a5a", fontSize:16, cursor:"pointer", padding:0 }}>×</button>
                 </div>
               ))}
             </div>
-          ) : (
-            (concert.merch || []).length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {concert.merch.map((m, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", color: "#c4c2f0", fontSize: 13 }}>
-                    <span>{m.item}</span>
-                    {m.price && <span style={{ color: "#a78bfa" }}>€{parseFloat(m.price).toFixed(2)}</span>}
-                  </div>
-                ))}
-              </div>
-            ) : <span style={{ color: "#2e2e4a", fontSize: 13 }}>—</span>
-          )}
-        </div>
+          </> },
 
-        {/* Notes */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Notes</div>
-          {editing ? (
-            <textarea
-              value={form.notes || ""}
-              onChange={e => update("notes", e.target.value)}
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical" }}
-              placeholder="Any notes..."
+          /* ── NOTES ── */
+          { title: 'Notes', content:
+            <textarea value={form.notes || ""} onChange={e => update("notes", e.target.value)} rows={3} style={{ ...inputStyle, resize:"vertical" }} placeholder="Any notes..." />
+          },
+
+        ].map(({ title, content }) => (
+          <div key={title} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff", marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #1a1a2e" }}>{title}</div>
+            {content}
+          </div>
+        ))}
+
+        {/* Acts — festivals only */}
+        {form.type === 'festival' && (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff", marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #1a1a2e" }}>Acts seen</div>
+            <FestivalActsSection
+              acts={form.acts || []}
+              onChange={v => update('acts', v)}
+              startDate={form.date}
+              endDate={form.endDate}
+              ratingMax={settings.ratingSystem || 5}
             />
-          ) : (
-            <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.5 }}>
-              {concert.notes || <span style={{ color: "#2e2e4a" }}>—</span>}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Setlist */}
-        {past && (
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", marginBottom: 8, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Setlist</div>
-            <SetlistSection concert={concert} />
+        {/* Setlist — concerts only, editable in edit mode */}
+        {past && form.type !== 'festival' && (() => {
+          const roleConfig = {
+            headliner: { color: '#a78bfa', bg: '#1a1a30' },
+            support:   { color: '#818cf8', bg: '#131328' },
+            guest:     { color: '#f472b6', bg: '#1a1030' },
+          };
+          const performers = [
+            { key: '__headliner__', name: concert.artist, role: 'headliner',
+              songs: form.setlist || [],
+              onSaveSetlist: (s) => update('setlist', s) },
+            ...(concert.support || []).map(s => {
+              const name = getSupportName(s); const role = getSupportRole(s);
+              return { key: name, name, role,
+                songs: (form.supportSetlists || {})[name] || [],
+                onSaveSetlist: (ns) => setForm(f => ({ ...f, supportSetlists: { ...(f.supportSetlists || {}), [name]: ns } })) };
+            }),
+          ];
+          return (
+            <div style={{ marginBottom: 24 }}>
+              <div style={labelStyle}>Setlist</div>
+              {performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
+                const { color, bg } = roleConfig[role] || roleConfig.support;
+                const isOpen = expandedSupportSetlists.has(key);
+                return (
+                  <div key={key} style={{ marginBottom: 6 }}>
+                    <button onClick={() => toggleSupportSetlist(key)} style={{
+                      width: '100%', textAlign: 'left', background: '#13131f',
+                      border: '1px solid #1f1f35', borderLeft: `3px solid ${color}`,
+                      borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 9, color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>{role}</span>
+                        <span style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 500 }}>{name}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        {songs.length > 0
+                          ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {songs.length}</span>
+                          : <span style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>+ setlist</span>}
+                        <span style={{ color: '#4a4870', fontSize: 10, lineHeight: 1 }}>{isOpen ? '▴' : '▾'}</span>
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `2px solid ${color}44` }}>
+                        <SetlistSection
+                          concert={concert} settings={settings}
+                          overrideSongs={songs}
+                          overrideArtist={key === '__headliner__' ? undefined : name}
+                          onSaveSetlist={save}
+                          headlinerSongs={role === 'guest' && key !== '__headliner__' ? (form.setlist || []) : []}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Delete */}
+        {onDelete && (
+          <div style={{ marginTop: 8, paddingTop: 20, borderTop: "1px solid #1a1a2e" }}>
+            {!deleteConfirm ? (
+              <button onClick={()=>setDeleteConfirm(true)} style={{
+                width:"100%", padding:"10px", borderRadius:8, fontSize:12, cursor:"pointer",
+                background:"none", border:"1px solid #2e2e50", color:"#4a4870",
+                fontFamily:"'DM Mono',monospace"
+              }}>Delete concert</button>
+            ) : (
+              <div style={{ background:"#1a0a0a", border:"1px solid #4a1a1a", borderRadius:8, padding:"14px" }}>
+                <div style={{ fontSize:13, color:"#f472b6", marginBottom:12 }}>Delete this concert? This can't be undone.</div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={()=>setDeleteConfirm(false)} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"none", border:"1px solid #2e2e50", color:"#6b6a8f", fontFamily:"'DM Mono',monospace" }}>Cancel</button>
+                  <button onClick={()=>{ onDelete(concert.id); onClose(); }} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"#f472b6", border:"none", color:"#0c0c14", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>Delete</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -420,11 +987,13 @@ function ConcertDetail({ concert, onClose, onSave, settings = {} }) {
   );
 }
 
-function Collapsible({ title, defaultOpen = true, children }) {
-  const [open, setOpen] = useState(defaultOpen);
+function Collapsible({ title, defaultOpen = true, children, open: controlledOpen, onToggle }) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const toggle = onToggle || (() => setInternalOpen(o => !o));
   return (
     <div style={{ marginBottom: 12 }}>
-      <button onClick={() => setOpen(o => !o)} style={{
+      <button onClick={toggle} style={{
         width: "100%", background: "none", border: "none", cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 0 8px", borderBottom: `1px solid ${open ? "#2e2e50" : "#1f1f35"}`
@@ -437,7 +1006,7 @@ function Collapsible({ title, defaultOpen = true, children }) {
   );
 }
 
-function StatsView({ concerts, settings = {} }) {
+function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false }) {
   const {
     topArtistsRows = 5, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -455,10 +1024,43 @@ function StatsView({ concerts, settings = {} }) {
     return sum + ticket + merch;
   }, 0);
 
-  // Artists frequency
+  // Artists frequency (headliner + support + guest + festival acts)
   const artistCount = {};
-  past.forEach(c => { artistCount[c.artist] = (artistCount[c.artist] || 0) + 1; });
-  const topArtists = Object.entries(artistCount).sort((a,b) => b[1]-a[1]).slice(0, topArtistsRows);
+  past.forEach(c => {
+    if (c.type !== 'festival') {
+      const key = c.artist.trim();
+      if (!artistCount[key]) artistCount[key] = { headliner: 0, support: 0, guest: 0, festival: 0 };
+      artistCount[key].headliner += 1;
+    }
+    (c.support || []).forEach(s => {
+      const name = getSupportName(s).trim();
+      const role = getSupportRole(s);
+      if (!artistCount[name]) artistCount[name] = { headliner: 0, support: 0, guest: 0, festival: 0 };
+      artistCount[name][role] = (artistCount[name][role] || 0) + 1;
+    });
+    (c.acts || []).forEach(act => {
+      const name = (act.name || '').trim();
+      if (!artistCount[name]) artistCount[name] = { headliner: 0, support: 0, guest: 0, festival: 0 };
+      artistCount[name].festival = (artistCount[name].festival || 0) + 1;
+    });
+  });
+  const topArtists = Object.entries(artistCount)
+    .map(([name, counts]) => [name, counts])
+    .sort((a, b) => {
+      const totA = a[1].headliner + a[1].support + a[1].guest + (a[1].festival || 0);
+      const totB = b[1].headliner + b[1].support + b[1].guest + (b[1].festival || 0);
+      return totB - totA;
+    })
+    .slice(0, topArtistsRows);
+
+  // Songs frequency
+  const songCount = {};
+  past.forEach(c => {
+    (c.setlist || []).forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; });
+    Object.values(c.supportSetlists || {}).forEach(songs => songs.forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; }));
+  });
+  const topSongsRows = settings.topSongsRows || 10;
+  const topSongs = Object.entries(songCount).sort((a,b) => b[1]-a[1]).slice(0, topSongsRows);
 
   // Friends frequency
   const friendCount = {};
@@ -470,9 +1072,16 @@ function StatsView({ concerts, settings = {} }) {
   past.forEach(c => { venueCount[c.venue] = (venueCount[c.venue] || 0) + 1; });
   const topVenues = Object.entries(venueCount).sort((a,b) => b[1]-a[1]).slice(0, topVenuesRows);
 
+  const venueRoomCount = {};
+  past.forEach(c => {
+    const key = c.room ? `${c.venue} · ${c.room}` : c.venue;
+    venueRoomCount[key] = (venueRoomCount[key] || 0) + 1;
+  });
+  const topVenuesByRoom = Object.entries(venueRoomCount).sort((a,b) => b[1]-a[1]).slice(0, topVenuesRows);
+
   // Countries
   const countryCount = {};
-  past.forEach(c => { countryCount[c.country] = (countryCount[c.country] || 0) + 1; });
+  past.forEach(c => { const k = (c.country || '').trim(); countryCount[k] = (countryCount[k] || 0) + 1; });
 
   // Years
   const yearCount = {};
@@ -484,6 +1093,25 @@ function StatsView({ concerts, settings = {} }) {
     yearSpend[y] = (yearSpend[y] || 0) + spent;
   });
   const years = Object.keys(yearCount).sort();
+
+  // Year counts including upcoming
+  const allYearCount = {};
+  const upcomingYearCount = {};
+  concerts.forEach(c => {
+    const y = getYear(c.date);
+    allYearCount[y] = (allYearCount[y] || 0) + 1;
+    if (!isPast(c.date)) upcomingYearCount[y] = (upcomingYearCount[y] || 0) + 1;
+  });
+  const allYears = Object.keys(allYearCount).sort();
+
+  // Month counts including upcoming
+  const allYearMonthCount = {};
+  concerts.forEach(c => {
+    const m = parseInt(c.date.split("-")[1]) - 1;
+    const y = getYear(c.date);
+    if (!allYearMonthCount[y]) allYearMonthCount[y] = {};
+    allYearMonthCount[y][m] = (allYearMonthCount[y][m] || 0) + 1;
+  });
 
   // Avg ticket price per year
   const yearTicketSum = {};
@@ -507,9 +1135,13 @@ function StatsView({ concerts, settings = {} }) {
 
   const monthCount = {};
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const yearMonthCount = {};
   past.forEach(c => {
     const m = parseInt(c.date.split("-")[1]) - 1;
+    const y = getYear(c.date);
     monthCount[m] = (monthCount[m] || 0) + 1;
+    if (!yearMonthCount[y]) yearMonthCount[y] = {};
+    yearMonthCount[y][m] = (yearMonthCount[y][m] || 0) + 1;
   });
 
   // Top 10 most expensive
@@ -522,17 +1154,24 @@ function StatsView({ concerts, settings = {} }) {
   const sortedPast = [...past].sort((a,b) => a.date.localeCompare(b.date));
   const cumulative = sortedPast.map((c, i) => ({ date: c.date.slice(0,7), count: i+1, artist: c.artist }));
 
-  // Venue size buckets
-  const smallVenues = ["TivoliVredenburg", "Melkweg", "013", "De Oosterpoort", "P60", "Central Park Festival"];
-  const midVenues = ["AFAS Live", "Ziggo Dome", "Rotterdam Ahoy"];
-  const arenaVenues = ["Johan Cruijff ArenA", "Sportpaleis", "AFAS Dome"];
-  const venueSizes = { "Club / Small": 0, "Mid-size": 0, "Arena": 0, "Festival": 0 };
+  // Venue size buckets (field-based, dynamic)
+  const venueSizeCount = {};
   past.forEach(c => {
-    if (c.type === "festival") venueSizes["Festival"]++;
-    else if (arenaVenues.some(v => c.venue.includes(v))) venueSizes["Arena"]++;
-    else if (midVenues.some(v => c.venue.includes(v))) venueSizes["Mid-size"]++;
-    else venueSizes["Club / Small"]++;
+    const sz = c.type === "festival" ? "Festival" : c.venueSize;
+    if (sz) venueSizeCount[sz] = (venueSizeCount[sz] || 0) + 1;
   });
+  const venueEntries = Object.entries(venueSizeCount).sort((a,b) => b[1]-a[1]);
+
+  // Avg shows per year
+  const avgPerYear = years.length ? (past.length / years.length).toFixed(1) : null;
+
+  // Genre breakdown
+  const genreCount = {};
+  past.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+  const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]);
+  const subgenreCount = {};
+  past.forEach(c => { if (c.subgenre) subgenreCount[c.subgenre] = (subgenreCount[c.subgenre] || 0) + 1; });
+  const topSubgenres = Object.entries(subgenreCount).sort((a,b) => b[1]-a[1]);
 
   // Ratings
   const rated = past.filter(c => c.rating);
@@ -568,6 +1207,30 @@ function StatsView({ concerts, settings = {} }) {
   const topArtistMerch = Object.entries(artistMerchSpend).sort((a,b) => b[1]-a[1]).slice(0, 8);
   const maxYearSpend = Math.max(...Object.values(yearSpend), 1);
   const maxMonth = Math.max(...Object.values(monthCount), 1);
+
+  // Friends group-size distribution
+  const groupSizeDist = {};
+  past.forEach(c => {
+    const n = c.friends?.length || 0;
+    const key = n >= 6 ? "6+" : String(n);
+    groupSizeDist[key] = (groupSizeDist[key] || 0) + 1;
+  });
+
+  // Average rating per year
+  const ratingByYear = {};
+  rated.forEach(c => {
+    const y = getYear(c.date);
+    if (!ratingByYear[y]) ratingByYear[y] = { sum: 0, count: 0 };
+    ratingByYear[y].sum += c.rating;
+    ratingByYear[y].count++;
+  });
+
+  // Most expensive shows including merch cost
+  const topExpensiveIncMerch = [...past]
+    .filter(c => c.ticketPrice || c.merch?.length > 0)
+    .map(c => ({ ...c, totalCost: (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) }))
+    .sort((a,b) => b.totalCost - a.totalCost)
+    .slice(0, topExpensiveRows);
 
 
   const StatBox = ({ label, value, sub }) => (
@@ -606,48 +1269,90 @@ function StatsView({ concerts, settings = {} }) {
   );
 
   // Donut chart (SVG)
-  const Donut = ({ segments, size = 120 }) => {
+  // labelTexts: array of strings to show on arcs instead of %; null = show %
+  // centerText: string to show in center; null = hide center; undefined = show total count
+  const Donut = ({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined, labelPad = 0.18 }) => {
     const total = segments.reduce((s, x) => s + x.value, 0);
     if (total === 0) return null;
-    const cx = size/2, cy = size/2, r = size*0.38, stroke = size*0.14;
+    const cx = size/2, cy = size/2, r = size*0.36, stroke = size*0.15;
+    const labelR = r + stroke + size*labelPad;
+    const GAP = segments.length > 1 ? 3 : 0;
     let angle = -90;
-    const arcs = segments.map(seg => {
+    const arcs = segments.map((seg, idx) => {
       const pct = seg.value / total;
-      const start = angle;
+      const segDeg = pct * 360 - GAP;
+      const midDeg = angle + GAP/2 + Math.max(0.1, segDeg)/2;
+      const s = ((angle + GAP/2) * Math.PI) / 180;
+      const e = ((angle + GAP/2 + Math.max(0.1, segDeg)) * Math.PI) / 180;
+      const midRad = (midDeg * Math.PI) / 180;
       angle += pct * 360;
-      const startRad = (start * Math.PI) / 180;
-      const endRad = ((angle-0.5) * Math.PI) / 180;
-      const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
-      const x2 = cx + r * Math.cos(endRad),   y2 = cy + r * Math.sin(endRad);
-      const large = pct > 0.5 ? 1 : 0;
-      return { ...seg, d: `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`, pct };
+      const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
+      const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
+      const lx = cx + labelR * Math.cos(midRad), ly = cy + labelR * Math.sin(midRad);
+      const rawLabel = labelTexts ? labelTexts[idx] : `${Math.round(pct*100)}%`;
+      const arcLabel = (!labelTexts && rawLabel && rawLabel.length > 7) ? rawLabel.slice(0, 6) + '…' : rawLabel;
+      return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
     });
+    const pad = showLabels ? Math.max(size*0.1, labelR - size/2 + size*0.14) : 0;
+    const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
     return (
-      <svg width={size} height={size}>
-        {arcs.map((a, i) => (
+      <svg overflow="visible" width={size + pad*2} height={size + pad*2} viewBox={vb} style={{ overflow: "visible", display: "block" }}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0d0d1a" strokeWidth={stroke} />
+        {arcs.map((a, i) => a.d && (
           <path key={i} d={a.d} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="butt" />
         ))}
-        <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.13} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
-        <text x={cx} y={cy+size*0.14} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.09} fontFamily="'DM Mono',monospace">total</text>
+        {showLabels && arcs.map((a, i) => a.pct > 0.05 && a.d && a.arcLabel && (
+          <text key={`l${i}`} x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="middle" fill={a.color} fontSize={size*0.09} fontFamily="'DM Mono',monospace" fontWeight="600">{a.arcLabel}</text>
+        ))}
+        {centerText === undefined ? (
+          <>
+            <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.14} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
+            <text x={cx} y={cy+size*0.16} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
+          </>
+        ) : centerText !== null ? (
+          Array.isArray(centerText) ? (
+            centerText.map((line, li) => (
+              <text key={li} x={cx} y={cy + (li - (centerText.length - 1) / 2) * size * 0.13 + 2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{line}</text>
+            ))
+          ) : (
+            <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{centerText}</text>
+          )
+        ) : null}
       </svg>
     );
   };
+
+  const ChartToggle = ({ options, value, onChange, color = "#a78bfa" }) => (
+    <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+      {options.map(o => (
+        <button key={o.id} onClick={() => onChange(o.id)} style={{
+          padding: "3px 10px", borderRadius: 99, fontSize: 10, cursor: "pointer",
+          fontFamily: "'DM Mono', monospace", fontWeight: 600,
+          background: value === o.id ? color : "none",
+          color: value === o.id ? "#0c0c14" : "#5a5880",
+          border: `1px solid ${value === o.id ? color : "#1f1f35"}`,
+        }}>{o.label}</button>
+      ))}
+    </div>
+  );
 
   const CHART_GROUPS = [
     {
       id: "artists", label: "Artists",
       charts: [
+        { id: "genres-pie", label: "🥧 Genres" },
+        { id: "shows",      label: "📅 Shows over time" },
         { id: "artists",    label: "🎤 Top artists" },
-        { id: "year-count", label: "📅 Shows per year" },
-        { id: "months",     label: "📆 Busiest months" },
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
+        { id: "language",   label: "🗣️ Language" },
+        ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
       ]
     },
     {
       id: "friends", label: "Friends",
       charts: [
-        { id: "friends-chart", label: "👥 Most shows with" },
         { id: "solo",          label: "👯 Solo vs with friends" },
+        { id: "friends-chart", label: "👥 Most shows with" },
       ]
     },
     {
@@ -669,38 +1374,267 @@ function StatsView({ concerts, settings = {} }) {
       id: "merch", label: "Merch",
       charts: [
         { id: "merch-overview", label: "🛍️ Merch overview" },
-        { id: "merch-types",    label: "👕 What I buy most" },
-        { id: "merch-artists",  label: "🎤 By artist" },
+        { id: "merch-breakdown", label: "📦 What I buy" },
       ]
     },
   ];
 
-  const [statsTab, setStatsTab] = useState(defaultStatsTab);
-  const [chartGroup, setChartGroup] = useState("artists");
+  const [showStatsSettings, setShowStatsSettings] = useState(false);
+  useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
+  const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
+  const handleSwipeStart = (e) => { swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; };
+  const handleSwipeEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x;
+    const dy = e.changedTouches[0].clientY - swipeTouchStart.current.y;
+    const dt = Date.now() - swipeTouchStart.current.t;
+    const idx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+    if (Math.abs(dx) < 12 || Math.abs(dy) > Math.abs(dx) * 2) return;
+    if (dx < 0 && idx < visibleChartGroups.length - 1) setChartGroup(visibleChartGroups[idx + 1].id);
+    else if (dx > 0 && idx > 0) setChartGroup(visibleChartGroups[idx - 1].id);
+  };
   const [selectedChart, setSelectedChart] = useState("artists");
+  const [selectedSong, setSelectedSong] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  useBackButton(() => setSelectedSong(null), selectedSong !== null);
+  const [chartOptions, setChartOptions] = useState({});
+  const chartOpt = (id, def) => chartOptions[id] ?? def;
+  const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
 
-  const activeGroup = CHART_GROUPS.find(g => g.id === chartGroup);
+  const hiddenChartGroups = settings.hiddenChartGroups || [];
+  const hiddenCharts = settings.hiddenCharts || [];
+  const visibleChartGroups = CHART_GROUPS
+    .filter(g => !hiddenChartGroups.includes(g.id))
+    .map(g => ({ ...g, charts: g.charts.filter(c => !hiddenCharts.includes(c.id)) }))
+    .filter(g => g.charts.length > 0);
+  const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0];
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
   const renderChart = (id) => {
     switch(id) {
-      case "year-count": return (
+      case "shows": {
+        const sView = chartOpt("shows", "cumulative");
+        const maxAll = Math.max(...Object.values(allYearCount), 1);
+        const hmAllYears = Object.keys(allYearMonthCount).sort();
+        const hmMax = Math.max(...hmAllYears.flatMap(y => Array.from({length:12}, (_,m) => allYearMonthCount[y]?.[m] || 0)), 1);
+        const todayYear = new Date().getFullYear().toString();
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"},{id:"heatmap",label:"Heatmap"},{id:"cumulative",label:"Cumulative"}]} value={sView} onChange={v => setChartOpt("shows", v)} />
+            {sView === "bars" && (() => (
+              <>
+                <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 4, borderRadius: 1, background: "#a78bfa" }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 4, borderRadius: 1, background: "#38bdf8" }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span>
+                  </div>
+                </div>
+                {Object.keys(allYearCount).sort((a,b) => b.localeCompare(a)).map(y => {
+                  const total = allYearCount[y];
+                  const upcoming = upcomingYearCount[y] || 0;
+                  const pastCount = total - upcoming;
+                  return (
+                    <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                        <div style={{ display: "flex", height: 4, borderRadius: 2, overflow: "hidden", width: Math.max(16, (total / maxAll) * 80) }}>
+                          {pastCount > 0 && <div style={{ flex: pastCount, background: "#a78bfa" }} />}
+                          {upcoming > 0 && <div style={{ flex: upcoming, background: "#38bdf8", opacity: 0.85 }} />}
+                        </div>
+                        <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{total}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            ))()}
+            {sView === "line" && (() => {
+              const n = allYears.length;
+              if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
+              const xOf = i => (i/(n-1))*274+3;
+              const yOf = v => 86-(v/maxAll)*76;
+              const splitIdx = allYears.findIndex(y => y >= todayYear);
+              const pastYears = splitIdx === -1 ? allYears : allYears.slice(0, splitIdx + 1);
+              const futureYears = splitIdx === -1 ? [] : allYears.slice(splitIdx);
+              const pastPath = pastYears.length > 1 ? "M " + pastYears.map((y,i) => `${xOf(allYears.indexOf(y))},${yOf(allYearCount[y])}`).join(" L ") : null;
+              const futurePath = futureYears.length > 1 ? "M " + futureYears.map(y => `${xOf(allYears.indexOf(y))},${yOf(allYearCount[y])}`).join(" L ") : null;
+              const firstPastX = pastYears.length ? xOf(0) : 3;
+              const lastPastX = pastYears.length ? xOf(pastYears.length - 1) : 3;
+              return (
+                <>
+                  <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
+                    <defs><linearGradient id="sGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
+                    {pastPath && <path d={pastPath + ` L ${lastPastX},88 L ${firstPastX},88 Z`} fill="url(#sGrad)" />}
+                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {futurePath && <path d={futurePath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {allYears.map((y, i) => <circle key={y} cx={xOf(i)} cy={yOf(allYearCount[y])} r="3" fill={y >= todayYear ? "#38bdf8" : "#a78bfa"} />)}
+                  </svg>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allYears[0]}</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allYears[allYears.length-1]}</span>
+                  </div>
+                </>
+              );
+            })()}
+            {sView === "heatmap" && (
+              <>
+                <div style={{ display: "flex", marginLeft: 30 }}>
+                  {monthNames.map((name, i) => <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>)}
+                </div>
+                {hmAllYears.map(y => (
+                  <div key={y} style={{ display: "flex", alignItems: "center", marginTop: 3 }}>
+                    <span style={{ width: 30, fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{y}</span>
+                    {Array.from({length:12}, (_, m) => {
+                      const count = allYearMonthCount[y]?.[m] || 0;
+                      const pastC = yearMonthCount[y]?.[m] || 0;
+                      const isUpcoming = count > 0 && pastC === 0;
+                      const intensity = count / hmMax;
+                      const color = isUpcoming ? `rgba(56,189,248,${0.15+intensity*0.85})` : `rgba(167,139,250,${0.15+intensity*0.85})`;
+                      const textColor = isUpcoming ? (intensity>0.55?"#0c0c14":"#38bdf8") : (intensity>0.55?"#0c0c14":"#a78bfa");
+                      return (
+                        <div key={m} style={{ flex:1, aspectRatio:"1", borderRadius:2, margin:"0 1px", background: count > 0 ? color : "#0e0e1a", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          {count > 0 && <span style={{ fontSize:7, color: textColor, fontFamily:"'DM Mono',monospace", lineHeight:1 }}>{count}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            )}
+            {sView === "cumulative" && (() => {
+              const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
+              if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+              const n = allSorted.length;
+              const W = 300, H = 80;
+              const firstMs = new Date(allSorted[0].date).getTime();
+              const lastMs = new Date(allSorted[n-1].date).getTime();
+              const rangeMs = lastMs - firstMs || 1;
+              const todayMs = new Date().getTime();
+              const todayX = Math.min(W - 3, ((todayMs - firstMs) / rangeMs) * (W - 6) + 3);
+              const coords = allSorted.map((c, i) => ({
+                x: ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3,
+                y: H - 6 - ((i + 1) / n) * (H - 14),
+                isPast: isPast(c.date),
+              }));
+              const pastCoords = coords.filter(p => p.isPast);
+              const upcomingCoords = coords.filter(p => !p.isPast);
+              const todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : coords[0].y;
+              const pastPath = pastCoords.length > 0 ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+              const upcomingPath = upcomingCoords.length > 0 ? `M ${todayX},${todayY} L ` + upcomingCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+              const areaPath = pastCoords.length > 0 ? pastPath + ` L ${todayX},${H-4} L ${pastCoords[0].x},${H-4} Z` : null;
+              return (
+                <>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 10, height: 2, background: "#a78bfa", borderRadius: 1 }} />
+                      <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>past</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 10, height: 2, background: "#38bdf8", borderRadius: 1, opacity: 0.7 }} />
+                      <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>upcoming</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 100, paddingTop: 2, paddingBottom: 6 }}>
+                      <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{n}</span>
+                      <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{Math.round(n/2)}</span>
+                      <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
+                    </div>
+                    <svg style={{ flex: 1 }} height={100} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                      <defs><linearGradient id="cumGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
+                      {areaPath && <path d={areaPath} fill="url(#cumGrad2)" />}
+                      {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                      {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />}
+                    </svg>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[0].date.slice(0,7)}</span>
+                    <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} past · {concerts.length - past.length} upcoming</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[n-1].date.slice(0,7)}</span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        );
+      }
+      case "year-count": {
+        const ycView = chartOpt("year-count", "bars");
+        const sortedYears = Object.keys(yearCount).sort();
+        const maxYC = Math.max(...Object.values(yearCount), 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ycView} onChange={v => setChartOpt("year-count", v)} />
+            {ycView === "bars" ? (
+              Object.entries(yearCount).sort((a,b) => b[0].localeCompare(a[0])).map(([y, count]) => (
+                <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                    <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / maxYC) * 80) }} />
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}</span>
+                  </div>
+                </div>
+              ))
+            ) : (() => {
+              const counts = sortedYears.map(y => yearCount[y]);
+              const n = sortedYears.length;
+              if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
+              const pts = sortedYears.map((y, i) => `${(i / (n - 1)) * 274 + 3},${86 - (counts[i] / maxYC) * 76}`);
+              const linePath = "M " + pts.join(" L ");
+              return (
+                <>
+                  <svg width="100%" height={100} viewBox="0 0 280 92" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="ycGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    <path d={linePath + ` L ${(n-1)/(n-1)*274+3},88 L 3,88 Z`} fill="url(#ycGrad)" />
+                    <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    {sortedYears.map((y, i) => (
+                      <circle key={y} cx={(i / (n - 1)) * 274 + 3} cy={86 - (counts[i] / maxYC) * 76} r="3" fill="#a78bfa" />
+                    ))}
+                  </svg>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYears[0]}</span>
+                    <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYears[sortedYears.length - 1]}</span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        );
+      }
+      case "year-spend": {
+        const ysView = chartOpt("year-spend", "bars");
+        const activeYearsYS = years.filter(y => yearSpend[y] > 0);
+        const maxSpendYS = Math.max(...activeYearsYS.map(y => yearSpend[y]), 1);
+        const thisYearFS = String(new Date().getFullYear());
+        const allTicketsFS = past.filter(c => c.ticketPrice);
+        const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
+        const avgAllFS = allTicketsFS.length ? allTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / allTicketsFS.length : null;
+        const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
+        return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {years.map(([y, count], i) => null) && null}
-          {Object.entries(yearCount).sort((a,b) => b[0].localeCompare(a[0])).map(([y, count], i, arr) => (
-            <div key={y} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
-                <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / Math.max(...Object.values(yearCount))) * 80) }} />
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}</span>
+          {/* Spend summary pills */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14 }}>
+            {[
+              { label: "total spent", value: totalSpent > 0 ? `€${Math.round(totalSpent)}` : "—", color: "#f472b6" },
+              { label: "avg ticket", value: avgAllFS ? `€${avgAllFS.toFixed(0)}` : "—", color: "#f472b6" },
+              { label: `avg ${thisYearFS}`, value: avgThisYearFS ? `€${avgThisYearFS.toFixed(0)}` : "—", color: "#38bdf8" },
+            ].map(b => (
+              <div key={b.label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
+                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
               </div>
-            </div>
-          ))}
-        </div>
-      );
-      case "year-spend": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            ))}
+          </div>
+          <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
+          {ysView === "bars" && <>
           {/* Legend */}
           <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -710,6 +1644,10 @@ function StatsView({ concerts, settings = {} }) {
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: "#38bdf8" }} />
               <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Avg ticket</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#34d399" }} />
+              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
             </div>
           </div>
           {/* Grouped bars */}
@@ -721,8 +1659,10 @@ function StatsView({ concerts, settings = {} }) {
             return activeYears.map(y => {
               const spend = yearSpend[y] || 0;
               const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
+              const merch = yearMerchSpend[y] || 0;
               const spendW = Math.max(4, (spend / maxSpend) * 100);
               const avgW = avg ? Math.max(4, (avg / maxSpend) * 100) : 0;
+              const merchW = merch > 0 ? Math.max(4, (merch / maxSpend) * 100) : 0;
               return (
                 <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
@@ -739,6 +1679,13 @@ function StatsView({ concerts, settings = {} }) {
                         <span style={{ fontSize: 10, color: "#38bdf8", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{avg.toFixed(0)}</span>
                       </div>
                     )}
+                    {/* Merch bar */}
+                    {merch > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ height: 7, borderRadius: 3, background: "#34d399", width: `${merchW}%`, opacity: 0.85, transition: "width 0.5s ease" }} />
+                        <span style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(merch)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -748,111 +1695,269 @@ function StatsView({ concerts, settings = {} }) {
             <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total</span>
             <span style={{ color: "#f472b6", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(totalSpent)}</span>
           </div>
+          </>}
+          {ysView === "line" && (() => {
+            const n = activeYearsYS.length;
+            if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
+            const leftPad = 40;
+            const chartW = 280;
+            const totalW = leftPad + chartW;
+            const xOf = i => leftPad + (i / (n - 1)) * (chartW - 6) + 3;
+            const yTop = 8; const yBot = 86;
+            const yOf = v => yBot - (v / maxSpendYS) * (yBot - yTop);
+            const mid = maxSpendYS / 2;
+            const spendPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearSpend[y] || 0) }));
+            const spendPath = "M " + spendPts.map(p => `${p.x},${p.y}`).join(" L ");
+            const avgPts = activeYearsYS.map((y, i) => {
+              const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
+              return avg !== null ? { x: xOf(i), y: yOf(avg) } : null;
+            });
+            const avgPath = avgPts.reduce((acc, pt, i) => {
+              if (!pt) return acc;
+              if (i === 0 || !avgPts[i - 1]) return acc + `M ${pt.x},${pt.y}`;
+              return acc + ` L ${pt.x},${pt.y}`;
+            }, '');
+            const merchPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearMerchSpend[y] || 0) }));
+            const merchPath = "M " + merchPts.map(p => `${p.x},${p.y}`).join(" L ");
+            return (
+              <>
+                <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 16, height: 2, background: "#f472b6", borderRadius: 1 }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Total spend</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 16, height: 2, background: "#38bdf8", borderRadius: 1 }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Avg ticket</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 16, height: 2, background: "#34d399", borderRadius: 1 }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
+                  </div>
+                </div>
+                <svg width="100%" height={100} viewBox={`0 0 ${totalW} 92`} preserveAspectRatio="none">
+                  <defs><linearGradient id="ysGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f472b6" stopOpacity="0.2"/><stop offset="100%" stopColor="#f472b6" stopOpacity="0"/></linearGradient></defs>
+                  {/* Gridlines */}
+                  <line x1={leftPad} y1={yTop} x2={totalW} y2={yTop} stroke="#1f1f35" strokeWidth="1" />
+                  <line x1={leftPad} y1={yOf(mid)} x2={totalW} y2={yOf(mid)} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
+                  <line x1={leftPad} y1={yBot} x2={totalW} y2={yBot} stroke="#1f1f35" strokeWidth="1" />
+                  {/* Y axis labels */}
+                  <text x={leftPad - 4} y={yTop + 3} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€{Math.round(maxSpendYS)}</text>
+                  <text x={leftPad - 4} y={yOf(mid) + 3} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€{Math.round(mid)}</text>
+                  <text x={leftPad - 4} y={yBot + 1} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€0</text>
+                  {/* Chart lines */}
+                  <path d={spendPath + ` L ${spendPts[n-1].x},${yBot} L ${spendPts[0].x},${yBot} Z`} fill="url(#ysGrad)" />
+                  <path d={spendPath} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {spendPts.map((pt, i) => <circle key={activeYearsYS[i]} cx={pt.x} cy={pt.y} r="3" fill="#f472b6" />)}
+                  {avgPath && <path d={avgPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {avgPts.map((pt, i) => pt && <circle key={activeYearsYS[i] + 'a'} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />)}
+                  <path d={merchPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {merchPts.map((pt, i) => <circle key={activeYearsYS[i] + 'm'} cx={pt.x} cy={pt.y} r="3" fill="#34d399" />)}
+                </svg>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, paddingLeft: leftPad }}>
+                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[0]}</span>
+                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{activeYearsYS[activeYearsYS.length - 1]}</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
-      );
+        );
+      }
       case "avg-ticket": return null;
-      case "expensive": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {topExpensive.map((c, i) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#c4c2f0", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
-                <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)} · {c.venue}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(12, (c.ticketPrice / topExpensive[0].ticketPrice) * 50) }} />
-                <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 44, textAlign: "right" }}>€{c.ticketPrice}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      );
-      case "over-time": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <svg width="100%" height={120} viewBox="0 0 300 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/>
-                <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
-              </linearGradient>
-            </defs>
-            {(() => {
-              if (cumulative.length < 2) return null;
-              const n = cumulative.length;
-              const maxC = cumulative[n-1].count;
-              const pts = cumulative.map((d, i) => `${(i/(n-1))*294+3},${96-(d.count/maxC)*88}`);
-              const linePath = "M " + pts.join(" L ");
-              const areaPath = linePath + ` L 297,96 L 3,96 Z`;
-              return (<>
-                <path d={areaPath} fill="url(#lineGrad)" />
-                <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx={3} cy={96-(cumulative[0].count/maxC)*88} r="3" fill="#a78bfa" />
-                <circle cx={297} cy={96-(cumulative[cumulative.length-1].count/maxC)*88} r="3" fill="#a78bfa" />
-              </>);
-            })()}
-          </svg>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[0]?.date.slice(0,7)}</span>
-            <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} total</span>
-            <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[sortedPast.length-1]?.date.slice(0,7)}</span>
-          </div>
-        </div>
-      );
-      case "months": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80, marginBottom: 6 }}>
-            {monthNames.map((name, i) => {
-              const count = monthCount[i] || 0;
+      case "expensive": {
+        const exView = chartOpt("expensive", "ticket");
+        const exList = exView === "merch" ? topExpensiveIncMerch : topExpensive;
+        const exMax = exView === "merch"
+          ? (exList[0]?.totalCost || 1)
+          : (exList[0]?.ticketPrice || 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"ticket",label:"Ticket only"},{id:"merch",label:"Inc. merch"}]} value={exView} onChange={v => setChartOpt("expensive", v)} />
+            {exList.map((c, i) => {
+              const amount = exView === "merch" ? c.totalCost : c.ticketPrice;
               return (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ fontSize: 9, color: count > 0 ? "#a78bfa" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2 }}>{count || ""}</div>
-                  <div style={{ width: "100%", background: count > 0 ? "#a78bfa" : "#0e0e1a", borderRadius: "2px 2px 0 0", height: `${Math.max(3, (count/Math.max(maxMonth,1))*60)}px` }} />
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: "#c4c2f0", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
+                    <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)} · {c.venue}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(12, (amount / exMax) * 50) }} />
+                    <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 50, textAlign: "right" }}>€{amount?.toFixed(0)}</span>
+                  </div>
                 </div>
               );
             })}
           </div>
-          <div style={{ display: "flex", gap: 3 }}>
-            {monthNames.map((name, i) => (
-              <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>
-            ))}
-          </div>
-        </div>
-      );
-      case "solo": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
-          <Donut segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#1f1f35" }]} size={110} />
-          <div style={{ flex: 1 }}>
-            {[{ label: "With friends", value: withFriends.length, color: "#a78bfa" }, { label: "Solo", value: solo.length, color: "#6b6a8f" }].map(s => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{s.label}</span>
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{s.value} ({Math.round(s.value/Math.max(past.length,1)*100)}%)</span>
+        );
+      }
+      case "over-time": return (
+        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+          {(() => {
+            if (cumulative.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+            const n = cumulative.length;
+            const maxC = cumulative[n-1].count;
+            const pts = cumulative.map((d, i) => `${(i/(n-1))*294+3},${96-(d.count/maxC)*88}`);
+            const linePath = "M " + pts.join(" L ");
+            const areaPath = linePath + ` L 297,96 L 3,96 Z`;
+            return (<>
+              <div style={{ display: "flex", gap: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 120, paddingTop: 2, paddingBottom: 6 }}>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxC}</span>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{Math.round(maxC / 2)}</span>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
+                </div>
+                <svg style={{ flex: 1 }} height={120} viewBox="0 0 300 100" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/>
+                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d={areaPath} fill="url(#lineGrad)" />
+                  <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx={3} cy={96-(cumulative[0].count/maxC)*88} r="3" fill="#a78bfa" />
+                  <circle cx={297} cy={96-(cumulative[n-1].count/maxC)*88} r="3" fill="#a78bfa" />
+                </svg>
               </div>
-            ))}
-          </div>
-        </div>
-      );
-      case "venue-size": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 20 }}>
-          <Donut segments={[
-            { value: venueSizes["Arena"], color: "#a78bfa" },
-            { value: venueSizes["Mid-size"], color: "#f472b6" },
-            { value: venueSizes["Club / Small"], color: "#7c3aed" },
-            { value: venueSizes["Festival"], color: "#4f46e5" },
-          ].filter(s=>s.value>0)} size={110} />
-          <div style={{ flex: 1 }}>
-            {[{ label: "Arena", color: "#a78bfa" }, { label: "Mid-size", color: "#f472b6" }, { label: "Club / Small", color: "#7c3aed" }, { label: "Festival", color: "#4f46e5" }]
-              .filter(s => venueSizes[s.label] > 0).map(s => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                <span style={{ color: "#c4c2f0", fontSize: 13, flex: 1 }}>{s.label}</span>
-                <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{venueSizes[s.label]}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[0]?.date.slice(0,7)}</span>
+                <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} total</span>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[sortedPast.length-1]?.date.slice(0,7)}</span>
               </div>
-            ))}
-          </div>
+            </>);
+          })()}
         </div>
       );
+      case "months": {
+        const mView = chartOpt("months", "bars");
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"heatmap",label:"Heatmap"}]} value={mView} onChange={v => setChartOpt("months", v)} />
+            {mView === "bars" ? (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80, marginBottom: 6 }}>
+                  {monthNames.map((name, i) => {
+                    const count = monthCount[i] || 0;
+                    return (
+                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <div style={{ fontSize: 9, color: count > 0 ? "#a78bfa" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2 }}>{count || ""}</div>
+                        <div style={{ width: "100%", background: count > 0 ? "#a78bfa" : "#0e0e1a", borderRadius: "2px 2px 0 0", height: `${Math.max(3, (count / Math.max(maxMonth, 1)) * 60)}px` }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 3 }}>
+                  {monthNames.map((name, i) => (
+                    <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>
+                  ))}
+                </div>
+              </>
+            ) : (() => {
+              const hmYears = Object.keys(yearMonthCount).sort();
+              const hmMax = Math.max(...hmYears.flatMap(y => Array.from({length:12}, (_,m) => yearMonthCount[y]?.[m] || 0)), 1);
+              return (
+                <>
+                  <div style={{ display: "flex", marginLeft: 30 }}>
+                    {monthNames.map((name, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>
+                    ))}
+                  </div>
+                  {hmYears.map(y => (
+                    <div key={y} style={{ display: "flex", alignItems: "center", marginTop: 3 }}>
+                      <span style={{ width: 30, fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{y}</span>
+                      {Array.from({length: 12}, (_, m) => {
+                        const count = yearMonthCount[y]?.[m] || 0;
+                        const intensity = count / hmMax;
+                        return (
+                          <div key={m} style={{
+                            flex: 1, aspectRatio: "1", borderRadius: 2, margin: "0 1px",
+                            background: count > 0 ? `rgba(167,139,250,${0.15 + intensity * 0.85})` : "#0e0e1a",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {count > 0 && <span style={{ fontSize: 7, color: intensity > 0.55 ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{count}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
+          </div>
+        );
+      }
+      case "solo": {
+        const soloView = chartOpt("solo", "overview");
+        const groupSizeLabels = ["0","1","2","3","4","5","6+"];
+        const groupSizeColors = ["#6b6a8f","#a78bfa","#818cf8","#60a5fa","#34d399","#fbbf24","#f472b6"];
+        const maxGroupSize = Math.max(...groupSizeLabels.map(k => groupSizeDist[k] || 0), 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"overview",label:"Overview"},{id:"group",label:"Group size"}]} value={soloView} onChange={v => setChartOpt("solo", v)} />
+            {soloView === "overview" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={100} />
+                <div style={{ flex: 1 }}>
+                  {[{ label: "With friends", color: "#a78bfa" }, { label: "Solo", color: "#6b6a8f" }].map(s => (
+                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 1, background: s.color, flexShrink: 0 }} />
+                      <span style={{ color: "#c4c2f0", fontSize: 11 }}>{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (() => {
+              const gsLegendLabels = groupSizeLabels.map(k => k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`);
+              const allGs = groupSizeLabels.map((k, i) => ({ label: gsLegendLabels[i], count: groupSizeDist[k] || 0, color: groupSizeColors[i] })).filter(x => x.count > 0).sort((a,b) => b.count - a.count);
+              const top4Gs = allGs.slice(0, 4);
+              const othersGs = allGs.slice(4).reduce((s, x) => s + x.count, 0);
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <Donut showLabels size={110} centerText={null} segments={[
+                    ...top4Gs.map(x => ({ value: x.count, color: x.color })),
+                    ...(othersGs > 0 ? [{ value: othersGs, color: "#4a4870" }] : [])
+                  ]} />
+                  <div style={{ flex: 1 }}>
+                    {[...top4Gs, ...(othersGs > 0 ? [{ label: "Others", color: "#4a4870" }] : [])].map(x => (
+                      <div key={x.label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
+                        <span style={{ color: x.label === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{x.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        );
+      }
+      case "venue-size": {
+        const top4VS = venueEntries.slice(0, 4);
+        const othersVS = venueEntries.slice(4).reduce((s,[,n])=>s+n,0);
+        return venueEntries.length === 0 ? (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a venue size to see this</div>
+          </div>
+        ) : (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", display: "flex", alignItems: "center", gap: 14 }}>
+            <Donut showLabels size={110} segments={[
+              ...top4VS.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i] })),
+              ...(othersVS > 0 ? [{ value: othersVS, color: "#4a4870" }] : [])
+            ]} />
+            <div style={{ flex: 1 }}>
+              {[...top4VS, ...(othersVS > 0 ? [["Others", othersVS]] : [])].map(([name], i) => (
+                <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                  <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
       case "countries": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {Object.entries(countryCount).sort((a,b)=>b[1]-a[1]).map(([country, count]) => (
@@ -866,38 +1971,135 @@ function StatsView({ concerts, settings = {} }) {
           ))}
         </div>
       );
-      case "ratings": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {[5,4,3,2,1].map(n => (
-            <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <span style={{ color: "#a78bfa", fontSize: 12, width: 36, flexShrink: 0 }}>{"★".repeat(n)}</span>
-              <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingDist[n]/Math.max(...Object.values(ratingDist),1))*100}%` }} />
+      case "ratings": {
+        const rView = chartOpt("ratings", "dist");
+        const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
+        const ratingYears = Object.keys(ratingByYear).sort();
+        const maxAvgRating = 5;
+        const ratingColors = { 5:"#a78bfa", 4:"#818cf8", 3:"#38bdf8", 2:"#34d399", 1:"#6b6a8f" };
+        const rAll = [5,4,3,2,1].filter(n => ratingDist[n]).map(n => ({ stars: n, count: ratingDist[n], color: ratingColors[n] })).sort((a,b) => b.count - a.count);
+        const top4R = rAll.slice(0, 4);
+        const othersR = rAll.slice(4).reduce((s,x) => s+x.count, 0);
+        const rSegs = [...top4R.map(x => ({ value: x.count, color: x.color })), ...(othersR > 0 ? [{ value: othersR, color: "#4a4870" }] : [])];
+        const rLegend = [...top4R, ...(othersR > 0 ? [{ stars: 0, color: "#4a4870" }] : [])];
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"pie",label:"Pie"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
+            {rView === "dist" ? (
+              <>
+                {[5,4,3,2,1].map(n => (
+                  <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#a78bfa", fontSize: 11, width: 56, flexShrink: 0, letterSpacing: "-1px" }}>{"★".repeat(n)}</span>
+                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingDist[n]/maxRatingDist)*100}%` }} />
+                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{ratingDist[n]}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop: "1px solid #1e3028", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
+                  <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
+                </div>
+              </>
+            ) : rView === "pie" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Donut showLabels size={110} centerText={`${avgRating}★`} segments={rSegs} />
+                <div style={{ flex: 1 }}>
+                  {rLegend.map((x, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
+                      <span style={{ color: x.stars ? "#c4c2f0" : "#4a4870", fontSize: 11 }}>{x.stars ? "★".repeat(x.stars) : "Others"}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 16, textAlign: "right" }}>{ratingDist[n]}</span>
-            </div>
-          ))}
-          <div style={{ borderTop: "1px solid #1e3028", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
-            <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
+            ) : (
+              ratingYears.map(y => {
+                const avg = ratingByYear[y].sum / ratingByYear[y].count;
+                return (
+                  <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(avg / maxAvgRating) * 100}%` }} />
+                    </div>
+                    <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{avg.toFixed(1)} ★</span>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
-      );
-      case "artists": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <ListStat title="" items={topArtists} suffix="x" />
-        </div>
-      );
+        );
+      }
+      case "artists": {
+        const aView = chartOpt("artists", "count");
+        const artistItems = aView === "alpha"
+          ? [...topArtists].sort((a, b) => a[0].localeCompare(b[0]))
+          : topArtists;
+        const medals = ["🥇","🥈","🥉"];
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
+            {artistItems.map(([name, counts], i) => {
+              const total = counts.headliner + counts.support + counts.guest + (counts.festival || 0);
+              const hasSub = counts.support > 0 || counts.guest > 0 || counts.festival > 0;
+              const parts = [];
+              if (counts.headliner > 0) parts.push(`${counts.headliner} headliner`);
+              if (counts.support > 0) parts.push(`${counts.support} support`);
+              if (counts.guest > 0) parts.push(`${counts.guest} guest`);
+              if (counts.festival > 0) parts.push(`${counts.festival} festival`);
+              return (
+                <div key={name} style={{ marginBottom: hasSub ? 8 : 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: aView === "count" && i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
+                        {aView === "count" && i < 3 ? medals[i] : `#${i+1}`}
+                      </span>
+                      <span style={{ color: "#c4c2f0", fontSize: 13 }}>{name}</span>
+                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{total}x</span>
+                  </div>
+                  {hasSub && (
+                    <div style={{ paddingLeft: 28, marginTop: 2 }}>
+                      <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{parts.join(' · ')}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
       case "friends-chart": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <ListStat title="" items={topFriends} suffix=" shows" />
+          {topFriends.map(([name, count], i) => (
+            <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
+              </div>
+              <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count} shows</span>
+            </div>
+          ))}
         </div>
       );
-      case "venues": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          <ListStat title="" items={topVenues} suffix="x" />
-        </div>
-      );
+      case "venues": {
+        const vView = chartOpt("venues", "venue");
+        const vItems = vView === "room" ? topVenuesByRoom : topVenues;
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
+            {vItems.map(([name, count], i) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
+                </div>
+                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}x</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
       case "merch-overview": return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {/* Summary row */}
@@ -913,71 +2115,235 @@ function StatsView({ concerts, settings = {} }) {
               </div>
             ))}
           </div>
-          {/* Top 3 most expensive items */}
-          {topMerchItems.length > 0 && (
-            <>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Top 3 most expensive</div>
-              {topMerchItems.map((m, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: "#e2e0ff" }}>{m.item}</div>
-                    <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{m.artist}</div>
+          {/* Top 3 list with toggle */}
+          {(topMerchItems.length > 0 || topMerchTypes.length > 0) && (() => {
+            const moView = chartOpt("merch-overview", "price");
+            return (
+              <>
+                <ChartToggle options={[{id:"price",label:"Top 3 by price"},{id:"count",label:"Top 3 by count"}]} value={moView} onChange={v => setChartOpt("merch-overview", v)} />
+                {moView === "price"
+                  ? topMerchItems.map((m, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: "#e2e0ff" }}>{m.item}</div>
+                        <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{m.artist}</div>
+                      </div>
+                      <span style={{ color: "#f472b6", fontSize: 13, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>€{parseFloat(m.price).toFixed(2)}</span>
+                    </div>
+                  ))
+                  : topMerchTypes.slice(0, 3).map(([type, count], i) => (
+                    <div key={type} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                      <span style={{ fontSize: 13, color: "#e2e0ff", flex: 1, textTransform: "capitalize" }}>{type}</span>
+                      <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}x</span>
+                    </div>
+                  ))
+                }
+              </>
+            );
+          })()}
+        </div>
+      );
+      case "merch-breakdown": {
+        const mbView = chartOpt("merch-breakdown", "types");
+        const noMerch = topMerchTypes.length === 0 && topArtistMerch.length === 0;
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"types",label:"By type"},{id:"artists",label:"By artist"}]} value={mbView} onChange={v => setChartOpt("merch-breakdown", v)} />
+            {noMerch
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see this</div>
+              : mbView === "types"
+                ? topMerchTypes.map(([type, count], i) => (
+                  <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>{type}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / topMerchTypes[0][1]) * 80) }} />
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}x</span>
+                    </div>
                   </div>
-                  <span style={{ color: "#f472b6", fontSize: 13, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>€{parseFloat(m.price).toFixed(2)}</span>
+                ))
+                : topArtistMerch.map(([artist, spend], i) => (
+                  <div key={artist} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{artist}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ height: 4, borderRadius: 2, background: "#f472b6", width: Math.max(16, (spend / topArtistMerch[0][1]) * 80) }} />
+                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 40, textAlign: "right" }}>€{spend.toFixed(0)}</span>
+                    </div>
+                  </div>
+                ))
+            }
+          </div>
+        );
+      }
+      case "genres": {
+        const glView = chartOpt("genres", "main");
+        const glItems = glView === "sub" ? topSubgenres : topGenres;
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={glView} onChange={v => setChartOpt("genres", v)} />
+            {glItems.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {glView === "sub" ? "subgenres" : "genres"} to see this</div>
+              : <ListStat title="" items={glItems} suffix="x" />
+            }
+          </div>
+        );
+      }
+      case "genres-pie": {
+        const gpData = chartOpt("gp-data", "main");
+        const gpView = chartOpt("gp-view", "pie");
+        const gpSource = gpData === "sub" ? topSubgenres : topGenres;
+        const top4 = gpSource.slice(0, 4);
+        const othersCount = gpSource.slice(4).reduce((s, [,n]) => s + n, 0);
+        const emptyLabel = gpData === "sub" ? "subgenres" : "genres";
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+              <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={gpData} onChange={v => setChartOpt("gp-data", v)} />
+              <div style={{ width: 1, height: 18, background: "#2e2e50", flexShrink: 0 }} />
+              <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("gp-view", v)} color="#6d28d9" />
+            </div>
+            {gpView === "list" ? (
+              gpSource.length === 0
+                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
+                : <ListStat title="" items={gpSource} suffix="x" />
+            ) : gpSource.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
+              : (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Donut size={110} showLabels label="shows" segments={[
+                    ...top4.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
+                    ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
+                  ]} />
+                  <div style={{ flex: 1 }}>
+                    {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </>
-          )}
-        </div>
-      );
-      case "merch-types": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {topMerchTypes.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No merch data yet</div>
-            : topMerchTypes.map(([type, count], i) => (
-              <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                  <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>{type}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / topMerchTypes[0][1]) * 80) }} />
-                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}x</span>
-                </div>
-              </div>
-            ))
-          }
-        </div>
-      );
-      case "merch-artists": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {topArtistMerch.length === 0
-            ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No merch data yet</div>
-            : topArtistMerch.map(([artist, spend], i) => (
-              <div key={artist} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                  <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{artist}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ height: 4, borderRadius: 2, background: "#f472b6", width: Math.max(16, (spend / topArtistMerch[0][1]) * 80) }} />
-                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 40, textAlign: "right" }}>€{spend.toFixed(0)}</span>
-                </div>
-              </div>
-            ))
-          }
-        </div>
-      );
+              )
+            }
+          </div>
+        );
+      }
+      case "language": {
+        const languageCount = {};
+        past.forEach(c => {
+          const langs = Array.isArray(c.language) ? c.language : c.language ? [c.language] : [];
+          langs.forEach(l => { if (l) languageCount[l] = (languageCount[l] || 0) + 1; });
+        });
+        const languageEntries = Object.entries(languageCount).sort((a,b) => b[1]-a[1]);
+        const langView = chartOpt("language", "list");
+        const top4Lang = languageEntries.slice(0, 4);
+        const langOthers = languageEntries.slice(4).reduce((s,[,n]) => s+n, 0);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            {languageEntries.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with a language to see this</div>
+              : <>
+                  <ChartToggle options={[{id:"list",label:"List"},{id:"pie",label:"Pie"}]} value={langView} onChange={v => setChartOpt("language", v)} />
+                  {langView === "list"
+                    ? <ListStat title="" items={languageEntries} suffix="x" />
+                    : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <Donut showLabels size={110} segments={[
+                          ...top4Lang.map(([,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
+                          ...(langOthers > 0 ? [{ value: langOthers, color: "#4a4870" }] : [])
+                        ]} />
+                        <div style={{ flex: 1 }}>
+                          {[...top4Lang, ...(langOthers > 0 ? [["Others", langOthers]] : [])].map(([name], i) => (
+                            <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                              <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                  }
+                </>
+            }
+          </div>
+        );
+      }
+      case "songs": {
+        const medals = ["🥇","🥈","🥉"];
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+            {topSongs.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log setlists on your shows to see this</div>
+              : topSongs.map(([song, count], i) => (
+                <button key={song} onClick={() => setSelectedSong(song)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
+                      {i < 3 ? medals[i] : `#${i+1}`}
+                    </span>
+                    <span style={{ color: "#c4c2f0", fontSize: 13 }}>{song}</span>
+                  </div>
+                  <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}×</span>
+                </button>
+              ))
+            }
+          </div>
+        );
+      }
       default: return null;
     }
   };
 
   return (
     <div style={{ padding: "0 0 100px" }}>
+      {selectedSong && (() => {
+        const appearances = past.flatMap(c => {
+          const result = [];
+          const mainSong = (c.setlist || []).find(s => getSongName(s) === selectedSong);
+          if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), isSupport: false });
+          Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
+            const s = songs.find(x => getSongName(x) === selectedSong);
+            if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), isSupport: true });
+          });
+          return result;
+        }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
+        return (
+          <div>
+            <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={() => setSelectedSong(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+              <div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedSong}</div>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{appearances.length}× live</div>
+              </div>
+            </div>
+            <div style={{ padding: "14px 16px" }}>
+              {appearances.map(({ concert: c, artist, info, isSupport }, i) => (
+                <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
+                  width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35",
+                  borderLeft: `3px solid ${isSupport ? "#3d3564" : "#a78bfa"}`,
+                  borderRadius: 10, padding: "11px 14px", cursor: "pointer", marginBottom: 6, display: "flex", flexDirection: "column", gap: 2
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(c.date)}</span>
+                    {isSupport && <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#1a1a30", borderRadius: 99 }}>support</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 600 }}>{artist}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</div>
+                  {info && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{info}</div>}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+      {!selectedSong && <>
       {/* Tab switcher */}
-      <div style={{ display: "flex", borderBottom: "1px solid #0d1a14", marginBottom: 0 }}>
-        {[{ id: "summary", label: "Summary" }, { id: "charts", label: "Charts" }].map(t => (
+      <div style={{ display: "flex", borderBottom: "1px solid #0d1a14", marginBottom: 0, alignItems: "stretch" }}>
+        {!hideTabs && [{ id: "summary", label: "Summary" }, { id: "charts", label: "Charts" }, { id: "friends", label: "Friends" }].map(t => (
           <button key={t.id} onClick={() => setStatsTab(t.id)} style={{
             flex: 1, background: "none", border: "none", cursor: "pointer",
             padding: "14px 0 12px", fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800,
@@ -986,51 +2352,78 @@ function StatsView({ concerts, settings = {} }) {
             marginBottom: -1
           }}>{t.label}</button>
         ))}
+        <button onClick={() => setShowStatsSettings(s => !s)} style={{
+          flex: hideTabs ? 0 : undefined,
+          background: showStatsSettings ? "#1a1a30" : "none", border: "none",
+          borderLeft: hideTabs ? "none" : "1px solid #1f1f35", cursor: "pointer", padding: hideTabs ? "12px 16px" : "0 16px",
+          color: showStatsSettings ? "#a78bfa" : "#4a4870", fontSize: 16, lineHeight: 1,
+          marginLeft: hideTabs ? "auto" : undefined
+        }}>⚙</button>
       </div>
+      {showStatsSettings && (() => {
+        const summaryBlocks = [
+          { id: "stats1", label: "Stats" }, { id: "stats2", label: "Financial" },
+          { id: "cumulative", label: "Cumulative" }, { id: "pies", label: "Genres & Venues" },
+          { id: "upnext", label: "Up next" },
+        ];
+        const hiddenBlocks = settings.hiddenSummaryBlocks || [];
+        const hiddenGroups = settings.hiddenChartGroups || [];
+        const hiddenChts = settings.hiddenCharts || [];
+        const toggleBlock = id => onUpdateSetting("hiddenSummaryBlocks", hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]);
+        const toggleGroup = id => onUpdateSetting("hiddenChartGroups", hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]);
+        const toggleChart = id => onUpdateSetting("hiddenCharts", hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]);
+        const pill = (label, active, onClick, small = false) => (
+          <button onClick={onClick} style={{
+            padding: small ? "2px 8px" : "3px 10px", borderRadius: 99, fontSize: small ? 9 : 10, cursor: "pointer",
+            fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
+            background: active ? "#1a1a30" : "none", color: active ? "#a78bfa" : "#4a4870",
+          }}>{label}</button>
+        );
+        return (
+          <div style={{ background: "#0f0f1e", borderBottom: "1px solid #0d1a14", padding: "12px 16px" }}>
+            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Summary</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
+              {summaryBlocks.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
+            </div>
+            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Charts</div>
+            {CHART_GROUPS.map(g => (
+              <div key={g.id} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
+                </div>
+                {!hiddenGroups.includes(g.id) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 10, borderLeft: "2px solid #1f1f35" }}>
+                    {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ── SUMMARY ── */}
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0" }}>
 
-          {/* Row 1: shows / festivals / countries */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
+          {/* Row 1: shows / festivals / countries / avg per year */}
+          {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
             {[
-              { label: "shows", value: shows.length },
-              { label: "festivals", value: festivals.length },
-              { label: "countries", value: Object.keys(countryCount).length },
+              { label: "shows", value: shows.length, nav: { view: 'home', filterType: 'concerts' } },
+              { label: "festivals", value: festivals.length, nav: { view: 'home', filterType: 'festivals' } },
+              { label: "countries", value: Object.keys(countryCount).length, nav: null },
+              { label: "avg / year", value: avgPerYear ?? "—", nav: null },
             ].map(b => (
-              <div key={b.label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
+              <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
+                <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
               </div>
             ))}
-          </div>
+          </div>}
 
-          {/* Row 2: total spend / avg ticket all time / avg ticket this year */}
-          {(() => {
-            const thisYear = String(new Date().getFullYear());
-            const allTickets = concerts.filter(c => c.ticketPrice);
-            const thisYearTickets = allTickets.filter(c => getYear(c.date) === thisYear);
-            const avgAll = allTickets.length ? allTickets.reduce((s,c) => s + c.ticketPrice, 0) / allTickets.length : null;
-            const avgThisYear = thisYearTickets.length ? thisYearTickets.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTickets.length : null;
-            return (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-                {[
-                  { label: "total spent", value: totalSpent > 0 ? `€${Math.round(totalSpent)}` : "—", color: "#f472b6" },
-                  { label: "avg ticket", value: avgAll ? `€${avgAll.toFixed(0)}` : "—", color: "#f472b6" },
-                  { label: `avg ${thisYear}`, value: avgThisYear ? `€${avgThisYear.toFixed(0)}` : "—", color: "#38bdf8" },
-                ].map(b => (
-                  <div key={b.label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 6px", textAlign: "center" }}>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
-                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
 
           {/* Cumulative line chart */}
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>cumulative shows</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1086,84 +2479,103 @@ function StatsView({ concerts, settings = {} }) {
               }));
 
               return (
-                <svg width="100%" viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
-                  <defs>
-                    <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
-                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
-                    </linearGradient>
-                  </defs>
-                  {yearLabels.map(({y, x}) => (
-                    <g key={y}>
-                      <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
-                      <text x={x} y={H+10} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Sans,sans-serif">{y}</text>
-                    </g>
-                  ))}
-                  {/* Today line */}
-                  <line x1={todayX} y1={0} x2={todayX} y2={H-4} stroke="#2e2e50" strokeWidth="1" />
-                  {/* Past area fill */}
-                  {areaPath && <path d={areaPath} fill="url(#cumGrad)" />}
-                  {/* Past line — purple */}
-                  {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                  {/* Upcoming line — light blue dashed */}
-                  {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,3" opacity="0.8" />}
-                  {/* Dots */}
-                  {pastCoords.length > 0 && <circle cx={pastCoords[0].x} cy={pastCoords[0].y} r="3" fill="#a78bfa" />}
-                  {pastCoords.length > 0 && <circle cx={todayX} cy={todayY} r="3" fill="#a78bfa" />}
-                  {upcomingCoords.length > 0 && <circle cx={upcomingCoords[upcomingCoords.length-1].x} cy={upcomingCoords[upcomingCoords.length-1].y} r="3" fill="#38bdf8" opacity="0.8" />}
-                </svg>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 14, flexShrink: 0 }}>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{n}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{Math.round(n/2)}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>0</span>
+                  </div>
+                  <svg style={{ flex: 1 }} viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
+                    <defs>
+                      <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    {yearLabels.map(({y, x}) => (
+                      <g key={y}>
+                        <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
+                        <text x={x} y={H+10} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Sans,sans-serif">{y}</text>
+                      </g>
+                    ))}
+                    <line x1={todayX} y1={0} x2={todayX} y2={H-4} stroke="#2e2e50" strokeWidth="1" />
+                    {areaPath && <path d={areaPath} fill="url(#cumGrad)" />}
+                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,3" opacity="0.8" />}
+                    {pastCoords.length > 0 && <circle cx={pastCoords[0].x} cy={pastCoords[0].y} r="3" fill="#a78bfa" />}
+                    {pastCoords.length > 0 && <circle cx={todayX} cy={todayY} r="3" fill="#a78bfa" />}
+                    {upcomingCoords.length > 0 && <circle cx={upcomingCoords[upcomingCoords.length-1].x} cy={upcomingCoords[upcomingCoords.length-1].y} r="3" fill="#38bdf8" opacity="0.8" />}
+                  </svg>
+                </div>
               );
             })()}
-          </div>
+          </div>}
 
-          {/* Two donuts side by side */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-            {/* Solo vs friends */}
-            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Solo vs friends</div>
-              <Donut segments={[
-                { value: withFriends.length, color: "#a78bfa" },
-                { value: solo.length, color: "#2e2e4a" },
-              ]} size={90} />
-              <div style={{ marginTop: 10, width: "100%" }}>
-                {[{ label: "w. friends", value: withFriends.length, color: "#a78bfa" }, { label: "solo", value: solo.length, color: "#4a4870" }].map(s => (
-                  <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, color: "#c4c2f0", flex: 1, fontFamily: "'DM Sans', sans-serif" }}>{s.label}</span>
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{s.value}</span>
-                  </div>
-                ))}
+          {/* Donut cards — stacked full width */}
+          {!(settings.hiddenSummaryBlocks||[]).includes("pies") && (() => {
+            const titleStyle = { fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 };
+            const placeholderStyle = { color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "20px 0" };
+            const legendItem = (color, name) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                <div style={{ width: 6, height: 6, borderRadius: 1, background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 9, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
               </div>
-            </div>
+            );
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, marginBottom: 12, display: "flex", overflow: "hidden" }}>
+                {/* Genre */}
+                <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer", borderRight: "1px solid #1f1f35" }}>
+                  {topGenres.length === 0 ? (
+                    <div style={placeholderStyle}>add genres to shows</div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <Donut size={80} showLabels labelPad={0.06} centerText="Genres" segments={[
+                          ...topGenres.slice(0,3).map(([g,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
+                          ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
+                        ]} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
+                        {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others"]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
+                            <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
 
-            {/* Venue size */}
-            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Venue size</div>
-              <Donut segments={[
-                { value: venueSizes["Arena"], color: "#a78bfa" },
-                { value: venueSizes["Mid-size"], color: "#f472b6" },
-                { value: venueSizes["Club / Small"], color: "#38bdf8" },
-                { value: venueSizes["Festival"], color: "#2e2e4a" },
-              ].filter(s => s.value > 0)} size={90} />
-              <div style={{ marginTop: 10, width: "100%" }}>
-                {[
-                  { label: "arena", color: "#a78bfa", key: "Arena" },
-                  { label: "mid-size", color: "#f472b6", key: "Mid-size" },
-                  { label: "club", color: "#38bdf8", key: "Club / Small" },
-                  { label: "festival", color: "#4a4870", key: "Festival" },
-                ].filter(s => venueSizes[s.key] > 0).map(s => (
-                  <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: 2, background: s.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, color: "#c4c2f0", flex: 1, fontFamily: "'DM Sans', sans-serif" }}>{s.label}</span>
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{venueSizes[s.key]}</span>
-                  </div>
-                ))}
+                {/* Venue size */}
+                <div onClick={() => { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart("venue-size"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer" }}>
+                  {venueEntries.length === 0 ? (
+                    <div style={placeholderStyle}>set venue size on shows</div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <Donut size={80} showLabels labelPad={0.06} centerText={["VENUE", "SIZE"]} segments={[
+                          ...venueEntries.slice(0,3).map(([name,n],i) => ({ value: n, color: VENUE_COLORS[i] })),
+                          ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
+                        ]} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
+                        {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others"]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
+                            <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Countdown — next 3 upcoming shows */}
-          {(() => {
+          {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && (() => {
             const upcoming = concerts
               .filter(c => !isPast(c.date))
               .sort((a,b) => a.date.localeCompare(b.date))
@@ -1207,76 +2619,219 @@ function StatsView({ concerts, settings = {} }) {
         </div>
       )}
       {statsTab === "charts" && (
-        <div style={{ padding: "0" }}>
-          {/* Category grid — 1 row, no scrolling */}
-          <div style={{ display: "flex", gap: 5, padding: "10px 16px", borderBottom: "1px solid #0d1a14" }}>
-            {CHART_GROUPS.map(g => (
-              <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
-                flex: 1, background: chartGroup === g.id ? "#1a1a30" : "none",
-                border: `1px solid ${chartGroup === g.id ? "#a78bfa" : "#1f1f35"}`,
-                borderRadius: 6, padding: "5px 2px", cursor: "pointer",
-                fontFamily: "'DM Mono', monospace", fontSize: 9,
-                fontWeight: chartGroup === g.id ? 700 : 400,
-                color: chartGroup === g.id ? "#a78bfa" : "#5a5880",
-                textAlign: "center", whiteSpace: "nowrap"
-              }}>{g.label}</button>
-            ))}
-          </div>
-          {/* All charts in group stacked */}
+        <div style={{ padding: "0" }} onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}>
           <div style={{ padding: "14px 16px 0" }}>
             {activeGroup?.charts.map((c, i) => (
               <div key={c.id} style={{ marginBottom: i < activeGroup.charts.length - 1 ? 16 : 0 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{c.label}</div>
                 {renderChart(c.id)}
               </div>
             ))}
           </div>
         </div>
       )}
+      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} />}
+      </>}
     </div>
   );
 }
 
-function FriendsView({ concerts }) {
-  const past = concerts.filter(c => isPast(c.date));
+function FriendsView({ concerts, onOpen }) {
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('most-shows');
+  const [showSortPanel, setShowSortPanel] = useState(false);
 
-  const friendStats = {};
-  FRIENDS.forEach(f => {
-    const together = past.filter(c => c.friends.includes(f));
-    if (together.length > 0) {
-      friendStats[f] = together;
-    }
+  const past = concerts.filter(c => isPast(c.date));
+  const allFriends = [...new Set(past.flatMap(c => c.friends))].sort();
+
+  const friendEntries = allFriends.map(name => {
+    const shows = past.filter(c => c.friends.includes(name));
+    const sortedShows = [...shows].sort((a, b) => a.date.localeCompare(b.date));
+    const firstShow = sortedShows[0] || null;
+    const lastShow = sortedShows[sortedShows.length - 1] || null;
+    const upcoming = concerts.filter(c => !isPast(c.date) && c.friends.includes(name));
+    const genreCount = {};
+    shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+    const topGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
+    const artistCount = {};
+    shows.forEach(c => { artistCount[c.artist] = (artistCount[c.artist] || 0) + 1; });
+    const topArtists = Object.entries(artistCount).sort((a, b) => b[1] - a[1]);
+    const concertCount = shows.filter(c => c.type === 'concert').length;
+    const festivalCount = shows.filter(c => c.type === 'festival').length;
+    return { name, shows, sortedShows, firstShow, lastShow, upcoming, topGenres, topArtists, concertCount, festivalCount };
   });
 
-  const sorted = Object.entries(friendStats).sort((a,b) => b[1].length - a[1].length);
+  const filtered = friendEntries
+    .filter(f => !search || f.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'most-shows') return b.shows.length - a.shows.length;
+      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
+      if (sortBy === 'recent') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
+      return 0;
+    });
 
-  return (
-    <div style={{ padding: "0 20px 100px" }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#e2e0ff", marginBottom: 20, paddingTop: 8 }}>
-        Friends
-      </div>
-      {sorted.map(([name, shows]) => (
-        <div key={name} style={{
-          background: "#13131f", border: "1px solid #1e3028", borderRadius: 12,
-          padding: "14px 16px", marginBottom: 10
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#a78bfa" }}>{shows.length} show{shows.length !== 1 ? "s" : ""}</span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {shows.slice(0,6).map(c => (
-              <span key={c.id} style={{
-                fontSize: 11, padding: "2px 7px", borderRadius: 99,
-                background: "#17172a", color: "#6b6a8f", border: "1px solid #1e3028"
-              }}>{c.artist}</span>
-            ))}
-            {shows.length > 6 && (
-              <span style={{ fontSize: 11, color: "#4a4870" }}>+{shows.length - 6} more</span>
-            )}
+  useBackButton(() => setSelectedFriend(null), selectedFriend !== null);
+
+  if (selectedFriend) {
+    const f = friendEntries.find(fd => fd.name === selectedFriend);
+    if (!f) return null;
+    const yearSpan = f.firstShow && f.lastShow && f.firstShow.date.slice(0,4) !== f.lastShow.date.slice(0,4)
+      ? `${f.firstShow.date.slice(0,4)} – ${f.lastShow.date.slice(0,4)}`
+      : f.firstShow ? f.firstShow.date.slice(0,4) : '';
+    const sectionLabel = { fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 };
+    const card = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
+
+    return (
+      <div style={{ padding: "0 0 100px" }}>
+        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{f.name}</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
+              {f.shows.length} show{f.shows.length !== 1 ? 's' : ''} together{yearSpan ? ` · ${yearSpan}` : ''}
+            </div>
           </div>
         </div>
-      ))}
+
+        <div style={{ padding: "16px 20px" }}>
+          {/* Timeline */}
+          <div style={card}>
+            <div style={sectionLabel}>Timeline</div>
+            <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
+              {f.firstShow && (
+                <div>
+                  <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: 3 }}>First together</div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0" }}>{formatDate(f.firstShow.date)}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f" }}>{f.firstShow.artist}</div>
+                </div>
+              )}
+              {f.lastShow && f.firstShow && f.lastShow.id !== f.firstShow.id && (
+                <div>
+                  <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: 3 }}>Most recent</div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0" }}>{formatDate(f.lastShow.date)}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f" }}>{f.lastShow.artist}</div>
+                </div>
+              )}
+            </div>
+            {(f.concertCount > 0 || f.festivalCount > 0) && (
+              <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
+                {f.concertCount > 0 && `${f.concertCount} concert${f.concertCount !== 1 ? 's' : ''}`}
+                {f.concertCount > 0 && f.festivalCount > 0 && ' · '}
+                {f.festivalCount > 0 && `${f.festivalCount} festival${f.festivalCount !== 1 ? 's' : ''}`}
+              </div>
+            )}
+          </div>
+
+          {/* Taste profile */}
+          {f.topGenres.length > 0 && (
+            <div style={card}>
+              <div style={sectionLabel}>Taste profile</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {f.topGenres.map(([genre, count]) => (
+                  <div key={genre} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#c4c2f0", minWidth: 90 }}>{genre}</span>
+                    <div style={{ flex: 1, height: 6, background: "#0c0c14", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(count / f.topGenres[0][1]) * 100}%` }} />
+                    </div>
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top artists together */}
+          {f.topArtists.length > 0 && (
+            <div style={card}>
+              <div style={sectionLabel}>Top artists together</div>
+              {f.topArtists.slice(0, 6).map(([artist, count], i) => (
+                <div key={artist} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < Math.min(f.topArtists.length, 6) - 1 ? 8 : 0 }}>
+                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: "#c4c2f0" }}>{artist}</span>
+                  <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{count}×</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upcoming together */}
+          {f.upcoming.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ ...sectionLabel, marginBottom: 8 }}>Upcoming together</div>
+              {f.upcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+            </div>
+          )}
+
+          {/* All shows */}
+          <div>
+            <div style={{ ...sectionLabel, marginBottom: 8 }}>All shows together</div>
+            {[...f.sortedShows].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "0 0 100px" }}>
+      {/* Search + sort */}
+      <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
+        <div style={{ position: "relative", marginBottom: 8 }}>
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search friend..."
+            style={{ width: "100%", background: "#13131f", border: `1px solid ${search ? "#a78bfa" : "#1f1f35"}`, borderRadius: 10, color: "#c4c2f0", padding: "9px 32px 9px 32px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }} />
+          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>}
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingBottom: 10, alignItems: "center" }}>
+          <button onClick={() => setShowSortPanel(p => !p)} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
+            Sort{sortBy !== 'most-shows' ? ' ↕' : ''}
+          </button>
+        </div>
+        {showSortPanel && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            {sortBy !== 'most-shows' && <button onClick={() => setSortBy('most-shows')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[{id:'most-shows',label:'Most shows'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Most recent'}].map(s => (
+                <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Friend list */}
+      <div style={{ padding: "0 16px" }}>
+        {filtered.map(({ name, shows, lastShow, topGenres, upcoming }) => (
+          <button key={name} onClick={() => setSelectedFriend(name)} style={{
+            width: "100%", textAlign: "left", background: "#13131f",
+            border: "1px solid #1f1f35", borderLeft: "3px solid #2e2e4a",
+            borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{name}</div>
+              {lastShow && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: topGenres.length ? 4 : 0 }}>last: {formatDate(lastShow.date)}</div>}
+              {topGenres.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {topGenres.slice(0, 3).map(([g]) => (
+                    <span key={g} style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", padding: "2px 6px", borderRadius: 99, background: "#1a1a30", color: "#6b6a8f" }}>{g}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#6b6a8f" }}>{shows.length}</span>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>shows</span>
+              </div>
+              {upcoming.length > 0 && <div style={{ fontSize: 9, color: "#818cf8", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>+{upcoming.length} soon</div>}
+            </div>
+          </button>
+        ))}
+        {filtered.length === 0 && (
+          <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no friends found</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1284,27 +2839,116 @@ function FriendsView({ concerts }) {
 function ArtistsView({ concerts, onOpen }) {
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("most-seen");
+  const [filterGenre, setFilterGenre] = useState("all");
+  const [filterMinSeen, setFilterMinSeen] = useState(0);
+  const [filterUpcoming, setFilterUpcoming] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSort, setShowSort] = useState(false);
 
-  const past = concerts.filter(c => isPast(c.date));
-
-  // Group all concerts (past + upcoming) by artist
+  // Group headliner shows by artist (festivals excluded — their name is not an artist)
   const artistMap = {};
   concerts.forEach(c => {
-    if (!artistMap[c.artist]) artistMap[c.artist] = [];
-    artistMap[c.artist].push(c);
+    if (c.type === 'festival') return;
+    const key = c.artist.trim();
+    if (!artistMap[key]) artistMap[key] = [];
+    artistMap[key].push(c);
   });
 
-  const artists = Object.entries(artistMap)
-    .sort((a, b) => b[1].filter(c => isPast(c.date)).length - a[1].filter(c => isPast(c.date)).length || a[0].localeCompare(b[0]))
-    .filter(([name]) => !search || name.toLowerCase().includes(search.toLowerCase()));
+  // Build support/guest/festival appearance map
+  const supportAppearancesMap = {};
+  concerts.forEach(c => {
+    (c.support || []).forEach(s => {
+      const name = getSupportName(s).trim();
+      const role = getSupportRole(s);
+      if (!supportAppearancesMap[name]) supportAppearancesMap[name] = [];
+      supportAppearancesMap[name].push({ concert: c, role });
+    });
+    (c.acts || []).forEach(act => {
+      const name = (act.name || '').trim();
+      if (!supportAppearancesMap[name]) supportAppearancesMap[name] = [];
+      supportAppearancesMap[name].push({ concert: c, role: 'festival' });
+    });
+  });
 
-  if (selectedArtist) {
-    const shows = artistMap[selectedArtist].sort((a,b) => b.date.localeCompare(a.date));
+  // Include support/festival-only artists in artistMap so they appear in the list
+  Object.keys(supportAppearancesMap).forEach(name => {
+    if (!artistMap[name]) artistMap[name] = [];
+  });
+
+  const allGenres = [...new Set(concerts.map(c => c.genre).filter(Boolean))].sort();
+
+  const artistEntries = Object.entries(artistMap).map(([name, shows]) => {
     const pastShows = shows.filter(c => isPast(c.date));
     const upcomingShows = shows.filter(c => !isPast(c.date));
+    const rated = pastShows.filter(c => c.rating);
+    const avgRating = rated.length ? rated.reduce((s, c) => s + c.rating, 0) / rated.length : null;
+    const sortedPast = [...pastShows].sort((a, b) => a.date.localeCompare(b.date));
+    const firstShow = sortedPast[0] || null;
+    const lastShow = sortedPast[sortedPast.length - 1] || null;
+    const genreCount = {};
+    shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+    const topGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const supportApps = (supportAppearancesMap[name] || []).filter(a => isPast(a.concert.date));
+    const supportCount = supportApps.filter(a => a.role === 'support').length;
+    const guestCount = supportApps.filter(a => a.role === 'guest').length;
+    const festivalCount = supportApps.filter(a => a.role === 'festival').length;
+    return { name, shows, pastShows, upcomingShows, pastCount: pastShows.length, avgRating, firstShow, lastShow, topGenre, supportApps, supportCount, guestCount, festivalCount };
+  });
+
+  const activeFilterCount = [filterGenre !== 'all', filterMinSeen > 0, filterUpcoming].filter(Boolean).length;
+
+  const sorted = artistEntries
+    .filter(a => {
+      if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterGenre !== 'all' && a.topGenre !== filterGenre) return false;
+      if (filterMinSeen > 0 && (a.pastCount + a.supportCount + a.guestCount + a.festivalCount) < filterMinSeen) return false;
+      if (filterUpcoming && a.upcomingShows.length === 0) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'most-seen') {
+        const totA = a.pastCount + a.supportCount + a.guestCount + a.festivalCount;
+        const totB = b.pastCount + b.supportCount + b.guestCount + b.festivalCount;
+        return totB - totA || a.name.localeCompare(b.name);
+      }
+      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
+      if (sortBy === 'recently-seen') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
+      if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0) || b.pastCount - a.pastCount;
+      return 0;
+    });
+
+  const getBorderColor = (count) => {
+    if (count >= 5) return '#a78bfa';
+    if (count >= 3) return '#6d5fa8';
+    if (count >= 2) return '#3d3564';
+    return '#2e2e4a';
+  };
+
+  useBackButton(() => setSelectedArtist(null), selectedArtist !== null);
+
+  if (selectedArtist) {
+    const shows = (artistMap[selectedArtist] || []).sort((a,b) => b.date.localeCompare(a.date));
+    const pastShows = shows.filter(c => isPast(c.date));
+    const upcomingShows = shows.filter(c => !isPast(c.date));
+    const rated = pastShows.filter(c => c.rating);
+    const avgRating = rated.length ? (rated.reduce((s,c) => s + c.rating, 0) / rated.length).toFixed(1) : null;
+    const sinceYear = pastShows.length ? [...pastShows].sort((a,b) => a.date.localeCompare(b.date))[0].date.slice(0,4) : null;
+    const friendCount = {};
+    pastShows.forEach(c => c.friends.forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
+    const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
+    const supportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => isPast(a.concert.date)).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
+    const supportOnlyCount = supportApps.filter(a => a.role === 'support').length;
+    const guestOnlyCount = supportApps.filter(a => a.role === 'guest').length;
+    const festivalOnlyCount = supportApps.filter(a => a.role === 'festival').length;
+    const totalAppearances = pastShows.length + supportApps.length;
+    const roleParts = [pastShows.length > 0 && `${pastShows.length} headliner`, supportOnlyCount > 0 && `${supportOnlyCount} support`, guestOnlyCount > 0 && `${guestOnlyCount} guest`, festivalOnlyCount > 0 && `${festivalOnlyCount} festival`].filter(Boolean);
+    const artistSongCount = {};
+    pastShows.forEach(c => (c.setlist || []).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
+    supportApps.forEach(({ concert: c }) => ((c.supportSetlists || {})[selectedArtist] || []).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
+    const artistSongs = Object.entries(artistSongCount).sort((a,b) => b[1]-a[1]);
     return (
       <div style={{ padding: "0 0 100px" }}>
-        {/* Artist header */}
         <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => setSelectedArtist(null)} style={{
             background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1
@@ -1312,10 +2956,33 @@ function ArtistsView({ concerts, onOpen }) {
           <div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedArtist}</div>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-              {pastShows.length} show{pastShows.length !== 1 ? "s" : ""}{upcomingShows.length > 0 ? ` · ${upcomingShows.length} upcoming` : ""}
+              {totalAppearances} appearance{totalAppearances !== 1 ? "s" : ""}{roleParts.length > 0 && pastShows.length !== totalAppearances ? ` · ${roleParts.join(' · ')}` : ''}{upcomingShows.length > 0 ? ` · ${upcomingShows.length} upcoming` : ""}
             </div>
           </div>
         </div>
+        {/* Quick stats row */}
+        {(avgRating || sinceYear || topFriend) && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, sinceYear, topFriend].filter(Boolean).length}, 1fr)`, gap: 8, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
+            {sinceYear && (
+              <div style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{sinceYear}</div>
+                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>since</div>
+              </div>
+            )}
+            {avgRating && (
+              <div style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>★ {avgRating}</div>
+                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>avg rating</div>
+              </div>
+            )}
+            {topFriend && (
+              <div style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{topFriend[0]}</div>
+                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>top friend · {topFriend[1]}×</div>
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ padding: "14px 16px" }}>
           {upcomingShows.length > 0 && (
             <div style={{ marginBottom: 16 }}>
@@ -1324,9 +2991,57 @@ function ArtistsView({ concerts, onOpen }) {
             </div>
           )}
           {pastShows.length > 0 && (
-            <div>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Past</div>
+            <div style={{ marginBottom: supportApps.length > 0 ? 16 : 0 }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Headliner</div>
               {pastShows.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+            </div>
+          )}
+          {artistSongs.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+                Songs heard live · {artistSongs.length} unique
+              </div>
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                {artistSongs.map(([song, count], i) => (
+                  <div key={song} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < artistSongs.length - 1 ? 6 : 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 12 }}>{song}</span>
+                    </div>
+                    {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {supportApps.length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Support, guest & festival</div>
+              {supportApps.map(({ concert: c, role }) => {
+                const isFestRole = role === 'festival';
+                const borderColor = role === 'guest' ? '#f472b6' : isFestRole ? '#f472b633' : '#3d3564';
+                const badgeBg = role === 'guest' ? '#1a1030' : isFestRole ? '#1a1030' : '#1a1a30';
+                const badgeColor = role === 'guest' ? '#f472b6' : isFestRole ? '#f472b6' : '#a78bfa';
+                return (
+                  <button key={`${c.id}-${role}`} onClick={() => onOpen(c)} style={{
+                    width: "100%", textAlign: "left", background: "#0e0e1a",
+                    border: "1px solid #1f1f35", borderLeft: `3px solid ${borderColor}`,
+                    borderRadius: 10, padding: "11px 14px", cursor: "pointer", marginBottom: 6,
+                    display: "flex", alignItems: "center", gap: 12
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: badgeBg, color: badgeColor, textTransform: "uppercase" }}>{isFestRole ? 'festival' : role}</span>
+                        <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(c.date)}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 500 }}>{c.artist}</div>
+                      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+                        {c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1336,9 +3051,9 @@ function ArtistsView({ concerts, onOpen }) {
 
   return (
     <div style={{ padding: "0 0 100px" }}>
-      {/* Search */}
-      <div style={{ padding: "12px 16px 8px" }}>
-        <div style={{ position: "relative" }}>
+      {/* Search + controls */}
+      <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
+        <div style={{ position: "relative", marginBottom: 8 }}>
           <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
           <input
             value={search}
@@ -1357,42 +3072,101 @@ function ArtistsView({ concerts, onOpen }) {
             }}>×</button>
           )}
         </div>
+
+        {/* Sort + Filter pill row */}
+        <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
+          <button onClick={() => { setShowSort(s => !s); setShowFilters(false); }} style={{ background: showSort || sortBy !== 'most-seen' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortBy !== 'most-seen' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-seen' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-seen' ? 700 : 400, flexShrink: 0 }}>
+            Sort{sortBy !== 'most-seen' ? ' ↕' : ''}
+          </button>
+          <button onClick={() => { setShowFilters(f => !f); setShowSort(false); }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+            {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
+          </button>
+        </div>
+
+        {showSort && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            {sortBy !== 'most-seen' && <button onClick={() => setSortBy('most-seen')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map(s => (
+                <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showFilters && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            {activeFilterCount > 0 && <button onClick={() => { setFilterGenre('all'); setFilterMinSeen(0); setFilterUpcoming(false); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Times seen</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[{v:0,label:'All'},{v:2,label:'2+'},{v:3,label:'3+'},{v:5,label:'5+'}].map(opt => (
+                  <button key={opt.v} onClick={() => setFilterMinSeen(opt.v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterMinSeen === opt.v ? '#a78bfa' : '#0c0c14', color: filterMinSeen === opt.v ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterMinSeen === opt.v ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
+            {allGenres.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <button onClick={() => setFilterGenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === 'all' ? '#a78bfa' : '#0c0c14', color: filterGenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {allGenres.map(g => (
+                    <button key={g} onClick={() => setFilterGenre(filterGenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === g ? '#a78bfa' : '#0c0c14', color: filterGenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === g ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Upcoming only</div>
+              <button onClick={() => setFilterUpcoming(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterUpcoming ? '#818cf8' : '#0c0c14', color: filterUpcoming ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterUpcoming ? '#818cf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Has upcoming</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Artist list */}
-      <div style={{ padding: "4px 16px" }}>
-        {artists.map(([name, shows]) => {
-          const pastCount = shows.filter(c => isPast(c.date)).length;
-          const upcomingCount = shows.filter(c => !isPast(c.date)).length;
-          const lastShow = shows.filter(c => isPast(c.date)).sort((a,b) => b.date.localeCompare(a.date))[0];
-          const tours = [...new Set(shows.map(c => c.tour).filter(Boolean))];
+      <div style={{ padding: "0 16px" }}>
+        {sorted.map(({ name, pastCount, upcomingShows, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps }) => {
+          const total = pastCount + supportCount + guestCount + festivalCount;
+          const latestSupportDate = supportApps.length > 0 ? supportApps.slice().sort((a,b) => b.concert.date.localeCompare(a.concert.date))[0].concert.date : null;
+          const displayDate = lastShow ? lastShow.date : latestSupportDate;
           return (
-            <button key={name} onClick={() => setSelectedArtist(name)} style={{
-              width: "100%", textAlign: "left", background: "#13131f",
-              border: "1px solid #1f1f35", borderLeft: `3px solid ${upcomingCount > 0 ? "#a78bfa" : "#2e2e4a"}`,
-              borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{name}</div>
-                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-                  {lastShow ? `last: ${formatDate(lastShow.date)}` : upcomingCount > 0 ? `upcoming: ${formatDate(shows[0].date)}` : ""}
-                </div>
-                {tours.length > 0 && (
-                  <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {tours.join(" · ")}
-                  </div>
+          <button key={name} onClick={() => setSelectedArtist(name)} style={{
+            width: "100%", textAlign: "left", background: "#13131f",
+            border: "1px solid #1f1f35", borderLeft: `3px solid ${getBorderColor(total)}`,
+            borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
+                {topGenre && (
+                  <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 99, background: '#1a1a30', color: '#6b6a8f', flexShrink: 0 }}>{topGenre}</span>
                 )}
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{pastCount}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase" }}>show{pastCount !== 1 ? "s" : ""}</div>
-                {upcomingCount > 0 && <div style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>+{upcomingCount} soon</div>}
+              <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+                {firstShow && lastShow && firstShow.date !== lastShow.date
+                  ? `${firstShow.date.slice(0,4)} – ${lastShow.date.slice(0,4)} · last ${formatDate(lastShow.date)}`
+                  : displayDate ? formatDate(displayDate) : ''}
               </div>
-            </button>
-          );
-        })}
-        {artists.length === 0 && (
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#6b6a8f', lineHeight: 1 }}>{total}</span>
+                <span style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>time{total !== 1 ? 's' : ''}</span>
+              </div>
+              {(supportCount > 0 || guestCount > 0 || festivalCount > 0) && (
+                <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right' }}>
+                  {[pastCount > 0 && `${pastCount}h`, supportCount > 0 && `${supportCount}s`, guestCount > 0 && `${guestCount}g`, festivalCount > 0 && `${festivalCount}f`].filter(Boolean).join('·')}
+                </div>
+              )}
+              {upcomingShows.length > 0 && (
+                <div style={{ fontSize: 9, color: '#818cf8', fontFamily: "'DM Mono', monospace" }}>+{upcomingShows.length} soon</div>
+              )}
+            </div>
+          </button>
+        ); })}
+        {sorted.length === 0 && (
           <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no artists found</div>
         )}
       </div>
@@ -1400,26 +3174,146 @@ function ArtistsView({ concerts, onOpen }) {
   );
 }
 
+function SongsView({ concerts, onOpen }) {
+  const past = concerts.filter(c => isPast(c.date));
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('count');
+  const [topN, setTopN] = useState(null);
+  const [selectedSong, setSelectedSong] = useState(null);
+  useBackButton(() => setSelectedSong(null), selectedSong !== null);
+
+  const songCount = {};
+  past.forEach(c => {
+    (c.setlist || []).forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; });
+    Object.values(c.supportSetlists || {}).forEach(songs => songs.forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; }));
+  });
+  const totalUnique = Object.keys(songCount).length;
+  const totalHeard = Object.values(songCount).reduce((a, b) => a + b, 0);
+
+  const byCount = Object.entries(songCount).sort((a, b) => b[1] - a[1]);
+  const topSet = topN ? new Set(byCount.slice(0, topN).map(([name]) => name)) : null;
+  const filtered = Object.entries(songCount)
+    .filter(([name]) => (!topSet || topSet.has(name)) && (!search || name.toLowerCase().includes(search.toLowerCase())))
+    .sort((a, b) => sortBy === 'count' ? b[1] - a[1] : a[0].localeCompare(b[0]));
+
+  if (selectedSong) {
+    const appearances = past.flatMap(c => {
+      const result = [];
+      const mainSong = (c.setlist || []).find(s => getSongName(s) === selectedSong);
+      if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), isSupport: false });
+      Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
+        const s = songs.find(x => getSongName(x) === selectedSong);
+        if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), isSupport: true });
+      });
+      return result;
+    }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
+    return (
+      <div style={{ padding: '0 0 100px' }}>
+        <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+          <div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong}</div>
+            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{appearances.length}× live</div>
+          </div>
+        </div>
+        <div style={{ padding: '14px 16px' }}>
+          {appearances.map(({ concert: c, artist, info, isSupport }) => (
+            <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
+              width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35',
+              borderLeft: `3px solid ${isSupport ? '#3d3564' : '#a78bfa'}`,
+              borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 2
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{formatDate(c.date)}</span>
+                {isSupport && <span style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: '#1a1a30', borderRadius: 99 }}>support</span>}
+              </div>
+              <div style={{ fontSize: 12, color: '#c4c2f0', fontWeight: 600 }}>{artist}</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{c.venue}{c.room ? ` · ${c.room}` : ''} · {c.city}</div>
+              {info && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{info}</div>}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '0 0 100px' }}>
+      <div style={{ padding: '14px 16px 10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff' }}>Songs</div>
+          {totalUnique > 0 && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{totalUnique} unique · {totalHeard} total</div>}
+        </div>
+        <div style={{ position: 'relative', marginBottom: 8 }}>
+          <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search songs…"
+            style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`, borderRadius: 10, color: '#c4c2f0', padding: '9px 32px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
+          {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[{id:'count',label:'Most heard'},{id:'alpha',label:'A–Z'}].map(o => (
+              <button key={o.id} onClick={() => setSortBy(o.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy===o.id ? '#a78bfa' : 'none', color: sortBy===o.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy===o.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: sortBy===o.id ? 700 : 400 }}>{o.label}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[{v:null,label:'All'},{v:5,label:'Top 5'},{v:10,label:'Top 10'},{v:20,label:'Top 20'}].map(o => (
+              <button key={o.label} onClick={() => setTopN(o.v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: topN===o.v ? '#3d3564' : 'none', color: topN===o.v ? '#c4c2f0' : '#6b6a8f', border: `1px solid ${topN===o.v ? '#6d5fa8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: topN===o.v ? 700 : 400 }}>{o.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: '0 16px' }}>
+        {totalUnique === 0 ? (
+          <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>log setlists on your shows to see songs here</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no songs found</div>
+        ) : filtered.map(([name, count], i) => (
+          <button key={name} onClick={() => setSelectedSong(name)} style={{
+            width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
+            borderLeft: `3px solid ${count >= 5 ? '#a78bfa' : count >= 3 ? '#6d5fa8' : count >= 2 ? '#3d3564' : '#2e2e4a'}`,
+            borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 20, textAlign: 'right', flexShrink: 0 }}>
+                {sortBy === 'count' ? (i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`) : null}
+              </span>
+              <span style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</span>
+            </div>
+            <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ArtistShowRow({ concert, onOpen }) {
   const past = isPast(concert.date);
+  const isFestival = concert.type === "festival";
   return (
     <button onClick={() => onOpen(concert)} style={{
-      width: "100%", textAlign: "left", background: past ? "#0e0e1a" : "#13131f",
-      border: "1px solid #1f1f35", borderRadius: 10, padding: "11px 14px",
+      width: "100%", textAlign: "left",
+      background: isFestival ? "#0e0e16" : past ? "#0e0e1a" : "#13131f",
+      border: `1px solid ${isFestival ? "#2a1f35" : "#1f1f35"}`,
+      borderLeft: `3px solid ${isFestival ? "#f472b6" : "#2e2e4a"}`,
+      borderRadius: 10, padding: "11px 14px",
       cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", gap: 12
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500, marginBottom: 2 }}>
-          {formatDate(concert.date)}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+          {isFestival && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: "#1a1030", color: "#f472b6" }}>FEST</span>}
+          <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(concert.date)}</span>
         </div>
         <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
           {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
         </div>
         {concert.tour && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>{concert.tour}</div>}
         {concert.friends.length > 0 && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>w. {concert.friends.join(", ")}</div>}
+        {concert.rating && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(Math.min(concert.rating, 10))}</div>}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {concert.rating && <div style={{ color: "#a78bfa", fontSize: 12 }}>{"★".repeat(concert.rating)}</div>}
         {concert.ticketPrice && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{concert.ticketPrice}</div>}
         {!past && <div style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>upcoming</div>}
       </div>
@@ -1427,24 +3321,393 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
+function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtists = [], recentFriends = [], initialType = 'concert' }) {
+  useBackButton(onClose);
+  const [form, setForm] = useState({
+    artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || '',
+    type: initialType, tour: '', support: [], friends: [], solo: false,
+    rating: null, ticketPrice: null, otherCost: null, merch: [], notes: '',
+    genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
+    acts: [],
+  })
+  const [supportInput, setSupportInput] = useState('')
+  const [supportRole, setSupportRole] = useState('support')
+  const [friendInput, setFriendInput] = useState('')
+  const [showFriendPicker, setShowFriendPicker] = useState(false)
+  const [errors, setErrors] = useState({})
+  const [artistSuggestions, setArtistSuggestions] = useState([])
+  const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
+  const addMerchItem = () => setForm(f => ({ ...f, merch: [...f.merch, { item: merchCategories[0], price: '' }] }))
+  const updateMerch = (i, key, val) => setForm(f => ({ ...f, merch: f.merch.map((m, j) => j === i ? { ...m, [key]: val } : m) }))
+  const removeMerch = (i) => setForm(f => ({ ...f, merch: f.merch.filter((_, j) => j !== i) }))
+
+  const update = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const handleArtistChange = (val) => {
+    update('artist', val)
+    if (val.trim().length > 0) {
+      const matches = allArtists.filter(a => a.toLowerCase().includes(val.toLowerCase())).slice(0, 6)
+      setArtistSuggestions(matches)
+    } else {
+      setArtistSuggestions([])
+    }
+  }
+
+  const toggleFriend = (name) => setForm(f => ({
+    ...f,
+    friends: f.friends.includes(name) ? f.friends.filter(x => x !== name) : [...f.friends, name],
+    solo: false
+  }))
+
+  const addCustomFriend = () => {
+    const name = friendInput.trim()
+    if (!name || form.friends.includes(name)) return
+    setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }))
+    setFriendInput('')
+  }
+
+  const addSupport = () => {
+    const t = supportInput.trim()
+    if (!t || form.support.some(x => getSupportName(x) === t)) return
+    setForm(f => ({ ...f, support: [...f.support, { name: t, role: supportRole }] }))
+    setSupportInput('')
+  }
+
+  const validate = () => {
+    const e = {}
+    if (!form.artist.trim()) e.artist = true
+    if (!form.date) e.date = true
+    if (!form.venue.trim()) e.venue = true
+    if (!form.city.trim()) e.city = true
+    if (!form.country.trim()) e.country = true
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSave = () => {
+    if (!validate()) return
+    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    onSave({ ...form, id })
+  }
+
+  const inputStyle = {
+    width: '100%', background: '#13131f', border: '1px solid #2a4a3a',
+    borderRadius: 8, color: '#c4c2f0', padding: '8px 12px',
+    fontFamily: "'DM Mono', monospace", fontSize: 13, boxSizing: 'border-box'
+  }
+  const errStyle = { ...inputStyle, border: '1px solid #f472b6' }
+  const fieldLabel = (text) => (
+    <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{text}</div>
+  )
+
+  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort()
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#0c0c14', overflowY: 'auto', zIndex: 100 }}>
+      <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: form.type === 'festival' ? '#f472b6' : '#e2e0ff', flex: 1 }}>{form.type === 'festival' ? 'Add festival' : 'Add concert'}</div>
+        <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+      </div>
+      <div style={{ padding: '20px' }}>
+        {/* Type toggle — always at top */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {[{ id: 'concert', label: '🎤 Concert' }, { id: 'festival', label: '🎪 Festival' }].map(t => (
+            <button key={t.id} onClick={() => update('type', t.id)} style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 14, cursor: 'pointer', background: form.type===t.id ? (t.id === 'festival' ? '#1a1030' : '#1a1a30') : '#0c0c14', border: `1px solid ${form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#2e2e50'}`, color: form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#6b6a8f', fontWeight: form.type===t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif" }}>{t.label}</button>
+          ))}
+        </div>
+        {(() => {
+          const isFest = form.type === 'festival';
+          const card = (title, content) => (
+            <div key={title} style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '16px', marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff', marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #1a1a2e' }}>{title}</div>
+              {content}
+            </div>
+          );
+          const financialContent = (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                <div>{fieldLabel('Ticket')}<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ color: '#6b6a8f' }}>€</span><input type="number" value={form.ticketPrice || ''} placeholder="0.00" onChange={e => update('ticketPrice', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, flex: 1 }} /></div></div>
+                <div>{fieldLabel(isFest ? 'Travel & other' : 'Other costs')}<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ color: '#6b6a8f' }}>€</span><input type="number" value={form.otherCost || ''} placeholder="0.00" onChange={e => update('otherCost', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, flex: 1 }} /></div></div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>{fieldLabel('Merch')}<button onClick={addMerchItem} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono',monospace" }}>+ Add item</button></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(form.merch || []).map((m, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <select value={merchCategories.includes(m.item) ? m.item : '__custom__'} onChange={e => { if (e.target.value !== '__custom__') updateMerch(i, 'item', e.target.value); }} style={{ ...inputStyle, width: '100%', appearance: 'none', paddingRight: 24 }}>
+                        {merchCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        <option value='__custom__'>Custom…</option>
+                      </select>
+                      <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#6b6a8f', fontSize: 10, pointerEvents: 'none' }}>▾</span>
+                    </div>
+                    {(!merchCategories.includes(m.item) || m.item === '') && <input value={m.item === '__custom__' ? '' : m.item} placeholder="Custom item…" onChange={e => updateMerch(i, 'item', e.target.value)} style={{ ...inputStyle, flex: 1 }} autoFocus />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ color: '#6b6a8f', fontSize: 12 }}>€</span><input type="number" value={m.price} placeholder="0" onChange={e => updateMerch(i, 'price', e.target.value)} style={{ ...inputStyle, width: 70 }} /></div>
+                    <button onClick={() => removeMerch(i)} style={{ background: 'none', border: 'none', color: '#4a6a5a', fontSize: 16, cursor: 'pointer', padding: 0 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          );
+          const experienceContent = (() => {
+            const pill = (label, active, onClick, isRemove) => (
+              <button key={label} onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400, flexShrink: 0 }}>
+                {label}{isRemove && <span style={{ fontSize: 13, lineHeight: 1, marginLeft: 2 }}>×</span>}
+              </button>
+            );
+            const groupedFriends = new Set((settings.friendGroups || []).flatMap(g => g.friends));
+            const pinnedFriends = recentFriends.filter(n => !groupedFriends.has(n));
+            const extraSelected = form.friends.filter(n => !pinnedFriends.includes(n) && !groupedFriends.has(n));
+            const pickerFriends = allFriendChoices.filter(n => !pinnedFriends.includes(n) && !groupedFriends.has(n));
+            return (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: showFriendPicker ? 10 : 0 }}>
+                  {pill('solo', form.solo, () => setForm(f => ({ ...f, solo: !f.solo, friends: [] })))}
+                  {(settings.friendGroups || []).map((g, i) => { const active = g.friends.every(f => form.friends.includes(f)); return <button key={i} onClick={() => setForm(f => ({ ...f, friends: [...new Set([...f.friends, ...g.friends])], solo: false }))} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#818cf8' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#818cf8' : '#2e2e50'}`, fontWeight: active ? 700 : 400, flexShrink: 0 }}>{g.name}</button>; })}
+                  {pinnedFriends.map(name => pill(name, form.friends.includes(name), () => toggleFriend(name)))}
+                  {extraSelected.map(name => pill(name, true, () => toggleFriend(name), true))}
+                  <button onClick={() => setShowFriendPicker(s => !s)} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: showFriendPicker ? '#2a4a3a' : '#0c0c14', color: '#a78bfa', border: '1px solid #2a4a3a', fontWeight: 700, flexShrink: 0 }}>other +</button>
+                </div>
+                {showFriendPicker && (
+                  <div style={{ background: '#0e0e1a', border: '1px solid #1f1f35', borderRadius: 10, padding: '12px' }}>
+                    {pickerFriends.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{pickerFriends.map(name => <button key={name} onClick={() => toggleFriend(name)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.friends.includes(name) ? '#a78bfa' : '#13131f', color: form.friends.includes(name) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.friends.includes(name) ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.friends.includes(name) ? 700 : 400 }}>{name}</button>)}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}><input value={friendInput} onChange={e => setFriendInput(e.target.value)} onKeyDown={e => e.key==='Enter' && addCustomFriend()} placeholder="Add new friend…" style={{ ...inputStyle, flex: 1 }} /><button onClick={addCustomFriend} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button></div>
+                  </div>
+                )}
+              </>
+            );
+          })();
+          if (isFest) return (
+            <>
+              {card('Festival', <>
+                {fieldLabel('Festival name *')}
+                <div style={{ marginBottom: 10, position: 'relative' }}>
+                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={{ ...(errors.artist ? errStyle : inputStyle) }} />
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => { update('artist', a); setArtistSuggestions([]); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  <div>{fieldLabel('Start date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('End date')}<input type="date" value={form.endDate || ''} onChange={e => update('endDate', e.target.value)} style={inputStyle} /></div>
+                </div>
+                {fieldLabel('Edition / year')}
+                <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="e.g. Lowlands 2024 (optional)" style={inputStyle} />
+              </>)}
+              {card('Location', <>
+                {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue === v.name && form.city === v.city && form.country === v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}</button>; })}</div>}
+                {fieldLabel('Festival grounds')}
+                <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Festival site / grounds" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                </div>
+              </>)}
+              {card('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />)}
+              {card('Your experience', experienceContent)}
+              {card('Financial', financialContent)}
+              {card('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />)}
+            </>
+          );
+
+          return (
+            <>
+              {card('Show', <>
+                <div style={{ marginBottom: 10, position: 'relative' }}>
+                  {fieldLabel('Artist *')}
+                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => { update('artist', a); setArtistSuggestions([]); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  {fieldLabel('Date *')}
+                  <input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
+                </div>
+                {fieldLabel('Tour')}
+                <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />
+              </>)}
+              {card('Venue', <>
+                {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue===v.name && form.city===v.city && form.country===v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, room: v.room||f.room, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</button>; })}</div>}
+                {fieldLabel('Venue name *')}
+                <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+                <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                </div>
+                {fieldLabel('Venue size')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(settings.venueSizes||[]).map(vs => <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.venueSize===vs ? '#a78bfa' : '#0c0c14', color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>)}</div>
+              </>)}
+              {card('Lineup', <>
+                {fieldLabel('Seen as')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 14 }}>{['Headliner','Support','Guest','Festival'].map(opt => <button key={opt} onClick={() => update('seenAs', form.seenAs===opt ? null : opt)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.seenAs===opt ? '#a78bfa' : '#0c0c14', color: form.seenAs===opt ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.seenAs===opt ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.seenAs===opt ? 700 : 400 }}>{opt}</button>)}</div>
+                {fieldLabel('Support acts')}
+                {form.support.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>{form.support.map(s => { const name = getSupportName(s); const role = getSupportRole(s); const toggleRole = () => setForm(f => ({ ...f, support: f.support.map(x => getSupportName(x)===name ? { name, role: getSupportRole(x)==='guest' ? 'support' : 'guest' } : x) })); return <span key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 99, padding: '3px 10px', fontSize: 12, color: '#a78bfa' }}>{name}<button onClick={toggleRole} style={{ fontSize: 9, color: role==='guest' ? '#f472b6' : '#4a4870', fontFamily: "'DM Mono',monospace", padding: '1px 4px', background: role==='guest' ? '#1a1030' : 'none', borderRadius: 99, border: `1px solid ${role==='guest' ? '#f472b6' : '#2e2e50'}`, cursor: 'pointer', lineHeight: 1.4 }}>{role}</button><button onClick={() => setForm(f => ({ ...f, support: f.support.filter(x => getSupportName(x)!==name) }))} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button></span>; })}</div>}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>{['support','guest'].map(r => <button key={r} onClick={() => setSupportRole(r)} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: supportRole===r ? '#a78bfa' : '#0c0c14', color: supportRole===r ? '#0c0c14' : '#6b6a8f', border: `1px solid ${supportRole===r ? '#a78bfa' : '#2e2e50'}`, fontWeight: supportRole===r ? 700 : 400, fontFamily: "'DM Mono',monospace" }}>{r}</button>)}</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}><input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key==='Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} /><button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button></div>
+                {fieldLabel('Genre')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.genres||[]).map(g => <button key={g} onClick={()=>update('genre', form.genre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.genre===g ? '#a78bfa' : '#0c0c14', color: form.genre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.genre===g ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.genre===g ? 700 : 400 }}>{g}</button>)}</div>
+                {fieldLabel('Subgenre')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}</div>
+                {fieldLabel('Language')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}</div>
+              </>)}
+              {card('Your experience', experienceContent)}
+              {card('Financial', financialContent)}
+              {card('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />)}
+            </>
+          );
+        })()}
+      </div>
+    </div>
+  )
+}
+
 function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSignOut, userEmail }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState(null);
+  const [importMessage, setImportMessage] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [newGenre, setNewGenre] = useState("");
+  const [newSubgenre, setNewSubgenre] = useState("");
+  const [newLanguage, setNewLanguage] = useState("");
+  const [newVenueSize, setNewVenueSize] = useState("");
+  const [newVenue, setNewVenue] = useState({ name: '', city: '', country: '', room: '' });
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupFriends, setNewGroupFriends] = useState([]);
+  const [local, setLocal] = useState({ ...settings });
+  const [saved, setSaved] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const [openSection, setOpenSection] = useState(null);
+  const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
 
-  const categories = settings.merchCategories || [];
+  useEffect(() => { if (!touched) setLocal({ ...settings }); }, [settings]);
 
-  const addCategory = () => {
-    const trimmed = newCategory.trim();
-    if (!trimmed || categories.map(c=>c.toLowerCase()).includes(trimmed.toLowerCase())) return;
-    onUpdate("merchCategories", [...categories, trimmed]);
-    setNewCategory("");
+  const hasChanges = JSON.stringify(local) !== JSON.stringify(settings);
+  const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
+  const handleSettingsSave = () => {
+    Object.entries(local).forEach(([k, v]) => onUpdate(k, v));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
-  const removeCategory = (cat) => {
-    onUpdate("merchCategories", categories.filter(c => c !== cat));
+  const categories = local.merchCategories || [];
+  const genres = local.genres || [];
+  const subgenres = local.subgenres || [];
+  const languages = local.languages || [];
+  const venueSizes = local.venueSizes || [];
+
+  const addCategory = () => {
+    const t = newCategory.trim();
+    if (!t || categories.map(c=>c.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("merchCategories", [...categories, t]); setNewCategory("");
+  };
+  const removeCategory = (cat) => lUpdate("merchCategories", categories.filter(c => c !== cat));
+
+  const addGenre = () => {
+    const t = newGenre.trim();
+    if (!t || genres.map(g=>g.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("genres", [...genres, t]); setNewGenre("");
+  };
+  const removeGenre = (g) => lUpdate("genres", genres.filter(x => x !== g));
+
+  const addSubgenre = () => {
+    const t = newSubgenre.trim();
+    if (!t || subgenres.map(g=>g.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("subgenres", [...subgenres, t]); setNewSubgenre("");
+  };
+  const removeSubgenre = (g) => lUpdate("subgenres", subgenres.filter(x => x !== g));
+
+  const addLanguage = () => {
+    const t = newLanguage.trim();
+    if (!t || languages.map(l=>l.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("languages", [...languages, t]); setNewLanguage("");
+  };
+  const removeLanguage = (l) => lUpdate("languages", languages.filter(x => x !== l));
+
+  const addVenueSize = () => {
+    const t = newVenueSize.trim();
+    if (!t || venueSizes.map(v=>v.toLowerCase()).includes(t.toLowerCase())) return;
+    lUpdate("venueSizes", [...venueSizes, t]); setNewVenueSize("");
+  };
+  const removeVenueSize = (v) => lUpdate("venueSizes", venueSizes.filter(x => x !== v));
+
+  const savedVenues = local.savedVenues || [];
+  const addSavedVenue = () => {
+    const v = { name: newVenue.name.trim(), city: newVenue.city.trim(), country: newVenue.country.trim(), room: newVenue.room.trim() };
+    if (!v.name || !v.city || !v.country) return;
+    if (savedVenues.some(x => x.name.toLowerCase() === v.name.toLowerCase() && x.city.toLowerCase() === v.city.toLowerCase())) return;
+    lUpdate("savedVenues", [...savedVenues, v]);
+    setNewVenue({ name: '', city: '', country: '', room: '' });
+  };
+  const removeSavedVenue = (i) => lUpdate("savedVenues", savedVenues.filter((_, j) => j !== i));
+
+  const friendGroups = local.friendGroups || [];
+  const allFriendsFromConcerts = [...new Set(concerts.flatMap(c => c.friends || []))].sort();
+  const addFriendGroup = () => {
+    const name = newGroupName.trim();
+    if (!name || newGroupFriends.length === 0) return;
+    if (friendGroups.some(g => g.name.toLowerCase() === name.toLowerCase())) return;
+    lUpdate("friendGroups", [...friendGroups, { name, friends: newGroupFriends }]);
+    setNewGroupName(''); setNewGroupFriends([]);
+  };
+  const removeFriendGroup = (i) => lUpdate("friendGroups", friendGroups.filter((_, j) => j !== i));
+  const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
+
+  const handleCsvExport = () => {
+    const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','Notes'];
+    const rows = concerts.map(c => [
+      c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
+      c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
+      (c.friends||[]).join('; '), c.solo?'yes':'', c.venueSize||'', (c.notes||'').replace(/\n/g,' ')
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='settracker.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleXlsxExport = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Shows
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(concerts.map(c => ({
+      ID: c.id, Date: c.date, Artist: c.artist, Venue: c.venue, Room: c.room || '',
+      City: c.city, Country: c.country, Type: c.type, Tour: c.tour || '',
+      SeenAs: c.seenAs || '', Genre: c.genre || '', Subgenre: c.subgenre || '',
+      Language: (Array.isArray(c.language) ? c.language : [c.language || '']).join('; '),
+      Rating: c.rating || '', TicketPrice: c.ticketPrice || '',
+      Friends: (c.friends || []).join('; '), Solo: c.solo ? 'yes' : '',
+      VenueSize: c.venueSize || '', Notes: (c.notes || '').replace(/\n/g, ' '),
+    }))), 'Shows');
+
+    // Sheet 2: Setlists (main artist + support acts, each song its own row)
+    const setlistRows = [];
+    concerts.forEach(c => {
+      (c.setlist || []).forEach((s, i) => setlistRows.push({
+        ConcertID: c.id, Date: c.date, MainArtist: c.artist,
+        Performer: c.artist, IsSupport: 'no',
+        Position: i + 1, Song: getSongName(s), Note: getSongInfo(s) || '',
+      }));
+      Object.entries(c.supportSetlists || {}).forEach(([artist, songs]) =>
+        songs.forEach((s, i) => setlistRows.push({
+          ConcertID: c.id, Date: c.date, MainArtist: c.artist,
+          Performer: artist, IsSupport: 'yes',
+          Position: i + 1, Song: getSongName(s), Note: getSongInfo(s) || '',
+        }))
+      );
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(setlistRows.length ? setlistRows : [{}]), 'Setlists');
+
+    // Sheet 3: Support acts
+    const supportRows = [];
+    concerts.forEach(c => (c.support || []).forEach(s => supportRows.push({
+      ConcertID: c.id, Date: c.date, MainArtist: c.artist,
+      SupportAct: getSupportName(s), Role: getSupportRole(s),
+    })));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(supportRows.length ? supportRows : [{}]), 'Support acts');
+
+    XLSX.writeFile(wb, 'settracker.xlsx');
   };
 
   const handleExport = async () => {
@@ -1466,20 +3729,152 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     }
   };
 
+  const doImport = async (concerts) => {
+    const valid = concerts.filter(c => c.artist && c.date);
+    const skipped = concerts.length - valid.length;
+    if (valid.length === 0) { setImportStatus("error"); setImportMessage("No valid concerts found — each row needs at least an Artist and Date."); return; }
+    for (const c of valid) await onSaveConcert(c);
+    setImportStatus("success");
+    setImportMessage(`Imported ${valid.length} concert${valid.length !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped — missing artist or date)` : ''}. Reloading...`);
+    setTimeout(() => { setImportStatus(null); window.location.reload(); }, 2000);
+  };
+
   const handleImport = async () => {
     try {
-      const parsed = JSON.parse(importText);
-      if (!Array.isArray(parsed)) throw new Error("not array");
-      // Save each concert via onSaveConcert
-      for (const concert of parsed) {
-        await onSaveConcert(concert);
-      }
-      setImportStatus("success");
+      let parsed;
+      try { parsed = JSON.parse(importText); } catch { setImportStatus("error"); setImportMessage("Couldn't read this as JSON — check for missing brackets or commas."); return; }
+      if (!Array.isArray(parsed)) { setImportStatus("error"); setImportMessage("Expected a list of concerts (JSON array starting with [ ). Got a different format."); return; }
+      if (parsed.length === 0) { setImportStatus("error"); setImportMessage("The JSON is empty — no concerts to import."); return; }
       setImportText("");
-      setTimeout(() => { setImportStatus(null); window.location.reload(); }, 1500);
-    } catch (e) {
-      setImportStatus("error");
+      await doImport(parsed);
+    } catch { setImportStatus("error"); setImportMessage("Something went wrong during import. Try again."); }
+  };
+
+  const parseCSV = (text) => {
+    const parseRow = (line) => {
+      const fields = []; let cur = ''; let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+        else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
+        else cur += ch;
+      }
+      fields.push(cur); return fields;
+    };
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return { error: "The CSV file looks empty — it needs a header row and at least one concert row." };
+    const headers = parseRow(lines[0]);
+    if (!headers.includes('Artist') || !headers.includes('Date')) {
+      return { error: `CSV is missing required columns. Found: ${headers.join(', ')}. Expected at least: Artist, Date.` };
     }
+    return lines.slice(1).map(line => {
+      const vals = parseRow(line);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+      return {
+        id: obj.ID || `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        date: obj.Date || null, artist: obj.Artist || null, venue: obj.Venue || '', room: obj.Room || null,
+        city: obj.City || '', country: obj.Country || '', type: obj.Type || 'concert',
+        tour: obj.Tour || null, genre: obj.Genre || null, subgenre: obj.SubGenre || null,
+        language: obj.Language ? obj.Language.split('; ').filter(Boolean) : [],
+        rating: obj.Rating ? parseInt(obj.Rating) : null,
+        ticketPrice: obj.TicketPrice ? parseFloat(obj.TicketPrice) : null,
+        friends: obj.Friends ? obj.Friends.split('; ').filter(Boolean) : [],
+        solo: obj.Solo === 'yes', venueSize: obj.VenueSize || null, notes: obj.Notes || null,
+        seenAs: obj.SeenAs || null, merch: [], support: [],
+      };
+    });
+  };
+
+  const handleFileImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        if (file.name.endsWith('.csv')) {
+          const result = parseCSV(ev.target.result);
+          if (result?.error) { setImportStatus("error"); setImportMessage(result.error); return; }
+          await doImport(result);
+        } else {
+          let parsed;
+          try { parsed = JSON.parse(ev.target.result); } catch { setImportStatus("error"); setImportMessage("Couldn't read the file as JSON — it may be corrupted or the wrong format."); return; }
+          if (!Array.isArray(parsed)) { setImportStatus("error"); setImportMessage("Expected a list of concerts (JSON array). Got a different format."); return; }
+          await doImport(parsed);
+        }
+      } catch { setImportStatus("error"); setImportMessage("Something went wrong reading the file. Try again."); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleXlsxImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+
+        // Merge support acts from "Support acts" sheet into existing concerts
+        const supportSheet = wb.Sheets['Support acts'];
+        if (supportSheet) {
+          const rows = XLSX.utils.sheet_to_json(supportSheet);
+          const byId = {};
+          rows.forEach(r => {
+            const id = r.ConcertID;
+            const name = r.SupportAct;
+            const role = r.Role || 'support';
+            if (!id || !name) return;
+            if (!byId[id]) byId[id] = [];
+            byId[id].push({ name, role });
+          });
+          let updated = 0;
+          for (const concert of concerts) {
+            const incoming = byId[concert.id];
+            if (!incoming) continue;
+            const existingNames = (concert.support || []).map(s =>
+              (typeof s === 'string' ? s : s.name).toLowerCase()
+            );
+            const toAdd = incoming.filter(a => !existingNames.includes(a.name.toLowerCase()));
+            if (toAdd.length === 0) continue;
+            await onSaveConcert({ ...concert, support: [...(concert.support || []), ...toAdd] });
+            updated++;
+          }
+          if (updated > 0) {
+            setImportStatus("success");
+            setImportMessage(`Updated support acts for ${updated} concert${updated !== 1 ? 's' : ''}.`);
+          } else {
+            setImportStatus("success");
+            setImportMessage("All support acts were already up to date — nothing to add.");
+          }
+          return;
+        }
+
+        // Fallback: try reading Shows sheet as full concert import
+        const showsSheet = wb.Sheets['Shows'];
+        if (!showsSheet) { setImportStatus("error"); setImportMessage("No recognised sheet found. Expected 'Support acts' or 'Shows'."); return; }
+        const rows = XLSX.utils.sheet_to_json(showsSheet);
+        const parsed = rows.map(r => ({
+          id: r.ID || `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          date: r.Date || null, artist: r.Artist || null, venue: r.Venue || '', room: r.Room || null,
+          city: r.City || '', country: r.Country || '', type: r.Type || 'concert',
+          tour: r.Tour || null, genre: r.Genre || null, subgenre: r.Subgenre || null,
+          language: r.Language ? r.Language.split('; ').filter(Boolean) : [],
+          rating: r.Rating ? parseInt(r.Rating) : null,
+          ticketPrice: r.TicketPrice ? parseFloat(r.TicketPrice) : null,
+          friends: r.Friends ? r.Friends.split('; ').filter(Boolean) : [],
+          solo: r.Solo === 'yes', venueSize: r.VenueSize || null, notes: r.Notes || null,
+          seenAs: r.SeenAs || null, merch: [], support: [],
+        }));
+        await doImport(parsed);
+      } catch (err) {
+        setImportStatus("error");
+        setImportMessage("Something went wrong reading the XLSX file. Try again.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
   };
 
   const Row = ({ label, sub, children }) => (
@@ -1520,166 +3915,256 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     </div>
   );
 
+  const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" };
+  const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
+  const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
+
+  const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => (
+    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 4 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: items.length ? 10 : 0 }}>
+        {items.map(item => (
+          <div key={item} style={tagStyle}>{item}
+            <button onClick={() => onRemove(item)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={input} onChange={e => onInput(e.target.value)} onKeyDown={e => e.key === "Enter" && onAdd()} placeholder={placeholder} style={tagInput} />
+        <button onClick={onAdd} style={addBtn}>Add</button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ padding: "16px 20px 100px" }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff", marginBottom: 20 }}>Settings</div>
-
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Charts</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 20 }}>
-        <Row label="Top artists rows" sub="How many artists to show in charts">
-          <Stepper value={settings.topArtistsRows} onChange={v => onUpdate("topArtistsRows", v)} />
-        </Row>
-        <Row label="Top friends rows" sub="How many friends to show in charts">
-          <Stepper value={settings.topFriendsRows} onChange={v => onUpdate("topFriendsRows", v)} />
-        </Row>
-        <Row label="Top venues rows" sub="How many venues to show in charts">
-          <Stepper value={settings.topVenuesRows} onChange={v => onUpdate("topVenuesRows", v)} />
-        </Row>
-        <Row label="Most expensive rows" sub="How many shows in expensive list">
-          <Stepper value={settings.topExpensiveRows} onChange={v => onUpdate("topExpensiveRows", v)} min={3} max={20} />
-        </Row>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
+        {(hasChanges || saved) && (
+          <button onClick={handleSettingsSave} style={{
+            background: saved ? "#a78bfa" : "#1a1a30",
+            border: `1px solid ${saved ? "#a78bfa" : "#2e2e50"}`,
+            color: saved ? "#0c0c14" : "#a78bfa",
+            borderRadius: 8, padding: "4px 12px", fontSize: 11, fontWeight: 700,
+            cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s"
+          }}>{saved ? "Saved ✓" : "Save"}</button>
+        )}
       </div>
 
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Defaults</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 20 }}>
-        <Row label="Opening tab" sub="Which tab opens on launch">
-          <OptionPills value={settings.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"}]} onChange={v => onUpdate("defaultTab", v)} />
-        </Row>
-        <Row label="Past shows" sub="Show past concerts by default">
-          <OptionPills value={settings.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => onUpdate("defaultShowPast", v)} />
-        </Row>
-        <Row label="Stats tab" sub="Which stats view opens first">
-          <OptionPills value={settings.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => onUpdate("defaultStatsTab", v)} />
-        </Row>
-      </div>
-
-      {/* Merch categories */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Merch categories</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-          These appear in the dropdown when adding merch to a show.
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {categories.map(cat => (
-            <div key={cat} style={{
-              display: "flex", alignItems: "center", gap: 4,
-              background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99,
-              padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif"
-            }}>
-              {cat}
-              <button onClick={() => removeCategory(cat)} style={{
-                background: "none", border: "none", color: "#4a4870", cursor: "pointer",
-                fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2
-              }}>×</button>
+      <Collapsible title="◆  Preferences" {...sec("preferences")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+          <Row label="Color theme" sub="Changes instantly, no save needed">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
+                <button key={o.id} onClick={() => { onUpdate('colorTheme', o.id); lUpdate('colorTheme', o.id); }} style={{
+                  padding: "4px 10px", borderRadius: 99, fontSize: 11, cursor: "pointer",
+                  background: (local.colorTheme||'purple') === o.id ? "#a78bfa" : "#13131f",
+                  color: (local.colorTheme||'purple') === o.id ? "#0c0c14" : "#6b6a8f",
+                  border: `1px solid ${(local.colorTheme||'purple') === o.id ? "#a78bfa" : "#1f1f35"}`,
+                  fontWeight: (local.colorTheme||'purple') === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
+                }}>{o.label}</button>
+              ))}
             </div>
+          </Row>
+          <Row label="Opening tab" sub="Which tab opens on launch">
+            <OptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"}]} onChange={v => lUpdate("defaultTab", v)} />
+          </Row>
+          <Row label="Past shows" sub="Show past concerts by default">
+            <OptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowPast", v)} />
+          </Row>
+          <Row label="Stats tab" sub="Which stats view opens first">
+            <OptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
+          </Row>
+          <Row label="Top artists" sub="Rows shown in charts">
+            <Stepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
+          </Row>
+          <Row label="Top friends" sub="Rows shown in charts">
+            <Stepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
+          </Row>
+          <Row label="Top venues" sub="Rows shown in charts">
+            <Stepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
+          </Row>
+          <Row label="Most expensive" sub="Rows shown in list">
+            <Stepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
+          </Row>
+          <Row label="Rating system" sub="Stars used when rating shows">
+            <OptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
+          </Row>
+          <Row label="Default country" sub="Pre-filled when adding a show">
+            <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
+          </Row>
+        </div>
+      </Collapsible>
+
+      <Collapsible title="◈  Tags" {...sec("tags")}>
+        {[
+          { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
+          { label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
+          { label: "Languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
+          { label: "Venue sizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
+          { label: "Merch items", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        ].map(({ label, ...props }) => (
+          <div key={label} style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}</div>
+            <TagManager {...props} />
+          </div>
+        ))}
+      </Collapsible>
+
+      <Collapsible title="◎  Saved venues" {...sec("venues")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+          {savedVenues.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              {savedVenues.map((v, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid #1a1a2e' }}>
+                  <div>
+                    <div style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 600 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</div>
+                    <div style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{v.city}, {v.country}</div>
+                  </div>
+                  <button onClick={() => removeSavedVenue(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Add venue</div>
+          {[
+            { key: 'name', placeholder: 'Venue name *' },
+            { key: 'room', placeholder: 'Room / stage (optional)' },
+          ].map(({ key, placeholder }) => (
+            <input key={key} value={newVenue[key]} onChange={e => setNewVenue(v => ({ ...v, [key]: e.target.value }))}
+              placeholder={placeholder}
+              style={{ width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} />
+          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+            {[{ key: 'city', placeholder: 'City *' }, { key: 'country', placeholder: 'Country *' }].map(({ key, placeholder }) => (
+              <input key={key} value={newVenue[key]} onChange={e => setNewVenue(v => ({ ...v, [key]: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && addSavedVenue()}
+                placeholder={placeholder}
+                style={{ background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }} />
+            ))}
+          </div>
+          <button onClick={addSavedVenue} disabled={!newVenue.name.trim() || !newVenue.city.trim() || !newVenue.country.trim()} style={{
+            background: 'none', border: '1px solid #2a4a3a', borderRadius: 8, color: '#a78bfa',
+            fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace",
+            opacity: !newVenue.name.trim() || !newVenue.city.trim() || !newVenue.country.trim() ? 0.4 : 1
+          }}>Add venue</button>
+        </div>
+      </Collapsible>
+
+      <Collapsible title="◈  Friend groups" {...sec("friendGroups")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+          {friendGroups.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              {friendGroups.map((g, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid #1a1a2e' }}>
+                  <div>
+                    <div style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 600 }}>{g.name}</div>
+                    <div style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{g.friends.join(', ')}</div>
+                  </div>
+                  <button onClick={() => removeFriendGroup(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Add group</div>
+          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Group name (e.g. Festival crew)" style={{ width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 8 }} />
+          {allFriendsFromConcerts.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {allFriendsFromConcerts.map(f => (
+                <button key={f} onClick={() => toggleGroupFriend(f)} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: newGroupFriends.includes(f) ? '#a78bfa' : '#0c0c14', color: newGroupFriends.includes(f) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${newGroupFriends.includes(f) ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{f}</button>
+              ))}
+            </div>
+          )}
+          <button onClick={addFriendGroup} disabled={!newGroupName.trim() || newGroupFriends.length === 0} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", opacity: !newGroupName.trim() || newGroupFriends.length === 0 ? 0.4 : 1 }}>Add group</button>
+        </div>
+      </Collapsible>
+
+      <Collapsible title="◉  Account & Data" {...sec("account")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <button onClick={handleXlsxExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Export XLSX</button>
+            {!exportData
+              ? <button onClick={handleExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Export JSON</button>
+              : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Close</button>
+            }
+          </div>
+          {exportData && (
+            <div style={{ marginBottom: 10 }}>
+              <textarea readOnly value={exportData} rows={4} style={{ width: "100%", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
+              <button onClick={handleCopy} style={{ width: "100%", padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied!" : "Copy to clipboard"}</button>
+            </div>
+          )}
+          <div style={{ borderTop: "1px solid #1a1a2e", paddingTop: 14 }}>
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
+            {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
+            {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
+            <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
+            <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
+            <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+              <button onClick={() => document.getElementById('import-xlsx').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Import XLSX</button>
+              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Import JSON</button>
+              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Import CSV</button>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              {[
+                { label: "CSV template", fn: () => {
+                  const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','SeenAs','Notes'];
+                  const example = ['c-example','2024-01-15','Artist Name','Venue Name','','City','Country','concert','Tour Name','Pop','','English','5','50','Friend One; Friend Two','','Mid-venue','Headliner','Great show'];
+                  const csv = [headers.join(','), example.map(v => `"${v}"`).join(',')].join('\n');
+                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'settracker-template.csv'; a.click();
+                }},
+                { label: "JSON template", fn: () => {
+                  const template = JSON.stringify([{ id: "c-example", date: "2024-01-15", artist: "Artist Name", venue: "Venue Name", room: "", city: "City", country: "Country", type: "concert", tour: "Tour Name", genre: "Pop", subgenre: "", language: ["English"], rating: 5, ticketPrice: 50, friends: ["Friend One"], solo: false, venueSize: "Mid-venue", seenAs: "Headliner", notes: "Great show", merch: [], support: [] }], null, 2);
+                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([template], { type: 'application/json' })); a.download = 'settracker-template.json'; a.click();
+                }},
+              ].map(({ label, fn }) => (
+                <button key={label} onClick={fn} style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>↓ {label}</button>
+              ))}
+            </div>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
+          </div>
+          <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 14, paddingTop: 14 }}>
+            <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>
+              signed in as <span style={{ color: "#6b6a8f" }}>{userEmail}</span>
+            </div>
+            <button onClick={onSignOut} style={{ width: "100%", padding: "11px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", background: "none", border: "1px solid #f472b6", color: "#f472b6", fontFamily: "'DM Mono', monospace" }}>log out</button>
+          </div>
+        </div>
+      </Collapsible>
+
+      <Collapsible title="◇  Help" {...sec("help")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
+          {[
+            { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+            { label: "📋 View all issues & requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+            { label: "📦 Releases & changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+            { label: "📖 Documentation (wiki)", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+          ].map(({ label, url }) => (
+            <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "#a78bfa", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textDecoration: "none", paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #1a1a2e" }}>{label} ↗</a>
+          ))}
+          <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
+            Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Use the ⚙ in Stats to show/hide sections
+          </div>
+        </div>
+      </Collapsible>
+
+      {/* Follow me on */}
+      <div style={{ marginTop: 24, paddingBottom: 8, textAlign: "center" }}>
+        <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em", marginBottom: 10 }}>follow me on</div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+          {[
+            { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg> },
+            { href: "https://www.threads.com/@annuhfloor", label: "Threads", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.028-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.594 12c.022 3.086.713 5.496 2.051 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.689-2.044 1.616-1.707 1.594-3.957 1.332-5.005-.274-1.386-.995-2.367-2.181-2.973-.321 1.798-.908 3.192-1.763 4.134-.99 1.092-2.298 1.617-3.89 1.56-1.354-.046-2.553-.54-3.37-1.388-.95-.984-1.404-2.383-1.277-3.848.235-2.65 2.168-4.356 5.089-4.424.952-.022 1.929.099 2.898.361-.094-.499-.195-.967-.305-1.394-.348-1.358-.854-2.365-1.506-2.994-.705-.677-1.645-1.014-2.866-.997-1.53.024-2.717.533-3.529 1.512-.74.889-1.154 2.154-1.22 3.758l-2.1-.078c.083-2.076.614-3.757 1.58-4.997 1.14-1.44 2.817-2.185 4.982-2.216 1.79-.025 3.235.444 4.3 1.397.872.784 1.537 1.95 1.976 3.467.12.413.236.883.346 1.405a11.3 11.3 0 0 1 1.133.508c1.821.982 2.95 2.478 3.317 4.329.407 2.056.214 5.273-2.202 7.851C17.056 23.22 14.908 24 12.186 24z"/></svg> },
+            { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg> },
+            { href: "https://www.vinted.nl/member/50873825", label: "Vinted", icon: <span style={{ fontSize: 13, fontWeight: 800, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>V</span> },
+            { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg> },
+          ].map(({ href, label, icon }) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, background: "#13131f", border: "1px solid #1f1f35", color: "#4a4870", textDecoration: "none" }}>
+              {icon}
+            </a>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            value={newCategory}
-            onChange={e => setNewCategory(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addCategory()}
-            placeholder="Add category..."
-            style={{
-              flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8,
-              color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif",
-              fontSize: 13
-            }}
-          />
-          <button onClick={addCategory} style={{
-            background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8,
-            color: "#a78bfa", padding: "8px 14px", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600
-          }}>Add</button>
-        </div>
-      </div>
-
-      {/* Data backup */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Data backup</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12, lineHeight: 1.5 }}>
-          Export your full concert database including ratings, merch, and notes. Save this JSON somewhere safe — you can use it to restore your data later.
-        </div>
-
-        {!exportData ? (
-          <button onClick={handleExport} style={{
-            width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-            background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa",
-            fontFamily: "'DM Sans', sans-serif", fontWeight: 600
-          }}>Export data</button>
-        ) : (
-          <div>
-            <textarea
-              readOnly
-              value={exportData}
-              rows={5}
-              style={{
-                width: "100%", background: "#0c0c14", border: "1px solid #1f1f35",
-                borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10,
-                fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box",
-                marginBottom: 8
-              }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleCopy} style={{
-                flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30",
-                border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`,
-                color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa",
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 600
-              }}>{exportStatus === "copied" ? "✓ Copied!" : "Copy to clipboard"}</button>
-              <button onClick={() => setExportData(null)} style={{
-                padding: "9px 14px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                background: "none", border: "1px solid #1f1f35", color: "#6b6a8f",
-                fontFamily: "'DM Sans', sans-serif"
-              }}>×</button>
-            </div>
-          </div>
-        )}
-
-        <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 16, paddingTop: 16 }}>
-          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>Restore from backup</div>
-          <textarea
-            value={importText}
-            onChange={e => setImportText(e.target.value)}
-            placeholder="Paste JSON backup here..."
-            rows={4}
-            style={{
-              width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`,
-              borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10,
-              fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8
-            }}
-          />
-          {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>Invalid JSON — check your backup and try again</div>}
-          {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>✓ Restored! Reloading...</div>}
-          <button
-            onClick={handleImport}
-            disabled={!importText.trim()}
-            style={{
-              width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed",
-              background: "none", border: "1px solid #1f1f35",
-              color: importText.trim() ? "#c4c2f0" : "#2e2e4a",
-              fontFamily: "'DM Sans', sans-serif"
-            }}
-          >Restore data</button>
-        </div>
-      </div>
-
-      <div style={{ fontSize: 11, color: "#2e2e4a", fontFamily: "'DM Mono', monospace", textAlign: "center", marginBottom: 20 }}>
-        settings saved automatically
-      </div>
-
-      {/* Account */}
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Account</div>
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
-          Signed in as <span style={{ color: "#a78bfa" }}>{userEmail}</span>
-        </div>
-        <button onClick={onSignOut} style={{
-          width: "100%", padding: "10px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-          background: "none", border: "1px solid #2e2e50", color: "#6b6a8f",
-          fontFamily: "'DM Sans', sans-serif"
-        }}>Sign out</button>
       </div>
     </div>
   );
@@ -1689,21 +4174,54 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 // MAIN APP
 // ============================================================
 
-export default function ConcertTracker({ concerts, settings, onSaveConcert, onUpdateSetting, onSignOut, userEmail }) {
+export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onSignOut, userEmail }) {
   const today = new Date()
   const isPastDate = (dateStr) => new Date(dateStr + 'T00:00:00') <= today
 
+  const showsGroup = ['home', 'artists', 'songs']
   const [view, setView] = useState(settings.defaultTab || 'stats')
+  const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
   const [selected, setSelected] = useState(null)
+  const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
+  const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
+  const [chartGroup, setChartGroup] = useState('artists')
   const [search, setSearch] = useState('')
   const [filterYear, setFilterYear] = useState('all')
   const [filterType, setFilterType] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
+  const [showSort, setShowSort] = useState(false)
   const [filterFriend, setFilterFriend] = useState('all')
   const [filterVenue, setFilterVenue] = useState('all')
+  const [filterRating, setFilterRating] = useState(0)
+  const [filterSolo, setFilterSolo] = useState(false)
+  const [filterGenre, setFilterGenre] = useState('all')
+  const [filterSubgenre, setFilterSubgenre] = useState('all')
+  const [filterCountry, setFilterCountry] = useState('all')
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
+  const [compact, setCompact] = useState(false)
+
+  useEffect(() => { if (showsGroup.includes(view)) setShowsTab(view); }, [view])
+
+  const allFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
+
+  const savedScrollPos = useRef(0)
+  const handleOpenConcert = (concert) => {
+    savedScrollPos.current = document.getElementById('content-scroll')?.scrollTop || 0
+    setSelected(concert)
+  }
+  useEffect(() => {
+    if (!selected && savedScrollPos.current > 0) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById('content-scroll')
+        if (el) el.scrollTop = savedScrollPos.current
+      })
+    }
+  }, [selected])
+
+  const THEME_FILTER = { purple:'', blue:'hue-rotate(-50deg)', green:'hue-rotate(-145deg)', red:'hue-rotate(90deg)', orange:'hue-rotate(130deg)', mono:'grayscale(1)' };
+  const themeFilter = THEME_FILTER[settings.colorTheme] ?? '';
 
   const handleSave = (updated) => {
     onSaveConcert(updated)
@@ -1717,11 +4235,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
   const years = [...new Set(concerts.map(c => c.date.slice(0,4)))].sort().reverse()
   const allVenues = [...new Set(concerts.map(c => c.venue))].sort()
   const activeFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
+  const allCountries = [...new Set(concerts.map(c => (c.country || '').trim()).filter(Boolean))].sort()
 
   const activeFilterCount = [
-    filterYear !== 'all', filterType !== 'all',
-    filterFriend !== 'all', filterVenue !== 'all', sortOrder !== 'newest'
+    filterFriend !== 'all', filterVenue !== 'all',
+    filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all'
   ].filter(Boolean).length
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all') }
+  const resetSort = () => setSortOrder('newest')
 
   const filtered = concerts.filter(c => {
     if (filterYear !== 'all' && c.date.slice(0,4) !== filterYear) return false
@@ -1729,6 +4250,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
     if (filterType === 'festivals' && c.type !== 'festival') return false
     if (filterFriend !== 'all' && !c.friends.includes(filterFriend)) return false
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
+    if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
+    if (filterSolo && !(c.friends.length === 0 || c.solo)) return false
+    if (filterGenre !== 'all' && c.genre !== filterGenre) return false
+    if (filterSubgenre !== 'all' && c.subgenre !== filterSubgenre) return false
+    if (filterCountry !== 'all' && (c.country || '').trim() !== filterCountry) return false
     if (search) {
       const q = search.toLowerCase()
       return c.artist.toLowerCase().includes(q) ||
@@ -1753,10 +4279,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
   const allPast = concerts.filter(c => isPastDate(c.date))
 
   const TabBtn = ({ id, icon, label }) => (
-    <button onClick={() => setView(id)} style={{
+    <button onClick={() => { if (id === 'stats' && view === 'stats' && statsTab === 'charts') { setStatsTab('summary'); } else { setView(id); } }} style={{
       flex: 1, background: 'none', border: 'none', cursor: 'pointer',
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-      padding: '8px 0', color: view === id ? '#a78bfa' : '#2e2e50',
+      padding: '8px 0', color: view === id ? '#a78bfa' : '#5a5880',
     }}>
       <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
       <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.05em', fontWeight: view === id ? 700 : 400 }}>{label}</span>
@@ -1774,54 +4300,131 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
     }}>{children}</button>
   )
 
+  const appShell = { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0c0c14', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined, overflow: 'hidden' }
+
+  const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
+
+  const ChartGroupNav = () => view === 'stats' && statsTab === 'charts' ? (
+    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
+      {visibleStatGroups.map(g => (
+        <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
+          flex: 1, background: chartGroup === g.id ? '#1a1a30' : 'none',
+          border: `1px solid ${chartGroup === g.id ? '#a78bfa' : '#1f1f35'}`,
+          borderRadius: 6, padding: '5px 2px', cursor: 'pointer',
+          fontFamily: "'DM Mono', monospace", fontSize: 9,
+          fontWeight: chartGroup === g.id ? 700 : 400,
+          color: chartGroup === g.id ? '#a78bfa' : '#5a5880',
+          textAlign: 'center', whiteSpace: 'nowrap'
+        }}>{g.label}</button>
+      ))}
+    </div>
+  ) : null
+
+  const isShowsActive = showsGroup.includes(view)
+
+  const ShowsSubNav = () => isShowsActive ? (
+    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
+      {[{ id: 'home', label: 'Shows' }, { id: 'artists', label: 'Artists' }, { id: 'songs', label: 'Songs' }].map(t => (
+        <button key={t.id} onClick={() => setView(t.id)} style={{
+          flex: 1, background: view === t.id ? '#1a1a30' : 'none',
+          border: `1px solid ${view === t.id ? '#a78bfa' : '#1f1f35'}`,
+          borderRadius: 6, padding: '5px 2px', cursor: 'pointer',
+          fontFamily: "'DM Mono', monospace", fontSize: 11,
+          fontWeight: view === t.id ? 700 : 400,
+          color: view === t.id ? '#a78bfa' : '#5a5880',
+          textAlign: 'center'
+        }}>{t.label}</button>
+      ))}
+    </div>
+  ) : null
+
+  const navBtn = (id, icon, label, active, onClick) => (
+    <button key={id} onClick={onClick} style={{
+      flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+      padding: '8px 0', color: active ? '#a78bfa' : '#5a5880',
+    }}>
+      <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
+      <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.05em', fontWeight: active ? 700 : 400 }}>{label}</span>
+      {active && <div style={{ width: 16, height: 2, borderRadius: 1, background: '#a78bfa', marginTop: 1 }} />}
+    </button>
+  )
+
+  const BottomNav = () => (
+    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
+      {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
+      {navBtn('summary', '▤', 'Summary', view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
+      {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
+      {navBtn('settings', '⚙', 'Settings', view === 'settings',                    () => setView('settings'))}
+    </div>
+  )
+
+  if (showAdd) return (
+    <div style={appShell}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+        <AddConcertForm
+          onSave={c => { onSaveConcert(c); setShowAdd(null); savedScrollPos.current = 0; setSelected(c) }}
+          onClose={() => setShowAdd(null)}
+          initialType={showAdd}
+          settings={settings}
+          friends={allFriends}
+          allArtists={[...new Set(concerts.map(c => c.artist))].sort()}
+          recentFriends={[...new Set(
+            [...concerts]
+              .filter(c => isPastDate(c.date) && (c.friends||[]).length > 0)
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .flatMap(c => c.friends)
+          )].slice(0, 3)}
+        />
+      </div>
+      <ChartGroupNav />
+      <ShowsSubNav />
+      <BottomNav />
+    </div>
+  )
+
   if (selected) return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} />
+    <div style={appShell}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} />
+      </div>
+      <ChartGroupNav />
+      <ShowsSubNav />
+      <BottomNav />
     </div>
   )
 
   return (
-    <div style={{ background: '#0c0c14', minHeight: '100vh', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={appShell}>
 
       {/* Header */}
-      <div style={{ padding: '16px 16px 0', position: 'sticky', top: 0, background: '#0c0c14', zIndex: 50, borderBottom: '1px solid #0d1a14' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+      <div style={{ flexShrink: 0, padding: '16px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>settracker</div>
-            <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
+            <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
               {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
             </div>
           </div>
-          {view === 'home' && (
-            <button onClick={() => setShowFilters(f => !f)} style={{
-              position: 'relative', background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none',
-              border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`,
-              borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
-              color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 13
-            }}>
-              ⚙
-              {activeFilterCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: -4, right: -4, background: '#a78bfa',
-                  color: '#0c0c14', borderRadius: 99, fontSize: 9, fontWeight: 800,
-                  width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>{activeFilterCount}</span>
-              )}
-            </button>
-          )}
+          <button onClick={() => setView('settings')} style={{ background: view === 'settings' ? '#1a1a30' : 'none', border: `1px solid ${view === 'settings' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 8, padding: '7px 10px', cursor: 'pointer', color: view === 'settings' ? '#a78bfa' : '#5a5880', fontSize: 18, lineHeight: 1 }}>⚙</button>
         </div>
 
         {view === 'home' && (
-          <div style={{ position: 'relative', marginBottom: 10 }}>
-            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Artist, venue, friend, tour..."
-              style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`,
-                borderRadius: 10, color: '#c4c2f0', padding: '9px 36px 9px 32px',
-                fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
-            {search && (
-              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
-            )}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Artist, venue, friend, tour..."
+                style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`,
+                  borderRadius: 10, color: '#c4c2f0', padding: '9px 36px 9px 32px',
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
+              )}
+            </div>
+            <button onClick={() => setShowAdd('concert')} style={{ background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ show</button>
+            <button onClick={() => setShowAdd('festival')} style={{ background: '#1a1030', border: '1px solid #f472b6', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#f472b6', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ fest</button>
           </div>
         )}
 
@@ -1829,14 +4432,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
           <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
             {/* Type dropdown */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button onClick={() => { setShowYearDropdown(false); document.getElementById('type-dd') && (document.getElementById('type-dd').style.display = document.getElementById('type-dd').style.display === 'block' ? 'none' : 'block') }} style={{
-                padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-                background: filterType !== 'all' ? '#a78bfa' : '#13131f',
-                color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f',
-                border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`,
-                fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace",
-                display: 'flex', alignItems: 'center', gap: 4
-              }}>
+              <button onClick={() => { setShowYearDropdown(false); document.getElementById('type-dd') && (document.getElementById('type-dd').style.display = document.getElementById('type-dd').style.display === 'block' ? 'none' : 'block') }} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterType !== 'all' ? '#a78bfa' : '#13131f', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
                 {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : 'Festivals'}
                 <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
               </button>
@@ -1860,22 +4456,35 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
                 </div>
               )}
             </div>
-            {filterFriend !== 'all' && <button onClick={() => setFilterFriend('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#f472b6', border: '1px solid #f472b6', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterFriend} ×</button>}
-            {filterVenue !== 'all' && <button onClick={() => setFilterVenue('all')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#38bdf8', border: '1px solid #38bdf8', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>{filterVenue} ×</button>}
-            {sortOrder !== 'newest' && <button onClick={() => setSortOrder('newest')} style={{ padding: '5px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', flexShrink: 0, background: '#1a1a30', color: '#a78bfa', border: '1px solid #a78bfa', fontFamily: "'DM Mono', monospace" }}>↕ {sortOrder} ×</button>}
+            {/* Sort button */}
+            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ background: showSort || sortOrder !== 'newest' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== 'newest' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortOrder !== 'newest' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== 'newest' ? 700 : 400, flexShrink: 0 }}>
+              Sort{sortOrder !== 'newest' ? ` ↕` : ''}
+            </button>
+            {/* Filters button */}
+            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+              {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
+            </button>
+            {/* Compact toggle */}
+            <button onClick={() => setCompact(c => !c)} style={{ marginLeft: 'auto', background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title="Compact view">
+              {compact ? '▤' : '☰'}
+            </button>
+          </div>
+        )}
+
+        {view === 'home' && showSort && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            {sortOrder !== 'newest' && <button onClick={resetSort} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[{id:'newest',label:'Newest'},{id:'oldest',label:'Oldest'},{id:'alpha',label:'A→Z'},{id:'price',label:'Price ↓'},{id:'rating',label:'Rating ↓'}].map(s => (
+                <button key={s.id} onClick={() => setSortOrder(s.id)} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortOrder === s.id ? '#a78bfa' : '#0c0c14', color: sortOrder === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortOrder === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+              ))}
+            </div>
           </div>
         )}
 
         {view === 'home' && showFilters && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Sort</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {[{id:'newest',label:'Newest'},{id:'oldest',label:'Oldest'},{id:'alpha',label:'A→Z'},{id:'price',label:'Price ↓'},{id:'rating',label:'Rating ↓'}].map(s => (
-                  <button key={s.id} onClick={() => setSortOrder(s.id)} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortOrder === s.id ? '#a78bfa' : '#0c0c14', color: sortOrder === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortOrder === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
-                ))}
-              </div>
-            </div>
+            {activeFilterCount > 0 && <button onClick={resetFilters} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Friend</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -1885,7 +4494,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Venue</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 <button onClick={() => setFilterVenue('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterVenue === 'all' ? '#38bdf8' : '#0c0c14', color: filterVenue === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterVenue === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
@@ -1894,21 +4503,64 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
                 ))}
               </div>
             </div>
-            {activeFilterCount > 0 && (
-              <button onClick={() => { setFilterYear('all'); setFilterType('all'); setFilterFriend('all'); setFilterVenue('all'); setSortOrder('newest'); setSearch('') }} style={{ width: '100%', padding: '8px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'none', border: '1px solid #2e2e50', color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>Reset all filters</button>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Rating</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                <button onClick={() => setFilterRating(0)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === 0 ? '#a78bfa' : '#0c0c14', color: filterRating === 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === 0 ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Any</button>
+                {Array.from({ length: settings.ratingSystem || 5 }, (_, i) => i + 1).map(n => (
+                  <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n}★</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Solo only</div>
+              <button onClick={() => setFilterSolo(s => !s)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSolo ? '#a78bfa' : '#0c0c14', color: filterSolo ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSolo ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Solo</button>
+            </div>
+            {(settings.genres||[]).length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  <button onClick={() => setFilterGenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === 'all' ? '#a78bfa' : '#0c0c14', color: filterGenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {(settings.genres||[]).map(g => (
+                    <button key={g} onClick={() => setFilterGenre(filterGenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === g ? '#a78bfa' : '#0c0c14', color: filterGenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === g ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(settings.subgenres||[]).length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Subgenre</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  <button onClick={() => setFilterSubgenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === 'all' ? '#38bdf8' : '#0c0c14', color: filterSubgenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {(settings.subgenres||[]).map(g => (
+                    <button key={g} onClick={() => setFilterSubgenre(filterSubgenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === g ? '#38bdf8' : '#0c0c14', color: filterSubgenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === g ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {allCountries.length > 1 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Country</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  <button onClick={() => setFilterCountry('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === 'all' ? '#a78bfa' : '#0c0c14', color: filterCountry === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                  {allCountries.map(c => (
+                    <button key={c} onClick={() => setFilterCountry(filterCountry === c ? 'all' : c)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === c ? '#a78bfa' : '#0c0c14', color: filterCountry === c ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === c ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{c}</button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div style={{ padding: '0 16px', paddingBottom: 90 }}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 16px' }}>
         {view === 'home' && (
           <>
             {upcoming.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Upcoming — {upcoming.length}</div>
-                {upcoming.map(c => <ConcertCard key={c.id} concert={c} onOpen={setSelected} />)}
+                {upcoming.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
                 <div style={{ height: 1, background: '#0e0e1a', margin: '12px 0 16px' }} />
               </div>
             )}
@@ -1920,24 +4572,19 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onUp
                 </div>
                 <span style={{ fontSize: 11, color: '#4a4870', transform: showPast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
               </button>
-              {showPast && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={setSelected} />)}
+              {showPast && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
             </div>
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} />}
-        {view === 'friends' && <FriendsView concerts={concerts} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={setSelected} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs />}
+        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
       </div>
 
-      {/* Bottom nav */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 8 }}>
-        <TabBtn id="home" icon="♪" label="Shows" />
-        <TabBtn id="artists" icon="★" label="Artists" />
-        <TabBtn id="stats" icon="◎" label="Stats" />
-        <TabBtn id="friends" icon="◉" label="Friends" />
-        <TabBtn id="settings" icon="⚙" label="Settings" />
-      </div>
+      <ChartGroupNav />
+      <ShowsSubNav />
+      <BottomNav />
     </div>
   )
 }

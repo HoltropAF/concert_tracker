@@ -1618,11 +1618,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
         const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
         const costOf = c => (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + (c.otherCost || 0);
-        const totalTicketFS = past.reduce((s, c) => s + (c.ticketPrice || 0), 0);
-        const totalMerchFS = past.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
-        const totalOtherFS = past.reduce((s, c) => s + (c.otherCost || 0), 0);
-        const totalConcertsFS = past.filter(c => c.type === 'concert').reduce((s, c) => s + costOf(c), 0);
-        const totalFestivalsFS = past.filter(c => c.type === 'festival').reduce((s, c) => s + costOf(c), 0);
+        const totalTicketFS = concerts.reduce((s, c) => s + (c.ticketPrice || 0), 0);
+        const totalMerchFS = concerts.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
+        const totalOtherFS = concerts.reduce((s, c) => s + (c.otherCost || 0), 0);
+        const totalConcertsFS = concerts.filter(c => c.type === 'concert').reduce((s, c) => s + costOf(c), 0);
+        const totalFestivalsFS = concerts.filter(c => c.type === 'festival').reduce((s, c) => s + costOf(c), 0);
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {/* Category row */}

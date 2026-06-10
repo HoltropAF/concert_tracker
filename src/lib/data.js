@@ -126,6 +126,8 @@ export const DEFAULT_SETTINGS = {
   hiddenCharts: [],
   hiddenSummaryBlocks: [],
   topSongsRows: 5,
+  summaryYear: 'all',
+  summaryFinType: 'all',
   setlistfmApiKey: '',
   savedVenues: [],
   friendGroups: [],

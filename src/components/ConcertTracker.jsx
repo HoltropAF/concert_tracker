@@ -1378,7 +1378,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     },
   ];
 
-  const [showStatsSettings, setShowStatsSettings] = useState(false);
   useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
   const handleSwipeStart = (e) => { swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; };
@@ -1398,8 +1397,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const [chartOptions, setChartOptions] = useState({});
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
-  const [summaryYear, setSummaryYear] = useState('all');
-  const [summaryFinType, setSummaryFinType] = useState('all');
+  const summaryYear = settings.summaryYear || 'all';
+  const summaryFinType = settings.summaryFinType || 'all';
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
   const hiddenCharts = settings.hiddenCharts || [];
@@ -2353,78 +2352,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             marginBottom: -1
           }}>{t.label}</button>
         ))}
-        <button onClick={() => setShowStatsSettings(s => !s)} style={{
-          flex: hideTabs ? 0 : undefined,
-          background: showStatsSettings ? "#1a1a30" : "none", border: "none",
-          borderLeft: hideTabs ? "none" : "1px solid #1f1f35", cursor: "pointer", padding: hideTabs ? "12px 16px" : "0 16px",
-          color: showStatsSettings ? "#a78bfa" : "#4a4870", fontSize: 16, lineHeight: 1,
-          marginLeft: hideTabs ? "auto" : undefined
-        }}>⚙</button>
       </div>
-      {showStatsSettings && (() => {
-        const summaryBlocks = [
-          { id: "stats1", label: "Stats" }, { id: "stats2", label: "Financial" },
-          { id: "cumulative", label: "Cumulative" }, { id: "pies", label: "Genres & Venues" },
-          { id: "upnext", label: "Up next" },
-        ];
-        const hiddenBlocks = settings.hiddenSummaryBlocks || [];
-        const hiddenGroups = settings.hiddenChartGroups || [];
-        const hiddenChts = settings.hiddenCharts || [];
-        const toggleBlock = id => onUpdateSetting("hiddenSummaryBlocks", hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]);
-        const toggleGroup = id => onUpdateSetting("hiddenChartGroups", hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]);
-        const toggleChart = id => onUpdateSetting("hiddenCharts", hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]);
-        const pill = (label, active, onClick, small = false) => (
-          <button onClick={onClick} style={{
-            padding: small ? "2px 8px" : "3px 10px", borderRadius: 99, fontSize: small ? 9 : 10, cursor: "pointer",
-            fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
-            background: active ? "#1a1a30" : "none", color: active ? "#a78bfa" : "#4a4870",
-          }}>{label}</button>
-        );
-        return (
-          <div style={{ background: "#0f0f1e", borderBottom: "1px solid #0d1a14", padding: "12px 16px" }}>
-            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Summary</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-              {summaryBlocks.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
-            </div>
-            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Charts</div>
-            {CHART_GROUPS.map(g => (
-              <div key={g.id} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                  {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
-                </div>
-                {!hiddenGroups.includes(g.id) && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 10, borderLeft: "2px solid #1f1f35" }}>
-                    {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        );
-      })()}
 
       {/* ── SUMMARY ── */}
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0" }}>
-
-          {/* Year filter */}
-          {(() => {
-            const currentYearStr = String(new Date().getFullYear());
-            const yearOpts = [{ id: 'all', label: 'All time' }, { id: currentYearStr, label: currentYearStr }];
-            return (
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                {yearOpts.map(o => (
-                  <button key={o.id} onClick={() => setSummaryYear(o.id)} style={{
-                    padding: '4px 12px', borderRadius: 99, fontSize: 11, cursor: 'pointer',
-                    fontFamily: "'DM Mono', monospace", fontWeight: 600,
-                    background: summaryYear === o.id ? '#a78bfa' : 'none',
-                    color: summaryYear === o.id ? '#0c0c14' : '#6b6a8f',
-                    border: `1px solid ${summaryYear === o.id ? '#a78bfa' : '#1f1f35'}`,
-                  }}>{o.label}</button>
-                ))}
-              </div>
-            );
-          })()}
 
           {/* Row 1: shows / festivals / countries / avg per year */}
           {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && (() => {
@@ -2470,7 +2402,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Financial</div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {finOpts.map(o => (
-                      <button key={o.id} onClick={() => setSummaryFinType(o.id)} style={{
+                      <button key={o.id} onClick={() => onUpdateSetting('summaryFinType', o.id)} style={{
                         padding: '2px 8px', borderRadius: 99, fontSize: 9, cursor: 'pointer',
                         fontFamily: "'DM Mono', monospace", fontWeight: 600,
                         background: summaryFinType === o.id ? '#3d3564' : 'none',
@@ -4230,6 +4162,69 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         </div>
       </Collapsible>
 
+      <Collapsible title="◈  Stats display" {...sec("statsDisplay")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+          <SettingsRow label="Summary scope" sub="Default time range on summary page">
+            <SettingsOptionPills
+              value={local.summaryYear || 'all'}
+              options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
+              onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
+            />
+          </SettingsRow>
+          <SettingsRow label="Financial split" sub="Which shows count in financial block">
+            <SettingsOptionPills
+              value={local.summaryFinType || 'all'}
+              options={[{ id: 'all', label: 'All' }, { id: 'concerts', label: 'Concerts' }, { id: 'festivals', label: 'Festivals' }]}
+              onChange={v => { onUpdate('summaryFinType', v); lUpdate('summaryFinType', v); }}
+            />
+          </SettingsRow>
+        </div>
+        {(() => {
+          const hiddenBlocks = local.hiddenSummaryBlocks || [];
+          const hiddenGroups = local.hiddenChartGroups || [];
+          const hiddenChts = local.hiddenCharts || [];
+          const toggleBlock = id => { const next = hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]; onUpdate('hiddenSummaryBlocks', next); lUpdate('hiddenSummaryBlocks', next); };
+          const toggleGroup = id => { const next = hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]; onUpdate('hiddenChartGroups', next); lUpdate('hiddenChartGroups', next); };
+          const toggleChart = id => { const next = hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]; onUpdate('hiddenCharts', next); lUpdate('hiddenCharts', next); };
+          const pill = (label, active, onClick, small = false) => (
+            <button onClick={onClick} style={{
+              padding: small ? '2px 8px' : '3px 10px', borderRadius: 99, fontSize: small ? 9 : 10, cursor: 'pointer',
+              fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? '#a78bfa' : '#1f1f35'}`,
+              background: active ? '#1a1a30' : 'none', color: active ? '#a78bfa' : '#4a4870',
+            }}>{label}</button>
+          );
+          const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'stats2', label: 'Financial' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
+          const ALL_CHART_GROUPS = [
+            { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: '🥧 Genres' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'artists', label: '🎤 Top artists' }, { id: 'ratings', label: '⭐ Ratings' }, { id: 'language', label: '🗣️ Language' }, { id: 'songs', label: '🎵 Top songs' }] },
+            { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Solo vs with friends' }, { id: 'friends-chart', label: '👥 Most shows with' }] },
+            { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: '📍 Favourite venues' }, { id: 'venue-size', label: '🏟️ Venue size' }, { id: 'countries', label: '🌍 Countries' }] },
+            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending & avg ticket' }, { id: 'expensive', label: '💰 Most expensive shows' }] },
+            { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: '🛍️ Merch overview' }, { id: 'merch-breakdown', label: '📦 What I buy' }] },
+          ];
+          return (
+            <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '12px 16px', marginBottom: 4 }}>
+              <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Summary blocks</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
+                {BLOCKS.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
+              </div>
+              <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Charts</div>
+              {ALL_CHART_GROUPS.map(g => (
+                <div key={g.id} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
+                  </div>
+                  {!hiddenGroups.includes(g.id) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingLeft: 10, borderLeft: '2px solid #1f1f35' }}>
+                      {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </Collapsible>
+
       <Collapsible title="◉  Account & Data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -4296,7 +4291,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
             <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "#a78bfa", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textDecoration: "none", paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #1a1a2e" }}>{label} ↗</a>
           ))}
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
-            Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Use the ⚙ in Stats to show/hide sections
+            Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Configure summary blocks and charts in Settings → Stats display
           </div>
         </div>
       </Collapsible>

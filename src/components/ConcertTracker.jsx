@@ -1716,8 +1716,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             const yTop = 8; const yBot = 86;
             const yOf = v => yBot - (v / maxSpendYS) * (yBot - yTop);
             const mid = maxSpendYS / 2;
-            const spendPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearSpend[y] || 0) }));
-            const spendPath = "M " + spendPts.map(p => `${p.x},${p.y}`).join(" L ");
+            const concertPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearConcertSpend[y] || 0), v: yearConcertSpend[y] || 0 }));
+            const festivalPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearFestivalSpend[y] || 0), v: yearFestivalSpend[y] || 0 }));
+            const concertPath = "M " + concertPts.map(p => `${p.x},${p.y}`).join(" L ");
+            const festivalPath = festivalPts.some(p => p.v > 0) ? "M " + festivalPts.map(p => `${p.x},${p.y}`).join(" L ") : null;
             const avgPts = activeYearsYS.map((y, i) => {
               const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
               return avg !== null ? { x: xOf(i), y: yOf(avg) } : null;
@@ -1731,22 +1733,24 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             const merchPath = "M " + merchPts.map(p => `${p.x},${p.y}`).join(" L ");
             return (
               <>
-                <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ width: 16, height: 2, background: "#f472b6", borderRadius: 1 }} />
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Total spend</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ width: 16, height: 2, background: "#38bdf8", borderRadius: 1 }} />
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Avg ticket</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ width: 16, height: 2, background: "#34d399", borderRadius: 1 }} />
-                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
-                  </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
+                  {[
+                    { color: "#a78bfa", label: "Concerts" },
+                    ...(festivalPath ? [{ color: "#fb923c", label: "Festivals" }] : []),
+                    { color: "#38bdf8", label: "Avg ticket" },
+                    { color: "#34d399", label: "Merch" },
+                  ].map(({ color, label }) => (
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 16, height: 2, background: color, borderRadius: 1 }} />
+                      <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
+                    </div>
+                  ))}
                 </div>
                 <svg width="100%" height={100} viewBox={`0 0 ${totalW} 92`} preserveAspectRatio="none">
-                  <defs><linearGradient id="ysGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f472b6" stopOpacity="0.2"/><stop offset="100%" stopColor="#f472b6" stopOpacity="0"/></linearGradient></defs>
+                  <defs>
+                    <linearGradient id="ysGradC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.15"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient>
+                    <linearGradient id="ysGradF" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#fb923c" stopOpacity="0.15"/><stop offset="100%" stopColor="#fb923c" stopOpacity="0"/></linearGradient>
+                  </defs>
                   {/* Gridlines */}
                   <line x1={leftPad} y1={yTop} x2={totalW} y2={yTop} stroke="#1f1f35" strokeWidth="1" />
                   <line x1={leftPad} y1={yOf(mid)} x2={totalW} y2={yOf(mid)} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
@@ -1755,12 +1759,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   <text x={leftPad - 4} y={yTop + 3} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€{Math.round(maxSpendYS)}</text>
                   <text x={leftPad - 4} y={yOf(mid) + 3} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€{Math.round(mid)}</text>
                   <text x={leftPad - 4} y={yBot + 1} textAnchor="end" fill="#4a4870" fontSize="7" fontFamily="monospace">€0</text>
-                  {/* Chart lines */}
-                  <path d={spendPath + ` L ${spendPts[n-1].x},${yBot} L ${spendPts[0].x},${yBot} Z`} fill="url(#ysGrad)" />
-                  <path d={spendPath} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  {spendPts.map((pt, i) => <circle key={activeYearsYS[i]} cx={pt.x} cy={pt.y} r="3" fill="#f472b6" />)}
+                  {/* Concert line */}
+                  <path d={concertPath + ` L ${concertPts[n-1].x},${yBot} L ${concertPts[0].x},${yBot} Z`} fill="url(#ysGradC)" />
+                  <path d={concertPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {concertPts.map((pt, i) => <circle key={activeYearsYS[i] + 'c'} cx={pt.x} cy={pt.y} r="3" fill="#a78bfa" />)}
+                  {/* Festival line */}
+                  {festivalPath && <path d={festivalPath + ` L ${festivalPts[n-1].x},${yBot} L ${festivalPts[0].x},${yBot} Z`} fill="url(#ysGradF)" />}
+                  {festivalPath && <path d={festivalPath} fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {festivalPath && festivalPts.map((pt, i) => pt.v > 0 && <circle key={activeYearsYS[i] + 'f'} cx={pt.x} cy={pt.y} r="3" fill="#fb923c" />)}
+                  {/* Avg ticket line */}
                   {avgPath && <path d={avgPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
                   {avgPts.map((pt, i) => pt && <circle key={activeYearsYS[i] + 'a'} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />)}
+                  {/* Merch line */}
                   <path d={merchPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   {merchPts.map((pt, i) => <circle key={activeYearsYS[i] + 'm'} cx={pt.x} cy={pt.y} r="3" fill="#34d399" />)}
                 </svg>

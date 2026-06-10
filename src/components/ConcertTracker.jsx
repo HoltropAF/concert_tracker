@@ -1085,11 +1085,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Years
   const yearCount = {};
   const yearSpend = {};
+  const yearConcertSpend = {};
+  const yearFestivalSpend = {};
   past.forEach(c => {
     const y = getYear(c.date);
     yearCount[y] = (yearCount[y] || 0) + 1;
-    const spent = (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0);
+    const spent = (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) + (c.otherCost || 0);
     yearSpend[y] = (yearSpend[y] || 0) + spent;
+    if (c.type === 'festival') yearFestivalSpend[y] = (yearFestivalSpend[y] || 0) + spent;
+    else yearConcertSpend[y] = (yearConcertSpend[y] || 0) + spent;
   });
   const years = Object.keys(yearCount).sort();
 
@@ -1656,56 +1660,42 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
           {ysView === "bars" && <>
           {/* Legend */}
-          <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#f472b6" }} />
-              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Total spend</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#38bdf8" }} />
-              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Avg ticket</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#34d399" }} />
-              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Merch</span>
-            </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+            {[
+              { color: "#a78bfa", label: "Concerts" },
+              { color: "#fb923c", label: "Festivals" },
+              { color: "#38bdf8", label: "Avg ticket" },
+              { color: "#34d399", label: "Merch" },
+            ].map(({ color, label }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
+              </div>
+            ))}
           </div>
           {/* Grouped bars */}
           {(() => {
             const activeYears = years.filter(y => yearSpend[y] > 0);
             const maxSpend = Math.max(...activeYears.map(y => yearSpend[y]), 1);
-            const maxAvg = Math.max(...activeYears.filter(y => yearTicketCount[y]).map(y => yearTicketSum[y] / yearTicketCount[y]), 1);
-            // normalise both to same scale — use maxSpend as reference
             return activeYears.map(y => {
-              const spend = yearSpend[y] || 0;
+              const concerts_ = yearConcertSpend[y] || 0;
+              const festivals_ = yearFestivalSpend[y] || 0;
               const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
               const merch = yearMerchSpend[y] || 0;
-              const spendW = Math.max(4, (spend / maxSpend) * 100);
-              const avgW = avg ? Math.max(4, (avg / maxSpend) * 100) : 0;
-              const merchW = merch > 0 ? Math.max(4, (merch / maxSpend) * 100) : 0;
+              const bar = (val, color, opacity = 1) => (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ height: 7, borderRadius: 3, background: color, width: `${Math.max(4, (val / maxSpend) * 100)}%`, opacity, transition: "width 0.5s ease" }} />
+                  <span style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(val)}</span>
+                </div>
+              );
               return (
                 <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                    {/* Spend bar */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ height: 7, borderRadius: 3, background: "#f472b6", width: `${spendW}%`, transition: "width 0.5s ease" }} />
-                      <span style={{ fontSize: 10, color: "#f472b6", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(spend)}</span>
-                    </div>
-                    {/* Avg bar */}
-                    {avg && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ height: 7, borderRadius: 3, background: "#38bdf8", width: `${avgW}%`, opacity: 0.8, transition: "width 0.5s ease" }} />
-                        <span style={{ fontSize: 10, color: "#38bdf8", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{avg.toFixed(0)}</span>
-                      </div>
-                    )}
-                    {/* Merch bar */}
-                    {merch > 0 && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ height: 7, borderRadius: 3, background: "#34d399", width: `${merchW}%`, opacity: 0.85, transition: "width 0.5s ease" }} />
-                        <span style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(merch)}</span>
-                      </div>
-                    )}
+                    {concerts_ > 0 && bar(concerts_, "#a78bfa")}
+                    {festivals_ > 0 && bar(festivals_, "#fb923c")}
+                    {avg && bar(avg, "#38bdf8", 0.8)}
+                    {merch > 0 && bar(merch, "#34d399", 0.85)}
                   </div>
                 </div>
               );
@@ -1713,7 +1703,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
           <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
             <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total</span>
-            <span style={{ color: "#f472b6", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(totalSpent)}</span>
+            <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(Object.values(yearSpend).reduce((s, v) => s + v, 0))}</span>
           </div>
           </>}
           {ysView === "line" && (() => {

@@ -2395,22 +2395,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             const totalMerchAmt = spFiltered.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
             const totalOtherAmt = spFiltered.reduce((s, c) => s + (c.otherCost || 0), 0);
             const totalAmt = totalTicketAmt + totalMerchAmt + totalOtherAmt;
-            const finOpts = [{ id: 'all', label: 'All' }, { id: 'concerts', label: 'Concerts' }, { id: 'festivals', label: 'Festivals' }];
+            const finLabel = summaryFinType === 'concerts' ? 'Concerts' : summaryFinType === 'festivals' ? 'Festivals' : null;
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Financial</div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {finOpts.map(o => (
-                      <button key={o.id} onClick={() => onUpdateSetting('summaryFinType', o.id)} style={{
-                        padding: '2px 8px', borderRadius: 99, fontSize: 9, cursor: 'pointer',
-                        fontFamily: "'DM Mono', monospace", fontWeight: 600,
-                        background: summaryFinType === o.id ? '#3d3564' : 'none',
-                        color: summaryFinType === o.id ? '#c4c2f0' : '#4a4870',
-                        border: `1px solid ${summaryFinType === o.id ? '#6d5fa8' : '#1f1f35'}`,
-                      }}>{o.label}</button>
-                    ))}
-                  </div>
+                  {finLabel && <div style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", background: '#1a1a30', border: '1px solid #3d3564', borderRadius: 99, padding: '1px 7px' }}>{finLabel}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: totalAmt > 0 ? 10 : 0 }}>
                   {[

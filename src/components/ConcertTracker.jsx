@@ -45,6 +45,7 @@ const getSupportRole = s => typeof s === 'string' ? 'support' : (s.role || 'supp
 
 const getSongName = s => typeof s === 'string' ? s : s.name;
 const getSongInfo = s => typeof s === 'string' ? null : (s.info || null);
+const getSongCover = s => typeof s === 'string' ? null : (s.cover || null);
 
 const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee","#facc15","#fb7185"];
 const GENRE_COLORS = DONUT_PALETTE;
@@ -304,13 +305,15 @@ function ConcertCard({ concert, onOpen, compact = false }) {
   );
 }
 
-function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [] }) {
+function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [] }) {
   const effectKey = concert.id + (overrideArtist || '');
   const [songs, setSongs] = useState(overrideSongs ?? concert.setlist ?? []);
   const [songInput, setSongInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [fetchState, setFetchState] = useState('idle');
   const [fetchError, setFetchError] = useState('');
+  const [editCoverIdx, setEditCoverIdx] = useState(null);
+  const [coverInput, setCoverInput] = useState('');
 
   useEffect(() => { setSongs(overrideSongs ?? concert.setlist ?? []); }, [effectKey]);
 
@@ -318,10 +321,25 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
 
   const addSong = () => {
     const t = songInput.trim();
-    if (!t || songs.includes(t)) return;
+    if (!t || songs.some(s => getSongName(s) === t)) return;
     save([...songs, t]);
     setSongInput('');
   };
+
+  const applyCover = (idx, artist) => {
+    save(songs.map((s, i) => {
+      if (i !== idx) return s;
+      const name = getSongName(s); const info = getSongInfo(s);
+      if (!artist) return info ? { name, info } : name;
+      return info ? { name, info, cover: artist } : { name, cover: artist };
+    }));
+    setEditCoverIdx(null);
+    setCoverInput('');
+  };
+
+  const coverSuggestions = coverInput.length > 0
+    ? allArtists.filter(a => a.toLowerCase().includes(coverInput.toLowerCase())).slice(0, 5)
+    : [];
 
   const fetchByUrl = async () => {
     const url = urlInput.trim();
@@ -360,14 +378,49 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
           {songs.map((song, i) => {
             const name = getSongName(song);
             const info = getSongInfo(song);
+            const cover = getSongCover(song);
+            const isEditingCover = editCoverIdx === i;
             return (
-              <div key={`${name}-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: info ? 6 : 4 }}>
-                <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</div>
-                  {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
+              <div key={`${name}-${i}`} style={{ marginBottom: isEditingCover ? 8 : (info || cover ? 6 : 4) }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</div>
+                    {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
+                    {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {cover}</div>}
+                  </div>
+                  {!readOnly && (
+                    <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); } }}
+                      style={{ background: 'none', border: 'none', color: cover || isEditingCover ? '#fb923c' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>↩</button>
+                  )}
+                  {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
                 </div>
-                {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
+                {isEditingCover && (
+                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        autoFocus value={coverInput}
+                        onChange={e => setCoverInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') applyCover(i, coverInput.trim()); if (e.key === 'Escape') { setEditCoverIdx(null); setCoverInput(''); } }}
+                        placeholder="Original artist…"
+                        style={{ width: '100%', background: '#0c0c14', border: '1px solid #fb923c44', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                      />
+                      {coverSuggestions.length > 0 && (
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 20, overflow: 'hidden', marginTop: 2 }}>
+                          {coverSuggestions.map(a => (
+                            <button key={a} onMouseDown={() => applyCover(i, a)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid #1a1a2e', color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Sans', sans-serif", fontSize: 12, cursor: 'pointer' }}>{a}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button onMouseDown={() => applyCover(i, coverInput.trim())} style={{ background: 'none', border: '1px solid #fb923c55', borderRadius: 6, color: '#fb923c', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                        {coverInput.trim() ? 'Save cover' : 'Mark as cover'}
+                      </button>
+                      {cover && <button onMouseDown={() => applyCover(i, null)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -951,6 +1004,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
                           overrideArtist={key === '__headliner__' ? undefined : name}
                           onSaveSetlist={save}
                           headlinerSongs={role === 'guest' && key !== '__headliner__' ? (form.setlist || []) : []}
+                          allArtists={allArtists}
                         />
                       </div>
                     )}
@@ -2994,6 +3048,21 @@ function ArtistsView({ concerts, onOpen }) {
     pastShows.forEach(c => (c.setlist || []).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
     supportApps.forEach(({ concert: c }) => ((c.supportSetlists || {})[selectedArtist] || []).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
     const artistSongs = Object.entries(artistSongCount).sort((a,b) => b[1]-a[1]);
+
+    // Songs of this artist covered by others
+    const coversByOthers = [];
+    concerts.filter(c => isPast(c.date)).forEach(c => {
+      const checkSongs = (songList, performingArtist) => {
+        if (performingArtist === selectedArtist) return;
+        (songList || []).forEach(song => {
+          if (getSongCover(song) === selectedArtist) {
+            coversByOthers.push({ songName: getSongName(song), concert: c, performingArtist });
+          }
+        });
+      };
+      checkSongs(c.setlist, c.artist);
+      Object.entries(c.supportSetlists || {}).forEach(([a, songs]) => checkSongs(songs, a));
+    });
     return (
       <div style={{ padding: "0 0 100px" }}>
         <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
@@ -3057,6 +3126,31 @@ function ArtistsView({ concerts, onOpen }) {
                     </div>
                     {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {coversByOthers.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
+                Covered by others · {coversByOthers.length} {coversByOthers.length === 1 ? 'time' : 'times'}
+              </div>
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                {coversByOthers.map(({ songName, concert: c, performingArtist }, i) => (
+                  <button key={`cover-${i}`} onClick={() => onOpen(c)} style={{
+                    width: "100%", textAlign: "left", background: "none", border: "none",
+                    borderBottom: i < coversByOthers.length - 1 ? "1px solid #1f1f35" : "none",
+                    padding: "6px 0", cursor: "pointer",
+                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 500 }}>{songName}</div>
+                      <div style={{ color: "#fb923c", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>↩ {performingArtist}</div>
+                    </div>
+                    <div style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0, textAlign: "right" }}>
+                      {formatDate(c.date)}
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -4479,7 +4573,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           initialType={showAdd}
           settings={settings}
           friends={allFriends}
-          allArtists={[...new Set(concerts.map(c => c.artist))].sort()}
+          allArtists={[...new Set([
+            ...concerts.map(c => c.artist),
+            ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
+            ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
+          ])].filter(Boolean).sort()}
           recentFriends={[...new Set(
             [...concerts]
               .filter(c => isPastDate(c.date) && (c.friends||[]).length > 0)

@@ -264,9 +264,8 @@ function ConcertCard({ concert, onOpen, compact = false }) {
             }}>{concert.artist}</span>
             {concert.seenAs && !isFestival && (() => {
               const cfg = {
-                Headliner: { bg: "#2a1f4a", color: "#a78bfa" },
-                Support:   { bg: "#1a2a3d", color: "#60a5fa" },
-                Guest:     { bg: "#2d2010", color: "#fbbf24" },
+                Support: { bg: "#1a2a3d", color: "#60a5fa" },
+                Guest:   { bg: "#2d2010", color: "#fbbf24" },
               }[concert.seenAs];
               return cfg ? (
                 <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: cfg.bg, color: cfg.color, flexShrink: 0 }}>{concert.seenAs.toUpperCase()}</span>
@@ -1399,6 +1398,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const [chartOptions, setChartOptions] = useState({});
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
+  const [summaryYear, setSummaryYear] = useState('all');
+  const [summaryFinType, setSummaryFinType] = useState('all');
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
   const hiddenCharts = settings.hiddenCharts || [];
@@ -2406,20 +2407,102 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0" }}>
 
-          {/* Row 1: shows / festivals / countries / avg per year */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
-            {[
-              { label: "shows", value: shows.length, nav: { view: 'home', filterType: 'concerts' } },
-              { label: "festivals", value: festivals.length, nav: { view: 'home', filterType: 'festivals' } },
-              { label: "countries", value: Object.keys(countryCount).length, nav: null },
-              { label: "avg / year", value: avgPerYear ?? "—", nav: null },
-            ].map(b => (
-              <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
+          {/* Year filter */}
+          {(() => {
+            const currentYearStr = String(new Date().getFullYear());
+            const yearOpts = [{ id: 'all', label: 'All time' }, { id: currentYearStr, label: currentYearStr }];
+            return (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                {yearOpts.map(o => (
+                  <button key={o.id} onClick={() => setSummaryYear(o.id)} style={{
+                    padding: '4px 12px', borderRadius: 99, fontSize: 11, cursor: 'pointer',
+                    fontFamily: "'DM Mono', monospace", fontWeight: 600,
+                    background: summaryYear === o.id ? '#a78bfa' : 'none',
+                    color: summaryYear === o.id ? '#0c0c14' : '#6b6a8f',
+                    border: `1px solid ${summaryYear === o.id ? '#a78bfa' : '#1f1f35'}`,
+                  }}>{o.label}</button>
+                ))}
               </div>
-            ))}
-          </div>}
+            );
+          })()}
+
+          {/* Row 1: shows / festivals / countries / avg per year */}
+          {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && (() => {
+            const currentYearStr = String(new Date().getFullYear());
+            const sp = summaryYear === 'all' ? past : past.filter(c => getYear(c.date) === summaryYear);
+            const spShows = sp.filter(c => c.type === 'concert');
+            const spFests = sp.filter(c => c.type === 'festival');
+            const spCountries = {};
+            sp.forEach(c => { const k = (c.country||'').trim(); if (k) spCountries[k] = (spCountries[k]||0)+1; });
+            const spYears = [...new Set(sp.map(c => getYear(c.date)))];
+            const spAvg = summaryYear === 'all' && spYears.length ? (sp.length / spYears.length).toFixed(1) : null;
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${spAvg !== null ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 8 }}>
+                {[
+                  { label: "shows", value: spShows.length, nav: { view: 'home', filterType: 'concerts' } },
+                  { label: "festivals", value: spFests.length, nav: { view: 'home', filterType: 'festivals' } },
+                  { label: "countries", value: Object.keys(spCountries).length, nav: null },
+                  ...(spAvg !== null ? [{ label: "avg / year", value: spAvg, nav: null }] : []),
+                ].map(b => (
+                  <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
+                    <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Financial block */}
+          {!(settings.hiddenSummaryBlocks||[]).includes("stats2") && (() => {
+            const sp = summaryYear === 'all' ? past : past.filter(c => getYear(c.date) === summaryYear);
+            const spFiltered = summaryFinType === 'concerts' ? sp.filter(c => c.type === 'concert')
+              : summaryFinType === 'festivals' ? sp.filter(c => c.type === 'festival')
+              : sp;
+            const totalTicketAmt = spFiltered.reduce((s, c) => s + (c.ticketPrice || 0), 0);
+            const totalMerchAmt = spFiltered.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
+            const totalOtherAmt = spFiltered.reduce((s, c) => s + (c.otherCost || 0), 0);
+            const totalAmt = totalTicketAmt + totalMerchAmt + totalOtherAmt;
+            const finOpts = [{ id: 'all', label: 'All' }, { id: 'concerts', label: 'Concerts' }, { id: 'festivals', label: 'Festivals' }];
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Financial</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {finOpts.map(o => (
+                      <button key={o.id} onClick={() => setSummaryFinType(o.id)} style={{
+                        padding: '2px 8px', borderRadius: 99, fontSize: 9, cursor: 'pointer',
+                        fontFamily: "'DM Mono', monospace", fontWeight: 600,
+                        background: summaryFinType === o.id ? '#3d3564' : 'none',
+                        color: summaryFinType === o.id ? '#c4c2f0' : '#4a4870',
+                        border: `1px solid ${summaryFinType === o.id ? '#6d5fa8' : '#1f1f35'}`,
+                      }}>{o.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: totalAmt > 0 ? 10 : 0 }}>
+                  {[
+                    { label: 'Ticket', value: totalTicketAmt, color: '#f472b6' },
+                    { label: 'Merch', value: totalMerchAmt, color: '#34d399' },
+                    { label: 'Other', value: totalOtherAmt, color: '#38bdf8' },
+                  ].map(b => (
+                    <div key={b.label} style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, padding: '8px 4px', textAlign: 'center' }}>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value > 0 ? b.color : '#2e2e4a', lineHeight: 1 }}>
+                        {b.value > 0 ? `€${Math.round(b.value)}` : '—'}
+                      </div>
+                      <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 3 }}>{b.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {totalAmt > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, paddingTop: 8, borderTop: '1px solid #1a1a2e' }}>
+                    <span style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>total</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#a78bfa', fontFamily: "'DM Sans', sans-serif" }}>€{Math.round(totalAmt)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
 
           {/* Cumulative line chart */}
@@ -2629,20 +2712,28 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         </div>
       )}
-      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} />}
+      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} />}
       </>}
     </div>
   );
 }
 
-function FriendsView({ concerts, onOpen }) {
+function FriendsView({ concerts, onOpen, settings = {} }) {
   const [selectedFriend, setSelectedFriend] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [showSortPanel, setShowSortPanel] = useState(false);
 
   const past = concerts.filter(c => isPast(c.date));
   const allFriends = [...new Set(past.flatMap(c => c.friends))].sort();
+
+  const friendGroups = settings.friendGroups || [];
+  const groupEntries = friendGroups.map(g => {
+    const shows = past.filter(c => g.friends.length > 0 && g.friends.every(f => c.friends.includes(f)));
+    const sorted = [...shows].sort((a, b) => a.date.localeCompare(b.date));
+    return { ...g, shows, sorted, lastShow: sorted[sorted.length - 1] || null };
+  });
 
   const friendEntries = allFriends.map(name => {
     const shows = past.filter(c => c.friends.includes(name));
@@ -2670,7 +2761,37 @@ function FriendsView({ concerts, onOpen }) {
       return 0;
     });
 
-  useBackButton(() => setSelectedFriend(null), selectedFriend !== null);
+  useBackButton(() => { if (selectedFriend) setSelectedFriend(null); else if (selectedGroup) setSelectedGroup(null); }, selectedFriend !== null || selectedGroup !== null);
+
+  if (selectedGroup !== null) {
+    const g = groupEntries[selectedGroup];
+    if (!g) return null;
+    const sectionLabel = { fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
+    return (
+      <div style={{ padding: "0 0 100px" }}>
+        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => setSelectedGroup(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{g.name}</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{g.friends.join(', ')}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#6b6a8f" }}>{g.shows.length}</div>
+            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>show{g.shows.length !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+        <div style={{ padding: "16px 20px" }}>
+          {g.shows.length === 0
+            ? <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no shows found where all members attended</div>
+            : <>
+                <div style={sectionLabel}>Shows together</div>
+                {[...g.sorted].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+              </>
+          }
+        </div>
+      </div>
+    );
+  }
 
   if (selectedFriend) {
     const f = friendEntries.find(fd => fd.name === selectedFriend);
@@ -2798,6 +2919,30 @@ function FriendsView({ concerts, onOpen }) {
           </div>
         )}
       </div>
+
+      {/* Groups */}
+      {groupEntries.length > 0 && (
+        <div style={{ padding: "0 16px", marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 2 }}>Groups</div>
+          {groupEntries.map((g, i) => (
+            <button key={g.name} onClick={() => setSelectedGroup(i)} style={{
+              width: "100%", textAlign: "left", background: "#13131f",
+              border: "1px solid #1f1f35", borderLeft: "3px solid #3d3564",
+              borderRadius: 10, padding: "10px 14px", cursor: "pointer", marginBottom: 8,
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 2 }}>{g.name}</div>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.friends.join(', ')}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#6b6a8f" }}>{g.shows.length}</div>
+                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>show{g.shows.length !== 1 ? 's' : ''}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Friend list */}
       <div style={{ padding: "0 16px" }}>
@@ -3174,11 +3319,11 @@ function ArtistsView({ concerts, onOpen }) {
   );
 }
 
-function SongsView({ concerts, onOpen }) {
+function SongsView({ concerts, onOpen, settings }) {
   const past = concerts.filter(c => isPast(c.date));
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('count');
-  const [topN, setTopN] = useState(null);
+  const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
 
@@ -3560,6 +3705,44 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   )
 }
 
+function SettingsRow({ label, sub, children }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 0", borderBottom: "1px solid #1a1a2e", gap: 12 }}>
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SettingsStepper({ value, onChange, min = 3, max = 20 }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+      <button onClick={() => onChange(Math.max(min, value - 1))} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 16, cursor: "pointer", padding: "6px 12px", lineHeight: 1 }}>−</button>
+      <span style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Mono', monospace", minWidth: 24, textAlign: "center" }}>{value}</span>
+      <button onClick={() => onChange(Math.min(max, value + 1))} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 16, cursor: "pointer", padding: "6px 12px", lineHeight: 1 }}>+</button>
+    </div>
+  );
+}
+
+function SettingsOptionPills({ value, options, onChange }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "flex-end" }}>
+      {options.map(o => (
+        <button key={o.id} onClick={() => onChange(o.id)} style={{
+          padding: "5px 11px", borderRadius: 99, fontSize: 11, cursor: "pointer",
+          background: value === o.id ? "#a78bfa" : "#13131f",
+          color: value === o.id ? "#0c0c14" : "#6b6a8f",
+          border: `1px solid ${value === o.id ? "#a78bfa" : "#1f1f35"}`,
+          fontWeight: value === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
+        }}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
 function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSignOut, userEmail }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
@@ -3579,6 +3762,8 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
   const [touched, setTouched] = useState(false);
   const [openSection, setOpenSection] = useState(null);
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
+  const [showSavedVenues, setShowSavedVenues] = useState(false);
+  const [showFriendGroups, setShowFriendGroups] = useState(false);
 
   useEffect(() => { if (!touched) setLocal({ ...settings }); }, [settings]);
 
@@ -3877,44 +4062,6 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     e.target.value = '';
   };
 
-  const Row = ({ label, sub, children }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 0", borderBottom: "1px solid #1a1a2e" }}>
-      <div>
-        <div style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
-      </div>
-      {children}
-    </div>
-  );
-
-  const Stepper = ({ value, onChange, min = 3, max = 20 }) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, overflow: "hidden" }}>
-      <button onClick={() => onChange(Math.max(min, value - 1))} style={{
-        background: "none", border: "none", color: "#6b6a8f", fontSize: 16, cursor: "pointer",
-        padding: "6px 12px", lineHeight: 1
-      }}>−</button>
-      <span style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Mono', monospace", minWidth: 24, textAlign: "center" }}>{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))} style={{
-        background: "none", border: "none", color: "#6b6a8f", fontSize: 16, cursor: "pointer",
-        padding: "6px 12px", lineHeight: 1
-      }}>+</button>
-    </div>
-  );
-
-  const OptionPills = ({ value, options, onChange }) => (
-    <div style={{ display: "flex", gap: 5 }}>
-      {options.map(o => (
-        <button key={o.id} onClick={() => onChange(o.id)} style={{
-          padding: "5px 11px", borderRadius: 99, fontSize: 11, cursor: "pointer",
-          background: value === o.id ? "#a78bfa" : "#13131f",
-          color: value === o.id ? "#0c0c14" : "#6b6a8f",
-          border: `1px solid ${value === o.id ? "#a78bfa" : "#1f1f35"}`,
-          fontWeight: value === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
-        }}>{o.label}</button>
-      ))}
-    </div>
-  );
-
   const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" };
   const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
   const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
@@ -3952,7 +4099,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 
       <Collapsible title="◆  Preferences" {...sec("preferences")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
-          <Row label="Color theme" sub="Changes instantly, no save needed">
+          <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
                 <button key={o.id} onClick={() => { onUpdate('colorTheme', o.id); lUpdate('colorTheme', o.id); }} style={{
@@ -3964,34 +4111,37 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
                 }}>{o.label}</button>
               ))}
             </div>
-          </Row>
-          <Row label="Opening tab" sub="Which tab opens on launch">
-            <OptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"}]} onChange={v => lUpdate("defaultTab", v)} />
-          </Row>
-          <Row label="Past shows" sub="Show past concerts by default">
-            <OptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowPast", v)} />
-          </Row>
-          <Row label="Stats tab" sub="Which stats view opens first">
-            <OptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
-          </Row>
-          <Row label="Top artists" sub="Rows shown in charts">
-            <Stepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
-          </Row>
-          <Row label="Top friends" sub="Rows shown in charts">
-            <Stepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
-          </Row>
-          <Row label="Top venues" sub="Rows shown in charts">
-            <Stepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
-          </Row>
-          <Row label="Most expensive" sub="Rows shown in list">
-            <Stepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
-          </Row>
-          <Row label="Rating system" sub="Stars used when rating shows">
-            <OptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
-          </Row>
-          <Row label="Default country" sub="Pre-filled when adding a show">
+          </SettingsRow>
+          <SettingsRow label="Opening tab" sub="Which tab opens on launch">
+            <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"}]} onChange={v => lUpdate("defaultTab", v)} />
+          </SettingsRow>
+          <SettingsRow label="Past shows" sub="Show past concerts by default">
+            <SettingsOptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowPast", v)} />
+          </SettingsRow>
+          <SettingsRow label="Stats tab" sub="Which stats view opens first">
+            <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
+          </SettingsRow>
+          <SettingsRow label="Top artists" sub="Rows shown in charts">
+            <SettingsStepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
+          </SettingsRow>
+          <SettingsRow label="Top friends" sub="Rows shown in charts">
+            <SettingsStepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
+          </SettingsRow>
+          <SettingsRow label="Top venues" sub="Rows shown in charts">
+            <SettingsStepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
+          </SettingsRow>
+          <SettingsRow label="Most expensive" sub="Rows shown in list">
+            <SettingsStepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
+          </SettingsRow>
+          <SettingsRow label="Songs shown" sub="Default rows in Songs tab">
+            <SettingsStepper value={local.topSongsRows} onChange={v => lUpdate("topSongsRows", v)} min={3} max={50} />
+          </SettingsRow>
+          <SettingsRow label="Rating system" sub="Stars used when rating shows">
+            <SettingsOptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
+          </SettingsRow>
+          <SettingsRow label="Default country" sub="Pre-filled when adding a show">
             <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
-          </Row>
+          </SettingsRow>
         </div>
       </Collapsible>
 
@@ -4014,11 +4164,15 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           {savedVenues.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              {savedVenues.map((v, i) => (
+              <button onClick={() => setShowSavedVenues(o => !o)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono', monospace", padding: 0, marginBottom: showSavedVenues ? 10 : 0 }}>
+                {showSavedVenues ? '▾' : '▸'} already added ({savedVenues.length})
+              </button>
+              {showSavedVenues && savedVenues.map((v, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid #1a1a2e' }}>
                   <div>
                     <div style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 600 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</div>
-                    <div style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{v.city}, {v.country}</div>
+                    <div style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{v.city}</div>
+                    <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{v.country}</div>
                   </div>
                   <button onClick={() => removeSavedVenue(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}>×</button>
                 </div>
@@ -4029,19 +4183,14 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
           {[
             { key: 'name', placeholder: 'Venue name *' },
             { key: 'room', placeholder: 'Room / stage (optional)' },
+            { key: 'city', placeholder: 'City *' },
+            { key: 'country', placeholder: 'Country *' },
           ].map(({ key, placeholder }) => (
             <input key={key} value={newVenue[key]} onChange={e => setNewVenue(v => ({ ...v, [key]: e.target.value }))}
+              onKeyDown={e => e.key === 'Enter' && addSavedVenue()}
               placeholder={placeholder}
               style={{ width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} />
           ))}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-            {[{ key: 'city', placeholder: 'City *' }, { key: 'country', placeholder: 'Country *' }].map(({ key, placeholder }) => (
-              <input key={key} value={newVenue[key]} onChange={e => setNewVenue(v => ({ ...v, [key]: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && addSavedVenue()}
-                placeholder={placeholder}
-                style={{ background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }} />
-            ))}
-          </div>
           <button onClick={addSavedVenue} disabled={!newVenue.name.trim() || !newVenue.city.trim() || !newVenue.country.trim()} style={{
             background: 'none', border: '1px solid #2a4a3a', borderRadius: 8, color: '#a78bfa',
             fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace",
@@ -4054,7 +4203,10 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           {friendGroups.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              {friendGroups.map((g, i) => (
+              <button onClick={() => setShowFriendGroups(o => !o)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono', monospace", padding: 0, marginBottom: showFriendGroups ? 10 : 0 }}>
+                {showFriendGroups ? '▾' : '▸'} already added ({friendGroups.length})
+              </button>
+              {showFriendGroups && friendGroups.map((g, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid #1a1a2e' }}>
                   <div>
                     <div style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 600 }}>{g.name}</div>
@@ -4400,14 +4552,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
       {/* Header */}
       <div style={{ flexShrink: 0, padding: '16px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
-            <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-              {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
-            </div>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
+          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
+            {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
           </div>
-          <button onClick={() => setView('settings')} style={{ background: view === 'settings' ? '#1a1a30' : 'none', border: `1px solid ${view === 'settings' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 8, padding: '7px 10px', cursor: 'pointer', color: view === 'settings' ? '#a78bfa' : '#5a5880', fontSize: 18, lineHeight: 1 }}>⚙</button>
         </div>
 
         {view === 'home' && (
@@ -4572,12 +4721,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 </div>
                 <span style={{ fontSize: 11, color: '#4a4870', transform: showPast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
               </button>
-              {showPast && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
+              {(showPast || !!search) && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
             </div>
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs />}
-        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} />}
+        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
       </div>

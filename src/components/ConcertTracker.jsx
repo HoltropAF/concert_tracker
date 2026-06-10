@@ -1617,19 +1617,32 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const allTicketsFS = past.filter(c => c.ticketPrice);
         const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
         const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
+        const costOf = c => (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + (c.otherCost || 0);
         const totalTicketFS = past.reduce((s, c) => s + (c.ticketPrice || 0), 0);
         const totalMerchFS = past.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
         const totalOtherFS = past.reduce((s, c) => s + (c.otherCost || 0), 0);
-        const totalAllFS = totalTicketFS + totalMerchFS + totalOtherFS;
+        const totalConcertsFS = past.filter(c => c.type === 'concert').reduce((s, c) => s + costOf(c), 0);
+        const totalFestivalsFS = past.filter(c => c.type === 'festival').reduce((s, c) => s + costOf(c), 0);
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {/* Spend summary pills */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 6 }}>
+          {/* Category row */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 6 }}>
             {[
               { label: "ticket", value: totalTicketFS > 0 ? `€${Math.round(totalTicketFS)}` : "—", color: "#f472b6" },
               { label: "merch", value: totalMerchFS > 0 ? `€${Math.round(totalMerchFS)}` : "—", color: "#34d399" },
               { label: "other", value: totalOtherFS > 0 ? `€${Math.round(totalOtherFS)}` : "—", color: "#38bdf8" },
-              { label: "total", value: totalAllFS > 0 ? `€${Math.round(totalAllFS)}` : "—", color: "#a78bfa" },
+            ].map(b => (
+              <div key={b.label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value !== "—" ? b.color : "#2e2e4a", lineHeight: 1 }}>{b.value}</div>
+                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Concert vs festival row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+            {[
+              { label: "concerts", value: totalConcertsFS > 0 ? `€${Math.round(totalConcertsFS)}` : "—", color: "#a78bfa" },
+              { label: "festivals", value: totalFestivalsFS > 0 ? `€${Math.round(totalFestivalsFS)}` : "—", color: "#fb923c" },
             ].map(b => (
               <div key={b.label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
                 <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value !== "—" ? b.color : "#2e2e4a", lineHeight: 1 }}>{b.value}</div>

@@ -2432,6 +2432,26 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0" }}>
 
+          {/* Year scope toggle */}
+          {(() => {
+            const curYr = String(new Date().getFullYear());
+            return (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                {[{ id: 'all', label: 'All time' }, { id: curYr, label: curYr }].map(({ id, label }) => (
+                  <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    padding: "2px 8px",
+                    fontSize: 11, fontFamily: "'DM Mono', monospace",
+                    color: summaryYear === id ? "#a78bfa" : "#4a4870",
+                    fontWeight: summaryYear === id ? 700 : 400,
+                    borderBottom: summaryYear === id ? "1px solid #a78bfa" : "1px solid transparent",
+                    letterSpacing: "0.04em",
+                  }}>{label}</button>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Row 1: shows / festivals / countries / avg per year */}
           {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && (() => {
             const currentYearStr = String(new Date().getFullYear());
@@ -3462,7 +3482,7 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
-function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtists = [], recentFriends = [], initialType = 'concert' }) {
+function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', concerts = [] }) {
   useBackButton(onClose);
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || '',
@@ -3492,6 +3512,17 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     } else {
       setArtistSuggestions([])
     }
+  }
+
+  const selectArtist = (name) => {
+    const prev = concerts.filter(c => c.artist === name && c.genre).sort((a, b) => b.date.localeCompare(a.date))[0]
+    setForm(f => ({
+      ...f,
+      artist: name,
+      genre: prev?.genre || f.genre,
+      subgenre: prev?.subgenre || f.subgenre,
+    }))
+    setArtistSuggestions([])
   }
 
   const toggleFriend = (name) => setForm(f => ({
@@ -3624,7 +3655,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 {fieldLabel('Festival name *')}
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={{ ...(errors.artist ? errStyle : inputStyle) }} />
-                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => { update('artist', a); setArtistSuggestions([]); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                   <div>{fieldLabel('Start date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
@@ -3655,7 +3686,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   {fieldLabel('Artist *')}
                   <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
-                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => { update('artist', a); setArtistSuggestions([]); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   {fieldLabel('Date *')}
@@ -4573,6 +4604,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           initialType={showAdd}
           settings={settings}
           friends={allFriends}
+          concerts={concerts}
           allArtists={[...new Set([
             ...concerts.map(c => c.artist),
             ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),

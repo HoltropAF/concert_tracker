@@ -1616,23 +1616,30 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const thisYearFS = String(new Date().getFullYear());
         const allTicketsFS = past.filter(c => c.ticketPrice);
         const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
-        const avgAllFS = allTicketsFS.length ? allTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / allTicketsFS.length : null;
         const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
+        const totalTicketFS = past.reduce((s, c) => s + (c.ticketPrice || 0), 0);
+        const totalMerchFS = past.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
+        const totalOtherFS = past.reduce((s, c) => s + (c.otherCost || 0), 0);
+        const totalAllFS = totalTicketFS + totalMerchFS + totalOtherFS;
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {/* Spend summary pills */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 6 }}>
             {[
-              { label: "total spent", value: totalSpent > 0 ? `€${Math.round(totalSpent)}` : "—", color: "#f472b6" },
-              { label: "avg ticket", value: avgAllFS ? `€${avgAllFS.toFixed(0)}` : "—", color: "#f472b6" },
-              { label: `avg ${thisYearFS}`, value: avgThisYearFS ? `€${avgThisYearFS.toFixed(0)}` : "—", color: "#38bdf8" },
+              { label: "ticket", value: totalTicketFS > 0 ? `€${Math.round(totalTicketFS)}` : "—", color: "#f472b6" },
+              { label: "merch", value: totalMerchFS > 0 ? `€${Math.round(totalMerchFS)}` : "—", color: "#34d399" },
+              { label: "other", value: totalOtherFS > 0 ? `€${Math.round(totalOtherFS)}` : "—", color: "#38bdf8" },
+              { label: "total", value: totalAllFS > 0 ? `€${Math.round(totalAllFS)}` : "—", color: "#a78bfa" },
             ].map(b => (
               <div key={b.label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value !== "—" ? b.color : "#2e2e4a", lineHeight: 1 }}>{b.value}</div>
                 <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
               </div>
             ))}
           </div>
+          {avgThisYearFS && (
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textAlign: "right", marginBottom: 12 }}>avg ticket {thisYearFS}: <span style={{ color: "#38bdf8" }}>€{avgThisYearFS.toFixed(0)}</span></div>
+          )}
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
           {ysView === "bars" && <>
           {/* Legend */}
@@ -2385,46 +2392,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-          {/* Financial block */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("stats2") && (() => {
-            const sp = summaryYear === 'all' ? past : past.filter(c => getYear(c.date) === summaryYear);
-            const spFiltered = summaryFinType === 'concerts' ? sp.filter(c => c.type === 'concert')
-              : summaryFinType === 'festivals' ? sp.filter(c => c.type === 'festival')
-              : sp;
-            const totalTicketAmt = spFiltered.reduce((s, c) => s + (c.ticketPrice || 0), 0);
-            const totalMerchAmt = spFiltered.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
-            const totalOtherAmt = spFiltered.reduce((s, c) => s + (c.otherCost || 0), 0);
-            const totalAmt = totalTicketAmt + totalMerchAmt + totalOtherAmt;
-            const finLabel = summaryFinType === 'concerts' ? 'Concerts' : summaryFinType === 'festivals' ? 'Festivals' : null;
-            return (
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Financial</div>
-                  {finLabel && <div style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", background: '#1a1a30', border: '1px solid #3d3564', borderRadius: 99, padding: '1px 7px' }}>{finLabel}</div>}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: totalAmt > 0 ? 10 : 0 }}>
-                  {[
-                    { label: 'Ticket', value: totalTicketAmt, color: '#f472b6' },
-                    { label: 'Merch', value: totalMerchAmt, color: '#34d399' },
-                    { label: 'Other', value: totalOtherAmt, color: '#38bdf8' },
-                  ].map(b => (
-                    <div key={b.label} style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, padding: '8px 4px', textAlign: 'center' }}>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value > 0 ? b.color : '#2e2e4a', lineHeight: 1 }}>
-                        {b.value > 0 ? `€${Math.round(b.value)}` : '—'}
-                      </div>
-                      <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 3 }}>{b.label}</div>
-                    </div>
-                  ))}
-                </div>
-                {totalAmt > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, paddingTop: 8, borderTop: '1px solid #1a1a2e' }}>
-                    <span style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>total</span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: '#a78bfa', fontFamily: "'DM Sans', sans-serif" }}>€{Math.round(totalAmt)}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
 
 
           {/* Cumulative line chart */}
@@ -4161,13 +4128,6 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
               onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
             />
           </SettingsRow>
-          <SettingsRow label="Financial split" sub="Which shows count in financial block">
-            <SettingsOptionPills
-              value={local.summaryFinType || 'all'}
-              options={[{ id: 'all', label: 'All' }, { id: 'concerts', label: 'Concerts' }, { id: 'festivals', label: 'Festivals' }]}
-              onChange={v => { onUpdate('summaryFinType', v); lUpdate('summaryFinType', v); }}
-            />
-          </SettingsRow>
         </div>
         {(() => {
           const hiddenBlocks = local.hiddenSummaryBlocks || [];
@@ -4183,7 +4143,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
               background: active ? '#1a1a30' : 'none', color: active ? '#a78bfa' : '#4a4870',
             }}>{label}</button>
           );
-          const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'stats2', label: 'Financial' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
+          const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
           const ALL_CHART_GROUPS = [
             { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: '🥧 Genres' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'artists', label: '🎤 Top artists' }, { id: 'ratings', label: '⭐ Ratings' }, { id: 'language', label: '🗣️ Language' }, { id: 'songs', label: '🎵 Top songs' }] },
             { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Solo vs with friends' }, { id: 'friends-chart', label: '👥 Most shows with' }] },

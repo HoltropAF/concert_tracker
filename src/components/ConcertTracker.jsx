@@ -1471,14 +1471,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       ]
     },
     {
-      id: "records", label: "Records",
-      charts: [
-        { id: "records",    label: "🏆 Records" },
-        { id: "milestones", label: "🎖️ Artist milestones" },
-        { id: "recap",      label: "🎁 Year recap" },
-      ]
-    },
-    {
       id: "friends", label: "Friends",
       charts: [
         { id: "solo",          label: "👯 Solo vs with friends" },
@@ -2476,84 +2468,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
-      case "records": {
-        const sortedShows = [...past].sort((a,b) => a.date.localeCompare(b.date));
-        const monthCount = {};
-        sortedShows.forEach(c => { const ym = c.date.slice(0,7); monthCount[ym] = (monthCount[ym] || 0) + 1; });
-        const yearCountR = {};
-        sortedShows.forEach(c => { const y = c.date.slice(0,4); yearCountR[y] = (yearCountR[y] || 0) + 1; });
-        const busiestMonth = Object.entries(monthCount).sort((a,b) => b[1]-a[1])[0];
-        const busiestYear = Object.entries(yearCountR).sort((a,b) => b[1]-a[1])[0];
-        const fmtMonth = ym => new Date(ym + "-15").toLocaleString("en", { month: "short", year: "numeric" });
-        let drought = null;
-        for (let i = 1; i < sortedShows.length; i++) {
-          const d = Math.round((new Date(sortedShows[i].date) - new Date(sortedShows[i-1].date)) / 86400000);
-          if (!drought || d > drought.days) drought = { days: d, from: sortedShows[i-1].date, to: sortedShows[i].date };
-        }
-        let bestStreak = 0; { let prev = null, run = 0;
-          Object.keys(monthCount).sort().forEach(m => {
-            if (prev) { const [py, pm] = prev.split("-").map(Number); const [yy, mm] = m.split("-").map(Number);
-              run = ((yy === py && mm === pm + 1) || (yy === py + 1 && pm === 12 && mm === 1)) ? run + 1 : 1;
-            } else run = 1;
-            if (run > bestStreak) bestStreak = run; prev = m;
-          });
-        }
-        const priced = past.filter(c => c.ticketPrice > 0);
-        const priciest = priced.length ? priced.reduce((a,b) => b.ticketPrice > a.ticketPrice ? b : a) : null;
-        const cheapest = priced.length ? priced.reduce((a,b) => b.ticketPrice < a.ticketPrice ? b : a) : null;
-        const freeShows = past.filter(c => !c.ticketPrice).length;
-        const Row = ({ label, value, sub, onClick }) => (
-          <button onClick={onClick} disabled={!onClick} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, width: "100%", background: "none", border: "none", padding: "7px 0", borderBottom: "1px solid #16162a", cursor: onClick ? "pointer" : "default", textAlign: "left" }}>
-            <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{label}</span>
-            <span style={{ fontSize: 12, color: "#c4c2f0", textAlign: "right" }}>{value}{sub && <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}> {sub}</span>}</span>
-          </button>
-        );
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "6px 14px" }}>
-            {busiestMonth && <Row label="busiest month" value={fmtMonth(busiestMonth[0])} sub={`${busiestMonth[1]} shows`} />}
-            {busiestYear && <Row label="busiest year" value={busiestYear[0]} sub={`${busiestYear[1]} shows`} />}
-            {bestStreak > 1 && <Row label="longest streak" value={`${bestStreak} months`} sub="in a row with shows" />}
-            {drought && <Row label="longest drought" value={`${drought.days} days`} sub={`${formatDate(drought.from)} → ${formatDate(drought.to)}`} />}
-            {priciest && <Row label="priciest ticket" value={`€${priciest.ticketPrice} · ${priciest.artist}`} sub={priciest.date.slice(0,4)} onClick={() => onOpen(priciest)} />}
-            {cheapest && cheapest !== priciest && <Row label="cheapest ticket" value={`€${cheapest.ticketPrice} · ${cheapest.artist}`} sub={cheapest.date.slice(0,4)} onClick={() => onOpen(cheapest)} />}
-            {freeShows > 0 && <Row label="free shows" value={`${freeShows}×`} />}
-          </div>
-        );
-      }
-      case "milestones": {
-        const tiers = [
-          { min: 10, label: "10+ shows", color: "#facc15" },
-          { min: 5,  label: "5–9 shows", color: "#a78bfa" },
-          { min: 3,  label: "3–4 shows", color: "#6b6a8f" },
-        ];
-        const totals = Object.entries(artistCount)
-          .map(([n, c]) => [n, c.headliner + c.support + c.guest + (c.festival || 0)])
-          .filter(([, t]) => t >= 3)
-          .sort((a,b) => b[1] - a[1]);
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            {totals.length === 0
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>See an artist 3+ times to start collecting milestones</div>
-              : tiers.map(({ min, label, color }, ti) => {
-                const max = ti === 0 ? Infinity : tiers[ti-1].min - 1;
-                const inTier = totals.filter(([, t]) => t >= min && t <= max);
-                if (inTier.length === 0) return null;
-                return (
-                  <div key={label} style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{label}</div>
-                    {inTier.map(([name, t]) => (
-                      <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
-                        <span style={{ color, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{t}×</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })
-            }
-          </div>
-        );
-      }
       case "venue-loyalty": {
         const topV = topVenues[0];
         const pct = topV && past.length ? Math.round((topV[1] / past.length) * 100) : 0;
@@ -2580,64 +2494,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             ))}
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 10 }}>{Object.keys(firstSeen).length} venues visited in total</div>
-          </div>
-        );
-      }
-      case "recap": {
-        const years = [...new Set(past.map(c => c.date.slice(0,4)))].sort((a,b) => b.localeCompare(a));
-        if (years.length === 0) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: 14, color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No past shows yet</div>;
-        const ry = chartOpt("recap", years[0]);
-        const yp = past.filter(c => c.date.slice(0,4) === ry);
-        const earlier = past.filter(c => c.date.slice(0,4) < ry);
-        const earlierArtists = new Set(earlier.flatMap(c => [c.artist, ...(c.support || []).map(getSupportName), ...(c.acts || []).map(a => a.name || "")]).filter(Boolean));
-        const yArtistCount = {};
-        yp.forEach(c => { if (c.type !== "festival") yArtistCount[c.artist] = (yArtistCount[c.artist] || 0) + 1; });
-        const yTopArtist = Object.entries(yArtistCount).sort((a,b) => b[1]-a[1])[0];
-        const ySongCount = {};
-        yp.forEach(c => {
-          const tally = (song, performer) => { const n = getSongName(song); if (!n) return; const cov = getSongCover(song); const a = (typeof cov === "string" && cov) || performer || ""; const k = `${n} — ${a}`; ySongCount[k] = (ySongCount[k] || 0) + 1; };
-          getSongList(c.setlist).forEach(s => tally(s, c.artist));
-          Object.entries(c.supportSetlists || {}).forEach(([an, songs]) => getSongList(songs).forEach(s => tally(s, an)));
-        });
-        const yTopSong = Object.entries(ySongCount).sort((a,b) => b[1]-a[1])[0];
-        const ySpent = yp.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
-        const yVenueCount = {};
-        yp.forEach(c => { if (c.venue) yVenueCount[c.venue] = (yVenueCount[c.venue] || 0) + 1; });
-        const yTopVenue = Object.entries(yVenueCount).sort((a,b) => b[1]-a[1])[0];
-        const yNewArtists = [...new Set(yp.flatMap(c => [c.artist, ...(c.support || []).map(getSupportName), ...(c.acts || []).map(a => a.name || "")]).filter(Boolean))].filter(a => !earlierArtists.has(a)).length;
-        const yFests = yp.filter(c => c.type === "festival").length;
-        const Big = ({ value, label }) => (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{value}</div>
-            <div style={{ fontSize: 9, color: "#9b97d4", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{label}</div>
-          </div>
-        );
-        const Line = ({ label, value }) => value ? (
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "6px 0", borderBottom: "1px solid #ffffff14" }}>
-            <span style={{ fontSize: 10, color: "#9b97d4", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{label}</span>
-            <span style={{ fontSize: 12, color: "#e2e0ff", textAlign: "right" }}>{value}</span>
-          </div>
-        ) : null;
-        return (
-          <div>
-            <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
-              {years.map(y => (
-                <button key={y} onClick={() => setChartOpt("recap", y)} style={{ padding: "3px 10px", borderRadius: 99, fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: 600, background: ry === y ? "#a78bfa" : "none", color: ry === y ? "#0c0c14" : "#5a5880", border: `1px solid ${ry === y ? "#a78bfa" : "#1f1f35"}` }}>{y}</button>
-              ))}
-            </div>
-            <div style={{ background: "linear-gradient(150deg, #2a1a4a 0%, #13131f 55%, #1a1030 100%)", border: "1px solid #3d3564", borderRadius: 16, padding: "20px 16px" }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>{ry} in concerts</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-                <Big value={yp.length} label="shows" />
-                <Big value={yFests} label="festivals" />
-                <Big value={`€${Math.round(ySpent)}`} label="spent" />
-              </div>
-              <Line label="top artist" value={yTopArtist && `${yTopArtist[0]} (${yTopArtist[1]}×)`} />
-              <Line label="top song" value={yTopSong && `${yTopSong[0]} (${yTopSong[1]}×)`} />
-              <Line label="top venue" value={yTopVenue && `${yTopVenue[0]} (${yTopVenue[1]}×)`} />
-              <Line label="new artists seen" value={yNewArtists > 0 ? `${yNewArtists}` : null} />
-              <div style={{ fontSize: 9, color: "#5a5880", fontFamily: "'DM Mono', monospace", marginTop: 12, textAlign: "center" }}>settracker · screenshot & share</div>
-            </div>
           </div>
         );
       }
@@ -3076,7 +2932,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {statsTab === "charts" && !activeGroup && (() => {
         const META = {
           artists:   { icon: "🎤", sub: "genres · top artists · songs · covers", preview: topArtists[0]?.[0] },
-          records:   { icon: "🏆", sub: "streaks · milestones · year recap", preview: null },
           friends:   { icon: "👯", sub: "solo vs friends · most shows with", preview: topFriends[0]?.[0] },
           venues:    { icon: "📍", sub: "favourites · loyalty · countries", preview: topVenues[0]?.[0] },
           financial: { icon: "💸", sub: "spending · averages · priciest", preview: totalSpent > 0 ? `€${Math.round(totalSpent)} total` : null },
@@ -4890,7 +4745,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
           const ALL_CHART_GROUPS = [
             { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: '🥧 Genres' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'artists', label: '🎤 Top artists' }, { id: 'ratings', label: '⭐ Ratings' }, { id: 'language', label: '🗣️ Language' }, { id: 'songs', label: '🎵 Top songs' }, { id: 'covers', label: '↩️ Covers' }] },
-            { id: 'records', label: 'Records', charts: [{ id: 'records', label: '🏆 Records' }, { id: 'milestones', label: '🎖️ Artist milestones' }, { id: 'recap', label: '🎁 Year recap' }] },
             { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Solo vs with friends' }, { id: 'friends-chart', label: '👥 Most shows with' }] },
             { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: '📍 Favourite venues' }, { id: 'venue-loyalty', label: '💜 Venue loyalty' }, { id: 'venue-size', label: '🏟️ Venue size' }, { id: 'countries', label: '🌍 Countries' }] },
             { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending & avg ticket' }, { id: 'averages', label: '💶 Averages' }, { id: 'expensive', label: '💰 Most expensive shows' }] },
@@ -5185,7 +5039,21 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
 
-  const ChartGroupNav = () => null
+  const ChartGroupNav = () => view === 'stats' && statsTab === 'charts' ? (
+    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
+      {visibleStatGroups.map(g => (
+        <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
+          flex: 1, background: chartGroup === g.id ? '#1a1a30' : 'none',
+          border: `1px solid ${chartGroup === g.id ? '#a78bfa' : '#1f1f35'}`,
+          borderRadius: 6, padding: '5px 2px', cursor: 'pointer',
+          fontFamily: "'DM Mono', monospace", fontSize: 9,
+          fontWeight: chartGroup === g.id ? 700 : 400,
+          color: chartGroup === g.id ? '#a78bfa' : '#5a5880',
+          textAlign: 'center', whiteSpace: 'nowrap'
+        }}>{g.label}</button>
+      ))}
+    </div>
+  ) : null
 
   const isShowsActive = showsGroup.includes(view)
 

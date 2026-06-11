@@ -132,3 +132,14 @@ stats chart had been fixed. Now it uses the same grouping: song + attributed art
 (covers credited to the original artist when linked). Rows show the artist under
 the song name, search matches artist too, the detail page matches name+artist and
 shows a "· cover" badge, and unique/total counts reflect the split.
+
+---
+
+## 2026-06-11 (9) — Remove Records section, restore bottom group bar
+
+- Removed the Records stats section entirely (Records / Milestones / Year recap
+  charts and their settings toggles, hub card, and dead code). Covers, Venue loyalty,
+  and Averages charts are kept in their respective sections.
+- Restored the 5-button chart-group bar above the bottom nav (Artists / Friends /
+  Venues / Financial / Merch) — works alongside the hub: tap a pill to jump straight
+  to a section, hub grid and ← back still available.

@@ -1511,15 +1511,16 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     },
   ];
 
-  useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
+  useBackButton(() => { if (statsTab === "charts" && chartGroup) { setChartGroup(null); } else { setStatsTab("summary"); } }, statsTab === "charts" || statsTab === "friends");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
   const handleSwipeStart = (e) => { swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; };
   const handleSwipeEnd = (e) => {
+    if (!chartGroup) return;
     const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x;
     const dy = e.changedTouches[0].clientY - swipeTouchStart.current.y;
     const dt = Date.now() - swipeTouchStart.current.t;
     const idx = visibleChartGroups.findIndex(g => g.id === chartGroup);
-    if (Math.abs(dx) < 12 || Math.abs(dy) > Math.abs(dx) * 2) return;
+    if (idx < 0 || Math.abs(dx) < 12 || Math.abs(dy) > Math.abs(dx) * 2) return;
     if (dx < 0 && idx < visibleChartGroups.length - 1) setChartGroup(visibleChartGroups[idx + 1].id);
     else if (dx > 0 && idx > 0) setChartGroup(visibleChartGroups[idx - 1].id);
   };
@@ -1545,7 +1546,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     .filter(g => !hiddenChartGroups.includes(g.id))
     .map(g => ({ ...g, charts: g.charts.filter(c => !hiddenCharts.includes(c.id)) }))
     .filter(g => g.charts.length > 0);
-  const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0];
+  const activeGroup = chartGroup ? (visibleChartGroups.find(g => g.id === chartGroup) || null) : null;
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
   const renderChart = (id) => {
@@ -3065,11 +3066,50 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         </div>
       )}
-      {statsTab === "charts" && (
+      {statsTab === "charts" && !activeGroup && (() => {
+        const META = {
+          artists:   { icon: "🎤", sub: "genres · top artists · songs · covers", preview: topArtists[0]?.[0] },
+          records:   { icon: "🏆", sub: "streaks · milestones · year recap", preview: null },
+          friends:   { icon: "👯", sub: "solo vs friends · most shows with", preview: topFriends[0]?.[0] },
+          venues:    { icon: "📍", sub: "favourites · loyalty · countries", preview: topVenues[0]?.[0] },
+          financial: { icon: "💸", sub: "spending · averages · priciest", preview: totalSpent > 0 ? `€${Math.round(totalSpent)} total` : null },
+          merch:     { icon: "🛍️", sub: "overview · what I buy", preview: null },
+        };
+        return (
+          <div style={{ padding: "16px" }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff", marginBottom: 12 }}>Explore your stats</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {visibleChartGroups.map(g => {
+                const m = META[g.id] || { icon: "◎", sub: "" };
+                return (
+                  <button key={g.id} onClick={() => { setChartGroup(g.id); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{
+                    background: "#13131f", border: "1px solid #1f1f35", borderRadius: 14,
+                    padding: "14px 12px", cursor: "pointer", textAlign: "left",
+                    display: "flex", flexDirection: "column", gap: 6, minHeight: 92
+                  }}>
+                    <span style={{ fontSize: 20, lineHeight: 1 }}>{m.icon}</span>
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>{g.label}</span>
+                    {m.preview
+                      ? <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.preview}</span>
+                      : <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.4 }}>{m.sub}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+      {statsTab === "charts" && activeGroup && (
         <div style={{ padding: "0" }} onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}>
-          <div style={{ padding: "14px 16px 0" }}>
-            {activeGroup?.charts.map((c, i) => (
+          <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5 }}>
+            <button onClick={() => setChartGroup(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
+            <div style={{ marginLeft: "auto", fontSize: 9, color: "#2e2e4a", fontFamily: "'DM Mono', monospace" }}>swipe for next ↔</div>
+          </div>
+          <div style={{ padding: "4px 16px 0" }}>
+            {activeGroup.charts.map((c, i) => (
               <div key={c.id} style={{ marginBottom: i < activeGroup.charts.length - 1 ? 16 : 0 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{c.label}</div>
                 {renderChart(c.id)}
               </div>
             ))}
@@ -4982,7 +5022,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [selected, setSelected] = useState(null)
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
-  const [chartGroup, setChartGroup] = useState('artists')
+  const [chartGroup, setChartGroup] = useState(null)
   const [search, setSearch] = useState('')
   const [filterYear, setFilterYear] = useState('all')
   const [filterType, setFilterType] = useState('all')
@@ -5121,21 +5161,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
 
-  const ChartGroupNav = () => view === 'stats' && statsTab === 'charts' ? (
-    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
-      {visibleStatGroups.map(g => (
-        <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
-          flex: 1, background: chartGroup === g.id ? '#1a1a30' : 'none',
-          border: `1px solid ${chartGroup === g.id ? '#a78bfa' : '#1f1f35'}`,
-          borderRadius: 6, padding: '5px 2px', cursor: 'pointer',
-          fontFamily: "'DM Mono', monospace", fontSize: 9,
-          fontWeight: chartGroup === g.id ? 700 : 400,
-          color: chartGroup === g.id ? '#a78bfa' : '#5a5880',
-          textAlign: 'center', whiteSpace: 'nowrap'
-        }}>{g.label}</button>
-      ))}
-    </div>
-  ) : null
+  const ChartGroupNav = () => null
 
   const isShowsActive = showsGroup.includes(view)
 

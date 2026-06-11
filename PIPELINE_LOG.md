@@ -88,3 +88,18 @@ All client-side; no schema or API changes.
 - **Settings chart toggles updated**: Covers, Records group (Records / Milestones /
   Year recap), Venue loyalty, and Averages can now all be hidden/shown in
   Settings → Stats display.
+
+---
+
+## 2026-06-11 (5) — Stats revamp: dashboard + drill-down
+
+- Summary stays the glanceable dashboard (with year + concert/festival filters).
+- The Stats tab no longer dumps a swipeable wall of stacked charts. It now lands on
+  an "Explore your stats" hub: a 2-column card grid (Artists 🎤, Records 🏆,
+  Friends 👯, Venues 📍, Financial 💸, Merch 🛍️), each with a live preview
+  (top artist, top venue, total spent…).
+- Tapping a card opens that section: sticky header with ← back, section title,
+  per-chart labels above each chart. Swipe left/right still moves between sections.
+- Hardware/gesture back goes section → hub → summary.
+- Removed the cramped chart-group pill bar above the bottom nav (navigation now in-page).
+- Hidden groups/charts (Settings → Stats display) are respected in the hub.

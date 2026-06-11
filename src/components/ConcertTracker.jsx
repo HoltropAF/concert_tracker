@@ -513,7 +513,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   );
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {} }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [] }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -1145,14 +1145,21 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     })
     .slice(0, topArtistsRows);
 
-  // Songs frequency
+  // Songs frequency — grouped by song + artist (covers attributed to the original artist)
   const songCount = {};
   past.forEach(c => {
-    getSongList(c.setlist).forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; });
-    Object.values(c.supportSetlists || {}).forEach(songs => getSongList(songs).forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; }));
+    const tally = (song, performer) => {
+      const n = getSongName(song); if (!n) return;
+      const a = getSongCover(song) || performer || '';
+      const k = `${n}\u0000${a}`;
+      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0 };
+      songCount[k].count += 1;
+    };
+    getSongList(c.setlist).forEach(song => tally(song, c.artist));
+    Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => getSongList(songs).forEach(song => tally(song, artistName)));
   });
   const topSongsRows = settings.topSongsRows || 10;
-  const topSongs = Object.entries(songCount).sort((a,b) => b[1]-a[1]).slice(0, topSongsRows);
+  const topSongs = Object.values(songCount).sort((a,b) => b.count - a.count).slice(0, topSongsRows);
 
   // Friends frequency
   const friendCount = {};
@@ -2392,13 +2399,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             {topSongs.length === 0
               ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log setlists on your shows to see this</div>
-              : topSongs.map(([song, count], i) => (
-                <button key={song} onClick={() => setSelectedSong(song)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+              : topSongs.map(({ name: song, artist, count }, i) => (
+                <button key={`${song}\u0000${artist}`} onClick={() => setSelectedSong({ name: song, artist })} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
                       {i < 3 ? medals[i] : `#${i+1}`}
                     </span>
-                    <span style={{ color: "#c4c2f0", fontSize: 13 }}>{song}</span>
+                    <span style={{ color: "#c4c2f0", fontSize: 13 }}>{song}<span style={{ color: "#6b6a8f", fontSize: 11 }}> — {artist}</span></span>
                   </div>
                   <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}×</span>
                 </button>
@@ -2414,13 +2421,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   return (
     <div style={{ padding: "0 0 100px" }}>
       {selectedSong && (() => {
+        const matchSong = (s, performer) => getSongName(s) === selectedSong.name && (getSongCover(s) || performer || '') === selectedSong.artist;
         const appearances = past.flatMap(c => {
           const result = [];
-          const mainSong = getSongList(c.setlist).find(s => getSongName(s) === selectedSong);
-          if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), isSupport: false });
+          const mainSong = getSongList(c.setlist).find(s => matchSong(s, c.artist));
+          if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), cover: getSongCover(mainSong), isSupport: false });
           Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
-            const s = getSongList(songs).find(x => getSongName(x) === selectedSong);
-            if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), isSupport: true });
+            const s = getSongList(songs).find(x => matchSong(x, artistName));
+            if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true });
           });
           return result;
         }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
@@ -2429,12 +2437,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
               <button onClick={() => setSelectedSong(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
               <div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedSong}</div>
-                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{appearances.length}× live</div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedSong.name}</div>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{selectedSong.artist} · {appearances.length}× live</div>
               </div>
             </div>
             <div style={{ padding: "14px 16px" }}>
-              {appearances.map(({ concert: c, artist, info, isSupport }, i) => (
+              {appearances.map(({ concert: c, artist, info, cover, isSupport }, i) => (
                 <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
                   width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35",
                   borderLeft: `3px solid ${isSupport ? "#3d3564" : "#a78bfa"}`,
@@ -2444,7 +2452,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(c.date)}</span>
                     {isSupport && <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#1a1a30", borderRadius: 99 }}>support</span>}
                   </div>
-                  <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 600 }}>{artist}</div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 600 }}>{artist}{cover ? <span style={{ color: "#fb923c", fontWeight: 400 }}> · cover</span> : null}</div>
                   <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</div>
                   {info && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{info}</div>}
                 </button>
@@ -4865,7 +4873,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} />
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} allArtists={[...new Set([
+          ...concerts.map(c => c.artist),
+          ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
+          ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
+        ])].filter(Boolean).sort()} />
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />

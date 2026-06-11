@@ -112,3 +112,12 @@ Per user feedback: removed the All / Concerts / Festivals pills from the summary
 Year toggle (All time / current year) remains and still filters the whole page
 (top boxes, cumulative chart, donuts). Concert vs festival breakdowns live in the
 stats sections (Financial averages, etc.) instead.
+
+---
+
+## 2026-06-11 (7) — Summary: monthly bar graph in current-year mode
+
+When the summary year toggle is set to the current year, the cumulative chart block
+now shows vertical bars per month (Jan–Dec): purple = past shows, blue = upcoming,
+count above each bar. "All time" keeps the cumulative line. Title switches between
+"cumulative shows" and "shows per month".

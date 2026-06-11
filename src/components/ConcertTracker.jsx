@@ -2833,7 +2833,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {/* Cumulative line chart */}
           {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>cumulative shows</div>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>{summaryYear === 'all' ? "cumulative shows" : "shows per month"}</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <div style={{ width: 8, height: 2, background: "#a78bfa", borderRadius: 1 }} />
@@ -2846,9 +2846,35 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             </div>
             {(() => {
-              const allSorted = [...concerts].filter(c =>
-                summaryYear === 'all' || c.date.slice(0,4) === summaryYear
-              ).sort((a,b) => a.date.localeCompare(b.date));
+              if (summaryYear !== 'all') {
+                const monthLabels = ["J","F","M","A","M","J","J","A","S","O","N","D"];
+                const pastM = Array(12).fill(0), upM = Array(12).fill(0);
+                concerts.filter(c => c.date.slice(0,4) === summaryYear).forEach(c => {
+                  const m = parseInt(c.date.slice(5,7), 10) - 1;
+                  if (m >= 0 && m < 12) (isPast(c.date) ? pastM : upM)[m] += 1;
+                });
+                const maxM = Math.max(...pastM.map((v, i) => v + upM[i]), 1);
+                const H = 64;
+                return (
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4, paddingTop: 8 }}>
+                    {monthLabels.map((ml, i) => {
+                      const total = pastM[i] + upM[i];
+                      return (
+                        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
+                          <div style={{ fontSize: 8, color: total > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{total || 0}</div>
+                          <div style={{ width: "100%", maxWidth: 14, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: H }}>
+                            {upM[i] > 0 && <div style={{ height: Math.max(2, (upM[i] / maxM) * H), background: "#38bdf8", opacity: 0.85, borderRadius: "3px 3px 0 0" }} />}
+                            {pastM[i] > 0 && <div style={{ height: Math.max(2, (pastM[i] / maxM) * H), background: "#a78bfa", borderRadius: upM[i] > 0 ? 0 : "3px 3px 0 0" }} />}
+                            {total === 0 && <div style={{ height: 2, background: "#1f1f35", borderRadius: 1 }} />}
+                          </div>
+                          <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{ml}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
               const W = 300, H = 80;

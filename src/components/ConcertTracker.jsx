@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import * as XLSX from 'xlsx'
 
 // ============================================================
 // HELPERS
@@ -51,6 +50,8 @@ const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf
 const GENRE_COLORS = DONUT_PALETTE;
 const VENUE_COLORS = DONUT_PALETTE;
 
+const loadXlsx = () => import('xlsx');
+
 // ============================================================
 // COMPONENTS
 // ============================================================
@@ -80,6 +81,35 @@ function Badge({ children, color = "#1a2e26" }) {
       fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
       background: color, color: "#a78bfa", border: "1px solid #2a3d35"
     }}>{children}</span>
+  );
+}
+
+function ToastHost({ toast, onDismiss }) {
+  if (!toast) return null;
+  const palette = toast.type === 'error'
+    ? { border: '#f472b6', color: '#f472b6', bg: '#1a1020' }
+    : { border: '#a78bfa', color: '#a78bfa', bg: '#13131f' };
+  return (
+    <div style={{
+      position: 'fixed', left: '50%', bottom: 82, transform: 'translateX(-50%)',
+      width: 'calc(100% - 32px)', maxWidth: 448, zIndex: 300,
+      background: palette.bg, border: `1px solid ${palette.border}`, borderRadius: 10,
+      boxShadow: '0 10px 28px rgba(0,0,0,0.5)', padding: '11px 12px',
+      display: 'flex', alignItems: 'center', gap: 10
+    }}>
+      <div style={{ flex: 1, color: palette.color, fontSize: 12, fontFamily: "'DM Mono', monospace", lineHeight: 1.4 }}>{toast.message}</div>
+      <button onClick={onDismiss} style={{ width: 32, height: 32, background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>x</button>
+    </div>
+  );
+}
+
+function EmptyState({ title, detail, actionLabel, onAction }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '42px 18px', border: '1px dashed #1f1f35', borderRadius: 12, background: '#10101b', margin: '14px 0' }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#c4c2f0', marginBottom: 8 }}>{title}</div>
+      {detail && <div style={{ color: '#6b6a8f', fontSize: 12, lineHeight: 1.6, fontFamily: "'DM Mono', monospace", marginBottom: actionLabel ? 16 : 0 }}>{detail}</div>}
+      {actionLabel && <button onClick={onAction} style={{ minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{actionLabel}</button>}
+    </div>
   );
 }
 
@@ -476,7 +506,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   );
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {} }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -546,6 +576,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
       concert.notes ? `📝 ${concert.notes}` : null,
     ].filter(Boolean).join('\n');
     navigator.clipboard?.writeText(lines);
+    onNotify('Copied share text');
   };
 
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
@@ -563,6 +594,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
   const sec = (label) => (
     <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{label}</div>
   );
+  const detailCard = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "14px" };
 
   if (!editing) {
     const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
@@ -624,7 +656,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Went with */}
-          <div>
+          <div style={detailCard}>
             {sec("Went with")}
             {concert.friends.length > 0
               ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{concert.friends.map(f => <Badge key={f} color="#1a1a30">{f}</Badge>)}</div>
@@ -633,7 +665,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
           {/* Notes */}
           {concert.notes && (
-            <div>
+            <div style={detailCard}>
               {sec("Notes")}
               <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
             </div>
@@ -641,7 +673,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
           {/* Merch */}
           {(concert.merch || []).length > 0 && (
-            <div>
+            <div style={detailCard}>
               {sec("Merch")}
               {concert.merch.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < concert.merch.length - 1 ? "1px solid #1a1a2e" : "none" }}>
@@ -654,7 +686,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
           {/* Acts — festivals */}
           {isFestival && (concert.acts || []).length > 0 && (
-            <div>
+            <div style={detailCard}>
               {sec("Acts seen")}
               <FestivalActsSection
                 acts={concert.acts || []}
@@ -686,7 +718,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
               }),
             ];
             return (
-              <div>
+              <div style={detailCard}>
                 {sec("Setlist")}
                 {performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
                   const { color, bg } = roleConfig[role] || roleConfig.support;
@@ -755,7 +787,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>{concert.artist}</div>
           <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)} · {concert.city}</div>
         </div>
-        <button onClick={() => { onSave(form); setEditing(false); }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
+        <button onClick={async () => { await onSave(form); setEditing(false); }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
       </div>
 
       <div style={{ padding: "20px" }}>
@@ -1029,7 +1061,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
                 <div style={{ fontSize:13, color:"#f472b6", marginBottom:12 }}>Delete this concert? This can't be undone.</div>
                 <div style={{ display:"flex", gap:8 }}>
                   <button onClick={()=>setDeleteConfirm(false)} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"none", border:"1px solid #2e2e50", color:"#6b6a8f", fontFamily:"'DM Mono',monospace" }}>Cancel</button>
-                  <button onClick={()=>{ onDelete(concert.id); onClose(); }} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"#f472b6", border:"none", color:"#0c0c14", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>Delete</button>
+                  <button onClick={async ()=>{ const result = await onDelete(concert.id); onNotify(result?.error ? 'Could not delete show' : 'Show deleted', result?.error ? 'error' : 'success'); if (!result?.error) onClose(); }} style={{ flex:1, padding:"8px", borderRadius:8, fontSize:12, cursor:"pointer", background:"#f472b6", border:"none", color:"#0c0c14", fontFamily:"'DM Mono',monospace", fontWeight:700 }}>Delete</button>
                 </div>
               </div>
             )}
@@ -2950,7 +2982,7 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
           </button>
         ))}
         {filtered.length === 0 && (
-          <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no friends found</div>
+          <EmptyState title="No friends found" detail="Try another search, or add friends to a show." />
         )}
       </div>
     </div>
@@ -3328,7 +3360,7 @@ function ArtistsView({ concerts, onOpen }) {
           </button>
         ); })}
         {sorted.length === 0 && (
-          <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no artists found</div>
+          <EmptyState title="No artists found" detail="Try another search or filter." />
         )}
       </div>
     </div>
@@ -3428,7 +3460,7 @@ function SongsView({ concerts, onOpen, settings }) {
         {totalUnique === 0 ? (
           <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>log setlists on your shows to see songs here</div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no songs found</div>
+          <EmptyState title="No songs found" detail="Add setlists to shows and songs will collect here." />
         ) : filtered.map(([name, count], i) => (
           <button key={name} onClick={() => setSelectedSong(name)} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
@@ -3497,6 +3529,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   const [showFriendPicker, setShowFriendPicker] = useState(false)
   const [errors, setErrors] = useState({})
   const [artistSuggestions, setArtistSuggestions] = useState([])
+  const [showDetails, setShowDetails] = useState(initialType === 'festival')
   const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
   const addMerchItem = () => setForm(f => ({ ...f, merch: [...f.merch, { item: merchCategories[0], price: '' }] }))
   const updateMerch = (i, key, val) => setForm(f => ({ ...f, merch: f.merch.map((m, j) => j === i ? { ...m, [key]: val } : m) }))
@@ -3585,7 +3618,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
         {/* Type toggle — always at top */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           {[{ id: 'concert', label: '🎤 Concert' }, { id: 'festival', label: '🎪 Festival' }].map(t => (
-            <button key={t.id} onClick={() => update('type', t.id)} style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 14, cursor: 'pointer', background: form.type===t.id ? (t.id === 'festival' ? '#1a1030' : '#1a1a30') : '#0c0c14', border: `1px solid ${form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#2e2e50'}`, color: form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#6b6a8f', fontWeight: form.type===t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif" }}>{t.label}</button>
+            <button key={t.id} onClick={() => { update('type', t.id); if (t.id === 'festival') setShowDetails(true); }} style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 14, cursor: 'pointer', background: form.type===t.id ? (t.id === 'festival' ? '#1a1030' : '#1a1a30') : '#0c0c14', border: `1px solid ${form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#2e2e50'}`, color: form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#6b6a8f', fontWeight: form.type===t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif" }}>{t.label}</button>
           ))}
         </div>
         {(() => {
@@ -3649,6 +3682,30 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
               </>
             );
           })();
+          if (!isFest && !showDetails) return (
+            <>
+              {card('Quick add', <>
+                <div style={{ marginBottom: 10, position: 'relative' }}>
+                  {fieldLabel('Artist *')}
+                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  <div>{fieldLabel('Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
+                </div>
+                {fieldLabel('Venue *')}
+                <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                </div>
+                {fieldLabel('Went with')}
+                {experienceContent}
+                <button onClick={() => setShowDetails(true)} style={{ width: '100%', marginTop: 14, minHeight: 40, borderRadius: 8, border: '1px solid #2e2e50', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>More details</button>
+              </>)}
+            </>
+          );
           if (isFest) return (
             <>
               {card('Festival', <>
@@ -3770,12 +3827,13 @@ function SettingsOptionPills({ value, options, onChange }) {
   );
 }
 
-function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail }) {
+function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail, onNotify = () => {} }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState(null);
   const [importMessage, setImportMessage] = useState("");
+  const [importReport, setImportReport] = useState(null);
   const [newCategory, setNewCategory] = useState("");
   const [newGenre, setNewGenre] = useState("");
   const [newSubgenre, setNewSubgenre] = useState("");
@@ -3788,6 +3846,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [saved, setSaved] = useState(false);
   const [touched, setTouched] = useState(false);
   const [openSection, setOpenSection] = useState(null);
+  const [activeSettingsTab, setActiveSettingsTab] = useState('preferences');
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
   const [showSavedVenues, setShowSavedVenues] = useState(false);
   const [showFriendGroups, setShowFriendGroups] = useState(false);
@@ -3803,9 +3862,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           (chain, [k, v]) => chain.then(() => onUpdate(k, v)),
           Promise.resolve()
         );
-    if (result?.error) return;
+    if (result?.error) {
+      onNotify('Could not save settings', 'error');
+      return;
+    }
     setTouched(false);
     setSaved(true);
+    onNotify('Settings saved');
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -3886,7 +3949,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     URL.revokeObjectURL(url);
   };
 
-  const handleXlsxExport = () => {
+  const handleXlsxExport = async () => {
+    const XLSX = await loadXlsx();
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: Shows
@@ -3942,9 +4006,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     try {
       navigator.clipboard.writeText(exportData);
       setExportStatus("copied");
+      onNotify('Backup copied');
       setTimeout(() => setExportStatus(null), 2000);
     } catch (e) {
       setExportStatus("error");
+      onNotify('Could not copy backup', 'error');
     }
   };
 
@@ -3968,7 +4034,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     return Number.isNaN(d.getTime()) ? null : trimmed;
   };
 
-  const excelDateToIso = (value) => {
+  const excelDateToIso = (value, XLSX) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
       const d = XLSX.SSF.parse_date_code(value);
       if (!d) return null;
@@ -4027,10 +4093,22 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const valid = concerts.map(normalizeConcertForImport).filter(Boolean);
     const skipped = concerts.length - valid.length;
     if (valid.length === 0) { setImportStatus("error"); setImportMessage("No valid concerts found — each row needs at least an Artist and Date."); return; }
-    for (const c of valid) await onSaveConcert(c);
+    let failed = 0;
+    for (const c of valid) {
+      const result = await onSaveConcert(c);
+      if (result?.error) failed++;
+    }
+    const imported = valid.length - failed;
+    setImportReport({ total: concerts.length, imported, skipped, failed });
+    if (failed > 0) {
+      setImportStatus("error");
+      setImportMessage(`Imported ${imported}, skipped ${skipped}, failed ${failed}.`);
+      onNotify('Import finished with errors', 'error');
+      return;
+    }
     setImportStatus("success");
-    setImportMessage(`Imported ${valid.length} concert${valid.length !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped — missing artist or date)` : ''}. Reloading...`);
-    setTimeout(() => { setImportStatus(null); window.location.reload(); }, 2000);
+    setImportMessage(`Imported ${imported} concert${imported !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}.`);
+    onNotify('Import finished');
   };
 
   const handleImport = async () => {
@@ -4108,6 +4186,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
+        const XLSX = await loadXlsx();
         const wb = XLSX.read(ev.target.result, { type: 'array' });
 
         // Merge support acts from "Support acts" sheet into existing concerts
@@ -4151,7 +4230,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         const rows = XLSX.utils.sheet_to_json(showsSheet);
         const parsed = rows.map(r => ({
           id: r.ID || `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          date: excelDateToIso(r.Date), artist: r.Artist || null, venue: r.Venue || '', room: r.Room || null,
+          date: excelDateToIso(r.Date, XLSX), artist: r.Artist || null, venue: r.Venue || '', room: r.Room || null,
           city: r.City || '', country: r.Country || '', type: r.Type || 'concert',
           tour: r.Tour || null, genre: r.Genre || null, subgenre: r.Subgenre || null,
           language: r.Language ? r.Language.split('; ').filter(Boolean) : [],
@@ -4206,6 +4285,24 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
+        {[
+          { id: 'preferences', label: 'Prefs' },
+          { id: 'tags', label: 'Tags' },
+          { id: 'people', label: 'People' },
+          { id: 'data', label: 'Data' },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
+            minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 11,
+            fontFamily: "'DM Mono', monospace", fontWeight: activeSettingsTab === tab.id ? 700 : 400,
+            background: activeSettingsTab === tab.id ? "#1a1a30" : "#13131f",
+            border: `1px solid ${activeSettingsTab === tab.id ? "#a78bfa" : "#1f1f35"}`,
+            color: activeSettingsTab === tab.id ? "#a78bfa" : "#6b6a8f",
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {activeSettingsTab === 'preferences' && <>
       <Collapsible title="◆  Preferences" {...sec("preferences")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
           <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
@@ -4254,6 +4351,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
+      </>}
+
+      {activeSettingsTab === 'tags' && (
       <Collapsible title="◈  Tags" {...sec("tags")}>
         {[
           { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
@@ -4269,6 +4369,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         ))}
       </Collapsible>
 
+      )}
+
+      {activeSettingsTab === 'people' && <>
       <Collapsible title="◎  Saved venues" {...sec("venues")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           {savedVenues.length > 0 && (
@@ -4339,6 +4442,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
+      </>}
+
+      {activeSettingsTab === 'preferences' && (
       <Collapsible title="◈  Stats display" {...sec("statsDisplay")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
           <SettingsRow label="Summary scope" sub="Default time range on summary page">
@@ -4395,6 +4501,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         })()}
       </Collapsible>
 
+      )}
+
+      {activeSettingsTab === 'data' && <>
       <Collapsible title="◉  Account & Data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -4414,6 +4523,21 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
             {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
             {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
+            {importReport && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
+                {[
+                  ["Rows", importReport.total],
+                  ["Added", importReport.imported],
+                  ["Skipped", importReport.skipped],
+                  ["Failed", importReport.failed],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "7px 4px", textAlign: "center" }}>
+                    <div style={{ color: label === "Failed" && value > 0 ? "#f472b6" : "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{value}</div>
+                    <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
             <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
             <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
@@ -4465,6 +4589,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </div>
       </Collapsible>
+
+      </>}
 
       {/* Follow me on */}
       <div style={{ marginTop: 24, paddingBottom: 8, textAlign: "center" }}>
@@ -4518,6 +4644,18 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [compact, setCompact] = useState(false)
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+
+  const notify = useCallback((message, type = 'success') => {
+    setToast({ message, type })
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2600)
+  }, [])
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+  }, [])
 
   useEffect(() => { if (showsGroup.includes(view)) setShowsTab(view); }, [view])
 
@@ -4540,8 +4678,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const THEME_FILTER = { purple:'', blue:'hue-rotate(-50deg)', green:'hue-rotate(-145deg)', red:'hue-rotate(90deg)', orange:'hue-rotate(130deg)', mono:'grayscale(1)' };
   const themeFilter = THEME_FILTER[settings.colorTheme] ?? '';
 
-  const handleSave = (updated) => {
-    onSaveConcert(updated)
+  const handleSave = async (updated) => {
+    const result = await onSaveConcert(updated)
+    notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success')
+    if (result?.error) return
     setSelected(updated)
   }
 
@@ -4685,7 +4825,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <div style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <AddConcertForm
-          onSave={c => { onSaveConcert(c); setShowAdd(null); savedScrollPos.current = 0; setSelected(c) }}
+          onSave={async c => {
+            const result = await onSaveConcert(c);
+            notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success');
+            if (result?.error) return;
+            setShowAdd(null); savedScrollPos.current = 0; setSelected(c);
+          }}
           onClose={() => setShowAdd(null)}
           initialType={showAdd}
           settings={settings}
@@ -4704,6 +4849,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           )].slice(0, 3)}
         />
       </div>
+      <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />
       <ShowsSubNav />
       <BottomNav />
@@ -4713,8 +4859,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} />
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} />
       </div>
+      <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />
       <ShowsSubNav />
       <BottomNav />
@@ -4746,8 +4893,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
               )}
             </div>
-            <button onClick={() => setShowAdd('concert')} style={{ background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ show</button>
-            <button onClick={() => setShowAdd('festival')} style={{ background: '#1a1030', border: '1px solid #f472b6', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#f472b6', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ fest</button>
+            <button onClick={() => setShowAdd('concert')} style={{ minHeight: 38, background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ Show</button>
+            <button onClick={() => setShowAdd('festival')} style={{ minHeight: 38, background: '#1a1030', border: '1px solid #f472b6', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: '#f472b6', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ Fest</button>
           </div>
         )}
 
@@ -4755,7 +4902,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
             {/* Type dropdown */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button onClick={() => { setShowYearDropdown(false); document.getElementById('type-dd') && (document.getElementById('type-dd').style.display = document.getElementById('type-dd').style.display === 'block' ? 'none' : 'block') }} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterType !== 'all' ? '#a78bfa' : '#13131f', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={() => { setShowYearDropdown(false); document.getElementById('type-dd') && (document.getElementById('type-dd').style.display = document.getElementById('type-dd').style.display === 'block' ? 'none' : 'block') }} style={{ minHeight: 36, padding: '7px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterType !== 'all' ? '#a78bfa' : '#13131f', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
                 {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : 'Festivals'}
                 <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
               </button>
@@ -4767,7 +4914,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             </div>
             {/* Year dropdown */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button onClick={() => setShowYearDropdown(d => !d)} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterYear !== 'all' ? '#a78bfa' : '#13131f', color: filterYear !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterYear !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterYear !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={() => setShowYearDropdown(d => !d)} style={{ minHeight: 36, padding: '7px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterYear !== 'all' ? '#a78bfa' : '#13131f', color: filterYear !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterYear !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterYear !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
                 {filterYear === 'all' ? 'Year' : filterYear}
                 <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
               </button>
@@ -4780,11 +4927,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               )}
             </div>
             {/* Sort button */}
-            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ background: showSort || sortOrder !== 'newest' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== 'newest' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortOrder !== 'newest' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== 'newest' ? 700 : 400, flexShrink: 0 }}>
+            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ minHeight: 36, background: showSort || sortOrder !== 'newest' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== 'newest' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== 'newest' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== 'newest' ? 700 : 400, flexShrink: 0 }}>
               Sort{sortOrder !== 'newest' ? ` ↕` : ''}
             </button>
             {/* Filters button */}
-            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ minHeight: 36, background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
               {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
             </button>
             {/* Compact toggle */}
@@ -4880,6 +5027,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 16px' }}>
         {view === 'home' && (
           <>
+            {concerts.length === 0 && (
+              <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
+            )}
+            {concerts.length > 0 && filtered.length === 0 && (
+              <EmptyState title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYear('all'); setFilterType('all'); resetFilters(); resetSort(); }} />
+            )}
+            {filtered.length > 0 && <>
             {upcoming.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Upcoming — {upcoming.length}</div>
@@ -4897,14 +5051,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               </button>
               {(showPast || !!search) && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
             </div>
+            </>}
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
-        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
+        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>
 
+      <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />
       <ShowsSubNav />
       <BottomNav />

@@ -39,6 +39,7 @@ function useGuestMode() {
       localStorage.setItem('guest_concerts', JSON.stringify(next))
       return next
     })
+    return { error: null }
   }, [])
 
   const deleteConcert = useCallback((id) => {
@@ -47,6 +48,7 @@ function useGuestMode() {
       localStorage.setItem('guest_concerts', JSON.stringify(next))
       return next
     })
+    return { error: null }
   }, [])
 
   const saveSetting = useCallback((key, value) => {

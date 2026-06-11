@@ -72,3 +72,19 @@ was typed.
 - Summary: "fill the gaps" nudge at the bottom (shows missing setlist / price / rating).
 
 All client-side; no schema or API changes.
+
+---
+
+## 2026-06-11 (4) — Financial logging + summary filters + averages
+
+- **Other costs editable**: the "Other costs" (concerts) / "Travel & other costs"
+  (festivals) field existed only in the Add form; added it to the edit form too,
+  so existing shows can now log other costs.
+- **Summary filters apply to the whole page**: year toggle (All time / current year)
+  AND new All / Concerts / Festivals pills now filter the top boxes, the cumulative
+  chart, and the genre/venue-size donuts together.
+- **💶 Averages chart** (Financial group): avg ticket, avg merch (when bought),
+  avg other costs (when logged), and avg total — split for concerts vs festivals.
+- **Settings chart toggles updated**: Covers, Records group (Records / Milestones /
+  Year recap), Venue loyalty, and Averages can now all be hidden/shown in
+  Settings → Stats display.

@@ -940,6 +940,11 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
               <span style={{ color:"#6b6a8f" }}>€</span>
               <input type="number" value={form.ticketPrice || ""} placeholder="0.00" onChange={e => update("ticketPrice", e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
             </div>
+            <div style={labelStyle}>{form.type === 'festival' ? 'Travel & other costs' : 'Other costs'}</div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: 14 }}>
+              <span style={{ color:"#6b6a8f" }}>€</span>
+              <input type="number" value={form.otherCost || ""} placeholder="0.00" onChange={e => update("otherCost", e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
+            </div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8 }}>
               <div style={labelStyle}>Merch</div>
               <button onClick={addMerchItem} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"3px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>+ Add item</button>
@@ -1493,6 +1498,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       id: "financial", label: "Financial",
       charts: [
         { id: "year-spend", label: "💸 Spending & avg ticket per year" },
+        { id: "averages",   label: "💶 Averages" },
         { id: "expensive",  label: "💰 Most expensive shows" },
       ]
     },
@@ -1528,6 +1534,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
   const summaryFinType = settings.summaryFinType || 'all';
+  const summaryPast = past.filter(c =>
+    (summaryYear === 'all' || c.date.slice(0,4) === summaryYear) &&
+    (summaryFinType === 'all' || c.type === (summaryFinType === 'festivals' ? 'festival' : 'concert'))
+  );
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
   const hiddenCharts = settings.hiddenCharts || [];
@@ -2633,6 +2643,46 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
+      case "averages": {
+        const cs = past.filter(c => c.type === "concert");
+        const fs = past.filter(c => c.type === "festival");
+        const avg = (arr, f) => { const v = arr.map(f).filter(x => x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; };
+        const merchOf = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
+        const totalOf = c => (c.ticketPrice || 0) + merchOf(c) + (c.otherCost || 0);
+        const rows = [
+          { section: "Concerts", color: "#a78bfa", items: [
+            ["avg ticket", avg(cs, c => c.ticketPrice || 0)],
+            ["avg merch (when bought)", avg(cs, merchOf)],
+            ["avg other costs (when logged)", avg(cs, c => c.otherCost || 0)],
+            ["avg total / show", avg(cs, totalOf)],
+          ]},
+          { section: "Festivals", color: "#fb923c", items: [
+            ["avg ticket", avg(fs, c => c.ticketPrice || 0)],
+            ["avg merch (when bought)", avg(fs, merchOf)],
+            ["avg travel & other (when logged)", avg(fs, c => c.otherCost || 0)],
+            ["avg total / festival", avg(fs, totalOf)],
+          ]},
+        ];
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            {rows.map(({ section, color, items }) => {
+              const visible = items.filter(([, v]) => v !== null);
+              if (visible.length === 0) return null;
+              return (
+                <div key={section} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{section}</div>
+                  {visible.map(([label, v]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #16162a" }}>
+                      <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0" }}>€{v.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
       default: return null;
     }
   };
@@ -2737,7 +2787,21 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {(() => {
             const curYr = String(new Date().getFullYear());
             return (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex" }}>
+                  {[{ id: 'all', label: 'All' }, { id: 'concerts', label: 'Concerts' }, { id: 'festivals', label: 'Festivals' }].map(({ id, label }) => (
+                    <button key={id} onClick={() => onUpdateSetting('summaryFinType', id)} style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      padding: "2px 8px 2px 0", marginRight: 6,
+                      fontSize: 11, fontFamily: "'DM Mono', monospace",
+                      color: summaryFinType === id ? (id === 'festivals' ? "#fb923c" : "#a78bfa") : "#4a4870",
+                      fontWeight: summaryFinType === id ? 700 : 400,
+                      borderBottom: summaryFinType === id ? `1px solid ${id === 'festivals' ? "#fb923c" : "#a78bfa"}` : "1px solid transparent",
+                      letterSpacing: "0.04em",
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <div style={{ display: "flex" }}>
                 {[{ id: 'all', label: 'All time' }, { id: curYr, label: curYr }].map(({ id, label }) => (
                   <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
                     background: "none", border: "none", cursor: "pointer",
@@ -2749,6 +2813,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     letterSpacing: "0.04em",
                   }}>{label}</button>
                 ))}
+                </div>
               </div>
             );
           })()}
@@ -2756,7 +2821,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {/* Row 1: shows / festivals / countries / avg per year */}
           {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && (() => {
             const currentYearStr = String(new Date().getFullYear());
-            const sp = summaryYear === 'all' ? past : past.filter(c => getYear(c.date) === summaryYear);
+            const sp = summaryPast;
             const spShows = sp.filter(c => c.type === 'concert');
             const spFests = sp.filter(c => c.type === 'festival');
             const spCountries = {};
@@ -2798,7 +2863,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             </div>
             {(() => {
-              const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
+              const allSorted = [...concerts].filter(c =>
+                (summaryYear === 'all' || c.date.slice(0,4) === summaryYear) &&
+                (summaryFinType === 'all' || c.type === (summaryFinType === 'festivals' ? 'festival' : 'concert'))
+              ).sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
               const W = 300, H = 80;
@@ -2873,6 +2941,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
           {/* Donut cards — stacked full width */}
           {!(settings.hiddenSummaryBlocks||[]).includes("pies") && (() => {
+            const gCount = {};
+            summaryPast.forEach(c => { if (c.genre) gCount[c.genre] = (gCount[c.genre] || 0) + 1; });
+            const topGenres = Object.entries(gCount).sort((a,b) => b[1] - a[1]);
+            const vsCount = {};
+            summaryPast.forEach(c => { const sz = c.type === "festival" ? "Festival" : c.venueSize; if (sz) vsCount[sz] = (vsCount[sz] || 0) + 1; });
+            const venueEntries = Object.entries(vsCount).sort((a,b) => b[1] - a[1]);
             const titleStyle = { fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 };
             const placeholderStyle = { color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "20px 0" };
             const legendItem = (color, name) => (
@@ -4751,10 +4825,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           );
           const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
           const ALL_CHART_GROUPS = [
-            { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: '🥧 Genres' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'artists', label: '🎤 Top artists' }, { id: 'ratings', label: '⭐ Ratings' }, { id: 'language', label: '🗣️ Language' }, { id: 'songs', label: '🎵 Top songs' }] },
+            { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: '🥧 Genres' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'artists', label: '🎤 Top artists' }, { id: 'ratings', label: '⭐ Ratings' }, { id: 'language', label: '🗣️ Language' }, { id: 'songs', label: '🎵 Top songs' }, { id: 'covers', label: '↩️ Covers' }] },
+            { id: 'records', label: 'Records', charts: [{ id: 'records', label: '🏆 Records' }, { id: 'milestones', label: '🎖️ Artist milestones' }, { id: 'recap', label: '🎁 Year recap' }] },
             { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Solo vs with friends' }, { id: 'friends-chart', label: '👥 Most shows with' }] },
-            { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: '📍 Favourite venues' }, { id: 'venue-size', label: '🏟️ Venue size' }, { id: 'countries', label: '🌍 Countries' }] },
-            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending & avg ticket' }, { id: 'expensive', label: '💰 Most expensive shows' }] },
+            { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: '📍 Favourite venues' }, { id: 'venue-loyalty', label: '💜 Venue loyalty' }, { id: 'venue-size', label: '🏟️ Venue size' }, { id: 'countries', label: '🌍 Countries' }] },
+            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending & avg ticket' }, { id: 'averages', label: '💶 Averages' }, { id: 'expensive', label: '💰 Most expensive shows' }] },
             { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: '🛍️ Merch overview' }, { id: 'merch-breakdown', label: '📦 What I buy' }] },
           ];
           return (

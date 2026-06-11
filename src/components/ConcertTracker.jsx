@@ -368,7 +368,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
       if (i !== idx) return s;
       const name = getSongName(s); const info = getSongInfo(s);
       if (!artist) return info ? { name, info } : name;
-      return info ? { name, info, cover: artist } : { name, cover: artist };
+      const cover = artist === true ? true : artist;
+      return info ? { name, info, cover } : { name, cover };
     }));
     setEditCoverIdx(null);
     setCoverInput('');
@@ -424,7 +425,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   <div style={{ flex: 1 }}>
                     <div style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</div>
                     {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
-                    {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {cover}</div>}
+                    {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {typeof cover === 'string' ? cover : 'cover'}</div>}
                   </div>
                   {!readOnly && (
                     <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); } }}
@@ -438,7 +439,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                       <input
                         autoFocus value={coverInput}
                         onChange={e => setCoverInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') applyCover(i, coverInput.trim()); if (e.key === 'Escape') { setEditCoverIdx(null); setCoverInput(''); } }}
+                        onKeyDown={e => { if (e.key === 'Enter') applyCover(i, coverInput.trim() || true); if (e.key === 'Escape') { setEditCoverIdx(null); setCoverInput(''); } }}
                         placeholder="Original artist…"
                         style={{ width: '100%', background: '#0c0c14', border: '1px solid #fb923c44', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
                       />
@@ -451,7 +452,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button onMouseDown={() => applyCover(i, coverInput.trim())} style={{ background: 'none', border: '1px solid #fb923c55', borderRadius: 6, color: '#fb923c', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                      <button onMouseDown={() => applyCover(i, coverInput.trim() || true)} style={{ background: 'none', border: '1px solid #fb923c55', borderRadius: 6, color: '#fb923c', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
                         {coverInput.trim() ? 'Save cover' : 'Mark as cover'}
                       </button>
                       {cover && <button onMouseDown={() => applyCover(i, null)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
@@ -1150,7 +1151,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   past.forEach(c => {
     const tally = (song, performer) => {
       const n = getSongName(song); if (!n) return;
-      const a = getSongCover(song) || performer || '';
+      const cov = getSongCover(song);
+      const a = (typeof cov === 'string' && cov) || performer || '';
       const k = `${n}\u0000${a}`;
       if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0 };
       songCount[k].count += 1;
@@ -2421,7 +2423,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   return (
     <div style={{ padding: "0 0 100px" }}>
       {selectedSong && (() => {
-        const matchSong = (s, performer) => getSongName(s) === selectedSong.name && (getSongCover(s) || performer || '') === selectedSong.artist;
+        const matchSong = (s, performer) => {
+          if (getSongName(s) !== selectedSong.name) return false;
+          const cov = getSongCover(s);
+          return ((typeof cov === 'string' && cov) || performer || '') === selectedSong.artist;
+        };
         const appearances = past.flatMap(c => {
           const result = [];
           const mainSong = getSongList(c.setlist).find(s => matchSong(s, c.artist));

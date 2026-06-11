@@ -32,3 +32,20 @@ Every push to `main` auto-deploys to Vercel (project `settracker`).
 
 **Not changed:** per-artist song list (inside an artist's page) still groups by name only,
 since it's already scoped to one artist. DB schema untouched (songs live in concert JSONB).
+
+---
+
+## 2026-06-11 (2) — Cover marking works without a linked artist
+
+**Bug found while verifying cover flow:** clicking "Mark as cover" (or pressing Enter)
+with an empty artist field *removed* the cover mark instead of applying it — `applyCover`
+treated an empty string as "remove". Covers could only be saved if the original artist
+was typed.
+
+**Changes (src/components/ConcertTracker.jsx):**
+- A song can now be marked as a cover without naming the original artist
+  (stored as `cover: true`); typing an artist still links it (stored as `cover: "Artist"`).
+- Setlist display shows "↩ Artist" when linked, "↩ cover" when not.
+- Song stats: only string covers are attributed to the original artist; unlinked covers
+  stay credited to the performing artist. Same for the song detail matcher.
+- Artist page "Covered by others" unaffected (string match only, as intended).

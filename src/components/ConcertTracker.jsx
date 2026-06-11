@@ -3780,26 +3780,40 @@ function SongsView({ concerts, onOpen, settings }) {
 
   const songCount = {};
   past.forEach(c => {
-    getSongList(c.setlist).forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; });
-    Object.values(c.supportSetlists || {}).forEach(songs => getSongList(songs).forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; }));
+    const tally = (s, performer) => {
+      const n = getSongName(s); if (!n) return;
+      const cov = getSongCover(s);
+      const a = (typeof cov === 'string' && cov) || performer || '';
+      const k = n + '\n' + a;
+      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0 };
+      songCount[k].count += 1;
+    };
+    getSongList(c.setlist).forEach(s => tally(s, c.artist));
+    Object.entries(c.supportSetlists || {}).forEach(([an, songs]) => getSongList(songs).forEach(s => tally(s, an)));
   });
-  const totalUnique = Object.keys(songCount).length;
-  const totalHeard = Object.values(songCount).reduce((a, b) => a + b, 0);
+  const songEntries = Object.values(songCount);
+  const totalUnique = songEntries.length;
+  const totalHeard = songEntries.reduce((a, e) => a + e.count, 0);
 
-  const byCount = Object.entries(songCount).sort((a, b) => b[1] - a[1]);
-  const topSet = topN ? new Set(byCount.slice(0, topN).map(([name]) => name)) : null;
-  const filtered = Object.entries(songCount)
-    .filter(([name]) => (!topSet || topSet.has(name)) && (!search || name.toLowerCase().includes(search.toLowerCase())))
-    .sort((a, b) => sortBy === 'count' ? b[1] - a[1] : a[0].localeCompare(b[0]));
+  const byCount = [...songEntries].sort((a, b) => b.count - a.count);
+  const topSet = topN ? new Set(byCount.slice(0, topN)) : null;
+  const filtered = songEntries
+    .filter(e => (!topSet || topSet.has(e)) && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase())))
+    .sort((a, b) => sortBy === 'count' ? b.count - a.count : (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist)));
 
   if (selectedSong) {
+    const matchSong = (s, performer) => {
+      if (getSongName(s) !== selectedSong.name) return false;
+      const cov = getSongCover(s);
+      return ((typeof cov === 'string' && cov) || performer || '') === selectedSong.artist;
+    };
     const appearances = past.flatMap(c => {
       const result = [];
-      const mainSong = getSongList(c.setlist).find(s => getSongName(s) === selectedSong);
-      if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), isSupport: false });
+      const mainSong = getSongList(c.setlist).find(s => matchSong(s, c.artist));
+      if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), cover: getSongCover(mainSong), isSupport: false });
       Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
-        const s = getSongList(songs).find(x => getSongName(x) === selectedSong);
-        if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), isSupport: true });
+        const s = getSongList(songs).find(x => matchSong(x, artistName));
+        if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true });
       });
       return result;
     }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
@@ -3808,12 +3822,12 @@ function SongsView({ concerts, onOpen, settings }) {
         <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong}</div>
-            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{appearances.length}× live</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
+            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{selectedSong.artist} · {appearances.length}× live</div>
           </div>
         </div>
         <div style={{ padding: '14px 16px' }}>
-          {appearances.map(({ concert: c, artist, info, isSupport }) => (
+          {appearances.map(({ concert: c, artist, info, cover, isSupport }) => (
             <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
               width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35',
               borderLeft: `3px solid ${isSupport ? '#3d3564' : '#a78bfa'}`,
@@ -3823,7 +3837,7 @@ function SongsView({ concerts, onOpen, settings }) {
                 <span style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{formatDate(c.date)}</span>
                 {isSupport && <span style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: '#1a1a30', borderRadius: 99 }}>support</span>}
               </div>
-              <div style={{ fontSize: 12, color: '#c4c2f0', fontWeight: 600 }}>{artist}</div>
+              <div style={{ fontSize: 12, color: '#c4c2f0', fontWeight: 600 }}>{artist}{cover ? <span style={{ color: '#fb923c', fontWeight: 400 }}> · cover</span> : null}</div>
               <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{c.venue}{c.room ? ` · ${c.room}` : ''} · {c.city}</div>
               {info && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{info}</div>}
             </button>
@@ -3864,20 +3878,23 @@ function SongsView({ concerts, onOpen, settings }) {
           <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>log setlists on your shows to see songs here</div>
         ) : filtered.length === 0 ? (
           <EmptyState title="No songs found" detail="Add setlists to shows and songs will collect here." />
-        ) : filtered.map(([name, count], i) => (
-          <button key={name} onClick={() => setSelectedSong(name)} style={{
+        ) : filtered.map((e, i) => (
+          <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist })} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
-            borderLeft: `3px solid ${count >= 5 ? '#a78bfa' : count >= 3 ? '#6d5fa8' : count >= 2 ? '#3d3564' : '#2e2e4a'}`,
+            borderLeft: `3px solid ${e.count >= 5 ? '#a78bfa' : e.count >= 3 ? '#6d5fa8' : e.count >= 2 ? '#3d3564' : '#2e2e4a'}`,
             borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 20, textAlign: 'right', flexShrink: 0 }}>
                 {sortBy === 'count' ? (i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`) : null}
               </span>
-              <span style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ color: '#c4c2f0', fontSize: 13, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>
+              </span>
             </div>
-            <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>
+            <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{e.count}×</span>
           </button>
         ))}
       </div>

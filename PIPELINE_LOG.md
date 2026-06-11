@@ -121,3 +121,14 @@ When the summary year toggle is set to the current year, the cumulative chart bl
 now shows vertical bars per month (Jan–Dec): purple = past shows, blue = upcoming,
 count above each bar. "All time" keeps the cumulative line. Title switches between
 "cumulative shows" and "shows per month".
+
+---
+
+## 2026-06-11 (8) — Songs page also groups by song + artist
+
+The standalone Songs page (Shows → Songs) was still counting by song name only,
+so two artists' same-titled songs showed a merged count ("3×") even though the
+stats chart had been fixed. Now it uses the same grouping: song + attributed artist
+(covers credited to the original artist when linked). Rows show the artist under
+the song name, search matches artist too, the detail page matches name+artist and
+shows a "· cover" badge, and unique/total counts reflect the split.

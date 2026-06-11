@@ -3,12 +3,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { url } = req.query;
-  if (!url || !url.includes('setlist.fm/festival/')) {
+  const parsedUrl = parseFestivalUrl(url);
+  if (!parsedUrl) {
     return res.status(400).json({ error: 'Expected a setlist.fm/festival/ URL' });
   }
 
   try {
-    const pageRes = await fetch(url, {
+    const pageRes = await fetch(parsedUrl.toString(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -35,6 +36,20 @@ export default async function handler(req, res) {
     return res.status(200).json({ days });
   } catch (e) {
     return res.status(500).json({ error: e.message });
+  }
+}
+
+function parseFestivalUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') return null;
+  try {
+    const parsed = new URL(rawUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    const isSetlistFm = hostname === 'setlist.fm' || hostname === 'www.setlist.fm';
+    if (!isSetlistFm || parsed.protocol !== 'https:') return null;
+    if (!parsed.pathname.includes('/festival/') || !parsed.pathname.endsWith('.html')) return null;
+    return parsed;
+  } catch {
+    return null;
   }
 }
 

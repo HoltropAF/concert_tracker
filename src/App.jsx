@@ -57,6 +57,12 @@ function useGuestMode() {
     })
   }, [])
 
+  const saveSettings = useCallback((next) => {
+    localStorage.setItem('guest_settings', JSON.stringify(next))
+    setSettings(next)
+    return { error: null }
+  }, [])
+
   const clearGuest = () => {
     localStorage.removeItem('guest_concerts')
     localStorage.removeItem('guest_settings')
@@ -68,7 +74,7 @@ function useGuestMode() {
     setConcerts(samples)
   }, [])
 
-  return { concerts, settings, saveConcert, deleteConcert, saveSetting, clearGuest, initWithSamples }
+  return { concerts, settings, saveConcert, deleteConcert, saveSetting, saveSettings, clearGuest, initWithSamples }
 }
 
 export default function App() {
@@ -93,7 +99,7 @@ export default function App() {
   const guest = useGuestMode()
   const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
   const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
-  const { settings, saveSetting } = useSettings(guestMode ? null : user?.id)
+  const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
 
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')
@@ -118,6 +124,7 @@ export default function App() {
         onSaveConcert={guest.saveConcert}
         onDeleteConcert={guest.deleteConcert}
         onUpdateSetting={guest.saveSetting}
+        onUpdateSettings={guest.saveSettings}
         onSignOut={exitGuest}
         userEmail="guest"
       />
@@ -178,6 +185,7 @@ export default function App() {
         onSaveConcert={saveConcert}
         onDeleteConcert={deleteConcert}
         onUpdateSetting={saveSetting}
+        onUpdateSettings={saveSettings}
         onSignOut={signOut}
         userEmail={user.email}
       />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
 
 export function useAuth() {
@@ -8,6 +8,11 @@ export function useAuth() {
   const [dbSleeping, setDbSleeping] = useState(false)
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false)
+      return
+    }
+
     const timeout = setTimeout(() => {
       setDbSleeping(true)
       setLoading(false)
@@ -33,6 +38,7 @@ export function useAuth() {
   }, [])
 
   const signIn = async (email) => {
+    if (!isSupabaseConfigured) return { error: new Error('Supabase is not configured') }
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: window.location.origin }
@@ -40,7 +46,7 @@ export function useAuth() {
     return { error }
   }
 
-  const signOut = () => supabase.auth.signOut()
+  const signOut = () => isSupabaseConfigured ? supabase.auth.signOut() : Promise.resolve()
 
   return { user, loading, signIn, signOut, dbSleeping }
 }
@@ -50,11 +56,12 @@ export function useConcerts(userId) {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    if (!userId) return
+    if (!isSupabaseConfigured || !userId) return
     loadConcerts()
   }, [userId])
 
   const loadConcerts = async () => {
+    if (!isSupabaseConfigured || !userId) return
     const { data, error } = await supabase
       .from('concerts')
       .select('id, data')
@@ -94,6 +101,7 @@ export function useConcerts(userId) {
   }
 
   const seedConcerts = async (uid) => {
+    if (!isSupabaseConfigured) return
     const rows = SEED_DATA.map(c => ({ id: c.id, user_id: uid, data: c }))
     // Insert in batches of 20
     for (let i = 0; i < rows.length; i += 20) {
@@ -103,18 +111,38 @@ export function useConcerts(userId) {
   }
 
   const saveConcert = useCallback(async (concert) => {
+    if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
+    let previousConcerts = []
     setConcerts(prev => {
+      previousConcerts = prev
       const exists = prev.some(c => c.id === concert.id)
       return exists ? prev.map(c => c.id === concert.id ? concert : c) : [...prev, concert]
     })
-    await supabase
+    const { error } = await supabase
       .from('concerts')
       .upsert({ id: concert.id, user_id: userId, data: concert, updated_at: new Date().toISOString() })
+    if (error) {
+      console.error('Error saving concert:', error)
+      setConcerts(previousConcerts)
+      return { error }
+    }
+    return { error: null }
   }, [userId])
 
   const deleteConcert = useCallback(async (concertId) => {
-    setConcerts(prev => prev.filter(c => c.id !== concertId))
-    await supabase.from('concerts').delete().eq('id', concertId).eq('user_id', userId)
+    if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
+    let previousConcerts = []
+    setConcerts(prev => {
+      previousConcerts = prev
+      return prev.filter(c => c.id !== concertId)
+    })
+    const { error } = await supabase.from('concerts').delete().eq('id', concertId).eq('user_id', userId)
+    if (error) {
+      console.error('Error deleting concert:', error)
+      setConcerts(previousConcerts)
+      return { error }
+    }
+    return { error: null }
   }, [userId])
 
   return { concerts, loaded, saveConcert, deleteConcert, reload: loadConcerts }
@@ -140,12 +168,24 @@ export function useSettings(userId) {
       })
   }, [userId])
 
-  const saveSetting = useCallback(async (key, value) => {
-    const next = { ...settingsRef.current, [key]: value }
+  const saveSettings = useCallback(async (next) => {
+    if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
+    const previous = settingsRef.current
     settingsRef.current = next
     setSettings(next)
-    await supabase.from('settings').upsert({ user_id: userId, data: next, updated_at: new Date().toISOString() })
+    const { error } = await supabase.from('settings').upsert({ user_id: userId, data: next, updated_at: new Date().toISOString() })
+    if (error) {
+      console.error('Error saving settings:', error)
+      settingsRef.current = previous
+      setSettings(previous)
+      return { error }
+    }
+    return { error: null }
   }, [userId])
 
-  return { settings, saveSetting }
+  const saveSetting = useCallback(async (key, value) => {
+    return saveSettings({ ...settingsRef.current, [key]: value })
+  }, [saveSettings])
+
+  return { settings, saveSetting, saveSettings }
 }

@@ -2544,7 +2544,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{Math.round(n/2)}</span>
                     <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>0</span>
                   </div>
-                  <svg style={{ flex: 1 }} viewBox={`0 0 ${W} ${H+14}`} style={{ overflow: "visible" }}>
+                  <svg style={{ flex: 1, overflow: "visible" }} viewBox={`0 0 ${W} ${H+14}`}>
                     <defs>
                       <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
@@ -3770,7 +3770,7 @@ function SettingsOptionPills({ value, options, onChange }) {
   );
 }
 
-function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSignOut, userEmail }) {
+function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
@@ -3796,8 +3796,15 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 
   const hasChanges = JSON.stringify(local) !== JSON.stringify(settings);
   const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
-  const handleSettingsSave = () => {
-    Object.entries(local).forEach(([k, v]) => onUpdate(k, v));
+  const handleSettingsSave = async () => {
+    const result = onUpdateAll
+      ? await onUpdateAll(local)
+      : await Object.entries(local).reduce(
+          (chain, [k, v]) => chain.then(() => onUpdate(k, v)),
+          Promise.resolve()
+        );
+    if (result?.error) return;
+    setTouched(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -3941,8 +3948,83 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
     }
   };
 
+  const asArray = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === 'string') return value.split(';').map(s => s.trim()).filter(Boolean);
+    return [];
+  };
+
+  const asNumber = (value) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const normalizeDate = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+    const d = new Date(`${trimmed}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : trimmed;
+  };
+
+  const excelDateToIso = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const d = XLSX.SSF.parse_date_code(value);
+      if (!d) return null;
+      return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+    }
+    return normalizeDate(String(value || ''));
+  };
+
+  const normalizeConcertForImport = (raw) => {
+    if (!raw || typeof raw !== 'object') return null;
+    const artist = typeof raw.artist === 'string' ? raw.artist.trim() : '';
+    const date = normalizeDate(raw.date);
+    if (!artist || !date) return null;
+
+    const ratingMax = settings.ratingSystem || 5;
+    const rating = asNumber(raw.rating);
+    const safeRating = rating && rating >= 1 && rating <= ratingMax ? rating : null;
+    const rawType = typeof raw.type === 'string' ? raw.type.toLowerCase() : raw.type;
+    const type = rawType === 'festival' ? 'festival' : 'concert';
+    const id = typeof raw.id === 'string' && raw.id.trim()
+      ? raw.id.trim()
+      : `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    return {
+      ...raw,
+      id,
+      artist,
+      date,
+      endDate: type === 'festival' ? normalizeDate(raw.endDate) || '' : raw.endDate || '',
+      venue: typeof raw.venue === 'string' ? raw.venue : '',
+      room: typeof raw.room === 'string' ? raw.room : '',
+      city: typeof raw.city === 'string' ? raw.city : '',
+      country: typeof raw.country === 'string' ? raw.country : '',
+      type,
+      tour: typeof raw.tour === 'string' ? raw.tour : '',
+      support: Array.isArray(raw.support) ? raw.support : [],
+      friends: asArray(raw.friends),
+      solo: raw.solo === true || raw.solo === 'yes',
+      rating: safeRating,
+      ticketPrice: asNumber(raw.ticketPrice),
+      otherCost: asNumber(raw.otherCost),
+      merch: Array.isArray(raw.merch) ? raw.merch : [],
+      notes: typeof raw.notes === 'string' ? raw.notes : '',
+      genre: raw.genre || null,
+      subgenre: raw.subgenre || null,
+      language: asArray(raw.language),
+      venueSize: raw.venueSize || null,
+      seenAs: raw.seenAs || (type === 'festival' ? 'Festival' : 'Headliner'),
+      acts: Array.isArray(raw.acts) ? raw.acts : [],
+      setlist: Array.isArray(raw.setlist) ? raw.setlist : [],
+      supportSetlists: raw.supportSetlists && typeof raw.supportSetlists === 'object' ? raw.supportSetlists : {},
+    };
+  };
+
   const doImport = async (concerts) => {
-    const valid = concerts.filter(c => c.artist && c.date);
+    const valid = concerts.map(normalizeConcertForImport).filter(Boolean);
     const skipped = concerts.length - valid.length;
     if (valid.length === 0) { setImportStatus("error"); setImportMessage("No valid concerts found — each row needs at least an Artist and Date."); return; }
     for (const c of valid) await onSaveConcert(c);
@@ -4069,7 +4151,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
         const rows = XLSX.utils.sheet_to_json(showsSheet);
         const parsed = rows.map(r => ({
           id: r.ID || `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          date: r.Date || null, artist: r.Artist || null, venue: r.Venue || '', room: r.Room || null,
+          date: excelDateToIso(r.Date), artist: r.Artist || null, venue: r.Venue || '', room: r.Room || null,
           city: r.City || '', country: r.Country || '', type: r.Type || 'concert',
           tour: r.Tour || null, genre: r.Genre || null, subgenre: r.Subgenre || null,
           language: r.Language ? r.Language.split('; ').filter(Boolean) : [],
@@ -4409,7 +4491,7 @@ function SettingsView({ settings, onUpdate, concerts = [], onSaveConcert, onSign
 // MAIN APP
 // ============================================================
 
-export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onSignOut, userEmail }) {
+export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail }) {
   const today = new Date()
   const isPastDate = (dateStr) => new Date(dateStr + 'T00:00:00') <= today
 
@@ -4464,7 +4546,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }
 
   const updateSetting = (key, value) => {
-    onUpdateSetting(key, value)
+    return onUpdateSetting(key, value)
+  }
+
+  const updateSettings = (next) => {
+    return onUpdateSettings ? onUpdateSettings(next) : Promise.resolve()
   }
 
   const years = [...new Set(concerts.map(c => c.date.slice(0,4)))].sort().reverse()
@@ -4816,7 +4902,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
-        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
+        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} />}
       </div>
 
       <ChartGroupNav />

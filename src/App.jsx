@@ -1,8 +1,36 @@
-import { useState, useEffect, useCallback } from 'react'
+import { Component, useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
+
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('App render error:', error, info)
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children
+    return (
+      <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ maxWidth: 360, width: '100%', background: '#13131f', border: '1px solid #f472b6', borderRadius: 12, padding: 20, textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', marginBottom: 8 }}>Something crashed</div>
+          <div style={{ color: '#6b6a8f', fontSize: 12, lineHeight: 1.6, fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>The app hit a render error. Reloading should get you back without losing saved data.</div>
+          <button onClick={() => window.location.reload()} style={{ width: '100%', minHeight: 40, borderRadius: 8, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>Reload app</button>
+        </div>
+      </div>
+    )
+  }
+}
 
 function InstallBanner({ onInstall, onDismiss }) {
   return (
@@ -120,16 +148,18 @@ export default function App() {
 
   if (guestMode) return (
     <>
-      <ConcertTracker
-        concerts={guest.concerts}
-        settings={guest.settings}
-        onSaveConcert={guest.saveConcert}
-        onDeleteConcert={guest.deleteConcert}
-        onUpdateSetting={guest.saveSetting}
-        onUpdateSettings={guest.saveSettings}
-        onSignOut={exitGuest}
-        userEmail="guest"
-      />
+      <AppErrorBoundary>
+        <ConcertTracker
+          concerts={guest.concerts}
+          settings={guest.settings}
+          onSaveConcert={guest.saveConcert}
+          onDeleteConcert={guest.deleteConcert}
+          onUpdateSetting={guest.saveSetting}
+          onUpdateSettings={guest.saveSettings}
+          onSignOut={exitGuest}
+          userEmail="guest"
+        />
+      </AppErrorBoundary>
       {banner}
     </>
   )
@@ -181,16 +211,18 @@ export default function App() {
 
   return (
     <>
-      <ConcertTracker
-        concerts={concerts}
-        settings={settings}
-        onSaveConcert={saveConcert}
-        onDeleteConcert={deleteConcert}
-        onUpdateSetting={saveSetting}
-        onUpdateSettings={saveSettings}
-        onSignOut={signOut}
-        userEmail={user.email}
-      />
+      <AppErrorBoundary>
+        <ConcertTracker
+          concerts={concerts}
+          settings={settings}
+          onSaveConcert={saveConcert}
+          onDeleteConcert={deleteConcert}
+          onUpdateSetting={saveSetting}
+          onUpdateSettings={saveSettings}
+          onSignOut={signOut}
+          userEmail={user.email}
+        />
+      </AppErrorBoundary>
       {banner}
     </>
   )

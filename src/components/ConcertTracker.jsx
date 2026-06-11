@@ -39,10 +39,11 @@ const getYear = (dateStr) => dateStr.slice(0, 4);
 const today = new Date();
 const isPast = (dateStr) => new Date(dateStr + "T00:00:00") <= today;
 
-const getSupportName = s => typeof s === 'string' ? s : s.name;
-const getSupportRole = s => typeof s === 'string' ? 'support' : (s.role || 'support');
+const getSupportName = s => typeof s === 'string' ? s : (s?.name || '');
+const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'support');
+const getFriends = c => Array.isArray(c?.friends) ? c.friends : [];
 
-const getSongName = s => typeof s === 'string' ? s : s.name;
+const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' ? null : (s.cover || null);
 
@@ -306,12 +307,12 @@ function ConcertCard({ concert, onOpen, compact = false }) {
           <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
             {formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
           </div>
-          {concert.friends.length > 0 && (
+          {getFriends(concert).length > 0 && (
             <div style={{ fontSize: 11, color: "#5a5880", marginTop: 4 }}>
-              w. {concert.friends.join(", ")}
+              w. {getFriends(concert).join(", ")}
             </div>
           )}
-          {concert.solo && concert.friends.length === 0 && (
+          {concert.solo && getFriends(concert).length === 0 && (
             <div style={{ fontSize: 11, color: "#5a5880", marginTop: 4, fontStyle: "italic" }}>solo</div>
           )}
         </div>
@@ -571,7 +572,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
     const lines = [
       `🎤 ${concert.artist}${concert.tour ? ` — ${concert.tour}` : ''}`,
       `📅 ${formatDate(concert.date)} · ${concert.venue}${concert.room ? ` · ${concert.room}` : ''} · ${concert.city}`,
-      concert.friends.length > 0 ? `👥 w. ${concert.friends.join(', ')}` : '👤 solo',
+      getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
       concert.rating ? `⭐ ${'★'.repeat(concert.rating)}` : null,
       concert.notes ? `📝 ${concert.notes}` : null,
     ].filter(Boolean).join('\n');
@@ -658,8 +659,8 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           {/* Went with */}
           <div style={detailCard}>
             {sec("Went with")}
-            {concert.friends.length > 0
-              ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{concert.friends.map(f => <Badge key={f} color="#1a1a30">{f}</Badge>)}</div>
+            {getFriends(concert).length > 0
+              ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{getFriends(concert).map(f => <Badge key={f} color="#1a1a30">{f}</Badge>)}</div>
               : <div style={{ color: "#6b6a8f", fontSize: 13, fontStyle: "italic" }}>solo</div>}
           </div>
 
@@ -787,7 +788,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>{concert.artist}</div>
           <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)} · {concert.city}</div>
         </div>
-        <button onClick={async () => { await onSave(form); setEditing(false); }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
+        <button onClick={async () => { const result = await onSave(form); if (!result?.error) setEditing(false); }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
       </div>
 
       <div style={{ padding: "20px" }}>
@@ -1100,8 +1101,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const past = concerts.filter(c => isPast(c.date));
   const shows = past.filter(c => c.type === "concert");
   const festivals = past.filter(c => c.type === "festival");
-  const solo = past.filter(c => c.friends.length === 0);
-  const withFriends = past.filter(c => c.friends.length > 0);
+  const solo = past.filter(c => getFriends(c).length === 0);
+  const withFriends = past.filter(c => getFriends(c).length > 0);
 
   const totalSpent = past.reduce((sum, c) => {
     const ticket = c.ticketPrice || 0;
@@ -1149,7 +1150,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   // Friends frequency
   const friendCount = {};
-  past.forEach(c => c.friends.forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
+  past.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
   const topFriends = Object.entries(friendCount).sort((a,b) => b[1]-a[1]).slice(0, topFriendsRows);
 
   // Venues
@@ -1300,7 +1301,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Friends group-size distribution
   const groupSizeDist = {};
   past.forEach(c => {
-    const n = c.friends?.length || 0;
+    const n = getFriends(c).length;
     const key = n >= 6 ? "6+" : String(n);
     groupSizeDist[key] = (groupSizeDist[key] || 0) + 1;
   });
@@ -2734,21 +2735,21 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
   const [showSortPanel, setShowSortPanel] = useState(false);
 
   const past = concerts.filter(c => isPast(c.date));
-  const allFriends = [...new Set(past.flatMap(c => c.friends))].sort();
+  const allFriends = [...new Set(past.flatMap(c => getFriends(c)))].sort();
 
   const friendGroups = settings.friendGroups || [];
   const groupEntries = friendGroups.map(g => {
-    const shows = past.filter(c => g.friends.length > 0 && g.friends.every(f => c.friends.includes(f)));
+    const shows = past.filter(c => g.friends.length > 0 && g.friends.every(f => getFriends(c).includes(f)));
     const sorted = [...shows].sort((a, b) => a.date.localeCompare(b.date));
     return { ...g, shows, sorted, lastShow: sorted[sorted.length - 1] || null };
   });
 
   const friendEntries = allFriends.map(name => {
-    const shows = past.filter(c => c.friends.includes(name));
+    const shows = past.filter(c => getFriends(c).includes(name));
     const sortedShows = [...shows].sort((a, b) => a.date.localeCompare(b.date));
     const firstShow = sortedShows[0] || null;
     const lastShow = sortedShows[sortedShows.length - 1] || null;
-    const upcoming = concerts.filter(c => !isPast(c.date) && c.friends.includes(name));
+    const upcoming = concerts.filter(c => !isPast(c.date) && getFriends(c).includes(name));
     const genreCount = {};
     shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
     const topGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
@@ -3088,7 +3089,7 @@ function ArtistsView({ concerts, onOpen }) {
     const avgRating = rated.length ? (rated.reduce((s,c) => s + c.rating, 0) / rated.length).toFixed(1) : null;
     const sinceYear = pastShows.length ? [...pastShows].sort((a,b) => a.date.localeCompare(b.date))[0].date.slice(0,4) : null;
     const friendCount = {};
-    pastShows.forEach(c => c.friends.forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
+    pastShows.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
     const supportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => isPast(a.concert.date)).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
     const supportOnlyCount = supportApps.filter(a => a.role === 'support').length;
@@ -3503,7 +3504,7 @@ function ArtistShowRow({ concert, onOpen }) {
           {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
         </div>
         {concert.tour && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>{concert.tour}</div>}
-        {concert.friends.length > 0 && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>w. {concert.friends.join(", ")}</div>}
+        {getFriends(concert).length > 0 && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>w. {getFriends(concert).join(", ")}</div>}
         {concert.rating && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(Math.min(concert.rating, 10))}</div>}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -3924,7 +3925,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const removeSavedVenue = (i) => lUpdate("savedVenues", savedVenues.filter((_, j) => j !== i));
 
   const friendGroups = local.friendGroups || [];
-  const allFriendsFromConcerts = [...new Set(concerts.flatMap(c => c.friends || []))].sort();
+  const allFriendsFromConcerts = [...new Set(concerts.flatMap(c => getFriends(c)))].sort();
   const addFriendGroup = () => {
     const name = newGroupName.trim();
     if (!name || newGroupFriends.length === 0) return;
@@ -3940,7 +3941,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const rows = concerts.map(c => [
       c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
       c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
-      (c.friends||[]).join('; '), c.solo?'yes':'', c.venueSize||'', (c.notes||'').replace(/\n/g,' ')
+      getFriends(c).join('; '), c.solo?'yes':'', c.venueSize||'', (c.notes||'').replace(/\n/g,' ')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -3960,7 +3961,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       SeenAs: c.seenAs || '', Genre: c.genre || '', Subgenre: c.subgenre || '',
       Language: (Array.isArray(c.language) ? c.language : [c.language || '']).join('; '),
       Rating: c.rating || '', TicketPrice: c.ticketPrice || '',
-      Friends: (c.friends || []).join('; '), Solo: c.solo ? 'yes' : '',
+      Friends: getFriends(c).join('; '), Solo: c.solo ? 'yes' : '',
       VenueSize: c.venueSize || '', Notes: (c.notes || '').replace(/\n/g, ' '),
     }))), 'Shows');
 
@@ -4206,9 +4207,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           for (const concert of concerts) {
             const incoming = byId[concert.id];
             if (!incoming) continue;
-            const existingNames = (concert.support || []).map(s =>
-              (typeof s === 'string' ? s : s.name).toLowerCase()
-            );
+            const existingNames = (concert.support || []).map(s => getSupportName(s).toLowerCase());
             const toAdd = incoming.filter(a => !existingNames.includes(a.name.toLowerCase()));
             if (toAdd.length === 0) continue;
             await onSaveConcert({ ...concert, support: [...(concert.support || []), ...toAdd] });
@@ -4659,7 +4658,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   useEffect(() => { if (showsGroup.includes(view)) setShowsTab(view); }, [view])
 
-  const allFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
+  const allFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
 
   const savedScrollPos = useRef(0)
   const handleOpenConcert = (concert) => {
@@ -4681,8 +4680,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const handleSave = async (updated) => {
     const result = await onSaveConcert(updated)
     notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success')
-    if (result?.error) return
+    if (result?.error) return result
     setSelected(updated)
+    return result
   }
 
   const updateSetting = (key, value) => {
@@ -4695,7 +4695,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const years = [...new Set(concerts.map(c => c.date.slice(0,4)))].sort().reverse()
   const allVenues = [...new Set(concerts.map(c => c.venue))].sort()
-  const activeFriends = [...new Set(concerts.flatMap(c => c.friends))].sort()
+  const activeFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
   const allCountries = [...new Set(concerts.map(c => (c.country || '').trim()).filter(Boolean))].sort()
 
   const activeFilterCount = [
@@ -4709,27 +4709,27 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (filterYear !== 'all' && c.date.slice(0,4) !== filterYear) return false
     if (filterType === 'concerts' && c.type !== 'concert') return false
     if (filterType === 'festivals' && c.type !== 'festival') return false
-    if (filterFriend !== 'all' && !c.friends.includes(filterFriend)) return false
+    if (filterFriend !== 'all' && !getFriends(c).includes(filterFriend)) return false
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
-    if (filterSolo && !(c.friends.length === 0 || c.solo)) return false
+    if (filterSolo && !(getFriends(c).length === 0 || c.solo)) return false
     if (filterGenre !== 'all' && c.genre !== filterGenre) return false
     if (filterSubgenre !== 'all' && c.subgenre !== filterSubgenre) return false
     if (filterCountry !== 'all' && (c.country || '').trim() !== filterCountry) return false
     if (search) {
       const q = search.toLowerCase()
-      return c.artist.toLowerCase().includes(q) ||
-        c.venue.toLowerCase().includes(q) ||
-        c.city.toLowerCase().includes(q) ||
+      return (c.artist || '').toLowerCase().includes(q) ||
+        (c.venue || '').toLowerCase().includes(q) ||
+        (c.city || '').toLowerCase().includes(q) ||
         (c.tour || '').toLowerCase().includes(q) ||
-        c.friends.some(f => f.toLowerCase().includes(q)) ||
-        (c.support || []).some(s => s.toLowerCase().includes(q)) ||
+        getFriends(c).some(f => f.toLowerCase().includes(q)) ||
+        (c.support || []).some(s => getSupportName(s).toLowerCase().includes(q)) ||
         (c.notes || '').toLowerCase().includes(q)
     }
     return true
   }).sort((a, b) => {
     if (sortOrder === 'oldest') return a.date.localeCompare(b.date)
-    if (sortOrder === 'alpha') return a.artist.localeCompare(b.artist)
+    if (sortOrder === 'alpha') return (a.artist || '').localeCompare(b.artist || '')
     if (sortOrder === 'rating') return (b.rating || 0) - (a.rating || 0)
     if (sortOrder === 'price') return (b.ticketPrice || 0) - (a.ticketPrice || 0)
     return b.date.localeCompare(a.date)
@@ -4843,9 +4843,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           ])].filter(Boolean).sort()}
           recentFriends={[...new Set(
             [...concerts]
-              .filter(c => isPastDate(c.date) && (c.friends||[]).length > 0)
+              .filter(c => isPastDate(c.date) && getFriends(c).length > 0)
               .sort((a, b) => b.date.localeCompare(a.date))
-              .flatMap(c => c.friends)
+              .flatMap(c => getFriends(c))
           )].slice(0, 3)}
         />
       </div>

@@ -1163,6 +1163,17 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const topSongsRows = settings.topSongsRows || 10;
   const topSongs = Object.values(songCount).sort((a,b) => b.count - a.count).slice(0, topSongsRows);
 
+  // All covers witnessed
+  const coversList = [];
+  past.forEach(c => {
+    const collect = (songList, performer) => getSongList(songList).forEach(song => {
+      const cov = getSongCover(song);
+      if (cov) coversList.push({ name: getSongName(song), performer, original: typeof cov === 'string' ? cov : null, concert: c });
+    });
+    collect(c.setlist, c.artist);
+    Object.entries(c.supportSetlists || {}).forEach(([a, songs]) => collect(songs, a));
+  });
+
   // Friends frequency
   const friendCount = {};
   past.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
@@ -1451,6 +1462,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         ...(rated.length > 0 ? [{ id: "ratings", label: "⭐ Ratings" }] : []),
         { id: "language",   label: "🗣️ Language" },
         ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
+        ...(coversList.length > 0 ? [{ id: "covers", label: "↩️ Covers" }] : []),
+      ]
+    },
+    {
+      id: "records", label: "Records",
+      charts: [
+        { id: "records",    label: "🏆 Records" },
+        { id: "milestones", label: "🎖️ Artist milestones" },
+        { id: "recap",      label: "🎁 Year recap" },
       ]
     },
     {
@@ -1464,6 +1484,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       id: "venues", label: "Venues",
       charts: [
         { id: "venues",      label: "📍 Favourite venues" },
+        { id: "venue-loyalty", label: "💜 Venue loyalty" },
         { id: "venue-size",  label: "🏟️ Venue size" },
         { id: "countries",   label: "🌍 Countries" },
       ]
@@ -1498,8 +1519,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   };
   const [selectedChart, setSelectedChart] = useState("artists");
   const [selectedSong, setSelectedSong] = useState(null);
+  const [selectedVenue, setSelectedVenue] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
+  useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
   const [chartOptions, setChartOptions] = useState({});
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
@@ -2211,13 +2234,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
             <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
             {vItems.map(([name, count], i) => (
-              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <button key={name} onClick={() => setSelectedVenue(vView === "room" ? name.split(" · ")[0] : name)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
                   <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
                 </div>
                 <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}x</span>
-              </div>
+              </button>
             ))}
           </div>
         );
@@ -2407,12 +2430,206 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <span style={{ fontSize: i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
                       {i < 3 ? medals[i] : `#${i+1}`}
                     </span>
-                    <span style={{ color: "#c4c2f0", fontSize: 13 }}>{song}<span style={{ color: "#6b6a8f", fontSize: 11 }}> — {artist}</span></span>
+                    <span style={{ color: "#c4c2f0", fontSize: 13 }}>{song}<br/><span style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{artist}</span></span>
                   </div>
                   <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}×</span>
                 </button>
               ))
             }
+          </div>
+        );
+      }
+      case "covers": {
+        const byOriginal = {};
+        coversList.forEach(cv => { const k = cv.original || "unknown original"; byOriginal[k] = (byOriginal[k] || 0) + 1; });
+        const topOriginals = Object.entries(byOriginal).sort((a,b) => b[1]-a[1]).slice(0, 5);
+        const sorted = [...coversList].sort((a,b) => b.concert.date.localeCompare(a.concert.date));
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Most covered artists</div>
+            {topOriginals.map(([name, count], i) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
+                </div>
+                <span style={{ color: "#fb923c", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}×</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", margin: "14px 0 8px", paddingTop: 12, borderTop: "1px solid #1f1f35" }}>All covers witnessed · {coversList.length}</div>
+            {sorted.map((cv, i) => (
+              <button key={`${cv.concert.id}-${cv.name}-${i}`} onClick={() => onOpen(cv.concert)} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "5px 0", borderBottom: i < sorted.length - 1 ? "1px solid #16162a" : "none" }}>
+                <div style={{ color: "#c4c2f0", fontSize: 12 }}>{cv.name}</div>
+                <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>
+                  {cv.performer}{cv.original ? <span style={{ color: "#fb923c" }}> ↩ {cv.original}</span> : <span style={{ color: "#fb923c" }}> ↩ cover</span>} · {formatDate(cv.concert.date)}
+                </div>
+              </button>
+            ))}
+          </div>
+        );
+      }
+      case "records": {
+        const sortedShows = [...past].sort((a,b) => a.date.localeCompare(b.date));
+        const monthCount = {};
+        sortedShows.forEach(c => { const ym = c.date.slice(0,7); monthCount[ym] = (monthCount[ym] || 0) + 1; });
+        const yearCountR = {};
+        sortedShows.forEach(c => { const y = c.date.slice(0,4); yearCountR[y] = (yearCountR[y] || 0) + 1; });
+        const busiestMonth = Object.entries(monthCount).sort((a,b) => b[1]-a[1])[0];
+        const busiestYear = Object.entries(yearCountR).sort((a,b) => b[1]-a[1])[0];
+        const fmtMonth = ym => new Date(ym + "-15").toLocaleString("en", { month: "short", year: "numeric" });
+        let drought = null;
+        for (let i = 1; i < sortedShows.length; i++) {
+          const d = Math.round((new Date(sortedShows[i].date) - new Date(sortedShows[i-1].date)) / 86400000);
+          if (!drought || d > drought.days) drought = { days: d, from: sortedShows[i-1].date, to: sortedShows[i].date };
+        }
+        let bestStreak = 0; { let prev = null, run = 0;
+          Object.keys(monthCount).sort().forEach(m => {
+            if (prev) { const [py, pm] = prev.split("-").map(Number); const [yy, mm] = m.split("-").map(Number);
+              run = ((yy === py && mm === pm + 1) || (yy === py + 1 && pm === 12 && mm === 1)) ? run + 1 : 1;
+            } else run = 1;
+            if (run > bestStreak) bestStreak = run; prev = m;
+          });
+        }
+        const priced = past.filter(c => c.ticketPrice > 0);
+        const priciest = priced.length ? priced.reduce((a,b) => b.ticketPrice > a.ticketPrice ? b : a) : null;
+        const cheapest = priced.length ? priced.reduce((a,b) => b.ticketPrice < a.ticketPrice ? b : a) : null;
+        const freeShows = past.filter(c => !c.ticketPrice).length;
+        const Row = ({ label, value, sub, onClick }) => (
+          <button onClick={onClick} disabled={!onClick} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, width: "100%", background: "none", border: "none", padding: "7px 0", borderBottom: "1px solid #16162a", cursor: onClick ? "pointer" : "default", textAlign: "left" }}>
+            <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{label}</span>
+            <span style={{ fontSize: 12, color: "#c4c2f0", textAlign: "right" }}>{value}{sub && <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}> {sub}</span>}</span>
+          </button>
+        );
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "6px 14px" }}>
+            {busiestMonth && <Row label="busiest month" value={fmtMonth(busiestMonth[0])} sub={`${busiestMonth[1]} shows`} />}
+            {busiestYear && <Row label="busiest year" value={busiestYear[0]} sub={`${busiestYear[1]} shows`} />}
+            {bestStreak > 1 && <Row label="longest streak" value={`${bestStreak} months`} sub="in a row with shows" />}
+            {drought && <Row label="longest drought" value={`${drought.days} days`} sub={`${formatDate(drought.from)} → ${formatDate(drought.to)}`} />}
+            {priciest && <Row label="priciest ticket" value={`€${priciest.ticketPrice} · ${priciest.artist}`} sub={priciest.date.slice(0,4)} onClick={() => onOpen(priciest)} />}
+            {cheapest && cheapest !== priciest && <Row label="cheapest ticket" value={`€${cheapest.ticketPrice} · ${cheapest.artist}`} sub={cheapest.date.slice(0,4)} onClick={() => onOpen(cheapest)} />}
+            {freeShows > 0 && <Row label="free shows" value={`${freeShows}×`} />}
+          </div>
+        );
+      }
+      case "milestones": {
+        const tiers = [
+          { min: 10, label: "10+ shows", color: "#facc15" },
+          { min: 5,  label: "5–9 shows", color: "#a78bfa" },
+          { min: 3,  label: "3–4 shows", color: "#6b6a8f" },
+        ];
+        const totals = Object.entries(artistCount)
+          .map(([n, c]) => [n, c.headliner + c.support + c.guest + (c.festival || 0)])
+          .filter(([, t]) => t >= 3)
+          .sort((a,b) => b[1] - a[1]);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            {totals.length === 0
+              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>See an artist 3+ times to start collecting milestones</div>
+              : tiers.map(({ min, label, color }, ti) => {
+                const max = ti === 0 ? Infinity : tiers[ti-1].min - 1;
+                const inTier = totals.filter(([, t]) => t >= min && t <= max);
+                if (inTier.length === 0) return null;
+                return (
+                  <div key={label} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{label}</div>
+                    {inTier.map(([name, t]) => (
+                      <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
+                        <span style={{ color, fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{t}×</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })
+            }
+          </div>
+        );
+      }
+      case "venue-loyalty": {
+        const topV = topVenues[0];
+        const pct = topV && past.length ? Math.round((topV[1] / past.length) * 100) : 0;
+        const firstSeen = {};
+        [...past].sort((a,b) => a.date.localeCompare(b.date)).forEach(c => { if (c.venue && !firstSeen[c.venue]) firstSeen[c.venue] = c.date.slice(0,4); });
+        const newPerYear = {};
+        Object.values(firstSeen).forEach(y => { newPerYear[y] = (newPerYear[y] || 0) + 1; });
+        const yearsDesc = Object.keys(newPerYear).sort((a,b) => b.localeCompare(a));
+        const maxNew = Math.max(...Object.values(newPerYear), 1);
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            {topV && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 24, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{pct}%</div>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>of your shows were at <span style={{ color: "#c4c2f0" }}>{topV[0]}</span> ({topV[1]}×)</div>
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>New venues discovered per year</div>
+            {yearsDesc.map(y => (
+              <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                <span style={{ color: "#c4c2f0", fontSize: 12, width: 36, flexShrink: 0 }}>{y}</span>
+                <div style={{ height: 4, borderRadius: 2, background: "#38bdf8", width: Math.max(8, (newPerYear[y] / maxNew) * 110) }} />
+                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{newPerYear[y]}</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 10 }}>{Object.keys(firstSeen).length} venues visited in total</div>
+          </div>
+        );
+      }
+      case "recap": {
+        const years = [...new Set(past.map(c => c.date.slice(0,4)))].sort((a,b) => b.localeCompare(a));
+        if (years.length === 0) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: 14, color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>No past shows yet</div>;
+        const ry = chartOpt("recap", years[0]);
+        const yp = past.filter(c => c.date.slice(0,4) === ry);
+        const earlier = past.filter(c => c.date.slice(0,4) < ry);
+        const earlierArtists = new Set(earlier.flatMap(c => [c.artist, ...(c.support || []).map(getSupportName), ...(c.acts || []).map(a => a.name || "")]).filter(Boolean));
+        const yArtistCount = {};
+        yp.forEach(c => { if (c.type !== "festival") yArtistCount[c.artist] = (yArtistCount[c.artist] || 0) + 1; });
+        const yTopArtist = Object.entries(yArtistCount).sort((a,b) => b[1]-a[1])[0];
+        const ySongCount = {};
+        yp.forEach(c => {
+          const tally = (song, performer) => { const n = getSongName(song); if (!n) return; const cov = getSongCover(song); const a = (typeof cov === "string" && cov) || performer || ""; const k = `${n} — ${a}`; ySongCount[k] = (ySongCount[k] || 0) + 1; };
+          getSongList(c.setlist).forEach(s => tally(s, c.artist));
+          Object.entries(c.supportSetlists || {}).forEach(([an, songs]) => getSongList(songs).forEach(s => tally(s, an)));
+        });
+        const yTopSong = Object.entries(ySongCount).sort((a,b) => b[1]-a[1])[0];
+        const ySpent = yp.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+        const yVenueCount = {};
+        yp.forEach(c => { if (c.venue) yVenueCount[c.venue] = (yVenueCount[c.venue] || 0) + 1; });
+        const yTopVenue = Object.entries(yVenueCount).sort((a,b) => b[1]-a[1])[0];
+        const yNewArtists = [...new Set(yp.flatMap(c => [c.artist, ...(c.support || []).map(getSupportName), ...(c.acts || []).map(a => a.name || "")]).filter(Boolean))].filter(a => !earlierArtists.has(a)).length;
+        const yFests = yp.filter(c => c.type === "festival").length;
+        const Big = ({ value, label }) => (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: 9, color: "#9b97d4", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{label}</div>
+          </div>
+        );
+        const Line = ({ label, value }) => value ? (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "6px 0", borderBottom: "1px solid #ffffff14" }}>
+            <span style={{ fontSize: 10, color: "#9b97d4", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{label}</span>
+            <span style={{ fontSize: 12, color: "#e2e0ff", textAlign: "right" }}>{value}</span>
+          </div>
+        ) : null;
+        return (
+          <div>
+            <div style={{ display: "flex", gap: 4, marginBottom: 12, flexWrap: "wrap" }}>
+              {years.map(y => (
+                <button key={y} onClick={() => setChartOpt("recap", y)} style={{ padding: "3px 10px", borderRadius: 99, fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: 600, background: ry === y ? "#a78bfa" : "none", color: ry === y ? "#0c0c14" : "#5a5880", border: `1px solid ${ry === y ? "#a78bfa" : "#1f1f35"}` }}>{y}</button>
+              ))}
+            </div>
+            <div style={{ background: "linear-gradient(150deg, #2a1a4a 0%, #13131f 55%, #1a1030 100%)", border: "1px solid #3d3564", borderRadius: 16, padding: "20px 16px" }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>{ry} in concerts</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+                <Big value={yp.length} label="shows" />
+                <Big value={yFests} label="festivals" />
+                <Big value={`€${Math.round(ySpent)}`} label="spent" />
+              </div>
+              <Line label="top artist" value={yTopArtist && `${yTopArtist[0]} (${yTopArtist[1]}×)`} />
+              <Line label="top song" value={yTopSong && `${yTopSong[0]} (${yTopSong[1]}×)`} />
+              <Line label="top venue" value={yTopVenue && `${yTopVenue[0]} (${yTopVenue[1]}×)`} />
+              <Line label="new artists seen" value={yNewArtists > 0 ? `${yNewArtists}` : null} />
+              <div style={{ fontSize: 9, color: "#5a5880", fontFamily: "'DM Mono', monospace", marginTop: 12, textAlign: "center" }}>settracker · screenshot & share</div>
+            </div>
           </div>
         );
       }
@@ -2467,7 +2684,38 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       })()}
-      {!selectedSong && <>
+      {!selectedSong && selectedVenue && (() => {
+        const atVenue = concerts.filter(c => c.venue === selectedVenue).sort((a, b) => b.date.localeCompare(a.date));
+        const pastAt = atVenue.filter(c => isPast(c.date));
+        return (
+          <div>
+            <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={() => setSelectedVenue(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+              <div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedVenue}</div>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{pastAt.length}× visited{atVenue[0]?.city ? ` · ${atVenue[0].city}` : ""}</div>
+              </div>
+            </div>
+            <div style={{ padding: "14px 16px" }}>
+              {atVenue.map(c => (
+                <button key={c.id} onClick={() => onOpen(c)} style={{
+                  width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35",
+                  borderLeft: `3px solid ${isPast(c.date) ? "#a78bfa" : "#38bdf8"}`,
+                  borderRadius: 10, padding: "11px 14px", cursor: "pointer", marginBottom: 6, display: "flex", flexDirection: "column", gap: 2
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(c.date)}</span>
+                    {!isPast(c.date) && <span style={{ fontSize: 9, color: "#38bdf8", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#0e2030", borderRadius: 99 }}>upcoming</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 600 }}>{c.artist}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.room ? `${c.room} · ` : ""}{c.rating ? `★ ${c.rating}` : ""}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+      {!selectedSong && !selectedVenue && <>
       {/* Tab switcher */}
       <div style={{ display: "flex", borderBottom: "1px solid #0d1a14", marginBottom: 0, alignItems: "stretch" }}>
         {!hideTabs && [{ id: "summary", label: "Summary" }, { id: "charts", label: "Charts" }, { id: "friends", label: "Friends" }].map(t => (
@@ -2724,6 +2972,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     </div>
                   );
                 })}
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const noSetlist = past.filter(c => c.type !== "festival" && getSongList(c.setlist).length === 0).length;
+            const noPrice = past.filter(c => !c.ticketPrice && c.ticketPrice !== 0).length;
+            const noRating = past.filter(c => !c.rating).length;
+            const parts = [noSetlist > 0 && `${noSetlist} without setlist`, noPrice > 0 && `${noPrice} without price`, noRating > 0 && `${noRating} unrated`].filter(Boolean);
+            if (parts.length === 0) return null;
+            return (
+              <div style={{ marginTop: 12, fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "center" }}>
+                fill the gaps: {parts.join(" · ")}
               </div>
             );
           })()}

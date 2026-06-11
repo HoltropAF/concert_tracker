@@ -49,3 +49,26 @@ was typed.
 - Song stats: only string covers are attributed to the original artist; unlinked covers
   stay credited to the performing artist. Same for the song detail matcher.
 - Artist page "Covered by others" unaffected (string match only, as intended).
+
+---
+
+## 2026-06-11 (3) — Stats expansion
+
+**New "Records" chart group:**
+- 🏆 Records: busiest month & year, longest streak of consecutive months with shows,
+  longest drought between shows, priciest & cheapest ticket (tappable), free show count.
+- 🎖️ Artist milestones: artists seen 10+/5–9/3–4 times, tiered.
+- 🎁 Year recap: shareable "Wrapped"-style card per year (shows, festivals, spent,
+  top artist/song/venue, new artists seen) with year selector.
+
+**Other additions:**
+- ↩️ Covers chart (Artists group, shows only if covers exist): most covered artists +
+  full list of covers witnessed, each tappable to the concert.
+- 💜 Venue loyalty chart (Venues group): % of shows at top venue, new venues per year,
+  total venues visited.
+- Favourite venues rows now tappable → venue detail page listing all shows there
+  (incl. upcoming), each tappable to the concert.
+- Top songs: artist now on its own smaller line (better on narrow screens).
+- Summary: "fill the gaps" nudge at the bottom (shows missing setlist / price / rating).
+
+All client-side; no schema or API changes.

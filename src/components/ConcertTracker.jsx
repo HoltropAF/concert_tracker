@@ -1535,10 +1535,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
   const summaryFinType = settings.summaryFinType || 'all';
-  const summaryPast = past.filter(c =>
-    (summaryYear === 'all' || c.date.slice(0,4) === summaryYear) &&
-    (summaryFinType === 'all' || c.type === (summaryFinType === 'festivals' ? 'festival' : 'concert'))
-  );
+  const summaryPast = past.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
   const hiddenCharts = settings.hiddenCharts || [];
@@ -2788,21 +2785,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {(() => {
             const curYr = String(new Date().getFullYear());
             return (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ display: "flex" }}>
-                  {[{ id: 'all', label: 'All' }, { id: 'concerts', label: 'Concerts' }, { id: 'festivals', label: 'Festivals' }].map(({ id, label }) => (
-                    <button key={id} onClick={() => onUpdateSetting('summaryFinType', id)} style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      padding: "2px 8px 2px 0", marginRight: 6,
-                      fontSize: 11, fontFamily: "'DM Mono', monospace",
-                      color: summaryFinType === id ? (id === 'festivals' ? "#fb923c" : "#a78bfa") : "#4a4870",
-                      fontWeight: summaryFinType === id ? 700 : 400,
-                      borderBottom: summaryFinType === id ? `1px solid ${id === 'festivals' ? "#fb923c" : "#a78bfa"}` : "1px solid transparent",
-                      letterSpacing: "0.04em",
-                    }}>{label}</button>
-                  ))}
-                </div>
-                <div style={{ display: "flex" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
                 {[{ id: 'all', label: 'All time' }, { id: curYr, label: curYr }].map(({ id, label }) => (
                   <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
                     background: "none", border: "none", cursor: "pointer",
@@ -2814,7 +2797,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     letterSpacing: "0.04em",
                   }}>{label}</button>
                 ))}
-                </div>
               </div>
             );
           })()}
@@ -2865,8 +2847,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             </div>
             {(() => {
               const allSorted = [...concerts].filter(c =>
-                (summaryYear === 'all' || c.date.slice(0,4) === summaryYear) &&
-                (summaryFinType === 'all' || c.type === (summaryFinType === 'festivals' ? 'festival' : 'concert'))
+                summaryYear === 'all' || c.date.slice(0,4) === summaryYear
               ).sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;

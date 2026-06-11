@@ -103,3 +103,12 @@ All client-side; no schema or API changes.
 - Hardware/gesture back goes section → hub → summary.
 - Removed the cramped chart-group pill bar above the bottom nav (navigation now in-page).
 - Hidden groups/charts (Settings → Stats display) are respected in the hub.
+
+---
+
+## 2026-06-11 (6) — Remove concert/festival filter from summary
+
+Per user feedback: removed the All / Concerts / Festivals pills from the summary page.
+Year toggle (All time / current year) remains and still filters the whole page
+(top boxes, cumulative chart, donuts). Concert vs festival breakdowns live in the
+stats sections (Financial averages, etc.) instead.

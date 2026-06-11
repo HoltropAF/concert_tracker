@@ -44,8 +44,9 @@ const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'sup
 const getFriends = c => Array.isArray(c?.friends) ? c.friends : [];
 
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
-const getSongInfo = s => typeof s === 'string' ? null : (s.info || null);
-const getSongCover = s => typeof s === 'string' ? null : (s.cover || null);
+const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
+const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
+const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 
 const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee","#facc15","#fb7185"];
 const GENRE_COLORS = DONUT_PALETTE;
@@ -327,7 +328,7 @@ function ConcertCard({ concert, onOpen, compact = false }) {
               upcoming
             </div>
           )}
-          {(concert.setlist?.length > 0 || Object.values(concert.supportSetlists || {}).some(s => s.length > 0)) && (
+          {(getSongList(concert.setlist).length > 0 || Object.values(concert.supportSetlists || {}).some(s => getSongList(s).length > 0)) && (
             <div style={{ fontSize: 11, color: "#4a4870", marginTop: 4 }}>♪</div>
           )}
         </div>
@@ -338,7 +339,8 @@ function ConcertCard({ concert, onOpen, compact = false }) {
 
 function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [] }) {
   const effectKey = concert.id + (overrideArtist || '');
-  const [songs, setSongs] = useState(overrideSongs ?? concert.setlist ?? []);
+  const sourceSongs = overrideSongs ?? concert.setlist;
+  const [songs, setSongs] = useState(() => getSongList(sourceSongs));
   const [songInput, setSongInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [fetchState, setFetchState] = useState('idle');
@@ -346,9 +348,13 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const [editCoverIdx, setEditCoverIdx] = useState(null);
   const [coverInput, setCoverInput] = useState('');
 
-  useEffect(() => { setSongs(overrideSongs ?? concert.setlist ?? []); }, [effectKey]);
+  useEffect(() => { setSongs(getSongList(sourceSongs)); }, [effectKey, overrideSongs, concert.setlist]);
 
-  const save = (newSongs) => { setSongs(newSongs); onSaveSetlist?.(newSongs); };
+  const save = (newSongs) => {
+    const next = getSongList(newSongs);
+    setSongs(next);
+    onSaveSetlist?.(next);
+  };
 
   const addSong = () => {
     const t = songInput.trim();
@@ -369,7 +375,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   };
 
   const coverSuggestions = coverInput.length > 0
-    ? allArtists.filter(a => a.toLowerCase().includes(coverInput.toLowerCase())).slice(0, 5)
+    ? allArtists.filter(a => String(a || '').toLowerCase().includes(coverInput.toLowerCase())).slice(0, 5)
     : [];
 
   const fetchByUrl = async () => {
@@ -709,12 +715,12 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             };
             const performers = [
               { key: '__headliner__', name: concert.artist, role: 'headliner',
-                songs: concert.setlist || [],
+                songs: getSongList(concert.setlist),
                 onSaveSetlist: (s) => onSave({ ...concert, setlist: s }) },
               ...(concert.support || []).map(s => {
                 const name = getSupportName(s); const role = getSupportRole(s);
                 return { key: name, name, role,
-                  songs: (concert.supportSetlists || {})[name] || [],
+                  songs: getSongList((concert.supportSetlists || {})[name]),
                   onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
               }),
             ];
@@ -995,12 +1001,12 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           };
           const performers = [
             { key: '__headliner__', name: concert.artist, role: 'headliner',
-              songs: form.setlist || [],
+              songs: getSongList(form.setlist),
               onSaveSetlist: (s) => update('setlist', s) },
             ...(concert.support || []).map(s => {
               const name = getSupportName(s); const role = getSupportRole(s);
               return { key: name, name, role,
-                songs: (form.supportSetlists || {})[name] || [],
+                songs: getSongList((form.supportSetlists || {})[name]),
                 onSaveSetlist: (ns) => setForm(f => ({ ...f, supportSetlists: { ...(f.supportSetlists || {}), [name]: ns } })) };
             }),
           ];
@@ -1036,7 +1042,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
                           overrideSongs={songs}
                           overrideArtist={key === '__headliner__' ? undefined : name}
                           onSaveSetlist={save}
-                          headlinerSongs={role === 'guest' && key !== '__headliner__' ? (form.setlist || []) : []}
+                          headlinerSongs={role === 'guest' && key !== '__headliner__' ? getSongList(form.setlist) : []}
                           allArtists={allArtists}
                         />
                       </div>
@@ -1142,8 +1148,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Songs frequency
   const songCount = {};
   past.forEach(c => {
-    (c.setlist || []).forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; });
-    Object.values(c.supportSetlists || {}).forEach(songs => songs.forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; }));
+    getSongList(c.setlist).forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; });
+    Object.values(c.supportSetlists || {}).forEach(songs => getSongList(songs).forEach(song => { const n = getSongName(song); songCount[n] = (songCount[n] || 0) + 1; }));
   });
   const topSongsRows = settings.topSongsRows || 10;
   const topSongs = Object.entries(songCount).sort((a,b) => b[1]-a[1]).slice(0, topSongsRows);
@@ -2410,10 +2416,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {selectedSong && (() => {
         const appearances = past.flatMap(c => {
           const result = [];
-          const mainSong = (c.setlist || []).find(s => getSongName(s) === selectedSong);
+          const mainSong = getSongList(c.setlist).find(s => getSongName(s) === selectedSong);
           if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), isSupport: false });
           Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
-            const s = songs.find(x => getSongName(x) === selectedSong);
+            const s = getSongList(songs).find(x => getSongName(x) === selectedSong);
             if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), isSupport: true });
           });
           return result;
@@ -3098,8 +3104,8 @@ function ArtistsView({ concerts, onOpen }) {
     const totalAppearances = pastShows.length + supportApps.length;
     const roleParts = [pastShows.length > 0 && `${pastShows.length} headliner`, supportOnlyCount > 0 && `${supportOnlyCount} support`, guestOnlyCount > 0 && `${guestOnlyCount} guest`, festivalOnlyCount > 0 && `${festivalOnlyCount} festival`].filter(Boolean);
     const artistSongCount = {};
-    pastShows.forEach(c => (c.setlist || []).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
-    supportApps.forEach(({ concert: c }) => ((c.supportSetlists || {})[selectedArtist] || []).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
+    pastShows.forEach(c => getSongList(c.setlist).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
+    supportApps.forEach(({ concert: c }) => getSongList((c.supportSetlists || {})[selectedArtist]).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
     const artistSongs = Object.entries(artistSongCount).sort((a,b) => b[1]-a[1]);
 
     // Songs of this artist covered by others
@@ -3107,7 +3113,7 @@ function ArtistsView({ concerts, onOpen }) {
     concerts.filter(c => isPast(c.date)).forEach(c => {
       const checkSongs = (songList, performingArtist) => {
         if (performingArtist === selectedArtist) return;
-        (songList || []).forEach(song => {
+        getSongList(songList).forEach(song => {
           if (getSongCover(song) === selectedArtist) {
             coversByOthers.push({ songName: getSongName(song), concert: c, performingArtist });
           }
@@ -3378,8 +3384,8 @@ function SongsView({ concerts, onOpen, settings }) {
 
   const songCount = {};
   past.forEach(c => {
-    (c.setlist || []).forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; });
-    Object.values(c.supportSetlists || {}).forEach(songs => songs.forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; }));
+    getSongList(c.setlist).forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; });
+    Object.values(c.supportSetlists || {}).forEach(songs => getSongList(songs).forEach(s => { const n = getSongName(s); songCount[n] = (songCount[n] || 0) + 1; }));
   });
   const totalUnique = Object.keys(songCount).length;
   const totalHeard = Object.values(songCount).reduce((a, b) => a + b, 0);
@@ -3393,10 +3399,10 @@ function SongsView({ concerts, onOpen, settings }) {
   if (selectedSong) {
     const appearances = past.flatMap(c => {
       const result = [];
-      const mainSong = (c.setlist || []).find(s => getSongName(s) === selectedSong);
+      const mainSong = getSongList(c.setlist).find(s => getSongName(s) === selectedSong);
       if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), isSupport: false });
       Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
-        const s = songs.find(x => getSongName(x) === selectedSong);
+        const s = getSongList(songs).find(x => getSongName(x) === selectedSong);
         if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), isSupport: true });
       });
       return result;
@@ -3968,13 +3974,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     // Sheet 2: Setlists (main artist + support acts, each song its own row)
     const setlistRows = [];
     concerts.forEach(c => {
-      (c.setlist || []).forEach((s, i) => setlistRows.push({
+      getSongList(c.setlist).forEach((s, i) => setlistRows.push({
         ConcertID: c.id, Date: c.date, MainArtist: c.artist,
         Performer: c.artist, IsSupport: 'no',
         Position: i + 1, Song: getSongName(s), Note: getSongInfo(s) || '',
       }));
       Object.entries(c.supportSetlists || {}).forEach(([artist, songs]) =>
-        songs.forEach((s, i) => setlistRows.push({
+        getSongList(songs).forEach((s, i) => setlistRows.push({
           ConcertID: c.id, Date: c.date, MainArtist: c.artist,
           Performer: artist, IsSupport: 'yes',
           Position: i + 1, Song: getSongName(s), Note: getSongInfo(s) || '',

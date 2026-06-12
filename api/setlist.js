@@ -2,7 +2,29 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { url } = req.query;
+  const apiKey = process.env.SETLISTFM_API_KEY;
+  const { url, artist, date } = req.query;
+
+  // Search mode: ?artist=X&date=YYYY-MM-DD → find the show and return songs + venue metadata
+  if (artist && date) {
+    if (!apiKey) return res.status(501).json({ error: 'search_unavailable' });
+    try {
+      const [y, m, d] = String(date).split('-');
+      const sfDate = `${d}-${m}-${y}`;
+      const apiRes = await fetch(`https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist)}&date=${sfDate}`, {
+        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+      });
+      if (apiRes.status === 404) return res.status(404).json({ error: 'not_found' });
+      if (!apiRes.ok) return res.status(apiRes.status).json({ error: `setlist.fm returned ${apiRes.status}` });
+      const data = await apiRes.json();
+      const sl = (data.setlist || [])[0];
+      if (!sl) return res.status(404).json({ error: 'not_found' });
+      return res.status(200).json(extractSetlist(sl));
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   const parsedUrl = parseSetlistUrl(url);
   if (!parsedUrl) {
     return res.status(400).json({ error: 'Invalid URL' });
@@ -10,7 +32,6 @@ export default async function handler(req, res) {
 
   try {
     // Best path: use the official API if a key is configured as a Vercel env var
-    const apiKey = process.env.SETLISTFM_API_KEY;
     if (apiKey) {
       const idMatch = parsedUrl.pathname.match(/([0-9a-f]{6,10})\.html/i);
       if (idMatch) {
@@ -19,14 +40,8 @@ export default async function handler(req, res) {
         });
         if (apiRes.ok) {
           const data = await apiRes.json();
-          const songs = (data.sets?.set || [])
-            .flatMap(set => (set.song || []).filter(s => !s.tape).map(s => ({
-              name: s.name,
-              info: s.info || null
-            })))
-            .filter(s => s.name)
-            .map(s => s.info ? s : s.name);
-          if (songs.length) return res.status(200).json({ songs });
+          const out = extractSetlist(data);
+          if (out.songs.length || out.venue) return res.status(200).json(out);
         }
       }
     }
@@ -98,4 +113,24 @@ function parseSongs(html) {
     if (name) songs.push(name);
   }
   return songs;
+}
+
+function extractSetlist(sl) {
+  const songs = (sl.sets?.set || [])
+    .flatMap(set => (set.song || []).filter(s => !s.tape).map(s => {
+      const out = { name: s.name };
+      if (s.info) out.info = s.info;
+      if (s.cover?.name) out.cover = s.cover.name;
+      return out.info || out.cover ? out : out.name;
+    }))
+    .filter(s => (typeof s === 'string' ? s : s.name));
+  return {
+    songs,
+    artist: sl.artist?.name || null,
+    venue: sl.venue?.name || null,
+    city: sl.venue?.city?.name || null,
+    country: sl.venue?.city?.country?.name || null,
+    tour: sl.tour?.name || null,
+    url: sl.url || null,
+  };
 }

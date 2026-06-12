@@ -3821,6 +3821,8 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   const [friendInput, setFriendInput] = useState('')
   const [showFriendPicker, setShowFriendPicker] = useState(false)
   const [errors, setErrors] = useState({})
+  const [sfStatus, setSfStatus] = useState(null)
+  const [sfMsg, setSfMsg] = useState('')
   const [artistSuggestions, setArtistSuggestions] = useState([])
   const [showDetails, setShowDetails] = useState(initialType === 'festival')
   const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
@@ -4041,6 +4043,38 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 <div style={{ marginBottom: 10 }}>
                   {fieldLabel('Date *')}
                   <input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <button
+                    disabled={!form.artist || !form.date || sfStatus === 'loading'}
+                    onClick={async () => {
+                      setSfStatus('loading'); setSfMsg('');
+                      try {
+                        const r = await fetch(`/api/setlist?artist=${encodeURIComponent(form.artist)}&date=${form.date}`, { signal: AbortSignal.timeout(15000) });
+                        const data = await r.json().catch(() => ({}));
+                        if (!r.ok) {
+                          setSfStatus('error');
+                          setSfMsg(r.status === 404 ? 'No setlist found for that artist + date' : r.status === 501 ? 'Search not available (no API key configured)' : 'Fetch failed — try again');
+                          return;
+                        }
+                        setForm(f => ({
+                          ...f,
+                          venue: f.venue || data.venue || f.venue,
+                          city: f.city || data.city || f.city,
+                          country: f.country || data.country || f.country,
+                          tour: f.tour || data.tour || f.tour,
+                          setlist: (f.setlist && f.setlist.length) ? f.setlist : (data.songs || []),
+                        }));
+                        setSfStatus('done');
+                        setSfMsg(`Filled${data.venue ? ` · ${data.venue}` : ''}${data.songs?.length ? ` · ${data.songs.length} songs` : ' · no songs listed'}`);
+                      } catch (e) {
+                        setSfStatus('error'); setSfMsg('Fetch failed — check your connection');
+                      }
+                    }}
+                    style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: (!form.artist || !form.date) ? '#2e2e4a' : '#a78bfa', fontSize: 12, padding: '8px', cursor: (!form.artist || !form.date) ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                    {sfStatus === 'loading' ? 'Searching setlist.fm…' : '✨ Auto-fill from setlist.fm'}
+                  </button>
+                  {sfMsg && <div style={{ fontSize: 10, color: sfStatus === 'error' ? '#f87171' : '#4ade80', fontFamily: "'DM Mono', monospace", marginTop: 4, textAlign: 'center' }}>{sfMsg}</div>}
                 </div>
                 {fieldLabel('Tour')}
                 <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />

@@ -155,3 +155,15 @@ shows a "· cover" badge, and unique/total counts reflect the split.
 - Summary page and its year toggle remain type-agnostic on purpose (per earlier
   feedback); the "fill the gaps" nudge also stays global.
 - The "Averages" chart naturally shows only the relevant section when filtered.
+
+---
+
+## 2026-06-12 (2) — Add form step 1: setlist.fm auto-fill
+
+- api/setlist.js: new search mode `?artist=X&date=YYYY-MM-DD` (uses official API,
+  needs SETLISTFM_API_KEY env var on Vercel) returning songs + venue/city/country/
+  tour. URL mode now also returns venue metadata when the key is present. Covers
+  marked on setlist.fm are mapped to the app's cover field automatically.
+- Add-concert form (Show card): "✨ Auto-fill from setlist.fm" button under the date.
+  Fills only empty fields (never overwrites typed values) and imports the setlist
+  if none was added. Clear success/error states incl. "no API key configured".

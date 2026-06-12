@@ -341,3 +341,13 @@ page behind doesn't move).
 9. Artist page: big "N× seen live" hero, avg ticket price, merch items + spend.
 10. Friend page: "Photos together" strip + "Together" stats (avg rating, most seen
     artist together, usual venue).
+
+---
+
+## 2026-06-12 (16) — Settings: per-category tag toggles + counts
+
+- The single "Tags & ticket options" section is split into one collapsible per
+  category (🎸 Genres, 🎶 Subgenres, 🗣️ Languages, 🏟️ Venue sizes, 🛍️ Merch items,
+  🎫 Ticket types, ✨ Ticket add-ons), each with its item count in the header —
+  the closed headers double as a settings summary at a glance.
+- Saved venues and Friend groups headers now show their counts too.

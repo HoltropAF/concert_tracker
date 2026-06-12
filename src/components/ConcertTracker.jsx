@@ -3848,6 +3848,48 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     } catch (e) { setSfStatus('error'); setSfMsg('Fetch failed — check your connection'); }
   };
   const quickUpcoming = form.date && !isPast(form.date);
+  const autoFillFromSearch = async () => {
+    setSfStatus('loading'); setSfMsg('');
+    try {
+      const r = await fetch(`/api/setlist?artist=${encodeURIComponent(form.artist)}&date=${form.date}`, { signal: AbortSignal.timeout(15000) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setSfStatus('error');
+        setSfMsg(r.status === 404 ? 'No setlist found for that artist + date' : r.status === 501 ? 'Search not available (no API key configured)' : 'Fetch failed — try again');
+        return;
+      }
+      setForm(f => ({
+        ...f,
+        venue: f.venue || data.venue || f.venue,
+        city: f.city || data.city || f.city,
+        country: f.country || data.country || f.country,
+        tour: f.tour || data.tour || f.tour,
+        setlist: (f.setlist && f.setlist.length) ? f.setlist : (data.songs || []),
+      }));
+      setSfStatus('done');
+      setSfMsg(`Filled${data.venue ? ` · ${data.venue}` : ''}${data.songs?.length ? ` · ${data.songs.length} songs` : ' · no songs listed'}`);
+    } catch (e) {
+      setSfStatus('error'); setSfMsg('Fetch failed — check your connection');
+    }
+  };
+
+  const [citySuggestions, setCitySuggestions] = useState([])
+  const [countrySuggestions, setCountrySuggestions] = useState([])
+  const cityBook = {};
+  [...concerts].sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach(c => { if (c.city) cityBook[c.city] = c.country || ''; });
+  const countryList = [...new Set(concerts.map(c => c.country).filter(Boolean))].sort();
+  const handleCityChange = (val) => {
+    update('city', val)
+    if (val.trim().length > 0) setCitySuggestions(Object.keys(cityBook).filter(v => v.toLowerCase().includes(val.toLowerCase())).slice(0, 6))
+    else setCitySuggestions([])
+  }
+  const selectCity = (v) => { setForm(f => ({ ...f, city: v, country: f.country || cityBook[v] || f.country })); setCitySuggestions([]) }
+  const handleCountryChange = (val) => {
+    update('country', val)
+    if (val.trim().length > 0) setCountrySuggestions(countryList.filter(v => v.toLowerCase().includes(val.toLowerCase())).slice(0, 6))
+    else setCountrySuggestions([])
+  }
+  const selectCountry = (v) => { update('country', v); setCountrySuggestions([]) }
   const [artistSuggestions, setArtistSuggestions] = useState([])
   const [showDetails, setShowDetails] = useState(false)
   const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
@@ -4048,14 +4090,15 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   <div>{fieldLabel('Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                   <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
                 </div>
+                <button disabled={!form.artist || !form.date || sfStatus === 'loading'} onClick={autoFillFromSearch} style={{ width: '100%', marginBottom: 12, background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: (!form.artist || !form.date) ? '#2e2e4a' : '#a78bfa', fontSize: 12, padding: '8px', cursor: (!form.artist || !form.date) ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? 'Searching setlist.fm…' : '✨ Auto-fill from setlist.fm (artist + date)'}</button>
                 {fieldLabel('Venue *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
                   <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
-                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 {quickUpcoming
                   ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming show — rating & extras unlock after the date</div>
@@ -4085,8 +4128,8 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
-                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 {quickUpcoming
                   ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming festival — acts & extras unlock after the date</div>
@@ -4121,8 +4164,8 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
-                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
               </>)}
               {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />, (form.acts || []).length > 0)}
@@ -4147,30 +4190,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 <div style={{ marginBottom: 12 }}>
                   <button
                     disabled={!form.artist || !form.date || sfStatus === 'loading'}
-                    onClick={async () => {
-                      setSfStatus('loading'); setSfMsg('');
-                      try {
-                        const r = await fetch(`/api/setlist?artist=${encodeURIComponent(form.artist)}&date=${form.date}`, { signal: AbortSignal.timeout(15000) });
-                        const data = await r.json().catch(() => ({}));
-                        if (!r.ok) {
-                          setSfStatus('error');
-                          setSfMsg(r.status === 404 ? 'No setlist found for that artist + date' : r.status === 501 ? 'Search not available (no API key configured)' : 'Fetch failed — try again');
-                          return;
-                        }
-                        setForm(f => ({
-                          ...f,
-                          venue: f.venue || data.venue || f.venue,
-                          city: f.city || data.city || f.city,
-                          country: f.country || data.country || f.country,
-                          tour: f.tour || data.tour || f.tour,
-                          setlist: (f.setlist && f.setlist.length) ? f.setlist : (data.songs || []),
-                        }));
-                        setSfStatus('done');
-                        setSfMsg(`Filled${data.venue ? ` · ${data.venue}` : ''}${data.songs?.length ? ` · ${data.songs.length} songs` : ' · no songs listed'}`);
-                      } catch (e) {
-                        setSfStatus('error'); setSfMsg('Fetch failed — check your connection');
-                      }
-                    }}
+                    onClick={autoFillFromSearch}
                     style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: (!form.artist || !form.date) ? '#2e2e4a' : '#a78bfa', fontSize: 12, padding: '8px', cursor: (!form.artist || !form.date) ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace" }}>
                     {sfStatus === 'loading' ? 'Searching setlist.fm…' : '✨ Auto-fill from setlist.fm'}
                   </button>
@@ -4188,8 +4208,8 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 </div>
                 <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
-                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 {fieldLabel('Venue size')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(settings.venueSizes||[]).map(vs => <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.venueSize===vs ? '#a78bfa' : '#0c0c14', color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>)}</div>

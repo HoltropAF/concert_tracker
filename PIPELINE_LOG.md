@@ -205,3 +205,15 @@ shows a "· cover" badge, and unique/total counts reflect the split.
 - Upcoming-aware quick add: when the chosen date is in the future, rating and
   "went with" are replaced by an "upcoming — extras unlock after the date" hint,
   on both concert and festival quick add.
+
+---
+
+## 2026-06-12 (6) — Location autocomplete + auto-fill on quick add
+
+- City and Country fields autocomplete from your history everywhere in the add form
+  (concert + festival, quick + full). Picking a known city fills its country too;
+  country suggestions come from all countries you've logged.
+- The "✨ Auto-fill from setlist.fm (artist + date)" button now also sits on the
+  concert Quick add, under the date — alongside the paste-a-link row, so both
+  auto-fill paths are available without expanding the form.
+- Refactor: shared autoFillFromSearch handler (used by quick add and full Show card).

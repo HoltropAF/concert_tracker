@@ -351,3 +351,14 @@ page behind doesn't move).
   🎫 Ticket types, ✨ Ticket add-ons), each with its item count in the header —
   the closed headers double as a settings summary at a glance.
 - Saved venues and Friend groups headers now show their counts too.
+
+---
+
+## 2026-06-12 (17) — Settings de-emoji + stats hub removed
+
+- Settings: removed all emojis from tab labels, section headers, and tag category
+  titles (counts kept, e.g. "Genres (12)").
+- Stats: removed the "Explore your stats" 5-card hub page. The Stats tab now opens
+  directly in a chart section; navigation is the 5-button group bar at the bottom
+  (just above the main nav), plus swipe between sections. Back gesture returns to
+  summary.

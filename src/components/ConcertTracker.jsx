@@ -1610,7 +1610,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     },
   ];
 
-  useBackButton(() => { if (statsTab === "charts" && chartGroup) { setChartGroup(null); } else { setStatsTab("summary"); } }, statsTab === "charts" || statsTab === "friends");
+  useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
   const handleSwipeStart = (e) => { swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; };
   const handleSwipeEnd = (e) => {
@@ -1642,7 +1642,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     .filter(g => !hiddenChartGroups.includes(g.id))
     .map(g => ({ ...g, charts: g.charts.filter(c => !hiddenCharts.includes(c.id)) }))
     .filter(g => g.charts.length > 0);
-  const activeGroup = chartGroup ? (visibleChartGroups.find(g => g.id === chartGroup) || null) : null;
+  const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0] || null;
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
   const renderChart = (id) => {
@@ -3036,52 +3036,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         </div>
       )}
-      {statsTab === "charts" && !activeGroup && (() => {
-        const META = {
-          artists:   { icon: "🎤", sub: "genres · top artists · songs · covers", preview: topArtists[0]?.[0] },
-          friends:   { icon: "👯", sub: "solo vs friends · most shows with", preview: topFriends[0]?.[0] },
-          venues:    { icon: "📍", sub: "favourites · loyalty · countries", preview: topVenues[0]?.[0] },
-          financial: { icon: "💸", sub: "spending · averages · priciest", preview: totalSpent > 0 ? `€${Math.round(totalSpent)} total` : null },
-          merch:     { icon: "🛍️", sub: "overview · what I buy", preview: null },
-        };
-        const TypePills = () => (
-          <div style={{ display: "flex", gap: 4 }}>
-            {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
-              <button key={id} onClick={() => setChartType(id)} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: chartType === id ? 700 : 400, background: chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : 'none', color: chartType === id ? '#0c0c14' : '#5a5880', border: `1px solid ${chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : '#1f1f35'}` }}>{label}</button>
-            ))}
-          </div>
-        );
-        return (
-          <div style={{ padding: "16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Explore your stats</div>
-              <TypePills />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {visibleChartGroups.map(g => {
-                const m = META[g.id] || { icon: "◎", sub: "" };
-                return (
-                  <button key={g.id} onClick={() => { setChartGroup(g.id); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{
-                    background: "#13131f", border: "1px solid #1f1f35", borderRadius: 14,
-                    padding: "14px 12px", cursor: "pointer", textAlign: "left",
-                    display: "flex", flexDirection: "column", gap: 6, minHeight: 92
-                  }}>
-                    <span style={{ fontSize: 20, lineHeight: 1 }}>{m.icon}</span>
-                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>{g.label}</span>
-                    {m.preview
-                      ? <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.preview}</span>
-                      : <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.4 }}>{m.sub}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
       {statsTab === "charts" && activeGroup && (
         <div style={{ padding: "0" }} onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}>
           <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5 }}>
-            <button onClick={() => setChartGroup(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
               {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
@@ -4944,10 +4901,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
         {[
-          { id: 'preferences', label: '⚙️ General' },
-          { id: 'tags', label: '🏷️ Tags' },
-          { id: 'people', label: '👥 People' },
-          { id: 'data', label: '💾 Data' },
+          { id: 'preferences', label: 'General' },
+          { id: 'tags', label: 'Tags' },
+          { id: 'people', label: 'People' },
+          { id: 'data', label: 'Data' },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
             minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 11,
@@ -5012,15 +4969,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {activeSettingsTab === 'tags' && <>
       {[
-        { icon: "🎸", label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
-        { icon: "🎶", label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
-        { icon: "🗣️", label: "Languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
-        { icon: "🏟️", label: "Venue sizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
-        { icon: "🛍️", label: "Merch items", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
-        { icon: "🎫", label: "Ticket types", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
-        { icon: "✨", label: "Ticket add-ons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
-      ].map(({ icon, label, items, ...props }) => (
-        <Collapsible key={label} title={`${icon} ${label} (${items.length})`} {...sec(`tag-${label}`)}>
+        { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
+        { label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
+        { label: "Languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
+        { label: "Venue sizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
+        { label: "Merch items", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        { label: "Ticket types", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
+        { label: "Ticket add-ons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
+      ].map(({ label, items, ...props }) => (
+        <Collapsible key={label} title={`${label} (${items.length})`} {...sec(`tag-${label}`)}>
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
             <TagManager items={items} {...props} />
           </div>
@@ -5029,7 +4986,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {activeSettingsTab === 'people' && <>
-      <Collapsible title={`📍 Saved venues (${savedVenues.length})`} {...sec("venues")}>
+      <Collapsible title={`Saved venues (${savedVenues.length})`} {...sec("venues")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           <button onClick={importVenuesFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>⤓ Import venues from my shows</button>
           {savedVenues.length > 0 && (
@@ -5069,7 +5026,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
-      <Collapsible title={`👯 Friend groups (${friendGroups.length})`} {...sec("friendGroups")}>
+      <Collapsible title={`Friend groups (${friendGroups.length})`} {...sec("friendGroups")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           {friendGroups.length > 0 && (
             <div style={{ marginBottom: 14 }}>
@@ -5103,7 +5060,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {activeSettingsTab === 'preferences' && (
-      <Collapsible title="📊 Stats display" {...sec("statsDisplay")}>
+      <Collapsible title="Stats display" {...sec("statsDisplay")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
           <SettingsRow label="Summary scope" sub="Default time range on summary page">
             <SettingsOptionPills
@@ -5162,7 +5119,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'data' && <>
-      <Collapsible title="🔐 Account & data" {...sec("account")}>
+      <Collapsible title="Account & data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <button onClick={handleXlsxExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Export XLSX</button>
@@ -5232,7 +5189,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
-      <Collapsible title="❓ Help" {...sec("help")}>
+      <Collapsible title="Help" {...sec("help")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           {[
             { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
@@ -5285,7 +5242,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [selected, setSelected] = useState(null)
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
-  const [chartGroup, setChartGroup] = useState(null)
+  const [chartGroup, setChartGroup] = useState('artists')
   const [search, setSearch] = useState('')
   const [filterYear, setFilterYear] = useState('all')
   const [filterType, setFilterType] = useState('all')

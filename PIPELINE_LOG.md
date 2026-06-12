@@ -300,3 +300,14 @@ replace, remove, reframe) live in edit mode's Photo card.
   - "📷 Show in list" — toggles photo banners on cards (persisted setting)
   - "Only with photo" — filters the list to shows that have a photo
     (counts toward the Filters (n) badge)
+
+---
+
+## 2026-06-12 (13) — Fix color shift in photo resizing
+
+Wide-gamut (Display P3, typical iPhone) photos were desaturated during the
+client-side resize because the canvas defaulted to sRGB. The resizer now requests
+a 'display-p3' canvas where the browser supports it (Safari 16.4+, modern Chrome),
+preserving saturated colors like stage lighting; falls back to sRGB elsewhere.
+Note: already-uploaded photos keep their stored colors until replaced (re-upload
+via Edit → Replace photo to re-process with the fix).

@@ -4,6 +4,8 @@ const MAX_DIM = 1280
 const QUALITY = 0.82
 
 // Downscale an image file to max 1280px (long edge) JPEG ~82% quality.
+// Uses a Display P3 canvas where supported so wide-gamut (iPhone) photos
+// keep their saturation instead of being squashed into sRGB.
 export async function resizeImage(file) {
   const bitmap = await createImageBitmap(file).catch(() => null)
   if (!bitmap) throw new Error('Could not read image')
@@ -12,7 +14,10 @@ export async function resizeImage(file) {
   const h = Math.round(bitmap.height * scale)
   const canvas = document.createElement('canvas')
   canvas.width = w; canvas.height = h
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h)
+  let ctx = null
+  try { ctx = canvas.getContext('2d', { colorSpace: 'display-p3' }) } catch (e) { /* fall through */ }
+  if (!ctx) ctx = canvas.getContext('2d')
+  ctx.drawImage(bitmap, 0, 0, w, h)
   bitmap.close?.()
   const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', QUALITY))
   if (!blob) throw new Error('Could not process image')

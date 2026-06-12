@@ -3824,8 +3824,32 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   const [sfStatus, setSfStatus] = useState(null)
   const [sfMsg, setSfMsg] = useState('')
   const [openCards, setOpenCards] = useState([])
+  const [sfUrl, setSfUrl] = useState('')
+  const fillFromSetlistUrl = async () => {
+    if (!sfUrl.trim()) return;
+    setSfStatus('loading'); setSfMsg('');
+    try {
+      const r = await fetch(`/api/setlist?url=${encodeURIComponent(sfUrl.trim())}`, { signal: AbortSignal.timeout(15000) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { setSfStatus('error'); setSfMsg('Could not read that link — is it a setlist.fm setlist URL?'); return; }
+      setForm(f => ({
+        ...f,
+        artist: f.artist || data.artist || f.artist,
+        date: f.date || data.date || f.date,
+        venue: f.venue || data.venue || f.venue,
+        city: f.city || data.city || f.city,
+        country: f.country || data.country || f.country,
+        tour: f.tour || data.tour || f.tour,
+        setlist: (f.setlist && f.setlist.length) ? f.setlist : (data.songs || []),
+      }));
+      setSfStatus('done');
+      setSfMsg(`Filled${data.artist ? ` · ${data.artist}` : ''}${data.songs?.length ? ` · ${data.songs.length} songs` : ''}${!data.venue ? ' · details need API key' : ''}`);
+      setSfUrl('');
+    } catch (e) { setSfStatus('error'); setSfMsg('Fetch failed — check your connection'); }
+  };
+  const quickUpcoming = form.date && !isPast(form.date);
   const [artistSuggestions, setArtistSuggestions] = useState([])
-  const [showDetails, setShowDetails] = useState(initialType === 'festival')
+  const [showDetails, setShowDetails] = useState(false)
   const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
   const addMerchItem = () => setForm(f => ({ ...f, merch: [...f.merch, { item: merchCategories[0], price: '' }] }))
   const updateMerch = (i, key, val) => setForm(f => ({ ...f, merch: f.merch.map((m, j) => j === i ? { ...m, [key]: val } : m) }))
@@ -4009,6 +4033,12 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
           if (!isFest && !showDetails) return (
             <>
               {card('Quick add', <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                  <input value={sfUrl} onChange={e => setSfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillFromSetlistUrl()} placeholder="✨ Paste setlist.fm link to auto-fill…" style={{ ...inputStyle, flex: 1 }} />
+                  <button onClick={fillFromSetlistUrl} disabled={!sfUrl.trim() || sfStatus === 'loading'} style={{ background: 'none', border: '1px solid #3d3564', borderRadius: 8, color: sfUrl.trim() ? '#a78bfa' : '#2e2e4a', fontSize: 12, padding: '0 14px', cursor: sfUrl.trim() ? 'pointer' : 'default', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? '…' : 'Fill'}</button>
+                </div>
+                {sfMsg && <div style={{ fontSize: 10, color: sfStatus === 'error' ? '#f87171' : '#4ade80', fontFamily: "'DM Mono', monospace", marginBottom: 8, textAlign: 'center' }}>{sfMsg}</div>}
+                <div style={{ height: 8 }} />
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   {fieldLabel('Artist *')}
                   <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
@@ -4027,9 +4057,44 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
                   <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
                 </div>
-                {fieldLabel('Went with')}
-                {experienceContent}
+                {quickUpcoming
+                  ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming show — rating & extras unlock after the date</div>
+                  : <>
+                    {fieldLabel('Went with')}
+                    {experienceContent}
+                  </>}
                 <button onClick={() => setShowDetails(true)} style={{ width: '100%', marginTop: 14, minHeight: 40, borderRadius: 8, border: '1px solid #2e2e50', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>More details</button>
+              </>)}
+            </>
+          );
+          if (isFest && !showDetails) return (
+            <>
+              {card('Quick add festival', <>
+                <div style={{ marginBottom: 10, position: 'relative' }}>
+                  {fieldLabel('Festival name *')}
+                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={errors.artist ? errStyle : inputStyle} />
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  <div>{fieldLabel('Start date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('End date')}<input type="date" value={form.endDate || ''} onChange={e => update('endDate', e.target.value)} style={inputStyle} /></div>
+                </div>
+                {fieldLabel('Festival site *')}
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Festival site / grounds" style={errors.venue ? errStyle : inputStyle} />
+                  {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                  <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
+                </div>
+                {quickUpcoming
+                  ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming festival — acts & extras unlock after the date</div>
+                  : <>
+                    {fieldLabel('Went with')}
+                    {experienceContent}
+                  </>}
+                <button onClick={() => setShowDetails(true)} style={{ width: '100%', marginTop: 14, minHeight: 40, borderRadius: 8, border: '1px solid #2e2e50', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>More details (acts, money, notes…)</button>
               </>)}
             </>
           );

@@ -124,8 +124,11 @@ function extractSetlist(sl) {
       return out.info || out.cover ? out : out.name;
     }))
     .filter(s => (typeof s === 'string' ? s : s.name));
+  let isoDate = null;
+  if (sl.eventDate) { const [d, m, y] = sl.eventDate.split('-'); if (y) isoDate = `${y}-${m}-${d}`; }
   return {
     songs,
+    date: isoDate,
     artist: sl.artist?.name || null,
     venue: sl.venue?.name || null,
     city: sl.venue?.city?.name || null,

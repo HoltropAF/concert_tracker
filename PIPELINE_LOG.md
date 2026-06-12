@@ -190,3 +190,18 @@ shows a "· cover" badge, and unique/total counts reflect the split.
   auto-fill or merch added earlier in the session).
 - Combined with auto-fill and venue memory, logging a show is now:
   artist → date → auto-fill → save.
+
+---
+
+## 2026-06-12 (5) — Quick add: festivals, setlist.fm paste, upcoming-aware
+
+- Festivals now open in a Quick add too (name, start/end date, site with venue
+  autocomplete, city/country, friends/rating) with "More details" expanding to the
+  full form (acts per day, money, notes). Previously festivals always opened the
+  long form.
+- Concert Quick add gets a "✨ Paste setlist.fm link" row at the top: pasting a
+  setlist URL fills artist, DATE, venue, city, country, tour and the setlist in one
+  go (API now returns the event date too). Only empty fields are filled.
+- Upcoming-aware quick add: when the chosen date is in the future, rating and
+  "went with" are replaced by an "upcoming — extras unlock after the date" hint,
+  on both concert and festival quick add.

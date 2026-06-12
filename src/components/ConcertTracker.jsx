@@ -4899,12 +4899,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14 }}>
         {[
           { id: 'preferences', label: 'General' },
           { id: 'tags', label: 'Tags' },
           { id: 'people', label: 'People' },
-          { id: 'data', label: 'Data' },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
             minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 11,
@@ -5118,7 +5117,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       )}
 
-      {activeSettingsTab === 'data' && <>
+      {activeSettingsTab === 'preferences' && <>
       <Collapsible title="Account & data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>

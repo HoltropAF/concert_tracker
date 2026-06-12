@@ -1110,7 +1110,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     topVenuesRows = 5, topExpensiveRows = 10,
     defaultStatsTab = "summary"
   } = settings;
-  const past = concerts.filter(c => isPast(c.date));
+  const [chartType, setChartType] = useState('all');
+  const typeMatch = c => chartType === 'all' || c.type === (chartType === 'festivals' ? 'festival' : 'concert');
+  const pastAll = concerts.filter(c => isPast(c.date));
+  const concertsT = concerts.filter(typeMatch);
+  const past = pastAll.filter(typeMatch);
   const shows = past.filter(c => c.type === "concert");
   const festivals = past.filter(c => c.type === "festival");
   const solo = past.filter(c => getFriends(c).length === 0);
@@ -1218,7 +1222,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Year counts including upcoming
   const allYearCount = {};
   const upcomingYearCount = {};
-  concerts.forEach(c => {
+  concertsT.forEach(c => {
     const y = getYear(c.date);
     allYearCount[y] = (allYearCount[y] || 0) + 1;
     if (!isPast(c.date)) upcomingYearCount[y] = (upcomingYearCount[y] || 0) + 1;
@@ -1527,7 +1531,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
   const summaryFinType = settings.summaryFinType || 'all';
-  const summaryPast = past.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
+  const summaryPast = pastAll.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
   const hiddenCharts = settings.hiddenCharts || [];
@@ -1634,7 +1638,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </>
             )}
             {sView === "cumulative" && (() => {
-              const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
+              const allSorted = [...concertsT].sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
               const n = allSorted.length;
               const W = 300, H = 80;
@@ -2915,9 +2919,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
 
           {(() => {
-            const noSetlist = past.filter(c => c.type !== "festival" && getSongList(c.setlist).length === 0).length;
-            const noPrice = past.filter(c => !c.ticketPrice && c.ticketPrice !== 0).length;
-            const noRating = past.filter(c => !c.rating).length;
+            const noSetlist = pastAll.filter(c => c.type !== "festival" && getSongList(c.setlist).length === 0).length;
+            const noPrice = pastAll.filter(c => !c.ticketPrice && c.ticketPrice !== 0).length;
+            const noRating = pastAll.filter(c => !c.rating).length;
             const parts = [noSetlist > 0 && `${noSetlist} without setlist`, noPrice > 0 && `${noPrice} without price`, noRating > 0 && `${noRating} unrated`].filter(Boolean);
             if (parts.length === 0) return null;
             return (
@@ -2937,9 +2941,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           financial: { icon: "💸", sub: "spending · averages · priciest", preview: totalSpent > 0 ? `€${Math.round(totalSpent)} total` : null },
           merch:     { icon: "🛍️", sub: "overview · what I buy", preview: null },
         };
+        const TypePills = () => (
+          <div style={{ display: "flex", gap: 4 }}>
+            {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
+              <button key={id} onClick={() => setChartType(id)} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: chartType === id ? 700 : 400, background: chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : 'none', color: chartType === id ? '#0c0c14' : '#5a5880', border: `1px solid ${chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : '#1f1f35'}` }}>{label}</button>
+            ))}
+          </div>
+        );
         return (
           <div style={{ padding: "16px" }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff", marginBottom: 12 }}>Explore your stats</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Explore your stats</div>
+              <TypePills />
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {visibleChartGroups.map(g => {
                 const m = META[g.id] || { icon: "◎", sub: "" };
@@ -2966,7 +2980,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5 }}>
             <button onClick={() => setChartGroup(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
-            <div style={{ marginLeft: "auto", fontSize: 9, color: "#2e2e4a", fontFamily: "'DM Mono', monospace" }}>swipe for next ↔</div>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
+                <button key={id} onClick={() => setChartType(id)} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: chartType === id ? 700 : 400, background: chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : 'none', color: chartType === id ? '#0c0c14' : '#5a5880', border: `1px solid ${chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : '#1f1f35'}` }}>{label}</button>
+              ))}
+            </div>
           </div>
           <div style={{ padding: "4px 16px 0" }}>
             {activeGroup.charts.map((c, i) => (

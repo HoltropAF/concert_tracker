@@ -143,3 +143,15 @@ shows a "· cover" badge, and unique/total counts reflect the split.
 - Restored the 5-button chart-group bar above the bottom nav (Artists / Friends /
   Venues / Financial / Merch) — works alongside the hub: tap a pill to jump straight
   to a section, hub grid and ← back still available.
+
+---
+
+## 2026-06-12 — Concerts/Festivals filter pills in chart sections
+
+- New All / Conc / Fest pills on the stats hub header and on every section header.
+- The filter applies to all charts in all sections (top artists, songs, venues,
+  loyalty, countries, financial, averages, merch, shows-over-time incl. its
+  cumulative line) and to the hub card previews. Filter resets on app reload.
+- Summary page and its year toggle remain type-agnostic on purpose (per earlier
+  feedback); the "fill the gaps" nudge also stays global.
+- The "Averages" chart naturally shows only the relevant section when filtered.

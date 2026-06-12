@@ -3823,6 +3823,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   const [errors, setErrors] = useState({})
   const [sfStatus, setSfStatus] = useState(null)
   const [sfMsg, setSfMsg] = useState('')
+  const [openCards, setOpenCards] = useState([])
   const [artistSuggestions, setArtistSuggestions] = useState([])
   const [showDetails, setShowDetails] = useState(initialType === 'festival')
   const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
@@ -3940,6 +3941,18 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
               {content}
             </div>
           );
+          const foldCard = (title, content, hasData = false) => {
+            const open = openCards.includes(title);
+            return (
+              <div key={title} style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+                <button onClick={() => setOpenCards(o => open ? o.filter(t => t !== title) : [...o, title])} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px' }}>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: open ? '#e2e0ff' : '#9b97d4' }}>{title}{!open && hasData && <span style={{ color: '#4ade80', fontSize: 11, marginLeft: 6 }}>●</span>}</span>
+                  <span style={{ color: '#4a4870', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{open ? '−' : '+'}</span>
+                </button>
+                {open && <div style={{ padding: '0 16px 16px' }}>{content}</div>}
+              </div>
+            );
+          };
           const financialContent = (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
@@ -4047,10 +4060,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
                 </div>
               </>)}
-              {card('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />)}
-              {card('Your experience', experienceContent)}
-              {card('Financial', financialContent)}
-              {card('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />)}
+              {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />, (form.acts || []).length > 0)}
+              {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
+              {foldCard('Financial', financialContent, !!(form.ticketPrice || form.otherCost || (form.merch || []).length))}
+              {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}
             </>
           );
 
@@ -4116,7 +4129,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 {fieldLabel('Venue size')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(settings.venueSizes||[]).map(vs => <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.venueSize===vs ? '#a78bfa' : '#0c0c14', color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>)}</div>
               </>)}
-              {card('Lineup', <>
+              {foldCard('Lineup & genre', <>
                 {fieldLabel('Seen as')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 14 }}>{['Headliner','Support','Guest','Festival'].map(opt => <button key={opt} onClick={() => update('seenAs', form.seenAs===opt ? null : opt)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.seenAs===opt ? '#a78bfa' : '#0c0c14', color: form.seenAs===opt ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.seenAs===opt ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.seenAs===opt ? 700 : 400 }}>{opt}</button>)}</div>
                 {fieldLabel('Support acts')}
@@ -4130,9 +4143,9 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 {fieldLabel('Language')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}</div>
               </>)}
-              {card('Your experience', experienceContent)}
-              {card('Financial', financialContent)}
-              {card('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />)}
+              {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
+              {foldCard('Financial', financialContent, !!(form.ticketPrice || form.otherCost || (form.merch || []).length))}
+              {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}
             </>
           );
         })()}

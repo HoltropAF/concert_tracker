@@ -178,3 +178,15 @@ shows a "· cover" badge, and unique/total counts reflect the split.
   fields). Latest visit wins for remembered details.
 - Country now defaults to your most recent show's country when no default country
   is set in settings.
+
+---
+
+## 2026-06-12 (4) — Add form step 3: essentials-first layout
+
+- The add form now leads with essentials only (Show/Festival + Location cards).
+- Optional sections — Lineup & genre, Acts seen (festival), Your experience,
+  Financial, Notes — are collapsed by default; tap to expand (+/−). A green dot
+  marks collapsed sections that already contain data (e.g. after setlist.fm
+  auto-fill or merch added earlier in the session).
+- Combined with auto-fill and venue memory, logging a show is now:
+  artist → date → auto-fill → save.

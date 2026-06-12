@@ -290,3 +290,13 @@ in edit clears the reference on Save (file is reused/overwritten on next upload)
 Normal show view now only displays the photo (16:9 rectangle) — no overlay
 replace/remove buttons and no "Add a photo" box. All photo actions (add,
 replace, remove, reframe) live in edit mode's Photo card.
+
+---
+
+## 2026-06-12 (12) — Photo controls moved into Filters panel
+
+- Removed the standalone 📷 button next to the compact toggle.
+- New "Photos" section at the top of the show-list Filters panel:
+  - "📷 Show in list" — toggles photo banners on cards (persisted setting)
+  - "Only with photo" — filters the list to shows that have a photo
+    (counts toward the Filters (n) badge)

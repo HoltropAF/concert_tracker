@@ -5168,6 +5168,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [filterGenre, setFilterGenre] = useState('all')
   const [filterSubgenre, setFilterSubgenre] = useState('all')
   const [filterCountry, setFilterCountry] = useState('all')
+  const [filterHasPhoto, setFilterHasPhoto] = useState(false)
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
@@ -5229,7 +5230,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
-    filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all'
+    filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto
   ].filter(Boolean).length
   const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all') }
   const resetSort = () => setSortOrder('newest')
@@ -5243,6 +5244,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
     if (filterSolo && !(getFriends(c).length === 0 || c.solo)) return false
     if (filterGenre !== 'all' && !getGenres(c).includes(filterGenre)) return false
+    if (filterHasPhoto && !c.photo) return false
     if (filterSubgenre !== 'all' && c.subgenre !== filterSubgenre) return false
     if (filterCountry !== 'all' && (c.country || '').trim() !== filterCountry) return false
     if (search) {
@@ -5467,10 +5469,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ minHeight: 36, background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
               {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
             </button>
-            {/* Photo toggle */}
-            <button onClick={() => onUpdateSetting('showListPhotos', settings.showListPhotos === false ? true : false)} style={{ background: settings.showListPhotos !== false ? '#1a1a30' : 'none', border: `1px solid ${settings.showListPhotos !== false ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: settings.showListPhotos !== false ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1, marginLeft: 'auto' }} title="Show photos in list">📷</button>
             {/* Compact toggle */}
-            <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title="Compact view">
+            <button onClick={() => setCompact(c => !c)} style={{ marginLeft: 'auto', background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title="Compact view">
               {compact ? '▤' : '☰'}
             </button>
           </div>
@@ -5515,6 +5515,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 {Array.from({ length: settings.ratingSystem || 5 }, (_, i) => i + 1).map(n => (
                   <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n}★</button>
                 ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Photos</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                <button onClick={() => onUpdateSetting('showListPhotos', settings.showListPhotos === false)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: settings.showListPhotos !== false ? '#a78bfa' : '#0c0c14', color: settings.showListPhotos !== false ? '#0c0c14' : '#6b6a8f', border: `1px solid ${settings.showListPhotos !== false ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>📷 Show in list</button>
+                <button onClick={() => setFilterHasPhoto(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterHasPhoto ? '#a78bfa' : '#0c0c14', color: filterHasPhoto ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterHasPhoto ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Only with photo</button>
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>

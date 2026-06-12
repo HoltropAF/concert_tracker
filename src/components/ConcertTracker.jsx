@@ -5010,7 +5010,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       </>}
 
-      {activeSettingsTab === 'tags' && (
+      {activeSettingsTab === 'tags' && <>
       {[
         { icon: "🎸", label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
         { icon: "🎶", label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
@@ -5026,8 +5026,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </Collapsible>
       ))}
-
-      )}
+      </>}
 
       {activeSettingsTab === 'people' && <>
       <Collapsible title={`📍 Saved venues (${savedVenues.length})`} {...sec("venues")}>

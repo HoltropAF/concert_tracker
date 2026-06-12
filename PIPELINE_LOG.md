@@ -241,3 +241,24 @@ cache. Photos load lazily, never during data sync.
 - Removing a photo deletes the storage file; replacing upserts in place (no
   orphans). Note: deleting a whole concert does not yet delete its photo file
   (harmless, pennies of space — can add cleanup later).
+
+---
+
+## 2026-06-12 (8) — Data audit fixes + multi-genre support
+
+**Database cleanup (run directly on Supabase):**
+- Trimmed trailing spaces in venue/city/country ("Tivoli ", "Oudkarspel ", "Netherlands ")
+- "Tivoli" merged into "TivoliVredenburg" (now 11 shows)
+- P60 city unified to Amstelveen; Ziggo Dome size unified to Arena
+- Fox Stevenson genre unified to Electronic / Drum & Bass
+- Liquicity Festival city → Oudkarspel; Down The Rabbit Hole city → Beuningen
+- Sportpaleis + AFAS Dome merged as "Sportpaleis (AFAS Dome)" (same building, both names)
+- Against the Current set to genres ["Rock","Pop"] + Pop punk
+
+**App: genres are now multi-select** (backward compatible — old single-string
+genre still works via getGenres helper):
+- Genre pills in add + edit forms toggle multiple genres
+- All genre stats (genre pie, summary donut, artist pages) count each genre
+- Genre filter matches shows containing the selected genre
+- Detail view shows one badge per genre
+- Stored as string when 1 genre, array when multiple. Subgenre remains single.

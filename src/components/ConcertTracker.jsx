@@ -12,6 +12,8 @@ function PhotoImg({ path, style }) {
 // HELPERS
 // ============================================================
 
+const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : c?.genre ? [c.genre] : [];
+
 const CHART_GROUP_IDS = [
   { id: "artists",  label: "Artists"   },
   { id: "friends",  label: "Friends"   },
@@ -695,7 +697,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             {!past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
             {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
-            {concert.genre && <Badge color="#13131f">{concert.genre}</Badge>}
+            {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
             {langs.map(l => <Badge key={l} color="#13131f">{l}</Badge>)}
           </div>
@@ -926,7 +928,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             <div style={labelStyle}>Genre</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom: 12 }}>
               {(settings.genres||[]).map(g => (
-                <button key={g} onClick={()=>update("genre",form.genre===g?null:g)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.genre===g ? "#a78bfa" : "#0c0c14", color: form.genre===g ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.genre===g ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.genre===g ? 700 : 400 }}>{g}</button>
+                <button key={g} onClick={()=>{ const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update("genre", next.length===0?null:next.length===1?next[0]:next); }} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: getGenres(form).includes(g) ? "#a78bfa" : "#0c0c14", color: getGenres(form).includes(g) ? "#0c0c14" : "#6b6a8f", border:`1px solid ${getGenres(form).includes(g) ? "#a78bfa" : "#2e2e50"}`, fontWeight: getGenres(form).includes(g) ? 700 : 400 }}>{g}</button>
               ))}
             </div>
             <div style={labelStyle}>Subgenre</div>
@@ -1333,7 +1335,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   // Genre breakdown
   const genreCount = {};
-  past.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+  past.forEach(c => { getGenres(c).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }); });
   const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]);
   const subgenreCount = {};
   past.forEach(c => { if (c.subgenre) subgenreCount[c.subgenre] = (subgenreCount[c.subgenre] || 0) + 1; });
@@ -2851,7 +2853,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {/* Donut cards — stacked full width */}
           {!(settings.hiddenSummaryBlocks||[]).includes("pies") && (() => {
             const gCount = {};
-            summaryPast.forEach(c => { if (c.genre) gCount[c.genre] = (gCount[c.genre] || 0) + 1; });
+            summaryPast.forEach(c => { getGenres(c).forEach(g => { gCount[g] = (gCount[g] || 0) + 1; }); });
             const topGenres = Object.entries(gCount).sort((a,b) => b[1] - a[1]);
             const vsCount = {};
             summaryPast.forEach(c => { const sz = c.type === "festival" ? "Festival" : c.venueSize; if (sz) vsCount[sz] = (vsCount[sz] || 0) + 1; });
@@ -3067,7 +3069,7 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
     const lastShow = sortedShows[sortedShows.length - 1] || null;
     const upcoming = concerts.filter(c => !isPast(c.date) && getFriends(c).includes(name));
     const genreCount = {};
-    shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+    shows.forEach(c => { getGenres(c).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }); });
     const topGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
     const artistCount = {};
     shows.forEach(c => { artistCount[c.artist] = (artistCount[c.artist] || 0) + 1; });
@@ -3346,7 +3348,7 @@ function ArtistsView({ concerts, onOpen }) {
     if (!artistMap[name]) artistMap[name] = [];
   });
 
-  const allGenres = [...new Set(concerts.map(c => c.genre).filter(Boolean))].sort();
+  const allGenres = [...new Set(concerts.flatMap(c => getGenres(c)))].sort();
 
   const artistEntries = Object.entries(artistMap).map(([name, shows]) => {
     const pastShows = shows.filter(c => isPast(c.date));
@@ -3357,7 +3359,7 @@ function ArtistsView({ concerts, onOpen }) {
     const firstShow = sortedPast[0] || null;
     const lastShow = sortedPast[sortedPast.length - 1] || null;
     const genreCount = {};
-    shows.forEach(c => { if (c.genre) genreCount[c.genre] = (genreCount[c.genre] || 0) + 1; });
+    shows.forEach(c => { getGenres(c).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }); });
     const topGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const supportApps = (supportAppearancesMap[name] || []).filter(a => isPast(a.concert.date));
     const supportCount = supportApps.filter(a => a.role === 'support').length;
@@ -4263,7 +4265,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>{['support','guest'].map(r => <button key={r} onClick={() => setSupportRole(r)} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: supportRole===r ? '#a78bfa' : '#0c0c14', color: supportRole===r ? '#0c0c14' : '#6b6a8f', border: `1px solid ${supportRole===r ? '#a78bfa' : '#2e2e50'}`, fontWeight: supportRole===r ? 700 : 400, fontFamily: "'DM Mono',monospace" }}>{r}</button>)}</div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}><input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key==='Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} /><button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button></div>
                 {fieldLabel('Genre')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.genres||[]).map(g => <button key={g} onClick={()=>update('genre', form.genre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.genre===g ? '#a78bfa' : '#0c0c14', color: form.genre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.genre===g ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.genre===g ? 700 : 400 }}>{g}</button>)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.genres||[]).map(g => <button key={g} onClick={()=>{ const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update('genre', next.length===0?null:next.length===1?next[0]:next); }} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: getGenres(form).includes(g) ? '#a78bfa' : '#0c0c14', color: getGenres(form).includes(g) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${getGenres(form).includes(g) ? '#a78bfa' : '#2e2e50'}`, fontWeight: getGenres(form).includes(g) ? 700 : 400 }}>{g}</button>)}</div>
                 {fieldLabel('Subgenre')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}</div>
                 {fieldLabel('Language')}
@@ -5203,7 +5205,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
     if (filterSolo && !(getFriends(c).length === 0 || c.solo)) return false
-    if (filterGenre !== 'all' && c.genre !== filterGenre) return false
+    if (filterGenre !== 'all' && !getGenres(c).includes(filterGenre)) return false
     if (filterSubgenre !== 'all' && c.subgenre !== filterSubgenre) return false
     if (filterCountry !== 'all' && (c.country || '').trim() !== filterCountry) return false
     if (search) {

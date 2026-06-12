@@ -1,11 +1,45 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
 
-function PhotoImg({ path, style }) {
+function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
   useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
+  const objectPosition = pos ? `${pos.x ?? 50}% ${pos.y ?? 50}%` : '50% 50%'
   if (!url) return <div style={{ ...style, background: '#13131f' }} />
-  return <img src={url} alt="" loading="lazy" style={{ ...style, objectFit: 'cover', display: 'block' }} />
+  return <img src={url} alt="" loading="lazy" style={{ ...style, objectFit: 'cover', objectPosition, display: 'block' }} />
+}
+
+function PhotoAdjust({ path, pos, onChange }) {
+  const [url, setUrl] = useState(null)
+  const boxRef = useRef(null)
+  const drag = useRef(null)
+  useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
+  const p = pos || { x: 50, y: 50 }
+  const start = (cx, cy) => { drag.current = { x: cx, y: cy, px: p.x ?? 50, py: p.y ?? 50 } }
+  const move = (cx, cy) => {
+    if (!drag.current || !boxRef.current) return
+    const rect = boxRef.current.getBoundingClientRect()
+    const nx = Math.max(0, Math.min(100, drag.current.px - ((cx - drag.current.x) / rect.width) * 100))
+    const ny = Math.max(0, Math.min(100, drag.current.py - ((cy - drag.current.y) / rect.height) * 100))
+    onChange({ x: Math.round(nx), y: Math.round(ny) })
+  }
+  return (
+    <div>
+      <div ref={boxRef}
+        onTouchStart={e => { const t = e.touches[0]; start(t.clientX, t.clientY) }}
+        onTouchMove={e => { const t = e.touches[0]; move(t.clientX, t.clientY) }}
+        onTouchEnd={() => { drag.current = null }}
+        onMouseDown={e => start(e.clientX, e.clientY)}
+        onMouseMove={e => { if (e.buttons === 1) move(e.clientX, e.clientY) }}
+        onMouseUp={() => { drag.current = null }}
+        onMouseLeave={() => { drag.current = null }}
+        style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden', touchAction: 'none', cursor: 'grab', background: '#13131f', position: 'relative' }}>
+        {url && <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: 'block', pointerEvents: 'none' }} />}
+        <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, color: '#e2e0ff', background: '#0c0c14aa', padding: '3px 8px', borderRadius: 99, fontFamily: "'DM Mono', monospace", pointerEvents: 'none' }}>↕↔ drag to reframe</div>
+      </div>
+      <button onClick={() => onChange({ x: 50, y: 50 })} style={{ marginTop: 6, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '4px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>center</button>
+    </div>
+  )
 }
 
 // ============================================================
@@ -298,7 +332,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
       }}
     >
       {showPhoto && concert.photo && (
-        <PhotoImg path={concert.photo} style={{ width: "100%", aspectRatio: "5 / 2", borderRadius: 8, marginBottom: 10 }} />
+        <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", aspectRatio: "5 / 2", borderRadius: 8, marginBottom: 10 }} />
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -654,7 +688,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           {/* Photo */}
           {concert.photo ? (
             <div style={{ marginBottom: 14, position: "relative" }}>
-              <PhotoImg path={concert.photo} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12 }} />
+              <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12 }} />
               {photosEnabled && (
                 <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", gap: 6 }}>
                   <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ background: "#0c0c14cc", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", backdropFilter: "blur(4px)" }}>{photoBusy ? "…" : "replace"}</button>
@@ -845,6 +879,12 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
         {/* Cards */}
         {[
+
+          /* ── PHOTO ── */
+          ...(form.photo ? [{ title: 'Photo', content: <>
+            <PhotoAdjust path={form.photo} pos={form.photoPos} onChange={v => update('photoPos', v)} />
+            <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 6 }}>Drag the image to choose which part shows in the rectangle. Applies to the show page and list banner.</div>
+          </> }] : []),
 
           /* ── SHOW ── */
           { title: form.type === 'festival' ? 'Festival' : 'Show', content: <>

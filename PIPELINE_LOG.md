@@ -262,3 +262,13 @@ genre still works via getGenres helper):
 - Genre filter matches shows containing the selected genre
 - Detail view shows one badge per genre
 - Stored as string when 1 genre, array when multiple. Subgenre remains single.
+
+---
+
+## 2026-06-12 (9) — Photo reframing in edit mode
+
+- Edit mode now starts with a Photo card (when the show has a photo): drag the
+  image to choose which part is visible in the rectangle, with a "center" reset.
+  Saved as photoPos {x,y} percentages in the concert data.
+- The chosen framing applies everywhere the photo renders: detail page (16:9)
+  and the list banner (5:2). Works with touch and mouse.

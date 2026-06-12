@@ -282,3 +282,11 @@ photo with drag-to-reframe, plus "📷 Replace photo" and "✕ Remove" buttons; 
 no photo, a dashed "Add a photo" box. New/replaced photos upload immediately
 (auto-downsized); the photo/framing fields persist when you hit Save. Removing
 in edit clears the reference on Save (file is reused/overwritten on next upload).
+
+---
+
+## 2026-06-12 (11) — Photo management only in edit mode
+
+Normal show view now only displays the photo (16:9 rectangle) — no overlay
+replace/remove buttons and no "Add a photo" box. All photo actions (add,
+replace, remove, reframe) live in edit mode's Photo card.

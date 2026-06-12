@@ -686,32 +686,11 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           </div>
 
           {/* Photo */}
-          {concert.photo ? (
-            <div style={{ marginBottom: 14, position: "relative" }}>
+          {concert.photo && (
+            <div style={{ marginBottom: 14 }}>
               <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12 }} />
-              {photosEnabled && (
-                <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", gap: 6 }}>
-                  <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ background: "#0c0c14cc", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", backdropFilter: "blur(4px)" }}>{photoBusy ? "…" : "replace"}</button>
-                  <button onClick={async () => { if (!window.confirm("Remove this photo?")) return; setPhotoBusy(true); try { await deleteConcertPhoto(concert.photo); onSave({ ...concert, photo: null }); onNotify("Photo removed"); } catch (e) { onNotify("Could not remove photo", "error"); } setPhotoBusy(false); }} disabled={photoBusy} style={{ background: "#0c0c14cc", border: "1px solid #2e2e50", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", backdropFilter: "blur(4px)" }}>✕</button>
-                </div>
-              )}
             </div>
-          ) : photosEnabled ? (
-            <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ width: "100%", aspectRatio: "16 / 5", marginBottom: 14, background: "none", border: "1px dashed #2e2e50", borderRadius: 12, color: "#4a4870", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
-              {photoBusy ? "Uploading…" : "📷 Add a photo"}
-            </button>
-          ) : null}
-          {photosEnabled && <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
-            const file = e.target.files?.[0]; e.target.value = "";
-            if (!file) return;
-            setPhotoBusy(true);
-            try {
-              const path = await uploadConcertPhoto(concert.id, file);
-              onSave({ ...concert, photo: path });
-              onNotify("Photo added");
-            } catch (err) { onNotify(err.message || "Upload failed", "error"); }
-            setPhotoBusy(false);
-          }} />}
+          )}
 
           {/* Stat cards */}
           {statCards.length > 0 && (

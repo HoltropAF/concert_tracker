@@ -657,12 +657,11 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
     const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
     const merchTotal = (concert.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
     const totalCost = (concert.ticketPrice || 0) + merchTotal + (concert.otherCost || 0);
+    const companions = getFriends(concert);
     const statCards = [
       past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—" },
-      concert.ticketPrice ? { label: "Ticket", value: `€${concert.ticketPrice}` } : null,
-      merchTotal > 0 ? { label: "Merch", value: `€${merchTotal.toFixed(0)}` } : null,
-      concert.otherCost ? { label: isFestival ? "Travel" : "Other", value: `€${concert.otherCost}` } : null,
-      isFestival && totalCost > 0 && (concert.otherCost || merchTotal > 0) ? { label: "Total", value: `€${Math.round(totalCost)}` } : null,
+      concert.ticketPrice ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${concert.ticketPrice}` } : null,
+      past && { label: "With", value: companions.length === 0 ? "Solo" : companions.length === 1 ? companions[0] : `${companions.length} friends` },
     ].filter(Boolean);
     return (
       <div style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
@@ -709,6 +708,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
             {!past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
+            {(concert.ticketAddons || []).map(a => <Badge key={a} color="#1a1030">{a}</Badge>)}
             {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
             {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
@@ -719,13 +719,28 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
-          {/* Went with */}
-          <div style={detailCard}>
-            {sec("Went with")}
-            {getFriends(concert).length > 0
-              ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{getFriends(concert).map(f => <Badge key={f} color="#1a1a30">{f}</Badge>)}</div>
-              : <div style={{ color: "#6b6a8f", fontSize: 13, fontStyle: "italic" }}>solo</div>}
-          </div>
+          {/* Costs */}
+          {(concert.ticketPrice || concert.otherCost || merchTotal > 0) && (
+            <div style={detailCard}>
+              {sec("Costs")}
+              {[
+                concert.ticketPrice ? [`Ticket${concert.ticketType ? ` (${concert.ticketType}${(concert.ticketAddons || []).length ? ' + ' + concert.ticketAddons.join(', ') : ''})` : (concert.ticketAddons || []).length ? ` (+ ${concert.ticketAddons.join(', ')})` : ''}`, concert.ticketPrice] : null,
+                merchTotal > 0 ? ["Merch", merchTotal] : null,
+                concert.otherCost ? [isFestival ? "Travel & other" : "Other costs", concert.otherCost] : null,
+              ].filter(Boolean).map(([label, amount]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12 }}>{label}</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{Number(amount).toFixed(2)}</span>
+                </div>
+              ))}
+              {totalCost > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 7 }}>
+                  <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 700 }}>Total</span>
+                  <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>€{totalCost.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           {concert.notes && (
@@ -1015,6 +1030,14 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
           /* ── FINANCIAL ── */
           { title: 'Financial', content: <>
+            <div style={labelStyle}>Ticket type</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {(settings.ticketTypes || ['GA','GC','Seated']).map(t => <button key={t} onClick={() => update('ticketType', form.ticketType === t ? null : t)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.ticketType === t ? '#a78bfa' : '#0c0c14', color: form.ticketType === t ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.ticketType === t ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.ticketType === t ? 700 : 400 }}>{t}</button>)}
+            </div>
+            <div style={labelStyle}>Add-ons</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
+            </div>
             <div style={labelStyle}>Ticket price</div>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: 14 }}>
               <span style={{ color:"#6b6a8f" }}>€</span>
@@ -3207,6 +3230,47 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
             )}
           </div>
 
+          {/* Photos together */}
+          {(() => {
+            const photos = f.shows.filter(c => c.photo).sort((a, b) => b.date.localeCompare(a.date));
+            if (photos.length === 0) return null;
+            return (
+              <div style={card}>
+                <div style={sectionLabel}>Photos together</div>
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  {photos.map(c => (
+                    <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.artist} · {c.date.slice(0, 4)}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Together stats */}
+          {(() => {
+            const rated = f.shows.filter(c => c.rating);
+            const avgR = rated.length ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : null;
+            const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
+            const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
+            const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
+            const topV = Object.entries(vCount).sort((a, b) => b[1] - a[1])[0];
+            if (!avgR && !topA && !topV) return null;
+            return (
+              <div style={card}>
+                <div style={sectionLabel}>Together</div>
+                {[avgR && ["avg rating", `★ ${avgR}`], topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`], topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`]].filter(Boolean).map(([l, v]) => (
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{l}</span>
+                    <span style={{ color: "#c4c2f0", fontSize: 12 }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Taste profile */}
           {f.topGenres.length > 0 && (
             <div style={card}>
@@ -3484,6 +3548,38 @@ function ArtistsView({ concerts, onOpen }) {
             </div>
           </div>
         </div>
+        {/* Hero count + money stats */}
+        {(() => {
+          const priced = pastShows.filter(c => c.ticketPrice > 0);
+          const avgTicket = priced.length ? priced.reduce((a, c) => a + c.ticketPrice, 0) / priced.length : null;
+          const merchItems = pastShows.flatMap(c => c.merch || []);
+          const merchSpend = merchItems.reduce((a, m) => a + (parseFloat(m.price) || 0), 0);
+          const photos = pastShows.filter(c => c.photo);
+          return (
+            <>
+              <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
+                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
+                {avgTicket !== null && <span style={{ marginLeft: "auto", fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg ticket <span style={{ color: "#c4c2f0" }}>€{avgTicket.toFixed(0)}</span></span>}
+              </div>
+              {(merchItems.length > 0) && (
+                <div style={{ padding: "4px 16px 0", fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+                  {merchItems.length} merch item{merchItems.length !== 1 ? 's' : ''} bought · €{merchSpend.toFixed(0)}
+                </div>
+              )}
+              {photos.length > 0 && (
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
+                  {photos.map(c => (
+                    <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {c.venue}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
         {/* Quick stats row */}
         {(avgRating || sinceYear || topFriend) && (
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, sinceYear, topFriend].filter(Boolean).length}, 1fr)`, gap: 8, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
@@ -3893,6 +3989,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
     type: initialType, tour: '', support: [], friends: [], solo: false,
     rating: null, ticketPrice: null, otherCost: null, merch: [], notes: '',
+    ticketType: null, ticketAddons: [],
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
     acts: [],
   })
@@ -4101,6 +4198,16 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
           };
           const financialContent = (
             <>
+              <div style={{ marginBottom: 12 }}>
+                {fieldLabel('Ticket type')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {(settings.ticketTypes || ['GA','GC','Seated']).map(t => <button key={t} onClick={() => update('ticketType', form.ticketType === t ? null : t)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.ticketType === t ? '#a78bfa' : '#0c0c14', color: form.ticketType === t ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.ticketType === t ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.ticketType === t ? 700 : 400 }}>{t}</button>)}
+                </div>
+                {fieldLabel('Add-ons')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
                 <div>{fieldLabel('Ticket')}<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ color: '#6b6a8f' }}>€</span><input type="number" value={form.ticketPrice || ''} placeholder="0.00" onChange={e => update('ticketPrice', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, flex: 1 }} /></div></div>
                 <div>{fieldLabel(isFest ? 'Travel & other' : 'Other costs')}<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ color: '#6b6a8f' }}>€</span><input type="number" value={form.otherCost || ''} placeholder="0.00" onChange={e => update('otherCost', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, flex: 1 }} /></div></div>
@@ -4369,6 +4476,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [newSubgenre, setNewSubgenre] = useState("");
   const [newLanguage, setNewLanguage] = useState("");
   const [newVenueSize, setNewVenueSize] = useState("");
+  const [newTicketType, setNewTicketType] = useState("");
+  const [newTicketAddon, setNewTicketAddon] = useState("");
   const [newVenue, setNewVenue] = useState({ name: '', city: '', country: '', room: '' });
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupFriends, setNewGroupFriends] = useState([]);
@@ -4442,16 +4551,35 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     lUpdate("venueSizes", [...venueSizes, t]); setNewVenueSize("");
   };
   const removeVenueSize = (v) => lUpdate("venueSizes", venueSizes.filter(x => x !== v));
+  const ticketTypes = local.ticketTypes || ['GA','GC','Seated'];
+  const ticketAddons = local.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry'];
+  const addTicketType = () => { const t = newTicketType.trim(); if (!t || ticketTypes.includes(t)) return; lUpdate("ticketTypes", [...ticketTypes, t]); setNewTicketType(""); };
+  const removeTicketType = (t) => lUpdate("ticketTypes", ticketTypes.filter(x => x !== t));
+  const addTicketAddon = () => { const t = newTicketAddon.trim(); if (!t || ticketAddons.includes(t)) return; lUpdate("ticketAddons", [...ticketAddons, t]); setNewTicketAddon(""); };
+  const removeTicketAddon = (t) => lUpdate("ticketAddons", ticketAddons.filter(x => x !== t));
 
   const savedVenues = local.savedVenues || [];
   const addSavedVenue = () => {
     const v = { name: newVenue.name.trim(), city: newVenue.city.trim(), country: newVenue.country.trim(), room: newVenue.room.trim() };
     if (!v.name || !v.city || !v.country) return;
     if (savedVenues.some(x => x.name.toLowerCase() === v.name.toLowerCase() && x.city.toLowerCase() === v.city.toLowerCase())) return;
-    lUpdate("savedVenues", [...savedVenues, v]);
+    const nextV = [...savedVenues, v];
+    lUpdate("savedVenues", nextV); onUpdate("savedVenues", nextV);
     setNewVenue({ name: '', city: '', country: '', room: '' });
   };
-  const removeSavedVenue = (i) => lUpdate("savedVenues", savedVenues.filter((_, j) => j !== i));
+  const removeSavedVenue = (i) => { const nextV = savedVenues.filter((_, j) => j !== i); lUpdate("savedVenues", nextV); onUpdate("savedVenues", nextV); };
+  const importVenuesFromHistory = () => {
+    const known = new Set(savedVenues.map(v => v.name.toLowerCase()));
+    const found = {};
+    [...concerts].sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach(c => {
+      if (c.venue && !known.has(c.venue.toLowerCase())) found[c.venue] = { name: c.venue, city: c.city || '', country: c.country || '', room: '' };
+    });
+    const adds = Object.values(found);
+    if (adds.length === 0) { onNotify('All venues from your shows are already saved'); return; }
+    const nextV = [...savedVenues, ...adds];
+    lUpdate("savedVenues", nextV); onUpdate("savedVenues", nextV);
+    onNotify(`Added ${adds.length} venue${adds.length === 1 ? '' : 's'} from your history`);
+  };
 
   const friendGroups = local.friendGroups || [];
   const allFriendsFromConcerts = [...new Set(concerts.flatMap(c => getFriends(c)))].sort();
@@ -4459,10 +4587,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const name = newGroupName.trim();
     if (!name || newGroupFriends.length === 0) return;
     if (friendGroups.some(g => g.name.toLowerCase() === name.toLowerCase())) return;
-    lUpdate("friendGroups", [...friendGroups, { name, friends: newGroupFriends }]);
+    const next = [...friendGroups, { name, friends: newGroupFriends }];
+    lUpdate("friendGroups", next); onUpdate("friendGroups", next);
     setNewGroupName(''); setNewGroupFriends([]);
   };
-  const removeFriendGroup = (i) => lUpdate("friendGroups", friendGroups.filter((_, j) => j !== i));
+  const removeFriendGroup = (i) => { const next = friendGroups.filter((_, j) => j !== i); lUpdate("friendGroups", next); onUpdate("friendGroups", next); };
   const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
 
   const handleCsvExport = () => {
@@ -4815,10 +4944,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
         {[
-          { id: 'preferences', label: 'Prefs' },
-          { id: 'tags', label: 'Tags' },
-          { id: 'people', label: 'People' },
-          { id: 'data', label: 'Data' },
+          { id: 'preferences', label: '⚙️ General' },
+          { id: 'tags', label: '🏷️ Tags' },
+          { id: 'people', label: '👥 People' },
+          { id: 'data', label: '💾 Data' },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
             minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 11,
@@ -4831,7 +4960,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </div>
 
       {activeSettingsTab === 'preferences' && <>
-      <Collapsible title="◆  Preferences" {...sec("preferences")}>
+      <Collapsible title="App preferences" {...sec("preferences")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
           <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
@@ -4882,13 +5011,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {activeSettingsTab === 'tags' && (
-      <Collapsible title="◈  Tags" {...sec("tags")}>
+      <Collapsible title="Tags & ticket options" {...sec("tags")}>
         {[
           { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
           { label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
           { label: "Languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
           { label: "Venue sizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
           { label: "Merch items", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+          { label: "Ticket types", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
+          { label: "Ticket add-ons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
         ].map(({ label, ...props }) => (
           <div key={label} style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}</div>
@@ -4900,8 +5031,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'people' && <>
-      <Collapsible title="◎  Saved venues" {...sec("venues")}>
+      <Collapsible title="📍 Saved venues" {...sec("venues")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+          <button onClick={importVenuesFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>⤓ Import venues from my shows</button>
           {savedVenues.length > 0 && (
             <div style={{ marginBottom: 14 }}>
               <button onClick={() => setShowSavedVenues(o => !o)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono', monospace", padding: 0, marginBottom: showSavedVenues ? 10 : 0 }}>
@@ -4939,7 +5071,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
-      <Collapsible title="◈  Friend groups" {...sec("friendGroups")}>
+      <Collapsible title="👯 Friend groups" {...sec("friendGroups")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           {friendGroups.length > 0 && (
             <div style={{ marginBottom: 14 }}>
@@ -4973,7 +5105,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {activeSettingsTab === 'preferences' && (
-      <Collapsible title="◈  Stats display" {...sec("statsDisplay")}>
+      <Collapsible title="📊 Stats display" {...sec("statsDisplay")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
           <SettingsRow label="Summary scope" sub="Default time range on summary page">
             <SettingsOptionPills
@@ -5032,7 +5164,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'data' && <>
-      <Collapsible title="◉  Account & Data" {...sec("account")}>
+      <Collapsible title="🔐 Account & data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <button onClick={handleXlsxExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Export XLSX</button>
@@ -5102,7 +5234,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
-      <Collapsible title="◇  Help" {...sec("help")}>
+      <Collapsible title="❓ Help" {...sec("help")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           {[
             { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
@@ -5408,10 +5540,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
       {/* Header */}
       <div style={{ flexShrink: 0, padding: '16px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 10, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
           <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-            {allPast.length} shows · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
+            {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
           </div>
         </div>
 

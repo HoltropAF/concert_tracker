@@ -320,3 +320,24 @@ The Filters panel (show list and artists page) lives in the fixed header area an
 could grow taller than the screen with no way to scroll. It's now capped at 55%
 of the viewport height with internal touch scrolling (overscroll contained so the
 page behind doesn't move).
+
+---
+
+## 2026-06-12 (15) — Big UX batch (10 items)
+
+1. Show detail reordered: venue/tour hero → photo → 3 stat tiles (Rating, Ticket
+   incl. type, With: Solo / friend name / "x friends"). "Went with" section removed;
+   replaced by a Costs card listing ticket (+type/add-ons), merch, other costs, total.
+2. Ticket type (GA/GC/Seated) + add-ons (Barricade, VIP, Soundcheck, Hi-touch,
+   Send-off, Early entry) selectable in add & edit forms (Financial), shown in the
+   ticket tile, Costs card, and as pink badges.
+3. Ticket types and add-ons editable in Settings → Tags.
+4. Settings: clearer tabs (⚙️ General / 🏷️ Tags / 👥 People / 💾 Data) and headers.
+5. Saved venues: "⤓ Import venues from my shows" backfills from history.
+6. Fix: friend groups and saved venues now persist immediately on add/remove
+   (previously lost unless Save settings was pressed).
+7. Home header centered; counts now "x concerts · x festivals · x upcoming".
+8. Artist page: horizontal photo strip of that artist's shows (tap → concert).
+9. Artist page: big "N× seen live" hero, avg ticket price, merch items + spend.
+10. Friend page: "Photos together" strip + "Together" stats (avg rating, most seen
+    artist together, usual venue).

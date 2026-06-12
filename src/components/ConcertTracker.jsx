@@ -881,9 +881,27 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         {[
 
           /* ── PHOTO ── */
-          ...(form.photo ? [{ title: 'Photo', content: <>
-            <PhotoAdjust path={form.photo} pos={form.photoPos} onChange={v => update('photoPos', v)} />
-            <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 6 }}>Drag the image to choose which part shows in the rectangle. Applies to the show page and list banner.</div>
+          ...(photosEnabled ? [{ title: 'Photo', content: <>
+            {form.photo ? <>
+              <PhotoAdjust path={form.photo} pos={form.photoPos} onChange={v => update('photoPos', v)} />
+              <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 6 }}>Drag the image to choose which part shows in the rectangle. Applies to the show page and list banner.</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ flex: 1, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{photoBusy ? 'Uploading…' : '📷 Replace photo'}</button>
+                <button onClick={() => { if (window.confirm('Remove this photo?')) setForm(f => ({ ...f, photo: null, photoPos: null })); }} disabled={photoBusy} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#f87171', fontSize: 12, padding: '8px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>✕ Remove</button>
+              </div>
+            </> : (
+              <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ width: '100%', aspectRatio: '16 / 5', background: 'none', border: '1px dashed #2e2e50', borderRadius: 12, color: '#4a4870', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{photoBusy ? 'Uploading…' : '📷 Add a photo'}</button>
+            )}
+            <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+              const file = e.target.files?.[0]; e.target.value = '';
+              if (!file) return;
+              setPhotoBusy(true);
+              try {
+                const path = await uploadConcertPhoto(concert.id, file);
+                setForm(f => ({ ...f, photo: path }));
+              } catch (err) { onNotify(err.message || 'Upload failed', 'error'); }
+              setPhotoBusy(false);
+            }} />
           </> }] : []),
 
           /* ── SHOW ── */

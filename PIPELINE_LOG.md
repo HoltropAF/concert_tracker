@@ -272,3 +272,13 @@ genre still works via getGenres helper):
   Saved as photoPos {x,y} percentages in the concert data.
 - The chosen framing applies everywhere the photo renders: detail page (16:9)
   and the list banner (5:2). Works with touch and mouse.
+
+---
+
+## 2026-06-12 (10) — Photo fully manageable in edit mode
+
+Edit mode's Photo card now always appears (when signed in): shows the current
+photo with drag-to-reframe, plus "📷 Replace photo" and "✕ Remove" buttons; when
+no photo, a dashed "Add a photo" box. New/replaced photos upload immediately
+(auto-downsized); the photo/framing fields persist when you hit Save. Removing
+in edit clears the reference on Save (file is reused/overwritten on next upload).

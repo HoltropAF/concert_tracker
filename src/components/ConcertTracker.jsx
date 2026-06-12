@@ -1,4 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
+
+function PhotoImg({ path, style }) {
+  const [url, setUrl] = useState(null)
+  useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
+  if (!url) return <div style={{ ...style, background: '#13131f' }} />
+  return <img src={url} alt="" loading="lazy" style={{ ...style, objectFit: 'cover', display: 'block' }} />
+}
 
 // ============================================================
 // HELPERS
@@ -247,7 +255,7 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
   );
 }
 
-function ConcertCard({ concert, onOpen, compact = false }) {
+function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
   const past = isPast(concert.date);
   const isFestival = concert.type === "festival";
   const accentColor = isFestival ? "#f472b6" : past ? "#a78bfa" : "#818cf8";
@@ -287,6 +295,9 @@ function ConcertCard({ concert, onOpen, compact = false }) {
         transition: "all 0.15s ease", marginBottom: 8
       }}
     >
+      {showPhoto && concert.photo && (
+        <PhotoImg path={concert.photo} style={{ width: "100%", aspectRatio: "5 / 2", borderRadius: 8, marginBottom: 10 }} />
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -514,12 +525,14 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   );
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [] }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ ...concert });
   useEffect(() => { setForm({ ...concert }); setEditing(false); }, [concert.id]);
+  const photoInputRef = useRef(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [friendInput, setFriendInput] = useState('');
   const [supportInput, setSupportInput] = useState('');
   const [supportRole, setSupportRole] = useState('support');
@@ -635,6 +648,34 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
             {concert.tour && <div style={{ fontSize: 12, color: "#4a4870", marginTop: 4 }}>{concert.tour}</div>}
           </div>
+
+          {/* Photo */}
+          {concert.photo ? (
+            <div style={{ marginBottom: 14, position: "relative" }}>
+              <PhotoImg path={concert.photo} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12 }} />
+              {photosEnabled && (
+                <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", gap: 6 }}>
+                  <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ background: "#0c0c14cc", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", backdropFilter: "blur(4px)" }}>{photoBusy ? "…" : "replace"}</button>
+                  <button onClick={async () => { if (!window.confirm("Remove this photo?")) return; setPhotoBusy(true); try { await deleteConcertPhoto(concert.photo); onSave({ ...concert, photo: null }); onNotify("Photo removed"); } catch (e) { onNotify("Could not remove photo", "error"); } setPhotoBusy(false); }} disabled={photoBusy} style={{ background: "#0c0c14cc", border: "1px solid #2e2e50", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", backdropFilter: "blur(4px)" }}>✕</button>
+                </div>
+              )}
+            </div>
+          ) : photosEnabled ? (
+            <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ width: "100%", aspectRatio: "16 / 5", marginBottom: 14, background: "none", border: "1px dashed #2e2e50", borderRadius: 12, color: "#4a4870", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+              {photoBusy ? "Uploading…" : "📷 Add a photo"}
+            </button>
+          ) : null}
+          {photosEnabled && <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
+            const file = e.target.files?.[0]; e.target.value = "";
+            if (!file) return;
+            setPhotoBusy(true);
+            try {
+              const path = await uploadConcertPhoto(concert.id, file);
+              onSave({ ...concert, photo: path });
+              onNotify("Photo added");
+            } catch (err) { onNotify(err.message || "Upload failed", "error"); }
+            setPhotoBusy(false);
+          }} />}
 
           {/* Stat cards */}
           {statCards.length > 0 && (
@@ -5308,7 +5349,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} allArtists={[...new Set([
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -5387,8 +5428,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ minHeight: 36, background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
               {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
             </button>
+            {/* Photo toggle */}
+            <button onClick={() => onUpdateSetting('showListPhotos', settings.showListPhotos === false ? true : false)} style={{ background: settings.showListPhotos !== false ? '#1a1a30' : 'none', border: `1px solid ${settings.showListPhotos !== false ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: settings.showListPhotos !== false ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1, marginLeft: 'auto' }} title="Show photos in list">📷</button>
             {/* Compact toggle */}
-            <button onClick={() => setCompact(c => !c)} style={{ marginLeft: 'auto', background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title="Compact view">
+            <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title="Compact view">
               {compact ? '▤' : '☰'}
             </button>
           </div>
@@ -5490,7 +5533,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {upcoming.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Upcoming — {upcoming.length}</div>
-                {upcoming.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
+                {upcoming.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} showPhoto={settings.showListPhotos !== false} />)}
                 <div style={{ height: 1, background: '#0e0e1a', margin: '12px 0 16px' }} />
               </div>
             )}
@@ -5502,7 +5545,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 </div>
                 <span style={{ fontSize: 11, color: '#4a4870', transform: showPast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
               </button>
-              {(showPast || !!search) && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} />)}
+              {(showPast || !!search) && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} showPhoto={settings.showListPhotos !== false} />)}
             </div>
             </>}
           </>

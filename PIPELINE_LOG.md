@@ -217,3 +217,27 @@ shows a "· cover" badge, and unique/total counts reflect the split.
   concert Quick add, under the date — alongside the paste-a-link row, so both
   auto-fill paths are available without expanding the form.
 - Refactor: shared autoFillFromSearch handler (used by quick add and full Show card).
+
+---
+
+## 2026-06-12 (7) — One photo per concert
+
+**Backend (Supabase migration `concert_photos_bucket`):** private `photos` storage
+bucket, 5 MB cap, jpeg/png/webp only, RLS so users can only read/write files under
+their own user-id folder. Photo path stored in the concert JSONB as `photo`.
+
+**Client (src/lib/photos.js):** automatic client-side downsizing (max 1280px long
+edge, JPEG ~82% → typically 150–250 KB), upload/replace (upsert to
+{userId}/{concertId}.jpg), delete, and signed-URL fetching with a 50-min in-memory
+cache. Photos load lazily, never during data sync.
+
+**UI:**
+- Concert detail (normal view): photo as a horizontal 16:9 rectangle under the
+  venue hero, with overlay "replace" / ✕ buttons; dashed "📷 Add a photo" box when
+  none. Hidden in guest mode (no account = no storage).
+- Show list: full cards show the photo as a wide 5:2 banner; a 📷 toggle next to
+  the compact toggle turns list photos on/off (persisted in settings).
+- Compact mode: never shows photos.
+- Removing a photo deletes the storage file; replacing upserts in place (no
+  orphans). Note: deleting a whole concert does not yet delete its photo file
+  (harmless, pennies of space — can add cleanup later).

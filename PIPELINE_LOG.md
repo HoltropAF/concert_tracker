@@ -311,3 +311,12 @@ a 'display-p3' canvas where the browser supports it (Safari 16.4+, modern Chrome
 preserving saturated colors like stage lighting; falls back to sRGB elsewhere.
 Note: already-uploaded photos keep their stored colors until replaced (re-upload
 via Edit → Replace photo to re-process with the fix).
+
+---
+
+## 2026-06-12 (14) — Filters panel scrollable
+
+The Filters panel (show list and artists page) lives in the fixed header area and
+could grow taller than the screen with no way to scroll. It's now capped at 55%
+of the viewport height with internal touch scrolling (overscroll contained so the
+page behind doesn't move).

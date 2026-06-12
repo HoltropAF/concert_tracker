@@ -362,3 +362,10 @@ page behind doesn't move).
   directly in a chart section; navigation is the 5-button group bar at the bottom
   (just above the main nav), plus swipe between sections. Back gesture returns to
   summary.
+
+---
+
+## 2026-06-12 (18) — Settings: merge Data into General
+
+Settings now has 3 tabs: General (leftmost, default — includes app preferences,
+stats display, account & data, help), Tags, People.

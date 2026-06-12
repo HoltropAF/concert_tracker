@@ -167,3 +167,14 @@ shows a "· cover" badge, and unique/total counts reflect the split.
 - Add-concert form (Show card): "✨ Auto-fill from setlist.fm" button under the date.
   Fills only empty fields (never overwrites typed values) and imports the setlist
   if none was added. Clear success/error states incl. "no API key configured".
+
+---
+
+## 2026-06-12 (3) — Add form step 2: venue memory & autocomplete
+
+- Venue inputs in the add form (Quick add, Festival, Show) now autocomplete from
+  your venue history, showing the city next to each suggestion.
+- Picking a known venue auto-fills city, country, and venue size (only into empty
+  fields). Latest visit wins for remembered details.
+- Country now defaults to your most recent show's country when no default country
+  is set in settings.

@@ -3810,7 +3810,7 @@ function ArtistShowRow({ concert, onOpen }) {
 function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', concerts = [] }) {
   useBackButton(onClose);
   const [form, setForm] = useState({
-    artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || '',
+    artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
     type: initialType, tour: '', support: [], friends: [], solo: false,
     rating: null, ticketPrice: null, otherCost: null, merch: [], notes: '',
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
@@ -3840,6 +3840,22 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     } else {
       setArtistSuggestions([])
     }
+  }
+
+  const [venueSuggestions, setVenueSuggestions] = useState([])
+  const venueBook = {};
+  [...concerts].sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach(c => {
+    if (c.venue) venueBook[c.venue] = { city: c.city || '', country: c.country || '', venueSize: c.venueSize || null };
+  });
+  const handleVenueChange = (val) => {
+    update('venue', val)
+    if (val.trim().length > 0) setVenueSuggestions(Object.keys(venueBook).filter(v => v.toLowerCase().includes(val.toLowerCase())).slice(0, 6))
+    else setVenueSuggestions([])
+  }
+  const selectVenue = (v) => {
+    const b = venueBook[v] || {};
+    setForm(f => ({ ...f, venue: v, city: f.city || b.city, country: f.country || b.country, venueSize: f.venueSize || b.venueSize }));
+    setVenueSuggestions([])
   }
 
   const selectArtist = (name) => {
@@ -3990,7 +4006,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
                 </div>
                 {fieldLabel('Venue *')}
-                <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
+                  {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
                   <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
                   <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
@@ -4019,7 +4038,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
               {card('Location', <>
                 {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue === v.name && form.city === v.city && form.country === v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}</button>; })}</div>}
                 {fieldLabel('Festival grounds')}
-                <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Festival site / grounds" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Festival site / grounds" style={errors.venue ? errStyle : inputStyle} />
+                  {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>
                   <div>{fieldLabel('Country *')}<input value={form.country} onChange={e => update('country', e.target.value)} placeholder="Country" style={errors.country ? errStyle : inputStyle} /></div>
@@ -4082,7 +4104,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
               {card('Venue', <>
                 {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue===v.name && form.city===v.city && form.country===v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, room: v.room||f.room, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</button>; })}</div>}
                 {fieldLabel('Venue name *')}
-                <input value={form.venue} onChange={e => update('venue', e.target.value)} placeholder="Venue name" style={{ ...(errors.venue ? errStyle : inputStyle), marginBottom: 8 }} />
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
+                  {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
+                </div>
                 <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
                   <div>{fieldLabel('City *')}<input value={form.city} onChange={e => update('city', e.target.value)} placeholder="City" style={errors.city ? errStyle : inputStyle} /></div>

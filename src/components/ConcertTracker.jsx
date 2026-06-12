@@ -4421,6 +4421,27 @@ function SettingsOptionPills({ value, options, onChange }) {
   );
 }
 
+const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" };
+const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
+const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
+
+const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => (
+    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 4 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: items.length ? 10 : 0 }}>
+        {items.map(item => (
+          <div key={item} style={tagStyle}>{item}
+            <button onClick={() => onRemove(item)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={input} onChange={e => onInput(e.target.value)} onKeyDown={e => e.key === "Enter" && onAdd()} placeholder={placeholder} style={tagInput} />
+        <button onClick={onAdd} style={addBtn}>Add</button>
+      </div>
+    </div>
+  );
+
+
 function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail, onNotify = () => {} }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
@@ -4863,26 +4884,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
-
-  const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: "4px 10px", fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" };
-  const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
-  const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
-
-  const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => (
-    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 4 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: items.length ? 10 : 0 }}>
-        {items.map(item => (
-          <div key={item} style={tagStyle}>{item}
-            <button onClick={() => onRemove(item)} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 13, padding: 0, lineHeight: 1, marginLeft: 2 }}>×</button>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input value={input} onChange={e => onInput(e.target.value)} onKeyDown={e => e.key === "Enter" && onAdd()} placeholder={placeholder} style={tagInput} />
-        <button onClick={onAdd} style={addBtn}>Add</button>
-      </div>
-    </div>
-  );
 
   return (
     <div style={{ padding: "16px 20px 100px" }}>

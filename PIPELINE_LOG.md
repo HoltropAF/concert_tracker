@@ -369,3 +369,12 @@ page behind doesn't move).
 
 Settings now has 3 tabs: General (leftmost, default — includes app preferences,
 stats display, account & data, help), Tags, People.
+
+
+---
+
+## 2026-06-12 (19) — Fix keyboard closing in settings inputs
+
+TagManager (and its styles) were defined inside SettingsView, so every keystroke
+re-created the component, remounting the input and dismissing the mobile keyboard.
+Hoisted to module scope; settings inputs now keep focus while typing.

@@ -1886,8 +1886,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          <TypeRow label="Concerts" ticket={totalTicketC} merch={totalMerchC} other={totalOtherC} total={totalCFS} color="#a78bfa" />
-          <TypeRow label="Festivals" ticket={totalTicketF} merch={totalMerchF} other={totalOtherF} total={totalFFS} color="#fb923c" />
           {avgThisYearFS && (
             <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textAlign: "right", marginBottom: 12 }}>avg ticket {thisYearFS}: <span style={{ color: "#38bdf8" }}>€{avgThisYearFS.toFixed(0)}</span></div>
           )}
@@ -1940,6 +1938,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(Object.values(yearSpend).reduce((s, v) => s + v, 0))}</span>
           </div>
           </>}
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+            <TypeRow label="Concerts" ticket={totalTicketC} merch={totalMerchC} other={totalOtherC} total={totalCFS} color="#a78bfa" />
+            <TypeRow label="Festivals" ticket={totalTicketF} merch={totalMerchF} other={totalOtherF} total={totalFFS} color="#fb923c" />
+          </div>
           {ysView === "line" && (() => {
             const n = activeYearsYS.length;
             if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;

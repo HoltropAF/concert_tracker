@@ -4471,6 +4471,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [newVenue, setNewVenue] = useState({ name: '', city: '', country: '', room: '' });
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupFriends, setNewGroupFriends] = useState([]);
+  const [importQueue, setImportQueue] = useState(null); // [{friends, suggested},...] | null
+  const [importNameInput, setImportNameInput] = useState('');
   const [local, setLocal] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -4582,6 +4584,22 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     setNewGroupName(''); setNewGroupFriends([]);
   };
   const removeFriendGroup = (i) => { const next = friendGroups.filter((_, j) => j !== i); lUpdate("friendGroups", next); onUpdate("friendGroups", next); };
+  const importFriendGroupsFromHistory = () => {
+    const existing = new Set(friendGroups.map(g => [...g.friends].sort().join('|')));
+    const pairCount = {};
+    concerts.forEach(c => {
+      const fs = getFriends(c); if (fs.length < 2) return;
+      const key = [...fs].sort().join('|');
+      pairCount[key] = (pairCount[key] || 0) + 1;
+    });
+    const queue = Object.entries(pairCount)
+      .filter(([key, count]) => count >= 3 && !existing.has(key))
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({ friends: key.split('|'), count, suggested: key.split('|').join(' & ') }));
+    if (queue.length === 0) { onNotify('No new groups found (need 3+ shows together)'); return; }
+    setImportQueue(queue);
+    setImportNameInput(queue[0].suggested);
+  };
   const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
 
   const handleCsvExport = () => {
@@ -5055,6 +5073,45 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 </div>
               ))}
             </div>
+          )}
+          {/* Import review flow */}
+          {importQueue && importQueue.length > 0 ? (() => {
+            const current = importQueue[0];
+            const remaining = importQueue.length;
+            const dismiss = () => {
+              const next = importQueue.slice(1);
+              setImportQueue(next.length > 0 ? next : null);
+              setImportNameInput(next[0]?.suggested || '');
+            };
+            const save = () => {
+              const name = importNameInput.trim() || current.suggested;
+              const next2 = [...friendGroups, { name, friends: current.friends }];
+              lUpdate('friendGroups', next2); onUpdate('friendGroups', next2);
+              const q = importQueue.slice(1);
+              setImportQueue(q.length > 0 ? q : null);
+              setImportNameInput(q[0]?.suggested || '');
+            };
+            return (
+              <div style={{ background: '#0c0c14', border: '1px solid #a78bfa55', borderRadius: 12, padding: '14px', marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                  Suggested group {importQueue.length > 1 ? `(${remaining} left)` : '(last one)'}
+                </div>
+                <div style={{ fontSize: 13, color: '#c4c2f0', marginBottom: 4 }}>{current.friends.join(', ')}</div>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>{current.count} shows together</div>
+                <input
+                  value={importNameInput}
+                  onChange={e => setImportNameInput(e.target.value)}
+                  placeholder="Group name…"
+                  style={{ width: '100%', background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 10 }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={save} style={{ flex: 1, background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>Save group</button>
+                  <button onClick={dismiss} style={{ flex: 1, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Skip</button>
+                </div>
+              </div>
+            );
+          })() : (
+            <button onClick={importFriendGroupsFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 14 }}>⤓ Suggest groups from my shows (3+ together)</button>
           )}
           <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Add group</div>
           <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Group name (e.g. Festival crew)" style={{ width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 8 }} />

@@ -396,3 +396,12 @@ Hoisted to module scope; settings inputs now keep focus while typing.
 Artist hero area now shows:
 - total songs heard live (across all their setlists you've logged)
 - €X.XX / song (ticket + merch total ÷ songs heard, only when both are available)
+
+---
+
+## 2026-06-12 (22) — Friend group import from history
+
+Settings → People → Friend groups: new "⤓ Suggest groups from my shows (3+ together)"
+button. Finds all combos of friends seen together 3+ times, skips any already saved,
+and shows a one-by-one review flow: group members + show count displayed, pre-filled
+name (editable), "Save group" or "Skip" to move to the next. Remaining count shown.

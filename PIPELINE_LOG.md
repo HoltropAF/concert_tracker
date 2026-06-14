@@ -378,3 +378,13 @@ stats display, account & data, help), Tags, People.
 TagManager (and its styles) were defined inside SettingsView, so every keystroke
 re-created the component, remounting the input and dismissing the mobile keyboard.
 Hoisted to module scope; settings inputs now keep focus while typing.
+
+---
+
+## 2026-06-12 (20) — Financial chart: other/travel costs in breakdown
+
+- Year-spend chart summary now shows two cards (Concerts / Festivals) each with
+  their own ticket + merch + other/travel breakdown, so festival travel costs are
+  visibly attributed and nothing is hidden in an undifferentiated "other" total.
+- The year bars still show concerts vs festivals (full cost incl. other); legend
+  updated to match.

@@ -1854,38 +1854,40 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
         const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
         const costOf = c => (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + (c.otherCost || 0);
-        const totalTicketFS = concerts.reduce((s, c) => s + (c.ticketPrice || 0), 0);
-        const totalMerchFS = concerts.reduce((s, c) => s + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0), 0);
-        const totalOtherFS = concerts.reduce((s, c) => s + (c.otherCost || 0), 0);
-        const totalConcertsFS = concerts.filter(c => c.type === 'concert').reduce((s, c) => s + costOf(c), 0);
-        const totalFestivalsFS = concerts.filter(c => c.type === 'festival').reduce((s, c) => s + costOf(c), 0);
+        const ticketOf = c => c.ticketPrice || 0;
+        const merchOf = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
+        const otherOf = c => c.otherCost || 0;
+
+        const concerts_ = past.filter(c => c.type !== 'festival');
+        const festivals_ = past.filter(c => c.type === 'festival');
+
+        const totalTicketC = concerts_.reduce((s, c) => s + ticketOf(c), 0);
+        const totalMerchC  = concerts_.reduce((s, c) => s + merchOf(c), 0);
+        const totalOtherC  = concerts_.reduce((s, c) => s + otherOf(c), 0);
+        const totalTicketF = festivals_.reduce((s, c) => s + ticketOf(c), 0);
+        const totalMerchF  = festivals_.reduce((s, c) => s + merchOf(c), 0);
+        const totalOtherF  = festivals_.reduce((s, c) => s + otherOf(c), 0);
+        const totalCFS = concerts_.reduce((s, c) => s + costOf(c), 0);
+        const totalFFS = festivals_.reduce((s, c) => s + costOf(c), 0);
+
+        const TypeRow = ({ label, ticket, merch, other, total, color }) => total === 0 ? null : (
+          <div style={{ marginBottom: 10, padding: "10px 12px", background: "#0c0c14", border: `1px solid ${color}33`, borderLeft: `3px solid ${color}`, borderRadius: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{label}</span>
+              <span style={{ fontSize: 14, color, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(total)}</span>
+            </div>
+            {[["ticket", ticket, "#f472b6"], ["merch", merch, "#34d399"], ["other / travel", other, "#38bdf8"]].map(([lbl, val, c]) => val > 0 ? (
+              <div key={lbl} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{lbl}</span>
+                <span style={{ fontSize: 10, color: c, fontFamily: "'DM Mono', monospace" }}>€{Math.round(val)}</span>
+              </div>
+            ) : null)}
+          </div>
+        );
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {/* Category row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 6 }}>
-            {[
-              { label: "ticket", value: totalTicketFS > 0 ? `€${Math.round(totalTicketFS)}` : "—", color: "#f472b6" },
-              { label: "merch", value: totalMerchFS > 0 ? `€${Math.round(totalMerchFS)}` : "—", color: "#34d399" },
-              { label: "other", value: totalOtherFS > 0 ? `€${Math.round(totalOtherFS)}` : "—", color: "#38bdf8" },
-            ].map(b => (
-              <div key={b.label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value !== "—" ? b.color : "#2e2e4a", lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
-              </div>
-            ))}
-          </div>
-          {/* Concert vs festival row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
-            {[
-              { label: "concerts", value: totalConcertsFS > 0 ? `€${Math.round(totalConcertsFS)}` : "—", color: "#a78bfa" },
-              { label: "festivals", value: totalFestivalsFS > 0 ? `€${Math.round(totalFestivalsFS)}` : "—", color: "#fb923c" },
-            ].map(b => (
-              <div key={b.label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: b.value !== "—" ? b.color : "#2e2e4a", lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
-              </div>
-            ))}
-          </div>
+          <TypeRow label="Concerts" ticket={totalTicketC} merch={totalMerchC} other={totalOtherC} total={totalCFS} color="#a78bfa" />
+          <TypeRow label="Festivals" ticket={totalTicketF} merch={totalMerchF} other={totalOtherF} total={totalFFS} color="#fb923c" />
           {avgThisYearFS && (
             <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textAlign: "right", marginBottom: 12 }}>avg ticket {thisYearFS}: <span style={{ color: "#38bdf8" }}>€{avgThisYearFS.toFixed(0)}</span></div>
           )}

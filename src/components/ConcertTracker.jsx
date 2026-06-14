@@ -3513,6 +3513,9 @@ function ArtistsView({ concerts, onOpen }) {
         {(() => {
           const priced = pastShows.filter(c => c.ticketPrice > 0);
           const avgTicket = priced.length ? priced.reduce((a, c) => a + c.ticketPrice, 0) / priced.length : null;
+          const totalSpentOnArtist = pastShows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+          const totalSongsHeard = pastShows.reduce((s, c) => s + getSongList(c.setlist).length, 0);
+          const costPerSong = totalSongsHeard > 0 && totalSpentOnArtist > 0 ? totalSpentOnArtist / totalSongsHeard : null;
           const merchItems = pastShows.flatMap(c => c.merch || []);
           const merchSpend = merchItems.reduce((a, m) => a + (parseFloat(m.price) || 0), 0);
           const photos = pastShows.filter(c => c.photo);
@@ -3526,6 +3529,11 @@ function ArtistsView({ concerts, onOpen }) {
               {(merchItems.length > 0) && (
                 <div style={{ padding: "4px 16px 0", fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
                   {merchItems.length} merch item{merchItems.length !== 1 ? 's' : ''} bought · €{merchSpend.toFixed(0)}
+                </div>
+              )}
+              {(totalSongsHeard > 0 || costPerSong) && (
+                <div style={{ padding: "4px 16px 0", fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+                  {totalSongsHeard} songs heard live{costPerSong ? <span> · <span style={{ color: "#c4c2f0" }}>€{costPerSong.toFixed(2)}</span> / song</span> : null}
                 </div>
               )}
               {photos.length > 0 && (

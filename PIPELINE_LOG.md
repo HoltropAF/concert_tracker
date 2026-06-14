@@ -388,3 +388,11 @@ Hoisted to module scope; settings inputs now keep focus while typing.
   visibly attributed and nothing is hidden in an undifferentiated "other" total.
 - The year bars still show concerts vs festivals (full cost incl. other); legend
   updated to match.
+
+---
+
+## 2026-06-12 (21) — Artist page: cost per song + total songs heard
+
+Artist hero area now shows:
+- total songs heard live (across all their setlists you've logged)
+- €X.XX / song (ticket + merch total ÷ songs heard, only when both are available)

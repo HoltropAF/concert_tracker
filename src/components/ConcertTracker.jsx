@@ -315,6 +315,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
         </span>
         {concert.rating ? (
           <span style={{ color: "#a78bfa", fontSize: 11, flexShrink: 0 }}>{"★".repeat(Math.min(concert.rating, 10))}</span>
+        ) : concert.wishlist ? (
+          <span style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>optional</span>
         ) : !past ? (
           <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>upcoming</span>
         ) : null}

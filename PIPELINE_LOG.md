@@ -425,3 +425,12 @@ back in one flow.
   are filled, linking directly to a pre-filled search on setlist.fm so you can
   find and copy the URL without typing anything extra.
 - Paste row and auto-fill button stay below it in order.
+
+---
+
+## 2026-06-12 (24) — Quick add: date-first flow + setlist.fm search button
+
+- Date moved above Artist so the natural flow is: date → artist → find → fill.
+- "Find on setlist.fm ↗" appears as a full-width button once both date and artist
+  are filled, linking to a pre-filled setlist.fm search. Copy the URL → paste →
+  Fill to auto-fill everything.

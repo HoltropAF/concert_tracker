@@ -1263,7 +1263,7 @@ function Collapsible({ title, defaultOpen = true, children, open: controlledOpen
   );
 }
 
-function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false }) {
+function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false, fillHeight = false }) {
   const {
     topArtistsRows = 5, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -1687,6 +1687,21 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const summaryFinType = settings.summaryFinType || 'all';
   const summaryPast = pastAll.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
 
+  // Measure available chart height so content never overflows
+  const chartAreaRef = useRef(null);
+  const [chartHeight, setChartHeight] = useState(400);
+  useEffect(() => {
+    if (!fillHeight) return;
+    const el = chartAreaRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => {
+      setChartHeight(el.clientHeight);
+    });
+    obs.observe(el);
+    setChartHeight(el.clientHeight);
+    return () => obs.disconnect();
+  }, [fillHeight, statsTab]);
+
   const hiddenChartGroups = settings.hiddenChartGroups || [];
   const hiddenCharts = settings.hiddenCharts || [];
   const visibleChartGroups = CHART_GROUPS
@@ -1696,7 +1711,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0] || null;
   const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
 
-  const renderChart = (id) => {
+  const renderChart = (id, chartHeight = 400) => {
     switch(id) {
       case "shows": {
         const sView = chartOpt("shows", "bars");
@@ -2599,42 +2614,48 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const gpViewMain = chartOpt("gp-view-main", "pie");
         const gpViewSub = chartOpt("gp-view-sub", "pie");
 
-        const DonutCard = ({ title, source, viewKey, currentView, colorOffset = 0 }) => {
+        // Each card gets half the available height minus gap and padding
+        const cardH = Math.floor((chartHeight - 16) / 2);
+        const donutSize = Math.min(110, Math.max(60, cardH - 80));
+
+        const DonutCard = ({ title, source, viewKey, currentView }) => {
           const top4 = source.slice(0, 4);
           const othersCount = source.slice(4).reduce((s, [,n]) => s + n, 0);
           return (
-            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ height: cardH, background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "12px 14px", marginBottom: 8, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexShrink: 0 }}>
                 <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
                 <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={currentView} onChange={v => setChartOpt(viewKey, v)} />
               </div>
-              {source.length === 0
-                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {title.toLowerCase()} to see this</div>
-                : currentView === "list"
-                  ? <ListStat title="" items={source} suffix="x" />
-                  : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <Donut size={110} showLabels label="shows" segments={[
-                        ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i + colorOffset] || GENRE_COLORS[i] })),
-                        ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
-                      ]} />
-                      <div style={{ flex: 1 }}>
-                        {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? (GENRE_COLORS[i + colorOffset] || GENRE_COLORS[i]) : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
-                          </div>
-                        ))}
+              <div style={{ flex: 1, overflow: "hidden" }}>
+                {source.length === 0
+                  ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {title.toLowerCase()} to see this</div>
+                  : currentView === "list"
+                    ? <div style={{ overflowY: "auto", height: "100%" }}><ListStat title="" items={source} suffix="x" /></div>
+                    : <div style={{ display: "flex", alignItems: "center", gap: 12, height: "100%" }}>
+                        <Donut size={donutSize} showLabels label="shows" segments={[
+                          ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
+                          ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
+                        ]} />
+                        <div style={{ flex: 1, overflow: "hidden" }}>
+                          {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
+                            <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                              <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-              }
+                }
+              </div>
             </div>
           );
         };
 
         return (
-          <div>
-            <DonutCard title="Genres" source={topGenres} viewKey="gp-view-main" currentView={gpViewMain} colorOffset={0} />
-            <DonutCard title="Subgenres" source={topSubgenres} viewKey="gp-view-sub" currentView={gpViewSub} colorOffset={0} />
+          <div style={{ height: chartHeight, overflow: "hidden" }}>
+            <DonutCard title="Genres" source={topGenres} viewKey="gp-view-main" currentView={gpViewMain} />
+            <DonutCard title="Subgenres" source={topSubgenres} viewKey="gp-view-sub" currentView={gpViewSub} />
           </div>
         );
       }
@@ -2800,7 +2821,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   };
 
   return (
-    <div style={{ padding: "0 0 100px" }}>
+    <div style={{ padding: fillHeight ? "0" : "0 0 100px", height: fillHeight ? "100%" : undefined, display: fillHeight ? "flex" : undefined, flexDirection: fillHeight ? "column" : undefined }}>
       {selectedSong && (() => {
         const matchSong = (s, performer) => {
           if (getSongName(s) !== selectedSong.name) return false;
@@ -3193,7 +3214,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const carouselSwipeStart = { x: 0, y: 0 };
         const goTo = (idx) => { if (charts[idx]) setSelectedChart(charts[idx].id); };
         return (
-          <div style={{ padding: "0", display: "flex", flexDirection: "column", height: "100%" }}>
+          <div style={{ padding: "0", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             {/* Header */}
             <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5, flexShrink: 0 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
@@ -3211,7 +3232,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
             {/* Swipeable chart area */}
             <div
-              style={{ flex: 1, padding: "0 16px", overflow: "hidden" }}
+              ref={chartAreaRef}
+              style={{ flex: 1, padding: "0 16px", overflow: "hidden", minHeight: 0 }}
               onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
               onTouchEnd={e => {
                 const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
@@ -3221,7 +3243,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 else if (dx > 0 && chartIdx > 0) goTo(chartIdx - 1);
               }}
             >
-              {renderChart(activeChart?.id)}
+              {renderChart(activeChart?.id, chartHeight)}
             </div>
 
             {/* Dots */}
@@ -6010,7 +6032,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       {/* Content */}
-      <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 16px' }}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && statsTab === 'charts' ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && statsTab === 'charts' ? '0' : '0 16px', display: view === 'stats' && statsTab === 'charts' ? 'flex' : 'block', flexDirection: 'column' }}>
         {view === 'home' && (
           <>
             {concerts.length === 0 && (
@@ -6053,7 +6075,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             </>}
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}

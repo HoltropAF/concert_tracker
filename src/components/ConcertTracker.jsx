@@ -5470,6 +5470,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   const appShell = { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0c0c14', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined, overflow: 'hidden' }
+  useEffect(() => {
+    const id = 'theme-img-counter'
+    let el = document.getElementById(id)
+    if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el) }
+    el.textContent = themeFilter ? '[data-theme-shell] img { filter: none !important; }' : ''
+    return () => { const e = document.getElementById(id); if (e) e.textContent = '' }
+  }, [themeFilter])
 
   const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
 
@@ -5530,7 +5537,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   if (showAdd) return (
-    <div style={appShell}>
+    <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <AddConcertForm
           onSave={async c => {
@@ -5565,7 +5572,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   if (selected) return (
-    <div style={appShell}>
+    <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
@@ -5581,7 +5588,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   return (
-    <div style={appShell}>
+    <div data-theme-shell="" style={appShell}>
 
       {/* Header */}
       <div style={{ flexShrink: 0, padding: '16px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>

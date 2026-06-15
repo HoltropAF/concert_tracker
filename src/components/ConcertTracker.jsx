@@ -1656,8 +1656,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     {
       id: "merch", label: "Merch",
       charts: [
-        { id: "merch-overview",  label: "🛍️ Merch overview" },
-        { id: "merch-breakdown", label: "📦 What I buy" },
+        { id: "merch-overview", label: "🛍️ Merch" },
       ]
     },
   ];
@@ -2507,26 +2506,28 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
-      case "merch-overview": return (
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {/* Summary row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
-            {[
-              { label: "total spent", value: `€${totalMerchSpend.toFixed(0)}`, color: "#f472b6" },
-              { label: "items bought", value: allMerchItems.length, color: "#a78bfa" },
-              { label: "shows w. merch", value: past.filter(c => c.merch?.length > 0).length, color: "#38bdf8" },
-            ].map(b => (
-              <div key={b.label} style={{ background: "#0c0c14", borderRadius: 8, padding: "10px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 17, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
+      case "merch-breakdown": return null; // merged into merch-overview below
+      case "merch-overview": {
+        const moView = chartOpt("merch-overview", "price");
+        const mbView = chartOpt("merch-breakdown", "types");
+        const noMerch = topMerchTypes.length === 0 && topArtistMerch.length === 0;
+        return (
+          <div>
+            {/* Summary tiles */}
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+                {[
+                  { label: "total spent", value: `€${totalMerchSpend.toFixed(0)}`, color: "#f472b6" },
+                  { label: "items bought", value: allMerchItems.length, color: "#a78bfa" },
+                  { label: "shows w. merch", value: past.filter(c => c.merch?.length > 0).length, color: "#38bdf8" },
+                ].map(b => (
+                  <div key={b.label} style={{ background: "#0c0c14", borderRadius: 8, padding: "10px 6px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 17, fontWeight: 700, color: b.color, lineHeight: 1 }}>{b.value}</div>
+                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{b.label}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {/* Top 3 list with toggle */}
-          {(topMerchItems.length > 0 || topMerchTypes.length > 0) && (() => {
-            const moView = chartOpt("merch-overview", "price");
-            return (
-              <>
+              {(topMerchItems.length > 0 || topMerchTypes.length > 0) && <>
                 <ChartToggle options={[{id:"price",label:"Top 3 by price"},{id:"count",label:"Top 3 by count"}]} value={moView} onChange={v => setChartOpt("merch-overview", v)} />
                 {moView === "price"
                   ? topMerchItems.map((m, i) => (
@@ -2547,45 +2548,37 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     </div>
                   ))
                 }
-              </>
-            );
-          })()}
-        </div>
-      );
-      case "merch-breakdown": {
-        const mbView = chartOpt("merch-breakdown", "types");
-        const noMerch = topMerchTypes.length === 0 && topArtistMerch.length === 0;
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            <ChartToggle options={[{id:"types",label:"By type"},{id:"artists",label:"By artist"}]} value={mbView} onChange={v => setChartOpt("merch-breakdown", v)} />
-            {noMerch
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see this</div>
-              : mbView === "types"
-                ? topMerchTypes.map(([type, count], i) => (
-                  <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>{type}</span>
+              </>}
+            </div>
+            {/* Breakdown */}
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Breakdown</div>
+              <ChartToggle options={[{id:"types",label:"By type"},{id:"artists",label:"By artist"}]} value={mbView} onChange={v => setChartOpt("merch-breakdown", v)} />
+              {noMerch
+                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Log merch on a show to see this</div>
+                : mbView === "types"
+                  ? topMerchTypes.map(([type, count], i) => (
+                    <div key={type} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1, textTransform: "capitalize" }}>{type}</span>
+                      <div style={{ width: 60, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+                        <div style={{ height: "100%", borderRadius: 2, background: "#a78bfa", width: `${(count / topMerchTypes[0][1]) * 100}%` }} />
+                      </div>
+                      <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 24, textAlign: "right", flexShrink: 0 }}>{count}x</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / topMerchTypes[0][1]) * 80) }} />
-                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}x</span>
+                  ))
+                  : topArtistMerch.map(([artist, spend], i) => (
+                    <div key={artist} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1 }}>{artist}</span>
+                      <div style={{ width: 60, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+                        <div style={{ height: "100%", borderRadius: 2, background: "#f472b6", width: `${(spend / topArtistMerch[0][1]) * 100}%` }} />
+                      </div>
+                      <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 40, textAlign: "right", flexShrink: 0 }}>€{spend.toFixed(0)}</span>
                     </div>
-                  </div>
-                ))
-                : topArtistMerch.map(([artist, spend], i) => (
-                  <div key={artist} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                      <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>{artist}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ height: 4, borderRadius: 2, background: "#f472b6", width: Math.max(16, (spend / topArtistMerch[0][1]) * 80) }} />
-                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 40, textAlign: "right" }}>€{spend.toFixed(0)}</span>
-                    </div>
-                  </div>
-                ))
-            }
+                  ))
+              }
+            </div>
           </div>
         );
       }
@@ -5385,7 +5378,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Friends & group size' }] },
             { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: '📍 Venues, size & countries' }, { id: 'venue-loyalty', label: '💜 Venue loyalty' }] },
             { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending & avg ticket' }, { id: 'averages', label: '💶 Averages' }, { id: 'expensive', label: '💰 Most expensive shows' }] },
-            { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: '🛍️ Merch overview' }, { id: 'merch-breakdown', label: '📦 What I buy' }] },
+            { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: '🛍️ Merch' }] },
           ];
           return (
             <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '12px 16px', marginBottom: 4 }}>

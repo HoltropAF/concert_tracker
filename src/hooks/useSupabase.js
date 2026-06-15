@@ -3,6 +3,24 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
 
 const arrayOr = (value, fallback = []) => Array.isArray(value) ? value : fallback
+const stringList = (value, fallback = []) => arrayOr(value, fallback).map(v => String(v || '').trim()).filter(Boolean)
+const supportList = (value) => arrayOr(value).map(v => {
+  if (typeof v === 'string') return v.trim()
+  if (v && typeof v === 'object') return { name: String(v.name || '').trim(), role: v.role === 'guest' ? 'guest' : 'support' }
+  return ''
+}).filter(v => typeof v === 'string' ? v : v.name)
+const actsList = (value) => arrayOr(value).map(v => {
+  const act = v && typeof v === 'object' ? v : {}
+  return { ...act, name: String(act.name || '').trim() }
+}).filter(v => v.name)
+const merchList = (value) => arrayOr(value).map(v => {
+  const item = v && typeof v === 'object' ? v : {}
+  return { ...item, item: String(item.item || '').trim(), price: item.price ?? '' }
+}).filter(v => v.item || v.price)
+const setlistMap = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value).map(([artist, songs]) => [String(artist || '').trim(), arrayOr(songs).filter(Boolean)]).filter(([artist]) => artist))
+}
 
 const normalizeConcert = (value, fallbackId = '') => {
   const concert = value && typeof value === 'object' ? value : {}
@@ -17,14 +35,14 @@ const normalizeConcert = (value, fallbackId = '') => {
     country: String(concert.country || ''),
     type: concert.type === 'festival' ? 'festival' : 'concert',
     tour: String(concert.tour || ''),
-    support: arrayOr(concert.support),
-    acts: arrayOr(concert.acts),
-    friends: arrayOr(concert.friends),
-    merch: arrayOr(concert.merch),
-    ticketAddons: arrayOr(concert.ticketAddons),
-    language: arrayOr(concert.language, concert.language ? [concert.language] : []),
-    setlist: arrayOr(concert.setlist),
-    supportSetlists: concert.supportSetlists && typeof concert.supportSetlists === 'object' ? concert.supportSetlists : {},
+    support: supportList(concert.support),
+    acts: actsList(concert.acts),
+    friends: stringList(concert.friends),
+    merch: merchList(concert.merch),
+    ticketAddons: stringList(concert.ticketAddons),
+    language: stringList(concert.language, concert.language ? [concert.language] : []),
+    setlist: arrayOr(concert.setlist).filter(Boolean),
+    supportSetlists: setlistMap(concert.supportSetlists),
     notes: String(concert.notes || ''),
   }
 }
@@ -34,16 +52,31 @@ const normalizeSettings = (value) => {
   const merged = { ...DEFAULT_SETTINGS, ...settings }
   return {
     ...merged,
-    merchCategories: arrayOr(merged.merchCategories, DEFAULT_SETTINGS.merchCategories),
-    genres: arrayOr(merged.genres, DEFAULT_SETTINGS.genres),
-    subgenres: arrayOr(merged.subgenres, DEFAULT_SETTINGS.subgenres),
-    languages: arrayOr(merged.languages, DEFAULT_SETTINGS.languages),
-    venueSizes: arrayOr(merged.venueSizes, DEFAULT_SETTINGS.venueSizes),
-    hiddenChartGroups: arrayOr(merged.hiddenChartGroups),
-    hiddenCharts: arrayOr(merged.hiddenCharts),
-    hiddenSummaryBlocks: arrayOr(merged.hiddenSummaryBlocks),
-    savedVenues: arrayOr(merged.savedVenues),
-    friendGroups: arrayOr(merged.friendGroups),
+    merchCategories: stringList(merged.merchCategories, DEFAULT_SETTINGS.merchCategories),
+    genres: stringList(merged.genres, DEFAULT_SETTINGS.genres),
+    subgenres: stringList(merged.subgenres, DEFAULT_SETTINGS.subgenres),
+    languages: stringList(merged.languages, DEFAULT_SETTINGS.languages),
+    venueSizes: stringList(merged.venueSizes, DEFAULT_SETTINGS.venueSizes),
+    hiddenChartGroups: stringList(merged.hiddenChartGroups),
+    hiddenCharts: stringList(merged.hiddenCharts),
+    hiddenSummaryBlocks: stringList(merged.hiddenSummaryBlocks),
+    savedVenues: arrayOr(merged.savedVenues).map(v => {
+      const venue = v && typeof v === 'object' ? v : {}
+      return {
+        name: String(venue.name || '').trim(),
+        city: String(venue.city || '').trim(),
+        country: String(venue.country || '').trim(),
+        room: String(venue.room || '').trim(),
+      }
+    }).filter(v => v.name),
+    friendGroups: arrayOr(merged.friendGroups).map(g => {
+      const group = g && typeof g === 'object' ? g : {}
+      return {
+        ...group,
+        name: String(group.name || '').trim(),
+        friends: stringList(group.friends),
+      }
+    }).filter(g => g.name || g.friends.length),
   }
 }
 

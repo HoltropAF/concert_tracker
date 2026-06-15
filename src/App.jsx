@@ -21,11 +21,13 @@ class AppErrorBoundary extends Component {
 
   render() {
     if (!this.state.error) return this.props.children
+    const message = this.state.error?.message || String(this.state.error || 'Unknown render error')
     return (
       <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'DM Sans', sans-serif" }}>
         <div style={{ maxWidth: 360, width: '100%', background: '#13131f', border: '1px solid #f472b6', borderRadius: 12, padding: 20, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', marginBottom: 8 }}>Something crashed</div>
           <div style={{ color: '#6b6a8f', fontSize: 12, lineHeight: 1.6, fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>The app hit a render error. Reloading should get you back without losing saved data.</div>
+          <div style={{ color: '#f472b6', fontSize: 11, lineHeight: 1.5, fontFamily: "'DM Mono', monospace", marginBottom: 16, wordBreak: 'break-word' }}>{message}</div>
           <button onClick={() => window.location.reload()} style={{ width: '100%', minHeight: 40, borderRadius: 8, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>Reload app</button>
         </div>
       </div>

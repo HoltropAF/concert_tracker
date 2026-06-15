@@ -926,6 +926,33 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             }} />
           </> }] : []),
 
+          /* ── WISHLIST STATUS (first card when editing a wish) ── */
+          ...(form.wishlist !== undefined ? [{ title: 'Wishlist', content: <>
+            <button onClick={() => {
+              update('wishlist', !form.wishlist);
+              if (form.wishlist && (!form.date || form.date === '9999-12-31')) {
+                update('date', new Date().toISOString().slice(0, 10));
+              }
+            }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#1f1f35' : '#34d399'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', marginBottom: 10 }}>
+              <span style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${form.wishlist ? '#3d3564' : '#34d399'}`, background: form.wishlist ? 'none' : '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '' : '✓'}</span>
+              <div>
+                <div style={{ fontSize: 13, color: form.wishlist ? '#6b6a8f' : '#34d399', fontWeight: form.wishlist ? 400 : 700 }}>{form.wishlist ? 'No tickets yet' : 'Tickets bought ✓'}</div>
+                <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{form.wishlist ? 'Tap to mark tickets as bought' : 'Tap to change back to want to go'}</div>
+              </div>
+            </button>
+            {form.wishlist && (
+              <div style={{ padding: '10px 12px', background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Ticket sale</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div><div style={labelStyle}>Date</div><input type="date" value={(form.ticketSaleAt||'').slice(0,10)} onChange={e => update('ticketSaleAt', e.target.value ? e.target.value + (form.ticketSaleAt?.slice(10)||'T10:00') : '')} style={inputStyle} /></div>
+                  <div><div style={labelStyle}>Time</div><input type="time" value={(form.ticketSaleAt||'').slice(11,16)||'10:00'} onChange={e => update('ticketSaleAt', ((form.ticketSaleAt||new Date().toISOString().slice(0,10)).slice(0,10)) + 'T' + e.target.value)} style={inputStyle} /></div>
+                </div>
+                <input value={form.ticketSaleLink||''} onChange={e => update('ticketSaleLink', e.target.value)} placeholder="Ticket link (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
+                <input value={form.ticketSaleNote||''} onChange={e => update('ticketSaleNote', e.target.value)} placeholder="Note (optional)" style={inputStyle} />
+              </div>
+            )}
+          </> }] : []),
+
           /* ── SHOW ── */
           { title: form.type === 'festival' ? 'Festival' : 'Show', content: <>
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>

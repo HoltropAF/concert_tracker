@@ -2490,19 +2490,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
-      case "friends-chart": return (
-        <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-          {topFriends.map(([name, count], i) => (
-            <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
-              </div>
-              <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count} shows</span>
-            </div>
-          ))}
-        </div>
-      );
+
       case "venues": {
         const vView = chartOpt("venues", "venue");
         const vItems = vView === "room" ? topVenuesByRoom : topVenues;

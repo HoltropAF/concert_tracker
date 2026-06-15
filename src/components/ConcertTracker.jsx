@@ -2425,12 +2425,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
               {artistItems.map(([name, counts], i) => {
                 const total = counts.headliner + counts.support + counts.guest + (counts.festival || 0);
-                const hasSub = counts.support > 0 || counts.guest > 0 || counts.festival > 0;
+                const hasSub = (counts.support > 0 || counts.guest > 0 || counts.festival > 0)
+                  && !(chartType === 'festivals' && counts.festival === total); // hide if all are festival
                 const parts = [];
                 if (counts.headliner > 0) parts.push(`${counts.headliner} headliner`);
                 if (counts.support > 0) parts.push(`${counts.support} support`);
                 if (counts.guest > 0) parts.push(`${counts.guest} guest`);
-                if (counts.festival > 0) parts.push(`${counts.festival} festival`);
+                if (counts.festival > 0 && chartType !== 'festivals') parts.push(`${counts.festival} festival`);
                 return (
                   <div key={name} style={{ marginBottom: hasSub ? 8 : 6 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2442,7 +2443,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       </div>
                       <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{total}x</span>
                     </div>
-                    {hasSub && (
+                    {hasSub && parts.length > 0 && (
                       <div style={{ paddingLeft: 28, marginTop: 2 }}>
                         <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{parts.join(' · ')}</span>
                       </div>
@@ -2484,20 +2485,47 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       ))}
                     </div>
                   </div>
-                ) : (
-                  ratingYears.map(y => {
-                    const avg = ratingByYear[y].sum / ratingByYear[y].count;
-                    return (
-                      <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                        <span style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
-                        <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(avg / maxAvgRating) * 100}%` }} />
-                        </div>
-                        <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{avg.toFixed(1)} ★</span>
+                ) : (() => {
+                  const BAR_H = 90;
+                  const maxAvg = settings.ratingSystem === 10 ? 10 : 5;
+                  const midAvg = maxAvg / 2;
+                  return (
+                    <div style={{ display: "flex" }}>
+                      {/* Y axis */}
+                      <div style={{ width: 26, display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 18, flexShrink: 0 }}>
+                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxAvg}★</span>
+                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{midAvg}★</span>
+                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
                       </div>
-                    );
-                  })
-                )}
+                      <div style={{ flex: 1, position: "relative" }}>
+                        {/* Gridlines */}
+                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, borderTop: "1px solid #1f1f35" }} />
+                        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, borderTop: "1px dashed #1a1a2e" }} />
+                        <div style={{ position: "absolute", bottom: 18, left: 0, right: 0, borderTop: "1px solid #1f1f35" }} />
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: BAR_H, paddingBottom: 1 }}>
+                          {ratingYears.map(y => {
+                            const avg = ratingByYear[y].sum / ratingByYear[y].count;
+                            const barH = Math.max(2, (avg / maxAvg) * (BAR_H - 2));
+                            return (
+                              <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                                <span style={{ fontSize: 8, color: "#a78bfa", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{avg.toFixed(1)}</span>
+                                <div style={{ width: "100%", height: barH, background: "#a78bfa", borderRadius: "3px 3px 0 0" }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* X axis */}
+                        <div style={{ display: "flex", gap: 4, borderTop: "1px solid #1f1f35", paddingTop: 3 }}>
+                          {ratingYears.map(y => (
+                            <div key={y} style={{ flex: 1, textAlign: "center" }}>
+                              <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{y.slice(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

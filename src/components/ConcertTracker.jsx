@@ -82,6 +82,7 @@ const getYear = (dateStr) => dateStr.slice(0, 4);
 
 const today = new Date();
 const isPast = (dateStr) => new Date(dateStr + "T00:00:00") <= today;
+const isWish = c => !!c?.wishlist;
 
 const getSupportName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'support');
@@ -706,7 +707,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           {/* Tag pills */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
-            {!past && <Badge color="#0d1a15">upcoming</Badge>}
+            {concert.wishlist ? <Badge color="#0a1a12">want to go</Badge> : !past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
             {(concert.ticketAddons || []).map(a => <Badge key={a} color="#1a1030">{a}</Badge>)}
             {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
@@ -1215,8 +1216,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   } = settings;
   const [chartType, setChartType] = useState('all');
   const typeMatch = c => chartType === 'all' || c.type === (chartType === 'festivals' ? 'festival' : 'concert');
-  const pastAll = concerts.filter(c => isPast(c.date));
-  const concertsT = concerts.filter(typeMatch);
+  const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
+  const concertsT = concerts.filter(c => !isWish(c) && typeMatch(c));
   const past = pastAll.filter(typeMatch);
   const shows = past.filter(c => c.type === "concert");
   const festivals = past.filter(c => c.type === "festival");
@@ -4231,6 +4232,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
           if (!isFest && !showDetails) return (
             <>
               {card('Quick add', <>
+                <button onClick={() => update('wishlist', !form.wishlist)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#34d399' : '#1f1f35'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
+                  <span style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.wishlist ? '#34d399' : '#3d3564'}`, background: form.wishlist ? '#34d399' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '✓' : ''}</span>
+                  <span style={{ fontSize: 12, color: form.wishlist ? '#34d399' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>No tickets yet — save as "want to go"</span>
+                </button>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                   <input value={sfUrl} onChange={e => setSfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillFromSetlistUrl()} placeholder="✨ Paste setlist.fm link to auto-fill…" style={{ ...inputStyle, flex: 1 }} />
                   <button onClick={fillFromSetlistUrl} disabled={!sfUrl.trim() || sfStatus === 'loading'} style={{ background: 'none', border: '1px solid #3d3564', borderRadius: 8, color: sfUrl.trim() ? '#a78bfa' : '#2e2e4a', fontSize: 12, padding: '0 14px', cursor: sfUrl.trim() ? 'pointer' : 'default', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? '…' : 'Fill'}</button>
@@ -4252,6 +4257,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   </a>
                 )}
                 <button disabled={!form.artist || !form.date || sfStatus === 'loading'} onClick={autoFillFromSearch} style={{ width: '100%', marginBottom: 12, background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: (!form.artist || !form.date) ? '#2e2e4a' : '#a78bfa', fontSize: 12, padding: '8px', cursor: (!form.artist || !form.date) ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? 'Searching setlist.fm…' : '✨ Auto-fill from setlist.fm (artist + date)'}</button>
+{!form.wishlist && <>
                 {fieldLabel('Venue *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
                   <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
@@ -4261,6 +4267,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
                   <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
+                </>}
                 {quickUpcoming
                   ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming show — rating & extras unlock after the date</div>
                   : <>
@@ -5397,6 +5404,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const resetSort = () => setSortOrder('newest')
 
   const filtered = concerts.filter(c => {
+    if (isWish(c)) return false
     if (filterYear !== 'all' && c.date.slice(0,4) !== filterYear) return false
     if (filterType === 'concerts' && c.type !== 'concert') return false
     if (filterType === 'festivals' && c.type !== 'festival') return false
@@ -5427,9 +5435,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     return b.date.localeCompare(a.date)
   })
 
-  const upcoming = filtered.filter(c => !isPastDate(c.date))
-  const past = filtered.filter(c => isPastDate(c.date))
-  const allPast = concerts.filter(c => isPastDate(c.date))
+  const wishlist = concerts.filter(c => isWish(c))
+  const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
+  const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
+  const allPast = concerts.filter(c => !isWish(c) && isPastDate(c.date))
 
   const TabBtn = ({ id, icon, label }) => (
     <button onClick={() => { if (id === 'stats' && view === 'stats' && statsTab === 'charts') { setStatsTab('summary'); } else { setView(id); } }} style={{
@@ -5737,6 +5746,22 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               <EmptyState title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYear('all'); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
             {filtered.length > 0 && <>
+            {wishlist.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Want to go — {wishlist.length}</div>
+                {wishlist.map(c => (
+                  <div key={c.id} style={{ background: '#0a1a12', border: '1px dashed #2a4a3a', borderLeft: '3px solid #34d399', borderRadius: 12, padding: '11px 14px', marginBottom: 8, cursor: 'pointer' }} onClick={() => handleOpenConcert(c)}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e0ff', fontFamily: "'Syne', sans-serif" }}>{c.artist}</span>
+                      <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace" }}>want to go</span>
+                    </div>
+                    {c.date && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{formatDate(c.date)}{c.venue ? ` · ${c.venue}` : ''}</div>}
+                    {!c.date && c.venue && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.venue}</div>}
+                  </div>
+                ))}
+                <div style={{ height: 1, background: '#0e0e1a', margin: '4px 0 16px' }} />
+              </div>
+            )}
             {upcoming.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Upcoming — {upcoming.length}</div>

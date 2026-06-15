@@ -88,6 +88,7 @@ const isWish = c => !!c?.wishlist;
 const getSupportName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'support');
 const getFriends = c => Array.isArray(c?.friends) ? c.friends : [];
+const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.genre ? [c.genre] : []);
 
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);

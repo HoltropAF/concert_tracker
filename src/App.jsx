@@ -110,13 +110,35 @@ function useGuestMode() {
 export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
-  const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
+  const [updateReady, setUpdateReady] = useState(false)
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }
     window.addEventListener('beforeinstallprompt', handler)
     window.addEventListener('appinstalled', () => setShowBanner(false))
     return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  // Detect when a new service worker has taken over → show update banner
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.ready.then(reg => {
+      // fired when a new SW activates after skipWaiting
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        setUpdateReady(true)
+      })
+      // also check if there's already a waiting SW on load
+      if (reg.waiting) setUpdateReady(true)
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing
+        if (!newWorker) return
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            setUpdateReady(true)
+          }
+        })
+      })
+    })
   }, [])
 
   const handleInstall = async () => {
@@ -211,6 +233,12 @@ export default function App() {
 
   return (
     <>
+      {updateReady && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#1a1a30', borderBottom: '1px solid #a78bfa', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" }}>
+          <span style={{ fontSize: 12, color: '#c4c2f0' }}>New version available</span>
+          <button onClick={() => window.location.reload()} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Update now</button>
+        </div>
+      )}
       <AppErrorBoundary>
         <ConcertTracker
           concerts={concerts}

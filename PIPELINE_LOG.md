@@ -471,3 +471,12 @@ has a "No tickets yet — save as 'want to go'" checkbox. When checked:
 - Venue/city/country fields hide
 - Saves with wishlist: true → appears in the green "Want to go" section
 The + Wish wishlist branch is kept as a fallback for the direct form.
+
+---
+
+## 2026-06-12 (27) — "New version available" update banner
+
+Detects when a new service worker has activated (via controllerchange event,
+updatefound/statechange, or a waiting SW on load) and shows a fixed banner at
+the top: "New version available · Update now" which reloads the page to apply
+it. Eliminates the need to close-and-reopen-twice after deploys.

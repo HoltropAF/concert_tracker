@@ -1265,7 +1265,7 @@ function Collapsible({ title, defaultOpen = true, children, open: controlledOpen
 
 function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false, fillHeight = false }) {
   const {
-    topArtistsRows = 5, topFriendsRows = 8,
+    topArtistsRows = 6, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
     defaultStatsTab = "summary"
   } = settings;
@@ -2547,46 +2547,40 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const gpViewMain = chartOpt("gp-view-main", "pie");
         const gpViewSub = chartOpt("gp-view-sub", "pie");
 
-        // Each card gets half the available height minus gap and padding
-        const cardH = Math.floor((chartHeight - 16) / 2);
-        const donutSize = Math.min(110, Math.max(60, cardH - 80));
-
         const DonutCard = ({ title, source, viewKey, currentView }) => {
           const top4 = source.slice(0, 4);
           const othersCount = source.slice(4).reduce((s, [,n]) => s + n, 0);
           return (
-            <div style={{ height: cardH, background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "12px 14px", marginBottom: 8, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexShrink: 0 }}>
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
                 <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={currentView} onChange={v => setChartOpt(viewKey, v)} />
               </div>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                {source.length === 0
-                  ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {title.toLowerCase()} to see this</div>
-                  : currentView === "list"
-                    ? <div style={{ overflowY: "auto", height: "100%" }}><ListStat title="" items={source} suffix="x" /></div>
-                    : <div style={{ display: "flex", alignItems: "center", gap: 12, height: "100%" }}>
-                        <Donut size={donutSize} showLabels label="shows" segments={[
-                          ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
-                          ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
-                        ]} />
-                        <div style={{ flex: 1, overflow: "hidden" }}>
-                          {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
-                            <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
-                              <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                              <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-                            </div>
-                          ))}
-                        </div>
+              {source.length === 0
+                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {title.toLowerCase()} to see this</div>
+                : currentView === "list"
+                  ? <ListStat title="" items={source} suffix="x" />
+                  : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <Donut size={90} showLabels label="shows" segments={[
+                        ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
+                        ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
+                      ]} />
+                      <div style={{ flex: 1 }}>
+                        {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                          </div>
+                        ))}
                       </div>
-                }
-              </div>
+                    </div>
+              }
             </div>
           );
         };
 
         return (
-          <div style={{ height: chartHeight, overflow: "hidden" }}>
+          <div>
             <DonutCard title="Genres" source={topGenres} viewKey="gp-view-main" currentView={gpViewMain} />
             <DonutCard title="Subgenres" source={topSubgenres} viewKey="gp-view-sub" currentView={gpViewSub} />
           </div>
@@ -5159,7 +5153,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
           </SettingsRow>
           <SettingsRow label="Top artists" sub="Rows shown in charts">
-            <SettingsStepper value={local.topArtistsRows} onChange={v => lUpdate("topArtistsRows", v)} />
+            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); onUpdate("topArtistsRows", v); }} max={6} />
           </SettingsRow>
           <SettingsRow label="Top friends" sub="Rows shown in charts">
             <SettingsStepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />

@@ -109,7 +109,7 @@ export const SAMPLE_CONCERTS = [
 ]
 
 export const DEFAULT_SETTINGS = {
-  topArtistsRows: 5,
+  topArtistsRows: 6,
   topFriendsRows: 8,
   topVenuesRows: 5,
   topExpensiveRows: 10,

@@ -5,6 +5,25 @@ Every push to `main` auto-deploys to Vercel (project `settracker`).
 
 ---
 
+## 2026-06-15 — ntfy topic: explicit Save button + saved confirmation
+
+**Issue reported:**
+- The ntfy topic name input had no clear save action — typing a name and closing settings
+  could leave it unsaved (only persisted if the main settings Save button was used or
+  the Test button was pressed).
+
+**Changes (src/components/ConcertTracker.jsx):**
+- Added a dedicated **Save** button next to the ntfy topic input (alongside the existing
+  Test button). Clicking Save calls `onUpdate("ntfyTopic", topic)` immediately.
+- The Save button is visually highlighted (purple, bold) when the input contains an unsaved
+  change vs. what's stored in `settings.ntfyTopic`.
+- After saving, a green `✓ Saved — topic: <name>` line appears below the input, confirming
+  what was persisted.
+- The input border also turns green-tinted when the current value matches the saved value.
+- Test button behaviour unchanged — it still saves the topic before sending the test push.
+
+---
+
 ## 2026-06-11 — Setlist editing fix + per-artist song stats
 
 **Issues reported:**

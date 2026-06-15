@@ -2389,6 +2389,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
+      case "ratings": return null; // merged into artists card below
+      case "artists": {
         const aView = chartOpt("artists", "count");
         const artistItems = aView === "alpha"
           ? [...topArtists].sort((a, b) => a[0].localeCompare(b[0]))

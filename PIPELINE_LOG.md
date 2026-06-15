@@ -460,3 +460,14 @@ festivals, song counts, friend counts, spending, etc.).
 
 **Filters:** not affected by year / type / sort / genre / rating filters.
 Header count ("x concerts · x festivals · x upcoming") unchanged.
+
+---
+
+## 2026-06-12 (26) — Wishlist via checkbox in quick add
+
+Removed the separate "+ Wish" button. Instead, the quick add form (+ Show) now
+has a "No tickets yet — save as 'want to go'" checkbox. When checked:
+- Date becomes optional
+- Venue/city/country fields hide
+- Saves with wishlist: true → appears in the green "Want to go" section
+The + Wish wishlist branch is kept as a fallback for the direct form.

@@ -4983,6 +4983,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Past shows" sub="Show past concerts by default">
             <SettingsOptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowPast", v)} />
           </SettingsRow>
+          <SettingsRow label="Want to go" sub="Show want-to-go list by default">
+            <SettingsOptionPills value={local.defaultShowWishlist} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowWishlist", v)} />
+          </SettingsRow>
           <SettingsRow label="Stats tab" sub="Which stats view opens first">
             <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
           </SettingsRow>
@@ -5343,7 +5346,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
-  const [showWishlist, setShowWishlist] = useState(true)
+  const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [compact, setCompact] = useState(false)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -5759,16 +5762,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   </div>
                   <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                 </button>
-                {showWishlist && wishlist.map(c => (
-                  <div key={c.id} style={{ background: '#0a1a12', border: '1px dashed #2a4a3a', borderLeft: '3px solid #34d399', borderRadius: 12, padding: '11px 14px', marginBottom: 8, cursor: 'pointer' }} onClick={() => handleOpenConcert(c)}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e0ff', fontFamily: "'Syne', sans-serif" }}>{c.artist}</span>
-                      <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace" }}>want to go</span>
-                    </div>
-                    {c.date && c.date !== '9999-12-31' && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{formatDate(c.date)}{c.venue ? ` · ${c.venue}` : ''}</div>}
-                    {(!c.date || c.date === '9999-12-31') && c.venue && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.venue}</div>}
-                  </div>
-                ))}
+                {showWishlist && wishlist.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} showPhoto={false} />)}
                 <div style={{ height: 1, background: '#0e0e1a', margin: '4px 0 16px' }} />
               </div>
             )}

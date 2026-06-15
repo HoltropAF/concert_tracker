@@ -293,11 +293,12 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
 }
 
 function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
-  const past = isPast(concert.date);
+  const past = isPast(concert.date) && !concert.wishlist;
+  const effectiveCompact = compact || !past;
   const isFestival = concert.type === "festival";
-  const accentColor = isFestival ? "#f472b6" : past ? "#a78bfa" : "#818cf8";
+  const accentColor = isFestival ? "#f472b6" : past ? "#a78bfa" : concert.wishlist ? "#34d399" : "#818cf8";
 
-  if (compact) {
+  if (effectiveCompact) {
     return (
       <button onClick={() => onOpen(concert)} style={{
         width: "100%", textAlign: "left", background: past ? "#17172a" : "#0d1a15",
@@ -332,7 +333,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
         transition: "all 0.15s ease", marginBottom: 8
       }}
     >
-      {showPhoto && concert.photo && (
+      {showPhoto && concert.photo && past && (
         <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", aspectRatio: "5 / 2", borderRadius: 8, marginBottom: 10 }} />
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>

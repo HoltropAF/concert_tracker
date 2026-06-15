@@ -17,7 +17,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         ...(tags ? { Tags: tags } : {}),
       },
-      body: JSON.stringify({ topic, title, message: body || '', priority }),
+      body: JSON.stringify({ topic, title, message: body || '', priority, ...(tags ? { tags: Array.isArray(tags) ? tags : [tags] } : {}) }),
     })
     if (!r.ok) return res.status(r.status).json({ error: `ntfy returned ${r.status}` })
     return res.status(200).json({ ok: true })

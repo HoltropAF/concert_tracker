@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
     // At sale time: sale is within this cron window
     if (saleMs > nowMs && saleMs <= endMs) {
-      await sendNtfy(ntfyTopic, '🎫 Tickets on sale NOW', `${concert.artist} — go get your tickets!`, 5, 'tada')
+      await sendNtfy(ntfyTopic, '🎫 Tickets on sale NOW', `${concert.artist} — go get your tickets!`, 5, 'fire')
       fired.push({ concert: concert.artist, type: 'sale' })
     }
   }

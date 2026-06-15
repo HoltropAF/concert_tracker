@@ -405,3 +405,12 @@ Settings → People → Friend groups: new "⤓ Suggest groups from my shows (3+
 button. Finds all combos of friends seen together 3+ times, skips any already saved,
 and shows a one-by-one review flow: group members + show count displayed, pre-filled
 name (editable), "Save group" or "Skip" to move to the next. Remaining count shown.
+
+---
+
+## 2026-06-12 (23) — "Find on setlist.fm ↗" on Quick add
+
+When artist or date is filled in on Quick add, a "Find on setlist.fm ↗" link
+appears below the paste row, opening setlist.fm search pre-filtered by artist
++ year in a new tab — so you can find the setlist, copy the URL, and paste it
+back in one flow.

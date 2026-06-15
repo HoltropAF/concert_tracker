@@ -4235,6 +4235,9 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   <input value={sfUrl} onChange={e => setSfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillFromSetlistUrl()} placeholder="✨ Paste setlist.fm link to auto-fill…" style={{ ...inputStyle, flex: 1 }} />
                   <button onClick={fillFromSetlistUrl} disabled={!sfUrl.trim() || sfStatus === 'loading'} style={{ background: 'none', border: '1px solid #3d3564', borderRadius: 8, color: sfUrl.trim() ? '#a78bfa' : '#2e2e4a', fontSize: 12, padding: '0 14px', cursor: sfUrl.trim() ? 'pointer' : 'default', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? '…' : 'Fill'}</button>
                 </div>
+                {(form.artist || form.date) && (
+                  <a href={`https://www.setlist.fm/search?query=${encodeURIComponent(form.artist || '')}${form.date ? '+' + form.date.slice(0,4) : ''}`} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 10, color: '#a78bfa', fontFamily: "'DM Mono', monospace", textDecoration: 'none', marginBottom: 4, textAlign: 'right' }}>Find on setlist.fm ↗</a>
+                )}
                 {sfMsg && <div style={{ fontSize: 10, color: sfStatus === 'error' ? '#f87171' : '#4ade80', fontFamily: "'DM Mono', monospace", marginBottom: 8, textAlign: 'center' }}>{sfMsg}</div>}
                 <div style={{ height: 8 }} />
                 <div style={{ marginBottom: 10, position: 'relative' }}>

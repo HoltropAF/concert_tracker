@@ -5,6 +5,22 @@ Every push to `main` auto-deploys to Vercel (project `settracker`).
 
 ---
 
+## 2026-06-16 — Charts: swipeable carousel with dots
+
+**Issue reported:** Charts page required a lot of scrolling; wanted a carousel feel.
+
+**Changes (src/components/ConcertTracker.jsx):**
+- Within each chart group (Artists / Friends / Venues / Financial / Merch), charts are now
+  shown one at a time in a swipeable carousel instead of stacked vertically.
+- Dot indicator at the bottom shows which chart you're on; dots are tappable to jump directly.
+  Active dot is wider (pill shape) to make current position obvious.
+- Swipe left/right to move between charts within the group.
+- Group navigation buttons (Artists / Venues / etc.) remain unchanged.
+- Per-chart toggle in Settings → Stats display already existed and continues to work —
+  hidden charts are simply excluded from the carousel.
+
+---
+
 ## 2026-06-15 — ntfy topic: fix mobile layout (buttons off screen)
 
 **Issue reported:** Save and Test buttons were going off screen on mobile.

@@ -3096,26 +3096,61 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         </div>
       )}
-      {statsTab === "charts" && activeGroup && (
-        <div style={{ padding: "0" }} onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}>
-          <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-              {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
-                <button key={id} onClick={() => setChartType(id)} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: chartType === id ? 700 : 400, background: chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : 'none', color: chartType === id ? '#0c0c14' : '#5a5880', border: `1px solid ${chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : '#1f1f35'}` }}>{label}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ padding: "4px 16px 0" }}>
-            {activeGroup.charts.map((c, i) => (
-              <div key={c.id} style={{ marginBottom: i < activeGroup.charts.length - 1 ? 16 : 0 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{c.label}</div>
-                {renderChart(c.id)}
+      {statsTab === "charts" && activeGroup && (() => {
+        const charts = activeGroup.charts;
+        const chartIdx = Math.max(0, charts.findIndex(c => c.id === (activeChart?.id)));
+        const carouselSwipeStart = { x: 0, y: 0 };
+        const goTo = (idx) => { if (charts[idx]) setSelectedChart(charts[idx].id); };
+        return (
+          <div style={{ padding: "0", display: "flex", flexDirection: "column", height: "100%" }}>
+            {/* Header */}
+            <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5, flexShrink: 0 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
+                  <button key={id} onClick={() => setChartType(id)} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: chartType === id ? 700 : 400, background: chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : 'none', color: chartType === id ? '#0c0c14' : '#5a5880', border: `1px solid ${chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : '#1f1f35'}` }}>{label}</button>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Chart label */}
+            <div style={{ padding: "0 16px 6px", flexShrink: 0 }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{activeChart?.label}</div>
+            </div>
+
+            {/* Swipeable chart area */}
+            <div
+              style={{ flex: 1, padding: "0 16px", overflow: "hidden" }}
+              onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
+              onTouchEnd={e => {
+                const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
+                const dy = e.changedTouches[0].clientY - carouselSwipeStart.y;
+                if (Math.abs(dx) < 30 || Math.abs(dy) > Math.abs(dx) * 1.2) return;
+                if (dx < 0 && chartIdx < charts.length - 1) goTo(chartIdx + 1);
+                else if (dx > 0 && chartIdx > 0) goTo(chartIdx - 1);
+              }}
+            >
+              {renderChart(activeChart?.id)}
+            </div>
+
+            {/* Dots */}
+            {charts.length > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, padding: "14px 0 8px", flexShrink: 0 }}>
+                {charts.map((c, i) => (
+                  <button key={c.id} onClick={() => goTo(i)} style={{
+                    width: i === chartIdx ? 18 : 7,
+                    height: 7,
+                    borderRadius: 99,
+                    background: i === chartIdx ? "#a78bfa" : "#2e2e50",
+                    border: "none", cursor: "pointer", padding: 0,
+                    transition: "all 0.2s",
+                  }} />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
       {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} />}
       </>}
     </div>

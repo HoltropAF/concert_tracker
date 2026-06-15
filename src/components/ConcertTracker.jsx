@@ -1870,27 +1870,27 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
 
         const CumulativeChart = () => {
-          const allSorted = [...concerts].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
-          if (allSorted.length < 2) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+          const cumSorted = [...concertsT].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
+          if (cumSorted.length < 2) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
           const nowMs = Date.now();
-          const pastAll = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
-          const upcomingAll = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
-          const n = allSorted.length;
+          const cumPast = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
+          const cumUpcoming = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
+          const n = cumSorted.length;
           const W = 300, H = 90;
-          const firstMs = new Date(allSorted[0].date).getTime();
-          const lastMs = new Date(allSorted[n - 1].date).getTime();
+          const firstMs = new Date(cumSorted[0].date).getTime();
+          const lastMs = new Date(cumSorted[n - 1].date).getTime();
           const rangeMs = Math.max(lastMs - firstMs, 1);
           const todayMs2 = Math.min(nowMs, lastMs);
           const todayX = ((todayMs2 - firstMs) / rangeMs) * (W - 6) + 3;
           const xOf = c => ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3;
           const yOf = i => H - 6 - ((i + 1) / n) * (H - 16);
-          const pastCoords = pastAll.map((c, i) => ({ x: xOf(c), y: yOf(i) }));
-          const upcomingCoords = upcomingAll.map((c, i) => ({ x: xOf(c), y: yOf(pastAll.length + i) }));
+          const pastCoords = cumPast.map((c, i) => ({ x: xOf(c), y: yOf(i) }));
+          const upcomingCoords = cumUpcoming.map((c, i) => ({ x: xOf(c), y: yOf(cumPast.length + i) }));
           const todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : yOf(-1);
           const pastPath = pastCoords.length > 1 ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
           const upcomingPath = upcomingCoords.length > 0 ? `M ${todayX},${todayY} L ` + upcomingCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
           const areaPath = pastCoords.length > 1 ? pastPath + ` L ${todayX},${H - 4} L ${pastCoords[0].x},${H - 4} Z` : null;
-          const yearLabels = [...new Set(allSorted.map(c => c.date.slice(0, 4)))].map(y => ({
+          const yearLabels = [...new Set(cumSorted.map(c => c.date.slice(0, 4)))].map(y => ({
             y, x: Math.max(8, Math.min(W - 16, ((new Date(`${y}-01-01`).getTime() - firstMs) / rangeMs) * (W - 6) + 3))
           }));
           return (
@@ -1920,9 +1920,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 </svg>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[0].date.slice(0, 7)}</span>
-                <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{pastAll.length} past · {upcomingAll.length} upcoming</span>
-                <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[n - 1].date.slice(0, 7)}</span>
+                <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{cumSorted[0].date.slice(0, 7)}</span>
+                <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{cumPast.length} past · {cumUpcoming.length} upcoming</span>
+                <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{cumSorted[n - 1].date.slice(0, 7)}</span>
               </div>
             </div>
           );
@@ -2275,7 +2275,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {/* Solo vs with friends */}
             <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={80} centerText={["With", "friends"]} />
+                <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={80} centerText={[String(past.length), "shows"]} />
                 <div style={{ flex: 1 }}>
                   {[{ label: `With friends`, value: withFriends.length, color: "#a78bfa" }, { label: `Solo`, value: solo.length, color: "#6b6a8f" }].map(s => (
                     <div key={s.label} style={{ marginBottom: 6 }}>

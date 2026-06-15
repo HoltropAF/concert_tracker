@@ -1727,41 +1727,66 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const todayYear = new Date().getFullYear().toString();
 
         const BarsChart = () => {
-          const BAR_H = 110;
+          const BAR_H = 100;
+          const Y_PAD = 28; // left space for y-axis labels
           const hasWish = Object.keys(wishYearCount).length > 0;
+          const midVal = Math.round(maxAllWithWish / 2);
           return (
             <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
-              <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                {[["#a78bfa","Past"],["#34d399","Upcoming"],..( hasWish ? [["#f472b6","Want to go"]] : [])].map(([color, label]) => (
+              <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                {[["#a78bfa","Past"],["#34d399","Upcoming"],...(hasWish ? [["#f472b6","Want to go"]] : [])].map(([color, label]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
                     <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: BAR_H + 24 }}>
-                {allYearsWithWish.map(y => {
-                  const total = allYearCount[y] || 0;
-                  const upcoming = upcomingYearCount[y] || 0;
-                  const pastCount = total - upcoming;
-                  const wish = wishYearCount[y] || 0;
-                  const grandTotal = total + wish;
-                  const barH = Math.max(4, (grandTotal / maxAllWithWish) * BAR_H);
-                  const pastH = grandTotal > 0 ? (pastCount / grandTotal) * barH : 0;
-                  const upH = grandTotal > 0 ? (upcoming / grandTotal) * barH : 0;
-                  const wishH = grandTotal > 0 ? (wish / grandTotal) * barH : 0;
-                  return (
-                    <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{grandTotal}</span>
-                      <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", borderRadius: 3, overflow: "hidden" }}>
-                        {wishH > 0 && <div style={{ height: wishH, background: "#f472b6", opacity: 0.7 }} />}
-                        {upH > 0 && <div style={{ height: upH, background: "#34d399" }} />}
-                        {pastH > 0 && <div style={{ height: pastH, background: "#a78bfa" }} />}
+              <div style={{ display: "flex" }}>
+                {/* Y axis */}
+                <div style={{ width: Y_PAD, display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 18, flexShrink: 0 }}>
+                  <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxAllWithWish}</span>
+                  <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{midVal}</span>
+                  <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
+                </div>
+                <div style={{ flex: 1, position: "relative" }}>
+                  {/* Gridlines */}
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: BAR_H, pointerEvents: "none" }}>
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, borderTop: "1px solid #1f1f35" }} />
+                    <div style={{ position: "absolute", top: "50%", left: 0, right: 0, borderTop: "1px dashed #1a1a2e" }} />
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderTop: "1px solid #1f1f35" }} />
+                  </div>
+                  {/* Bars */}
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: BAR_H, paddingBottom: 1 }}>
+                    {allYearsWithWish.map(y => {
+                      const total = allYearCount[y] || 0;
+                      const upcoming = upcomingYearCount[y] || 0;
+                      const pastCount = total - upcoming;
+                      const wish = wishYearCount[y] || 0;
+                      const grandTotal = total + wish;
+                      const barH = Math.max(2, (grandTotal / maxAllWithWish) * (BAR_H - 2));
+                      const pastH = grandTotal > 0 ? (pastCount / grandTotal) * barH : 0;
+                      const upH = grandTotal > 0 ? (upcoming / grandTotal) * barH : 0;
+                      const wishH = grandTotal > 0 ? (wish / grandTotal) * barH : 0;
+                      return (
+                        <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                          <div style={{ width: "100%", display: "flex", flexDirection: "column", borderRadius: "3px 3px 0 0", overflow: "hidden" }}>
+                            {wishH > 0 && <div style={{ height: wishH, background: "#f472b6", opacity: 0.7 }} />}
+                            {upH > 0 && <div style={{ height: upH, background: "#34d399" }} />}
+                            {pastH > 0 && <div style={{ height: pastH, background: "#a78bfa" }} />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* X axis labels */}
+                  <div style={{ display: "flex", gap: 3, borderTop: "1px solid #1f1f35", paddingTop: 3 }}>
+                    {allYearsWithWish.map(y => (
+                      <div key={y} style={{ flex: 1, textAlign: "center" }}>
+                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{y.slice(2)}</span>
                       </div>
-                      <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4, lineHeight: 1 }}>{y.slice(2)}</span>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -1770,34 +1795,48 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const LineChart = () => {
           const sortedYearsAsc = Object.keys(allYearCount).sort();
           const maxAll = Math.max(...Object.values(allYearCount), 1);
+          const midAll = Math.round(maxAll / 2);
           const n = sortedYearsAsc.length;
           if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
-          const H = 90;
-          const xOf = i => (i / (n - 1)) * 274 + 3;
-          const yOf = v => H - 6 - (v / maxAll) * (H - 16);
+          const W = 240, H = 90;
+          const Y_PAD = 28;
+          const xOf = i => (i / (n - 1)) * (W - 6) + 3;
+          const yOf = v => H - 4 - (v / maxAll) * (H - 14);
           const splitIdx = sortedYearsAsc.findIndex(y => y >= todayYear);
           const pastYears = splitIdx === -1 ? sortedYearsAsc : sortedYearsAsc.slice(0, splitIdx + 1);
           const futureYears = splitIdx === -1 ? [] : sortedYearsAsc.slice(splitIdx);
           const pastPath = pastYears.length > 1 ? "M " + pastYears.map((y, i) => `${xOf(sortedYearsAsc.indexOf(y))},${yOf(allYearCount[y])}`).join(" L ") : null;
           const futurePath = futureYears.length > 1 ? "M " + futureYears.map(y => `${xOf(sortedYearsAsc.indexOf(y))},${yOf(allYearCount[y])}`).join(" L ") : null;
-          const firstPastX = pastYears.length ? xOf(0) : 3;
+          const firstPastX = xOf(0);
           const lastPastX = pastYears.length ? xOf(pastYears.length - 1) : 3;
           return (
             <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
-              <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+              <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} /><span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span></div>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1 }} /><span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>
               </div>
-              <svg width="100%" height={H + 10} viewBox={`0 0 280 ${H + 10}`} preserveAspectRatio="none">
-                <defs><linearGradient id="sGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
-                {pastPath && <path d={pastPath + ` L ${lastPastX},${H-4} L ${firstPastX},${H-4} Z`} fill="url(#sGrad)" />}
-                {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                {futurePath && <path d={futurePath} fill="none" stroke="#34d399" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" />}
-                {sortedYearsAsc.map((y, i) => <circle key={y} cx={xOf(i)} cy={yOf(allYearCount[y])} r="3" fill={parseInt(y) >= parseInt(todayYear) && (upcomingYearCount[y] || 0) > 0 ? "#34d399" : "#a78bfa"} />)}
-              </svg>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsAsc[0]}</span>
-                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsAsc[sortedYearsAsc.length - 1]}</span>
+              <div style={{ display: "flex", alignItems: "flex-start" }}>
+                {/* Y axis labels */}
+                <div style={{ width: Y_PAD, display: "flex", flexDirection: "column", justifyContent: "space-between", height: H + 14, paddingBottom: 14, flexShrink: 0 }}>
+                  <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxAll}</span>
+                  <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{midAll}</span>
+                  <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
+                </div>
+                <svg style={{ flex: 1 }} height={H + 14} viewBox={`0 0 ${W} ${H + 14}`} preserveAspectRatio="none">
+                  <defs><linearGradient id="sGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
+                  {/* Gridlines */}
+                  <line x1={0} y1={yOf(maxAll)} x2={W} y2={yOf(maxAll)} stroke="#1f1f35" strokeWidth="1" />
+                  <line x1={0} y1={yOf(midAll)} x2={W} y2={yOf(midAll)} stroke="#1a1a2e" strokeWidth="1" strokeDasharray="3,3" />
+                  <line x1={0} y1={yOf(0)} x2={W} y2={yOf(0)} stroke="#1f1f35" strokeWidth="1" />
+                  {/* X axis year labels */}
+                  {sortedYearsAsc.map((y, i) => (
+                    <text key={y} x={xOf(i)} y={H + 11} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Mono,monospace">{y.slice(2)}</text>
+                  ))}
+                  {pastPath && <path d={pastPath + ` L ${lastPastX},${yOf(0)} L ${firstPastX},${yOf(0)} Z`} fill="url(#sGrad)" />}
+                  {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {futurePath && <path d={futurePath} fill="none" stroke="#34d399" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {sortedYearsAsc.map((y, i) => <circle key={y} cx={xOf(i)} cy={yOf(allYearCount[y])} r="3" fill={parseInt(y) >= parseInt(todayYear) && (upcomingYearCount[y] || 0) > 0 ? "#34d399" : "#a78bfa"} />)}
+                </svg>
               </div>
             </div>
           );
@@ -1978,29 +2017,42 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {(() => {
             const activeYears = years.filter(y => yearSpend[y] > 0).slice(-10);
             const maxSpend = Math.max(...activeYears.map(y => yearSpend[y]), 1);
-            return activeYears.map(y => {
-              const concerts_ = yearConcertSpend[y] || 0;
-              const festivals_ = yearFestivalSpend[y] || 0;
-              const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
-              const merch = yearMerchSpend[y] || 0;
-              const bar = (val, color, opacity = 1) => (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ height: 7, borderRadius: 3, background: color, width: `${Math.max(4, (val / maxSpend) * 100)}%`, opacity, transition: "width 0.5s ease" }} />
-                  <span style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(val)}</span>
-                </div>
-              );
-              return (
-                <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                    {concerts_ > 0 && bar(concerts_, "#a78bfa")}
-                    {festivals_ > 0 && bar(festivals_, "#fb923c")}
-                    {avg && bar(avg, "#38bdf8", 0.8)}
-                    {merch > 0 && bar(merch, "#34d399", 0.85)}
+            const midSpend = Math.round(maxSpend / 2);
+            return (
+              <>
+                <div style={{ display: "flex", marginBottom: 4 }}>
+                  <div style={{ width: 36, flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€0</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{Math.round(midSpend)}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{Math.round(maxSpend)}</span>
                   </div>
                 </div>
-              );
-            });
+                {activeYears.map(y => {
+                  const concerts_ = yearConcertSpend[y] || 0;
+                  const festivals_ = yearFestivalSpend[y] || 0;
+                  const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
+                  const merch = yearMerchSpend[y] || 0;
+                  const bar = (val, color, opacity = 1) => (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ height: 7, borderRadius: 3, background: color, width: `${Math.max(2, (val / maxSpend) * 100)}%`, opacity, transition: "width 0.5s ease" }} />
+                      <span style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(val)}</span>
+                    </div>
+                  );
+                  return (
+                    <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                        {concerts_ > 0 && bar(concerts_, "#a78bfa")}
+                        {festivals_ > 0 && bar(festivals_, "#fb923c")}
+                        {avg && bar(avg, "#38bdf8", 0.8)}
+                        {merch > 0 && bar(merch, "#34d399", 0.85)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            );
           })()}
           <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
             <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total</span>

@@ -1715,40 +1715,48 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     switch(id) {
       case "shows": {
         const sView = chartOpt("shows", "bars");
-        const sortedYearsAsc = Object.keys(allYearCount).sort();
-        const maxAll = Math.max(...Object.values(allYearCount), 1);
+        const wishYearCount = {};
+        concerts.filter(c => isWish(c) && c.date && c.date !== '9999-12-31').forEach(c => {
+          const y = getYear(c.date);
+          if (y) wishYearCount[y] = (wishYearCount[y] || 0) + 1;
+        });
+        const allYearsWithWish = [...new Set([...Object.keys(allYearCount), ...Object.keys(wishYearCount)])].sort();
+        const maxAllWithWish = Math.max(...allYearsWithWish.map(y => (allYearCount[y] || 0) + (wishYearCount[y] || 0)), 1);
         const hmAllYears = Object.keys(allYearMonthCount).sort();
         const hmMax = Math.max(...hmAllYears.flatMap(y => Array.from({length:12}, (_,m) => allYearMonthCount[y]?.[m] || 0)), 1);
         const todayYear = new Date().getFullYear().toString();
 
         const BarsChart = () => {
           const BAR_H = 110;
+          const hasWish = Object.keys(wishYearCount).length > 0;
           return (
-            <div style={{ width: "100%" }}>
-              <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: "#a78bfa" }} />
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: "#34d399" }} />
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span>
-                </div>
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                {[["#a78bfa","Past"],["#34d399","Upcoming"],..( hasWish ? [["#f472b6","Want to go"]] : [])].map(([color, label]) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+                    <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
+                  </div>
+                ))}
               </div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: BAR_H + 24 }}>
-                {sortedYearsAsc.map(y => {
-                  const total = allYearCount[y];
+                {allYearsWithWish.map(y => {
+                  const total = allYearCount[y] || 0;
                   const upcoming = upcomingYearCount[y] || 0;
                   const pastCount = total - upcoming;
-                  const barH = Math.max(4, (total / maxAll) * BAR_H);
-                  const pastH = total > 0 ? (pastCount / total) * barH : 0;
-                  const upH = total > 0 ? (upcoming / total) * barH : 0;
+                  const wish = wishYearCount[y] || 0;
+                  const grandTotal = total + wish;
+                  const barH = Math.max(4, (grandTotal / maxAllWithWish) * BAR_H);
+                  const pastH = grandTotal > 0 ? (pastCount / grandTotal) * barH : 0;
+                  const upH = grandTotal > 0 ? (upcoming / grandTotal) * barH : 0;
+                  const wishH = grandTotal > 0 ? (wish / grandTotal) * barH : 0;
                   return (
                     <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{total}</span>
+                      <span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{grandTotal}</span>
                       <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", borderRadius: 3, overflow: "hidden" }}>
-                        {upH > 0 && <div style={{ height: upH, background: "#34d399", borderRadius: upcoming > 0 && pastCount === 0 ? "3px 3px 3px 3px" : "3px 3px 0 0" }} />}
-                        {pastH > 0 && <div style={{ height: pastH, background: "#a78bfa", borderRadius: upH > 0 ? 0 : "3px 3px 3px 3px" }} />}
+                        {wishH > 0 && <div style={{ height: wishH, background: "#f472b6", opacity: 0.7 }} />}
+                        {upH > 0 && <div style={{ height: upH, background: "#34d399" }} />}
+                        {pastH > 0 && <div style={{ height: pastH, background: "#a78bfa" }} />}
                       </div>
                       <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4, lineHeight: 1 }}>{y.slice(2)}</span>
                     </div>
@@ -1760,6 +1768,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         };
 
         const LineChart = () => {
+          const sortedYearsAsc = Object.keys(allYearCount).sort();
+          const maxAll = Math.max(...Object.values(allYearCount), 1);
           const n = sortedYearsAsc.length;
           if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
           const H = 90;
@@ -1773,16 +1783,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           const firstPastX = pastYears.length ? xOf(0) : 3;
           const lastPastX = pastYears.length ? xOf(pastYears.length - 1) : 3;
           return (
-            <>
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 8 }}>
               <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} />
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1 }} />
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span>
-                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} /><span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1 }} /><span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>
               </div>
               <svg width="100%" height={H + 10} viewBox={`0 0 280 ${H + 10}`} preserveAspectRatio="none">
                 <defs><linearGradient id="sGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
@@ -1795,12 +1799,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsAsc[0]}</span>
                 <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedYearsAsc[sortedYearsAsc.length - 1]}</span>
               </div>
-            </>
+            </div>
           );
         };
 
         const Heatmap = () => (
-          <div style={{ marginTop: 16, borderTop: "1px solid #1f1f35", paddingTop: 12 }}>
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
             <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Monthly heatmap</div>
             <div style={{ display: "flex", marginLeft: 28 }}>
               {monthNames.map((name, i) => <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 7, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{name[0]}</div>)}
@@ -1828,39 +1832,33 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         const CumulativeChart = () => {
           const allSorted = [...concerts].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
-          if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+          if (allSorted.length < 2) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+          const nowMs = Date.now();
+          const pastAll = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
+          const upcomingAll = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
           const n = allSorted.length;
           const W = 300, H = 90;
           const firstMs = new Date(allSorted[0].date).getTime();
           const lastMs = new Date(allSorted[n - 1].date).getTime();
-          const rangeMs = lastMs - firstMs || 1;
-          const todayMs = Date.now();
-          const todayX = Math.min(W - 3, ((todayMs - firstMs) / rangeMs) * (W - 6) + 3);
-          const coords = allSorted.map((c, i) => ({
-            x: ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3,
-            y: H - 6 - ((i + 1) / n) * (H - 16),
-            isPast: isPast(c.date),
-          }));
-          const pastCoords = coords.filter(p => p.isPast);
-          const upcomingCoords = coords.filter(p => !p.isPast);
-          const todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : coords[0].y;
-          const pastPath = pastCoords.length > 0 ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+          const rangeMs = Math.max(lastMs - firstMs, 1);
+          const todayMs2 = Math.min(nowMs, lastMs);
+          const todayX = ((todayMs2 - firstMs) / rangeMs) * (W - 6) + 3;
+          const xOf = c => ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3;
+          const yOf = i => H - 6 - ((i + 1) / n) * (H - 16);
+          const pastCoords = pastAll.map((c, i) => ({ x: xOf(c), y: yOf(i) }));
+          const upcomingCoords = upcomingAll.map((c, i) => ({ x: xOf(c), y: yOf(pastAll.length + i) }));
+          const todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : yOf(-1);
+          const pastPath = pastCoords.length > 1 ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
           const upcomingPath = upcomingCoords.length > 0 ? `M ${todayX},${todayY} L ` + upcomingCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
-          const areaPath = pastCoords.length > 0 ? pastPath + ` L ${todayX},${H - 4} L ${pastCoords[0].x},${H - 4} Z` : null;
+          const areaPath = pastCoords.length > 1 ? pastPath + ` L ${todayX},${H - 4} L ${pastCoords[0].x},${H - 4} Z` : null;
           const yearLabels = [...new Set(allSorted.map(c => c.date.slice(0, 4)))].map(y => ({
             y, x: Math.max(8, Math.min(W - 16, ((new Date(`${y}-01-01`).getTime() - firstMs) / rangeMs) * (W - 6) + 3))
           }));
           return (
-            <>
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
               <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} />
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1, opacity: 0.8 }} />
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span>
-                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} /><span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1, opacity: 0.8 }} /><span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
                 <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: H + 10, paddingBottom: 14 }}>
@@ -1884,15 +1882,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
                 <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[0].date.slice(0, 7)}</span>
-                <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{pastCoords.length} past · {upcomingCoords.length} upcoming</span>
+                <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{pastAll.length} past · {upcomingAll.length} upcoming</span>
                 <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[n - 1].date.slice(0, 7)}</span>
               </div>
-            </>
+            </div>
           );
         };
 
         return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+          <div>
             <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"},{id:"cumulative",label:"Cumulative"}]} value={sView} onChange={v => setChartOpt("shows", v)} />
             {sView === "bars" && <><BarsChart /><Heatmap /></>}
             {sView === "line" && <><LineChart /><Heatmap /></>}
@@ -2544,21 +2542,17 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
       }
       case "genres-pie": {
-        const gpViewMain = chartOpt("gp-view-main", "pie");
-        const gpViewSub = chartOpt("gp-view-sub", "pie");
+        const gpView = chartOpt("gp-view", "pie");
 
-        const DonutCard = ({ title, source, viewKey, currentView }) => {
+        const DonutCard = ({ title, source }) => {
           const top4 = source.slice(0, 4);
           const othersCount = source.slice(4).reduce((s, [,n]) => s + n, 0);
           return (
             <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
-                <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={currentView} onChange={v => setChartOpt(viewKey, v)} />
-              </div>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{title}</div>
               {source.length === 0
                 ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {title.toLowerCase()} to see this</div>
-                : currentView === "list"
+                : gpView === "list"
                   ? <ListStat title="" items={source} suffix="x" />
                   : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <Donut size={90} showLabels label="shows" segments={[
@@ -2581,8 +2575,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         return (
           <div>
-            <DonutCard title="Genres" source={topGenres} viewKey="gp-view-main" currentView={gpViewMain} />
-            <DonutCard title="Subgenres" source={topSubgenres} viewKey="gp-view-sub" currentView={gpViewSub} />
+            <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("gp-view", v)} />
+            <DonutCard title="Genres" source={topGenres} />
+            <DonutCard title="Subgenres" source={topSubgenres} />
           </div>
         );
       }

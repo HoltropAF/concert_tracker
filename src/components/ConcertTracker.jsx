@@ -1388,9 +1388,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   });
   const allYears = Object.keys(allYearCount).sort();
 
-  // Month counts including upcoming
+  // Month counts including upcoming — respects chartType filter via concertsT
   const allYearMonthCount = {};
-  concerts.forEach(c => {
+  concertsT.forEach(c => {
     const m = parseInt(c.date.split("-")[1]) - 1;
     const y = getYear(c.date);
     if (!allYearMonthCount[y]) allYearMonthCount[y] = {};

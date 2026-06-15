@@ -1590,8 +1590,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         ))}
         {centerText === undefined ? (
           <>
-            <text x={cx} y={cy - size*0.08} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.22} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
-            <text x={cx} y={cy + size*0.13} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
+            <text x={cx} y={cy - size*0.08} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.16} fontFamily="'Syne',sans-serif" fontWeight="800">{label.split(' ')[0]}</text>
+            {label.split(' ').length > 1 && <text x={cx} y={cy + size*0.11} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.10} fontFamily="'DM Mono',monospace">{label.split(' ').slice(1).join(' ')}</text>}
           </>
         ) : centerText !== null ? (
           Array.isArray(centerText) ? (
@@ -1827,7 +1827,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
 
         const CumulativeChart = () => {
-          const allSorted = [...concertsT].sort((a, b) => a.date.localeCompare(b.date));
+          const allSorted = [...concerts].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
           if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
           const n = allSorted.length;
           const W = 300, H = 90;
@@ -1950,43 +1950,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       }
       case "year-spend": {
         const ysView = chartOpt("year-spend", "bars");
-        const activeYearsYS = years.filter(y => yearSpend[y] > 0);
+        const activeYearsYS = years.filter(y => yearSpend[y] > 0).slice(-10);
         const maxSpendYS = Math.max(...activeYearsYS.map(y => yearSpend[y]), 1);
         const thisYearFS = String(new Date().getFullYear());
         const allTicketsFS = past.filter(c => c.ticketPrice);
         const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
         const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
         const costOf = c => (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + (c.otherCost || 0);
-        const ticketOf = c => c.ticketPrice || 0;
-        const merchOf = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-        const otherOf = c => c.otherCost || 0;
-
-        const concerts_ = past.filter(c => c.type !== 'festival');
-        const festivals_ = past.filter(c => c.type === 'festival');
-
-        const totalTicketC = concerts_.reduce((s, c) => s + ticketOf(c), 0);
-        const totalMerchC  = concerts_.reduce((s, c) => s + merchOf(c), 0);
-        const totalOtherC  = concerts_.reduce((s, c) => s + otherOf(c), 0);
-        const totalTicketF = festivals_.reduce((s, c) => s + ticketOf(c), 0);
-        const totalMerchF  = festivals_.reduce((s, c) => s + merchOf(c), 0);
-        const totalOtherF  = festivals_.reduce((s, c) => s + otherOf(c), 0);
-        const totalCFS = concerts_.reduce((s, c) => s + costOf(c), 0);
-        const totalFFS = festivals_.reduce((s, c) => s + costOf(c), 0);
-
-        const TypeRow = ({ label, ticket, merch, other, total, color }) => total === 0 ? null : (
-          <div style={{ marginBottom: 10, padding: "10px 12px", background: "#0c0c14", border: `1px solid ${color}33`, borderLeft: `3px solid ${color}`, borderRadius: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{label}</span>
-              <span style={{ fontSize: 14, color, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(total)}</span>
-            </div>
-            {[["ticket", ticket, "#f472b6"], ["merch", merch, "#34d399"], ["other / travel", other, "#38bdf8"]].map(([lbl, val, c]) => val > 0 ? (
-              <div key={lbl} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{lbl}</span>
-                <span style={{ fontSize: 10, color: c, fontFamily: "'DM Mono', monospace" }}>€{Math.round(val)}</span>
-              </div>
-            ) : null)}
-          </div>
-        );
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {avgThisYearFS && (
@@ -1994,7 +1964,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           )}
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
           {ysView === "bars" && <>
-          {/* Legend */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
             {[
               { color: "#a78bfa", label: "Concerts" },
@@ -2008,9 +1977,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             ))}
           </div>
-          {/* Grouped bars */}
           {(() => {
-            const activeYears = years.filter(y => yearSpend[y] > 0);
+            const activeYears = years.filter(y => yearSpend[y] > 0).slice(-10);
             const maxSpend = Math.max(...activeYears.map(y => yearSpend[y]), 1);
             return activeYears.map(y => {
               const concerts_ = yearConcertSpend[y] || 0;
@@ -2041,10 +2009,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(Object.values(yearSpend).reduce((s, v) => s + v, 0))}</span>
           </div>
           </>}
-          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-            <TypeRow label="Concerts" ticket={totalTicketC} merch={totalMerchC} other={totalOtherC} total={totalCFS} color="#a78bfa" />
-            <TypeRow label="Festivals" ticket={totalTicketF} merch={totalMerchF} other={totalOtherF} total={totalFFS} color="#fb923c" />
-          </div>
           {ysView === "line" && (() => {
             const n = activeYearsYS.length;
             if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
@@ -3211,8 +3175,21 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
                 const dy = e.changedTouches[0].clientY - carouselSwipeStart.y;
                 if (Math.abs(dx) < 30 || Math.abs(dy) > Math.abs(dx) * 1.2) return;
-                if (dx < 0 && chartIdx < charts.length - 1) goTo(chartIdx + 1);
-                else if (dx > 0 && chartIdx > 0) goTo(chartIdx - 1);
+                if (dx < 0) {
+                  if (chartIdx < charts.length - 1) goTo(chartIdx + 1);
+                  else {
+                    // at last chart — switch to next group
+                    const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+                    if (gIdx < visibleChartGroups.length - 1) { setChartGroup(visibleChartGroups[gIdx + 1].id); setSelectedChart(visibleChartGroups[gIdx + 1].charts[0]?.id); }
+                  }
+                } else {
+                  if (chartIdx > 0) goTo(chartIdx - 1);
+                  else {
+                    // at first chart — switch to prev group
+                    const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+                    if (gIdx > 0) { const prevG = visibleChartGroups[gIdx - 1]; setChartGroup(prevG.id); setSelectedChart(prevG.charts[prevG.charts.length - 1]?.id); }
+                  }
+                }
               }}
             >
               {renderChart(activeChart?.id, chartHeight)}

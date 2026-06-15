@@ -321,6 +321,9 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
         ) : !past ? (
           <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>upcoming</span>
         ) : null}
+        {concert.wishlist && concert.ticketSaleAt && (
+          <span style={{ fontSize: 11, color: "#34d399", flexShrink: 0 }}>🔔</span>
+        )}
       </button>
     );
   }

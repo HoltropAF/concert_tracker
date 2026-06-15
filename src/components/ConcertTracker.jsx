@@ -324,9 +324,6 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
         {concert.wishlist && concert.ticketSaleAt && (
           <span style={{ fontSize: 11, flexShrink: 0 }}>🔔</span>
         )}
-        {!concert.wishlist && (!concert.date || concert.date === '9999-12-31') && (
-          <span style={{ fontSize: 11, flexShrink: 0 }}>🎫</span>
-        )}
       </button>
     );
   }
@@ -936,9 +933,6 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           ...(form.wishlist !== undefined ? [{ title: 'Wishlist', content: <>
             <button onClick={() => {
               update('wishlist', !form.wishlist);
-              if (form.wishlist && (!form.date || form.date === '9999-12-31')) {
-                update('date', new Date().toISOString().slice(0, 10));
-              }
             }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#1f1f35' : '#34d399'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', marginBottom: 10 }}>
               <span style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${form.wishlist ? '#3d3564' : '#34d399'}`, background: form.wishlist ? 'none' : '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '' : '✓'}</span>
               <div>

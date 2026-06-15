@@ -2635,7 +2635,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 : gpView === "list"
                   ? <ListStat title="" items={source} suffix="x" />
                   : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <Donut size={90} showLabels centerText={[String(source.length), title.toLowerCase()]} segments={[
+                      <Donut size={90} showLabels centerText={title === "Subgenres" ? [String(source.length), "sub", "genres"] : [String(source.length), title.toLowerCase()]} segments={[
                         ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
                         ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
                       ]} />

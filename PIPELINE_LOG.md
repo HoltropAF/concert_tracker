@@ -434,3 +434,29 @@ back in one flow.
 - "Find on setlist.fm ↗" appears as a full-width button once both date and artist
   are filled, linking to a pre-filled setlist.fm search. Copy the URL → paste →
   Fill to auto-fill everything.
+
+---
+
+## 2026-06-12 (25) — "Want to go" wishlist
+
+A third category alongside past and upcoming, stored as `wishlist: true` in the
+concert data.
+
+**Adding:** "+ Wish" button (green dashed) next to + Show / + Fest in the header.
+Opens a minimal form: artist (required), date / venue / city / country (all
+optional, since you might not have tickets yet).
+
+**List section:** "Want to go — N" appears above upcoming in a green accent.
+Cards have a dashed green border and "want to go" badge. Wishlist items do NOT
+appear in the filtered/sorted show list (so year filter, type filter, sort etc.
+don't touch them) — they always show as their own section.
+
+**Detail view:** shows a "want to go" badge and a "Got tickets ✓" button that
+converts it to an upcoming show (sets wishlist: false, uses existing date or
+today if none set).
+
+**Stats:** wishlist explicitly excluded from all pipelines (past, concerts,
+festivals, song counts, friend counts, spending, etc.).
+
+**Filters:** not affected by year / type / sort / genre / rating filters.
+Header count ("x concerts · x festivals · x upcoming") unchanged.

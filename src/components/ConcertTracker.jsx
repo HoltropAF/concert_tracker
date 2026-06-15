@@ -5294,7 +5294,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <div>4. Pick a unique name — it's your private channel</div>
           </div>
           <SettingsRow label="Enable notifications" sub="Send ticket sale reminders via ntfy">
-            <SettingsToggle value={!!local.ntfyEnabled} onChange={v => { lUpdate("ntfyEnabled", v); onUpdate("ntfyEnabled", v); }} />
+            <SettingsOptionPills value={local.ntfyEnabled ? 'on' : 'off'} options={[{id:'on',label:'On'},{id:'off',label:'Off'}]} onChange={v => { lUpdate("ntfyEnabled", v === 'on'); onUpdate("ntfyEnabled", v === 'on'); }} />
           </SettingsRow>
           {local.ntfyEnabled && <>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>Your ntfy topic name</div>

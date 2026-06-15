@@ -4106,10 +4106,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   const validate = () => {
     const e = {}
     if (!form.artist.trim()) e.artist = true
-    if (!form.date) e.date = true
-    if (!form.venue.trim()) e.venue = true
-    if (!form.city.trim()) e.city = true
-    if (!form.country.trim()) e.country = true
+    if (!form.wishlist && !form.date) e.date = true
+    if (!form.wishlist && !form.venue.trim()) e.venue = true
+    if (!form.wishlist && !form.city.trim()) e.city = true
+    if (!form.wishlist && !form.country.trim()) e.country = true
     setErrors(e)
     return Object.keys(e).length === 0
   }

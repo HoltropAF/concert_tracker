@@ -1590,8 +1590,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         ))}
         {centerText === undefined ? (
           <>
-            <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.14} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
-            <text x={cx} y={cy+size*0.16} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
+            <text x={cx} y={cy - size*0.08} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.22} fontFamily="'Syne',sans-serif" fontWeight="800">{total}</text>
+            <text x={cx} y={cy + size*0.13} textAnchor="middle" dominantBaseline="middle" fill="#4a4870" fontSize={size*0.09} fontFamily="'DM Mono',monospace">{label}</text>
           </>
         ) : centerText !== null ? (
           Array.isArray(centerText) ? (
@@ -2508,42 +2508,45 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
       }
       case "genres-pie": {
-        const gpData = chartOpt("gp-data", "main");
-        const gpView = chartOpt("gp-view", "pie");
-        const gpSource = gpData === "sub" ? topSubgenres : topGenres;
-        const top4 = gpSource.slice(0, 4);
-        const othersCount = gpSource.slice(4).reduce((s, [,n]) => s + n, 0);
-        const emptyLabel = gpData === "sub" ? "subgenres" : "genres";
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-              <ChartToggle options={[{id:"main",label:"Main"},{id:"sub",label:"Subgenre"}]} value={gpData} onChange={v => setChartOpt("gp-data", v)} />
-              <div style={{ width: 1, height: 18, background: "#2e2e50", flexShrink: 0 }} />
-              <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("gp-view", v)} color="#6d28d9" />
-            </div>
-            {gpView === "list" ? (
-              gpSource.length === 0
-                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
-                : <ListStat title="" items={gpSource} suffix="x" />
-            ) : gpSource.length === 0
-              ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {emptyLabel} to see this</div>
-              : (
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <Donut size={110} showLabels label="shows" segments={[
-                    ...top4.map(([g, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
-                    ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
-                  ]} />
-                  <div style={{ flex: 1 }}>
-                    {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
-                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                        <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+        const gpViewMain = chartOpt("gp-view-main", "pie");
+        const gpViewSub = chartOpt("gp-view-sub", "pie");
+
+        const DonutCard = ({ title, source, viewKey, currentView, colorOffset = 0 }) => {
+          const top4 = source.slice(0, 4);
+          const othersCount = source.slice(4).reduce((s, [,n]) => s + n, 0);
+          return (
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
+                <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={currentView} onChange={v => setChartOpt(viewKey, v)} />
+              </div>
+              {source.length === 0
+                ? <div style={{ color: "#2e2e4a", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>Tag shows with {title.toLowerCase()} to see this</div>
+                : currentView === "list"
+                  ? <ListStat title="" items={source} suffix="x" />
+                  : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <Donut size={110} showLabels label="shows" segments={[
+                        ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i + colorOffset] || GENRE_COLORS[i] })),
+                        ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
+                      ]} />
+                      <div style={{ flex: 1 }}>
+                        {[...top4, ...(othersCount > 0 ? [["Others", othersCount]] : [])].map(([name], i) => (
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? (GENRE_COLORS[i + colorOffset] || GENRE_COLORS[i]) : "#4a4870", flexShrink: 0 }} />
+                            <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            }
+                    </div>
+              }
+            </div>
+          );
+        };
+
+        return (
+          <div>
+            <DonutCard title="Genres" source={topGenres} viewKey="gp-view-main" currentView={gpViewMain} colorOffset={0} />
+            <DonutCard title="Subgenres" source={topSubgenres} viewKey="gp-view-sub" currentView={gpViewSub} colorOffset={0} />
           </div>
         );
       }

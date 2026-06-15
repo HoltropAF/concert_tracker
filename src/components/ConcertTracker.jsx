@@ -5299,20 +5299,20 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </SettingsRow>
           {local.ntfyEnabled && <>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>Your ntfy topic name</div>
+            <input
+              value={local.ntfyTopic || ""}
+              onChange={e => lUpdate("ntfyTopic", e.target.value.trim())}
+              placeholder="e.g. settracker-yourname"
+              style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: `1px solid ${local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic ? "#1a3a2a" : "#2e2e50"}`, borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12, marginBottom: 8 }}
+            />
             <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-              <input
-                value={local.ntfyTopic || ""}
-                onChange={e => lUpdate("ntfyTopic", e.target.value.trim())}
-                placeholder="e.g. settracker-yourname"
-                style={{ flex: 1, background: "#0c0c14", border: `1px solid ${local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic ? "#1a3a2a" : "#2e2e50"}`, borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
-              />
               <button onClick={async () => {
                 const topic = (local.ntfyTopic || "").trim();
                 if (!topic) { onNotify("Enter a topic name first"); return; }
                 const result = await onUpdate("ntfyTopic", topic);
                 if (result?.error) { onNotify("Could not save topic", "error"); return; }
                 onNotify("Topic saved ✓");
-              }} style={{ background: local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#a78bfa" : "#1a1a30", border: `1px solid ${local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#a78bfa" : "#2e2e50"}`, borderRadius: 8, color: local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#0c0c14" : "#6b6a8f", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0, fontWeight: 700, transition: "all 0.15s" }}>Save</button>
+              }} style={{ flex: 1, background: local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#a78bfa" : "#1a1a30", border: `1px solid ${local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#a78bfa" : "#2e2e50"}`, borderRadius: 8, color: local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#0c0c14" : "#6b6a8f", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: 700, transition: "all 0.15s" }}>Save</button>
               <button onClick={async () => {
                 const topic = (local.ntfyTopic || "").trim();
                 if (!topic) { onNotify("Enter a topic name first"); return; }
@@ -5320,7 +5320,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 const r = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, title: "🎫 settracker connected!", body: "Ticket sale notifications are set up." }) });
                 if (r.ok) onNotify("Test notification sent! Check your ntfy app.");
                 else onNotify("Could not reach ntfy — check your topic name", "error");
-              }} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Test</button>
+              }} style={{ flex: 1, background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Test</button>
             </div>
             {local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic && (
               <div style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>✓ Saved — topic: {settings.ntfyTopic}</div>

@@ -5,6 +5,17 @@ Every push to `main` auto-deploys to Vercel (project `settracker`).
 
 ---
 
+## 2026-06-15 — ntfy topic: fix mobile layout (buttons off screen)
+
+**Issue reported:** Save and Test buttons were going off screen on mobile.
+
+**Changes (src/components/ConcertTracker.jsx):**
+- Moved ntfy topic input to its own full-width row (above the buttons).
+- Save and Test buttons now share a row below the input, each `flex: 1` so they
+  fill the width equally and never overflow on narrow screens.
+
+---
+
 ## 2026-06-15 — ntfy topic: explicit Save button + saved confirmation
 
 **Issue reported:**

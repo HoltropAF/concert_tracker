@@ -5342,6 +5342,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [sortOrder, setSortOrder] = useState('newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
+  const [showWishlist, setShowWishlist] = useState(true)
   const [compact, setCompact] = useState(false)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -5750,8 +5751,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {filtered.length > 0 && <>
             {wishlist.length > 0 && (
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Want to go — {wishlist.length}</div>
-                {wishlist.map(c => (
+                <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px 10px', marginBottom: showWishlist ? 4 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Want to go</span>
+                    <span style={{ fontSize: 10, color: '#2e4a3a', fontFamily: "'DM Mono', monospace", background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 99, padding: '1px 7px' }}>{wishlist.length}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+                </button>
+                {showWishlist && wishlist.map(c => (
                   <div key={c.id} style={{ background: '#0a1a12', border: '1px dashed #2a4a3a', borderLeft: '3px solid #34d399', borderRadius: 12, padding: '11px 14px', marginBottom: 8, cursor: 'pointer' }} onClick={() => handleOpenConcert(c)}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e0ff', fontFamily: "'Syne', sans-serif" }}>{c.artist}</span>

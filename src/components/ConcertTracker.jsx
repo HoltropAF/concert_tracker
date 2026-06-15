@@ -2275,7 +2275,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {/* Solo vs with friends */}
             <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={80} label="friends" />
+                <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={80} centerText={["With", "friends"]} />
                 <div style={{ flex: 1 }}>
                   {[{ label: `With friends`, value: withFriends.length, color: "#a78bfa" }, { label: `Solo`, value: solo.length, color: "#6b6a8f" }].map(s => (
                     <div key={s.label} style={{ marginBottom: 6 }}>
@@ -2295,7 +2295,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {/* Group size */}
             <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Donut showLabels size={80} centerText={null} segments={[
+                <Donut showLabels size={80} centerText={["Group", "size"]} segments={[
                   ...top4Gs.map(x => ({ value: x.count, color: x.color })),
                   ...(othersGs > 0 ? [{ value: othersGs, color: "#4a4870" }] : [])
                 ]} />
@@ -2607,7 +2607,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 : gpView === "list"
                   ? <ListStat title="" items={source} suffix="x" />
                   : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <Donut size={90} showLabels label="shows" segments={[
+                      <Donut size={90} showLabels centerText="Genres" segments={[
                         ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
                         ...(othersCount > 0 ? [{ value: othersCount, color: "#4a4870" }] : []),
                       ]} />
@@ -2652,7 +2652,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   {langView === "list"
                     ? <ListStat title="" items={languageEntries} suffix="x" />
                     : <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <Donut showLabels size={110} segments={[
+                        <Donut showLabels size={110} centerText="Language" segments={[
                           ...top4Lang.map(([,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
                           ...(langOthers > 0 ? [{ value: langOthers, color: "#4a4870" }] : [])
                         ]} />

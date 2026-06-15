@@ -5317,7 +5317,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 const topic = (local.ntfyTopic || "").trim();
                 if (!topic) { onNotify("Enter a topic name first"); return; }
                 await onUpdate("ntfyTopic", topic);
-                const r = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, title: "🎫 settracker connected!", body: "Ticket sale notifications are set up." }) });
+                const r = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, title: "🎶 settracker connected!", body: "Ticket sale notifications are set up.", tags: "musical_note" }) });
                 if (r.ok) onNotify("Test notification sent! Check your ntfy app.");
                 else onNotify("Could not reach ntfy — check your topic name", "error");
               }} style={{ flex: 1, background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Test</button>

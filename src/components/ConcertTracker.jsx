@@ -5280,6 +5280,47 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'preferences' && <>
+      <Collapsible title="Push notifications" {...sec("notifications")}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+          <p style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", margin: "0 0 12px", lineHeight: 1.6 }}>
+            Get notified when a ticket sale starts — even when the app is closed. Uses <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>ntfy.sh</a>, a free open-source service.
+          </p>
+          <div style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.7 }}>
+            <div style={{ color: "#c4c2f0", fontWeight: 700, marginBottom: 4 }}>Setup (5 min):</div>
+            <div>1. Install <strong style={{ color: "#c4c2f0" }}>ntfy</strong> on your phone</div>
+            <div style={{ color: "#6b6a8f", marginLeft: 12, marginBottom: 4 }}>Android: free · iOS: free + <strong style={{ color: "#fb923c" }}>€2 in-app</strong> for push delivery</div>
+            <div>2. Open ntfy → Subscribe → enter your topic name below</div>
+            <div>3. Paste that same topic name here and save</div>
+            <div>4. Pick a unique name — it's your private channel</div>
+          </div>
+          <SettingsRow label="Enable notifications" sub="Send ticket sale reminders via ntfy">
+            <SettingsToggle value={!!local.ntfyEnabled} onChange={v => { lUpdate("ntfyEnabled", v); onUpdate("ntfyEnabled", v); }} />
+          </SettingsRow>
+          {local.ntfyEnabled && <>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>Your ntfy topic name</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input
+                value={local.ntfyTopic || ""}
+                onChange={e => lUpdate("ntfyTopic", e.target.value.trim())}
+                placeholder="e.g. settracker-yourname"
+                style={{ flex: 1, background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
+              />
+              <button onClick={async () => {
+                const topic = (local.ntfyTopic || "").trim();
+                if (!topic) { onNotify("Enter a topic name first"); return; }
+                await onUpdate("ntfyTopic", topic);
+                const r = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, title: "🎫 settracker connected!", body: "Ticket sale notifications are set up." }) });
+                if (r.ok) onNotify("Test notification sent! Check your ntfy app.");
+                else onNotify("Could not reach ntfy — check your topic name", "error");
+              }} style={{ background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Test</button>
+            </div>
+            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
+              Keep this private — anyone who knows your topic can send you notifications.
+            </div>
+          </>}
+        </div>
+      </Collapsible>
+
       <Collapsible title="Account & data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>

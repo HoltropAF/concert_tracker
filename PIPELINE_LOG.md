@@ -480,3 +480,18 @@ Detects when a new service worker has activated (via controllerchange event,
 updatefound/statechange, or a waiting SW on load) and shows a fixed banner at
 the top: "New version available · Update now" which reloads the page to apply
 it. Eliminates the need to close-and-reopen-twice after deploys.
+
+---
+
+## 2026-06-13 (2) — ntfy push notifications
+
+- api/notify.js: serverless function POSTing to ntfy.sh (topic, title, body, priority, tags)
+- api/cron-notify.js: Vercel cron (every 15 min) that checks all wishlist entries with
+  ticketSaleAt, looks up the user's ntfyTopic from their settings row, and fires
+  notifications 30 min before and at sale time. Requires CRON_SECRET and
+  SUPABASE_SERVICE_ROLE_KEY env vars on Vercel.
+- vercel.json: cron schedule (*/15 * * * *)
+- Settings → Push notifications: opt-in toggle, topic name field, Test button,
+  platform note (Android free, iOS €2 in-app unlock), setup instructions.
+- README: new Step 10 documenting the full ntfy setup with cost info, Vercel env
+  vars, and link to Play Store / App Store. Old Step 10 renumbered to Step 11.

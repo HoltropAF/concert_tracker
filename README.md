@@ -191,7 +191,45 @@ The app opens fullscreen like a regular app — no browser bar.
 
 ---
 
-### Step 10 — Personalise it
+### Step 10 — Set up push notifications (optional)
+
+Get a native push notification on your phone when a ticket sale starts — even when the app is fully closed. This uses **ntfy**, a free open-source notification service.
+
+**Cost:**
+- Android: completely free
+- iPhone: free app + **€1.99 one-time in-app purchase** to unlock push delivery (without it, notifications only work when the app is open)
+
+**Step-by-step:**
+
+1. Install the **ntfy** app on your phone
+   - Android: [Play Store → ntfy](https://play.google.com/store/apps/details?id=io.heckel.ntfy)
+   - iPhone: [App Store → ntfy](https://apps.apple.com/app/ntfy/id1625396347) — buy the push delivery unlock inside the app
+
+2. Open ntfy → tap **+** → **Subscribe to topic**
+   - Enter a unique topic name, e.g. `settracker-yourname-2024`
+   - **Make it hard to guess** — anyone who knows your topic can send you messages
+   - Tap **Subscribe**
+
+3. In settracker → **Settings → Push notifications**
+   - Toggle **Enable notifications** on
+   - Enter the same topic name
+   - Tap **Test** — you should get a test notification on your phone within seconds
+
+4. Add these environment variables in Vercel → your project → **Settings → Environment Variables**:
+   - `CRON_SECRET` — any random string you make up (e.g. generate one at [randomkeygen.com](https://randomkeygen.com)). This protects the cron endpoint.
+   - `SUPABASE_SERVICE_ROLE_KEY` — from Supabase → Project Settings → API → **service_role** key (keep this secret!)
+
+   After adding them, redeploy from Vercel → Deployments → Redeploy.
+
+5. The cron job runs every 15 minutes automatically. It checks for upcoming ticket sales and sends:
+   - A notification **30 minutes before** the sale starts
+   - A notification **at the exact sale time**
+
+> **Note:** If you skip Step 4 (the environment variables), the in-app test button still works, but background notifications won't fire when the app is closed.
+
+---
+
+### Step 11 — Personalise it
 
 This is a fork of someone else's project, so a few details still point to the original creator. Find and replace these:
 

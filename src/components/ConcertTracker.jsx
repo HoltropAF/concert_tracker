@@ -3957,7 +3957,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   useBackButton(onClose);
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
-    type: initialType, tour: '', support: [], friends: [], solo: false,
+    type: initialType === 'wish' ? 'concert' : initialType, wishlist: initialType === 'wish', tour: '', support: [], friends: [], solo: false,
     rating: null, ticketPrice: null, otherCost: null, merch: [], notes: '',
     ticketType: null, ticketAddons: [],
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
@@ -4117,7 +4117,9 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
   const handleSave = () => {
     if (!validate()) return
     const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    onSave({ ...form, id })
+    const entry = { ...form, id }
+    if (form.wishlist && !form.date) entry.date = '9999-12-31' // far future so isPast never fires
+    onSave(entry)
   }
 
   const inputStyle = {
@@ -5755,8 +5757,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                       <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e0ff', fontFamily: "'Syne', sans-serif" }}>{c.artist}</span>
                       <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace" }}>want to go</span>
                     </div>
-                    {c.date && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{formatDate(c.date)}{c.venue ? ` · ${c.venue}` : ''}</div>}
-                    {!c.date && c.venue && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.venue}</div>}
+                    {c.date && c.date !== '9999-12-31' && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{formatDate(c.date)}{c.venue ? ` · ${c.venue}` : ''}</div>}
+                    {(!c.date || c.date === '9999-12-31') && c.venue && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.venue}</div>}
                   </div>
                 ))}
                 <div style={{ height: 1, background: '#0e0e1a', margin: '4px 0 16px' }} />

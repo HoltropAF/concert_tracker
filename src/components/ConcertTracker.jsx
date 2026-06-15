@@ -3169,7 +3169,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {/* Swipeable chart area */}
             <div
               ref={chartAreaRef}
-              style={{ flex: 1, padding: "0 16px", overflow: "hidden", minHeight: 0 }}
+              style={{ flex: 1, padding: "0 16px", overflowY: "auto", overflowX: "hidden", minHeight: 0 }}
               onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
               onTouchEnd={e => {
                 const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;

@@ -312,7 +312,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
           {concert.artist}
         </span>
         <span style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
-          {formatDate(concert.date)}
+          {concert.date && concert.date !== '9999-12-31' ? formatDate(concert.date) : ''}
         </span>
         {concert.rating ? (
           <span style={{ color: "#a78bfa", fontSize: 11, flexShrink: 0 }}>{"★".repeat(Math.min(concert.rating, 10))}</span>
@@ -322,7 +322,10 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
           <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>upcoming</span>
         ) : null}
         {concert.wishlist && concert.ticketSaleAt && (
-          <span style={{ fontSize: 11, color: "#34d399", flexShrink: 0 }}>🔔</span>
+          <span style={{ fontSize: 11, flexShrink: 0 }}>🔔</span>
+        )}
+        {!concert.wishlist && (!concert.date || concert.date === '9999-12-31') && (
+          <span style={{ fontSize: 11, flexShrink: 0 }}>🎫</span>
         )}
       </button>
     );

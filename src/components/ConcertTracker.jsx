@@ -2491,24 +2491,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
       }
 
-      case "venues": {
-        const vView = chartOpt("venues", "venue");
-        const vItems = vView === "room" ? topVenuesByRoom : topVenues;
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
-            {vItems.map(([name, count], i) => (
-              <button key={name} onClick={() => setSelectedVenue(vView === "room" ? name.split(" · ")[0] : name)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                  <span style={{ color: "#c4c2f0", fontSize: 12 }}>{name}</span>
-                </div>
-                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{count}x</span>
-              </button>
-            ))}
-          </div>
-        );
-      }
       case "merch-breakdown": return null; // merged into merch-overview below
       case "merch-overview": {
         const moView = chartOpt("merch-overview", "price");

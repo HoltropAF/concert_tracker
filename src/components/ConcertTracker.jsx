@@ -47,7 +47,7 @@ function PhotoAdjust({ path, pos, onChange }) {
 // HELPERS
 // ============================================================
 
-const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : c?.genre ? [c.genre] : [];
+const APP_VERSION = '1.0.1'
 
 const CHART_GROUP_IDS = [
   { id: "artists",  label: "Artists"   },

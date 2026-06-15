@@ -5055,10 +5055,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"}]} onChange={v => lUpdate("defaultTab", v)} />
           </SettingsRow>
           <SettingsRow label="Past shows" sub="Show past concerts by default">
-            <SettingsOptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowPast", v)} />
+            <SettingsOptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => { lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
           </SettingsRow>
           <SettingsRow label="Want to go" sub="Show want-to-go list by default">
-            <SettingsOptionPills value={local.defaultShowWishlist} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => lUpdate("defaultShowWishlist", v)} />
+            <SettingsOptionPills value={local.defaultShowWishlist} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => { lUpdate("defaultShowWishlist", v); onUpdate("defaultShowWishlist", v); }} />
           </SettingsRow>
           <SettingsRow label="Stats tab" sub="Which stats view opens first">
             <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />

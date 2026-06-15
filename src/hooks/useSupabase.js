@@ -2,6 +2,51 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
 
+const arrayOr = (value, fallback = []) => Array.isArray(value) ? value : fallback
+
+const normalizeConcert = (value, fallbackId = '') => {
+  const concert = value && typeof value === 'object' ? value : {}
+  return {
+    ...concert,
+    id: String(concert.id || fallbackId || crypto.randomUUID()),
+    artist: String(concert.artist || ''),
+    date: String(concert.date || ''),
+    venue: String(concert.venue || ''),
+    room: String(concert.room || ''),
+    city: String(concert.city || ''),
+    country: String(concert.country || ''),
+    type: concert.type === 'festival' ? 'festival' : 'concert',
+    tour: String(concert.tour || ''),
+    support: arrayOr(concert.support),
+    acts: arrayOr(concert.acts),
+    friends: arrayOr(concert.friends),
+    merch: arrayOr(concert.merch),
+    ticketAddons: arrayOr(concert.ticketAddons),
+    language: arrayOr(concert.language, concert.language ? [concert.language] : []),
+    setlist: arrayOr(concert.setlist),
+    supportSetlists: concert.supportSetlists && typeof concert.supportSetlists === 'object' ? concert.supportSetlists : {},
+    notes: String(concert.notes || ''),
+  }
+}
+
+const normalizeSettings = (value) => {
+  const settings = value && typeof value === 'object' ? value : {}
+  const merged = { ...DEFAULT_SETTINGS, ...settings }
+  return {
+    ...merged,
+    merchCategories: arrayOr(merged.merchCategories, DEFAULT_SETTINGS.merchCategories),
+    genres: arrayOr(merged.genres, DEFAULT_SETTINGS.genres),
+    subgenres: arrayOr(merged.subgenres, DEFAULT_SETTINGS.subgenres),
+    languages: arrayOr(merged.languages, DEFAULT_SETTINGS.languages),
+    venueSizes: arrayOr(merged.venueSizes, DEFAULT_SETTINGS.venueSizes),
+    hiddenChartGroups: arrayOr(merged.hiddenChartGroups),
+    hiddenCharts: arrayOr(merged.hiddenCharts),
+    hiddenSummaryBlocks: arrayOr(merged.hiddenSummaryBlocks),
+    savedVenues: arrayOr(merged.savedVenues),
+    friendGroups: arrayOr(merged.friendGroups),
+  }
+}
+
 export function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -83,7 +128,7 @@ export function useConcerts(userId) {
 
     if (SEED_DATA.length === 0) {
       // No hardcoded seed — concerts are self-contained in DB
-      setConcerts(data.map(r => r.data).sort((a, b) => b.date.localeCompare(a.date)))
+      setConcerts(data.map(r => normalizeConcert(r.data, r.id)).sort((a, b) => b.date.localeCompare(a.date)))
     } else {
       // Merge: seed is source of truth for base fields, DB wins for user edits
       const userFields = ['rating', 'merch', 'notes', 'friends', 'solo']
@@ -93,7 +138,7 @@ export function useConcerts(userId) {
         if (!saved) return seed
         const out = { ...seed }
         userFields.forEach(f => { if (saved[f] !== undefined) out[f] = saved[f] })
-        return out
+        return normalizeConcert(out, seed.id)
       })
       setConcerts(merged)
     }
@@ -161,7 +206,7 @@ export function useSettings(userId) {
       .single()
       .then(({ data }) => {
         if (data?.data) {
-          const merged = { ...DEFAULT_SETTINGS, ...data.data }
+          const merged = normalizeSettings(data.data)
           settingsRef.current = merged
           setSettings(merged)
         }

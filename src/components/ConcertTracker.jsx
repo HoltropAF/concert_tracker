@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
+import { requestPermission, scheduleTicketAlarm, clearTicketAlarm, reScheduleAll, canNotify } from '../lib/notifications'
 
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
@@ -662,6 +663,28 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
     const merchTotal = (concert.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
     const totalCost = (concert.ticketPrice || 0) + merchTotal + (concert.otherCost || 0);
     const companions = getFriends(concert);
+    // Ticket sale block for wishlist items
+    const ticketSaleBlock = concert.wishlist && concert.ticketSaleAt ? (() => {
+      const saleDate = new Date(concert.ticketSaleAt);
+      const now = new Date();
+      const diff = saleDate - now;
+      const isPast = diff < 0;
+      const label = isPast ? 'Sale started' : diff < 30*60*1000 ? 'Sale starting soon!' : `Sale in ${diff < 3600000 ? Math.round(diff/60000)+' min' : diff < 86400000 ? Math.round(diff/3600000)+'h' : Math.round(diff/86400000)+'d'}`;
+      return (
+        <div style={{ margin: '0 0 14px', background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 12, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: '#34d399', fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>🎫 Ticket sale</span>
+            <span style={{ fontSize: 10, color: isPast ? '#6b6a8f' : '#4ade80', fontFamily: "'DM Mono', monospace" }}>{label}</span>
+          </div>
+          <div style={{ fontSize: 12, color: '#c4c2f0', fontFamily: "'DM Mono', monospace" }}>
+            {saleDate.toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' })} · {saleDate.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          {concert.ticketSaleNote && <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 3 }}>{concert.ticketSaleNote}</div>}
+          {concert.ticketSaleLink && <a href={concert.ticketSaleLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 11, color: '#a78bfa', marginTop: 4, wordBreak: 'break-all' }}>↗ {concert.ticketSaleLink}</a>}
+        </div>
+      );
+    })() : null;
+
     const statCards = [
       past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—" },
       concert.ticketPrice ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${concert.ticketPrice}` } : null,
@@ -695,6 +718,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             </div>
           )}
 
+          {ticketSaleBlock}
           {/* Stat cards */}
           {statCards.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
@@ -4122,6 +4146,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const entry = { ...form, id }
     if (form.wishlist && !form.date) entry.date = '9999-12-31' // far future so isPast never fires
+    if (entry.wishlist && entry.ticketSaleAt) scheduleTicketAlarm(id, entry.ticketSaleAt, entry.artist)
     onSave(entry)
   }
 
@@ -4281,6 +4306,26 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   </>}
                 <button onClick={() => setShowDetails(true)} style={{ width: '100%', marginTop: 14, minHeight: 40, borderRadius: 8, border: '1px solid #2e2e50', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>More details</button>
               </>)}
+                {/* Ticket sale info */}
+                <div style={{ borderTop: '1px solid #1a1a2e', marginTop: 12, paddingTop: 12 }}>
+                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Ticket sale</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    <div>{fieldLabel('Date')}<input type="date" value={(form.ticketSaleAt||'').slice(0,10)} onChange={e => update('ticketSaleAt', e.target.value ? e.target.value + (form.ticketSaleAt?.slice(10)||'T10:00') : '')} style={inputStyle} /></div>
+                    <div>{fieldLabel('Time')}<input type="time" value={(form.ticketSaleAt||'').slice(11,16)||'10:00'} onChange={e => update('ticketSaleAt', (form.ticketSaleAt||new Date().toISOString().slice(0,10))?.slice(0,10) + 'T' + e.target.value)} style={inputStyle} /></div>
+                  </div>
+                  <input value={form.ticketSaleLink||''} onChange={e => update('ticketSaleLink', e.target.value)} placeholder="Ticket link (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
+                  <input value={form.ticketSaleNote||''} onChange={e => update('ticketSaleNote', e.target.value)} placeholder="Note (e.g. presale code, queue link…)" style={{ ...inputStyle, marginBottom: 8 }} />
+                  {form.ticketSaleAt && (
+                    <button onClick={async () => {
+                      const perm = await requestPermission();
+                      if (perm !== 'granted') { alert('Enable notifications in your browser/phone settings to get ticket sale reminders.'); return; }
+                      scheduleTicketAlarm('preview', form.ticketSaleAt, form.artist || 'Artist');
+                      alert('Notifications enabled! You'll get a reminder 30 min before and at sale time.');
+                    }} style={{ width: '100%', background: 'none', border: '1px solid #34d399', borderRadius: 8, color: '#34d399', fontSize: 12, padding: '7px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                      🔔 {canNotify() ? 'Notifications on' : 'Enable sale reminder'}
+                    </button>
+                  )}
+                </div>
             </>
           );
           if (isFest && !showDetails) return (

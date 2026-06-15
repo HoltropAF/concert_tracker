@@ -4320,7 +4320,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                       const perm = await requestPermission();
                       if (perm !== 'granted') { alert('Enable notifications in your browser/phone settings to get ticket sale reminders.'); return; }
                       scheduleTicketAlarm('preview', form.ticketSaleAt, form.artist || 'Artist');
-                      alert('Notifications enabled! You'll get a reminder 30 min before and at sale time.');
+                      alert("Notifications enabled! You'll get a reminder 30 min before and at sale time.");
                     }} style={{ width: '100%', background: 'none', border: '1px solid #34d399', borderRadius: 8, color: '#34d399', fontSize: 12, padding: '7px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
                       🔔 {canNotify() ? 'Notifications on' : 'Enable sale reminder'}
                     </button>

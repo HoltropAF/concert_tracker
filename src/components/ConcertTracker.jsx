@@ -5474,7 +5474,15 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     const id = 'theme-img-counter'
     let el = document.getElementById(id)
     if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el) }
-    el.textContent = themeFilter ? '[data-theme-shell] img { filter: none !important; }' : ''
+    const inverse = {
+      'hue-rotate(-50deg)': 'hue-rotate(50deg)',
+      'hue-rotate(-145deg)': 'hue-rotate(145deg)',
+      'hue-rotate(90deg)': 'hue-rotate(-90deg)',
+      'hue-rotate(130deg)': 'hue-rotate(-130deg)',
+      'grayscale(1)': 'grayscale(1) invert(1) grayscale(1) invert(1)',
+    }
+    const inv = inverse[themeFilter] || ''
+    el.textContent = themeFilter && inv ? `[data-theme-shell] img { filter: ${inv} !important; }` : ''
     return () => { const e = document.getElementById(id); if (e) e.textContent = '' }
   }, [themeFilter])
 

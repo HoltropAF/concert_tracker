@@ -414,3 +414,14 @@ When artist or date is filled in on Quick add, a "Find on setlist.fm ↗" link
 appears below the paste row, opening setlist.fm search pre-filtered by artist
 + year in a new tab — so you can find the setlist, copy the URL, and paste it
 back in one flow.
+
+---
+
+## 2026-06-12 (23) — Quick add: date-first flow + setlist.fm search button
+
+- Date moved above Artist in the Quick add form so the natural flow is:
+  date → artist → find → fill.
+- "Find on setlist.fm ↗" appears as a full-width button once both date and artist
+  are filled, linking directly to a pre-filled search on setlist.fm so you can
+  find and copy the URL without typing anything extra.
+- Paste row and auto-fill button stay below it in order.

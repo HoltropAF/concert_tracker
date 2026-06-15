@@ -111,6 +111,7 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
+  const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }

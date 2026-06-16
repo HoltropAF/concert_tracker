@@ -4258,8 +4258,6 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
-}
-
 function VenuesView({ concerts, onOpen, settings }) {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [search, setSearch] = useState('');

@@ -5557,42 +5557,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'preferences' && <>
-        <div style={{ display: "none" }}><SettingsSection title="About settracker">
-          <div style={{ padding: "15px 16px", color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>
-            settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats in one dark mobile-first app.
-          </div>
-        </SettingsSection></div>
-
-        <div style={{ display: "none" }}><SettingsSection title="Help">
-          {[
-            { label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-            { label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
-            { label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-            { label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-          ].map(({ label, url }) => (
-            <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "13px 16px", borderBottom: "1px solid #232239" }}>
-              <span>{label}</span>
-              <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>open</span>
-            </a>
-          ))}
-        </SettingsSection></div>
-
-        <div style={{ display: "none" }}><SettingsSection title="Social links">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8, padding: 14 }}>
-            {[
-              { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub" },
-              { href: "https://www.threads.com/@annuhfloor", label: "Threads" },
-              { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok" },
-              { href: "https://www.vinted.nl/member/50873825", label: "Vinted" },
-              { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify" },
-            ].map(({ href, label }) => (
-              <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ minHeight: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.24)", color: "#a78bfa", textDecoration: "none", fontSize: 10, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
-                {label}
-              </a>
-            ))}
-          </div>
-        </SettingsSection></div>
-
         <SettingsSection title="Default view">
           <SettingsRow label="Opening tab" sub="Which tab opens on launch">
             <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"},{id:"venues",label:"Venues"}]} onChange={v => lUpdate("defaultTab", v)} />
@@ -5659,11 +5623,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         { label: "Ticket types", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
         { label: "Ticket add-ons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
       ].map(({ label, items, ...props }) => (
-        <Collapsible key={label} title={`${label} (${items.length})`} {...sec(`tag-${label}`)}>
+        <div key={label} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{`${label} (${items.length})`}</div>
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
             <TagManager items={items} {...props} />
           </div>
-        </Collapsible>
+        </div>
       ))}
       </>}
 

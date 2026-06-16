@@ -1872,19 +1872,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
 
         const CumulativeChart = () => {
-          const cumSorted = [...concertsT].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
+          const cumSorted = [...concertsT].filter(c => !isWish(c) && c.date && c.date.length === 10).sort((a, b) => a.date.localeCompare(b.date));
           if (cumSorted.length < 2) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
           const nowMs = Date.now();
           const cumPast = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
           const cumUpcoming = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
           const n = cumSorted.length;
           const W = 300, H = 90;
-          const firstMs = new Date(cumSorted[0].date).getTime();
-          const lastMs = new Date(cumSorted[n - 1].date).getTime();
+          const firstMs = new Date(cumSorted[0].date + 'T00:00:00').getTime();
+          const lastMs = new Date(cumSorted[n - 1].date + 'T00:00:00').getTime();
           const rangeMs = Math.max(lastMs - firstMs, 1);
           const todayMs2 = Math.min(nowMs, lastMs);
           const todayX = ((todayMs2 - firstMs) / rangeMs) * (W - 6) + 3;
-          const xOf = c => ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3;
+          const xOf = c => ((new Date(c.date + 'T00:00:00').getTime() - firstMs) / rangeMs) * (W - 6) + 3;
           const yOf = i => H - 6 - ((i + 1) / n) * (H - 16);
           const pastCoords = cumPast.map((c, i) => ({ x: xOf(c), y: yOf(i) }));
           const upcomingCoords = cumUpcoming.map((c, i) => ({ x: xOf(c), y: yOf(cumPast.length + i) }));
@@ -2169,17 +2169,17 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       case "over-time": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           {(() => {
-            const allSorted = [...concerts].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
+            const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10).sort((a, b) => a.date.localeCompare(b.date));
             if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
             const nowMs = Date.now();
             const W = 300, H = 96;
-            const firstMs = new Date(allSorted[0].date).getTime();
-            const lastMs = new Date(allSorted[allSorted.length - 1].date).getTime();
+            const firstMs = new Date(allSorted[0].date + 'T00:00:00').getTime();
+            const lastMs = new Date(allSorted[allSorted.length - 1].date + 'T00:00:00').getTime();
             const rangeMs = Math.max(lastMs - firstMs, 1);
             const todayMs = Math.min(nowMs, lastMs);
             const todayX = ((todayMs - firstMs) / rangeMs) * (W - 6) + 3;
             const n = allSorted.length;
-            const xOf = c => ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3;
+            const xOf = c => ((new Date(c.date + 'T00:00:00').getTime() - firstMs) / rangeMs) * (W - 6) + 3;
             const yOf = i => H - 4 - ((i + 1) / n) * (H - 14);
             const cumPast = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
             const cumUp = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);

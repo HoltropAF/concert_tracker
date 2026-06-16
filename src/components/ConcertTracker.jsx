@@ -4923,10 +4923,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
 
 function SettingsRow({ label, sub, children }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 0", borderBottom: "1px solid #1a1a2e", gap: 12 }}>
-      <div style={{ flexShrink: 0 }}>
-        <div style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid #232239", gap: 12 }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: "#7d7aa5", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
       </div>
       {children}
     </div>
@@ -4935,7 +4935,7 @@ function SettingsRow({ label, sub, children }) {
 
 function SettingsStepper({ value, onChange, min = 3, max = 20 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 0, background: "#19182a", border: "1px solid #343052", borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
       <button onClick={() => onChange(Math.max(min, value - 1))} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 16, cursor: "pointer", padding: "6px 12px", lineHeight: 1 }}>−</button>
       <span style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Mono', monospace", minWidth: 24, textAlign: "center" }}>{value}</span>
       <button onClick={() => onChange(Math.min(max, value + 1))} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 16, cursor: "pointer", padding: "6px 12px", lineHeight: 1 }}>+</button>
@@ -4955,6 +4955,49 @@ function SettingsOptionPills({ value, options, onChange }) {
           fontWeight: value === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
         }}>{o.label}</button>
       ))}
+    </div>
+  );
+}
+
+function SettingsSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.14em", margin: "0 0 8px 2px" }}>{title}</div>
+      <div style={{ background: "#13131f", border: "1px solid #25243a", borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 28px rgba(0,0,0,0.16)" }}>{children}</div>
+    </div>
+  );
+}
+
+function SettingsToggle({ checked, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 44, height: 26, borderRadius: 99, border: `1px solid ${checked ? "#a78bfa" : "#3a3855"}`,
+        background: checked ? "#3b2a68" : "#202033", padding: 2, cursor: "pointer", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: checked ? "flex-end" : "flex-start",
+        boxShadow: checked ? "0 0 0 1px rgba(167,139,250,0.18) inset" : "none"
+      }}
+    >
+      <span style={{ width: 20, height: 20, borderRadius: 99, background: checked ? "#b69cff" : "#77739b", display: "block" }} />
+    </button>
+  );
+}
+
+function SettingsActionRow({ icon, title, sub, tone = "accent", children }) {
+  const palette = tone === "danger"
+    ? { color: "#fb7185", bg: "rgba(251,113,133,0.1)", border: "rgba(251,113,133,0.32)" }
+    : tone === "success"
+      ? { color: "#34d399", bg: "rgba(52,211,153,0.1)", border: "rgba(52,211,153,0.32)" }
+      : { color: "#a78bfa", bg: "rgba(167,139,250,0.12)", border: "rgba(167,139,250,0.32)" };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderBottom: "1px solid #232239" }}>
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, color: tone === "danger" ? "#fb7185" : "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{title}</div>
+        {sub && <div style={{ fontSize: 11, color: "#7d7aa5", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
     </div>
   );
 }
@@ -5442,7 +5485,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   return (
-    <div style={{ padding: "16px 20px 100px" }}>
+    <div style={{ padding: "16px 10px 100px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
         {(hasChanges || saved) && (
@@ -5456,17 +5499,18 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
-      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 99, background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+      <div style={{ background: "linear-gradient(180deg, rgba(167,139,250,0.08), #13131f 34%)", border: "1px solid #25243a", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 12, boxShadow: "0 -18px 28px rgba(255,255,255,0.16), 0 14px 32px rgba(0,0,0,0.28)" }}>
+        <div style={{ width: 36, height: 36, borderRadius: 99, background: "#201a34", border: "1px solid #a78bfa", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
           {(userEmail || "ST").slice(0, 2).toUpperCase()}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
+          <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
+          <div style={{ color: "#7d7aa5", fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>personal account</div>
           <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 5, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
           { id: 'preferences', label: 'General' },
           { id: 'tags', label: 'Tags' },
@@ -5475,10 +5519,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           { id: 'data', label: 'Data' },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
-            minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 10,
+            minHeight: 34, borderRadius: 7, cursor: "pointer", fontSize: 10,
             fontFamily: "'DM Mono', monospace", fontWeight: activeSettingsTab === tab.id ? 700 : 400,
-            background: activeSettingsTab === tab.id ? "#1a1a30" : "#13131f",
-            border: `1px solid ${activeSettingsTab === tab.id ? "#a78bfa" : "#1f1f35"}`,
+            background: activeSettingsTab === tab.id ? "#30284d" : "transparent",
+            border: `1px solid ${activeSettingsTab === tab.id ? "#5e4c8f" : "transparent"}`,
             color: activeSettingsTab === tab.id ? "#a78bfa" : "#6b6a8f",
             padding: "6px 4px", overflow: "hidden", textOverflow: "ellipsis",
           }}>{tab.label}</button>
@@ -5486,8 +5530,19 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </div>
 
       {activeSettingsTab === 'preferences' && <>
-      <Collapsible title="App preferences" {...sec("preferences")}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+        <SettingsSection title="Default view">
+          <SettingsRow label="Opening tab" sub="Which tab opens on launch">
+            <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"},{id:"venues",label:"Venues"}]} onChange={v => lUpdate("defaultTab", v)} />
+          </SettingsRow>
+          <SettingsRow label="Show past concerts" sub="On by default when opening app">
+            <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
+          </SettingsRow>
+          <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
+            <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); onUpdate("defaultShowWishlist", v); }} />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Display">
           <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
@@ -5501,18 +5556,18 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               ))}
             </div>
           </SettingsRow>
-          <SettingsRow label="Opening tab" sub="Which tab opens on launch">
-            <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"},{id:"venues",label:"Venues"}]} onChange={v => lUpdate("defaultTab", v)} />
-          </SettingsRow>
-          <SettingsRow label="Past shows" sub="Show past concerts by default">
-            <SettingsOptionPills value={local.defaultShowPast} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => { lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
-          </SettingsRow>
-          <SettingsRow label="Want to go" sub="Show want-to-go list by default">
-            <SettingsOptionPills value={local.defaultShowWishlist} options={[{id:"open",label:"Open"},{id:"closed",label:"Closed"}]} onChange={v => { lUpdate("defaultShowWishlist", v); onUpdate("defaultShowWishlist", v); }} />
-          </SettingsRow>
           <SettingsRow label="Stats tab" sub="Which stats view opens first">
             <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
           </SettingsRow>
+          <SettingsRow label="Rating system" sub="Stars used when rating shows">
+            <SettingsOptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
+          </SettingsRow>
+          <SettingsRow label="Default country" sub="Pre-filled when adding a show">
+            <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Chart limits">
           <SettingsRow label="Top artists" sub="Rows shown in charts">
             <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); onUpdate("topArtistsRows", v); }} max={6} />
           </SettingsRow>
@@ -5528,15 +5583,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Songs shown" sub="Default rows in Songs tab">
             <SettingsStepper value={local.topSongsRows} onChange={v => lUpdate("topSongsRows", v)} min={3} max={50} />
           </SettingsRow>
-          <SettingsRow label="Rating system" sub="Stars used when rating shows">
-            <SettingsOptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
-          </SettingsRow>
-          <SettingsRow label="Default country" sub="Pre-filled when adding a show">
-            <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
-          </SettingsRow>
-        </div>
-      </Collapsible>
-
+        </SettingsSection>
       </>}
 
       {activeSettingsTab === 'tags' && <>
@@ -5671,8 +5718,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {activeSettingsTab === 'preferences' && (
-      <Collapsible title="Stats display" {...sec("statsDisplay")}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "0 16px", marginBottom: 4 }}>
+        <SettingsSection title="Visible sections">
           <SettingsRow label="Summary scope" sub="Default time range on summary page">
             <SettingsOptionPills
               value={local.summaryYear || 'all'}
@@ -5680,7 +5726,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
             />
           </SettingsRow>
-        </div>
         {(() => {
           const hiddenBlocks = local.hiddenSummaryBlocks || [];
           const hiddenGroups = local.hiddenChartGroups || [];
@@ -5704,7 +5749,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: '🛍️ Merch' }] },
           ];
           return (
-            <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '12px 16px', marginBottom: 4 }}>
+            <div style={{ padding: '14px 16px' }}>
               <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Summary blocks</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
                 {BLOCKS.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
@@ -5725,12 +5770,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </div>
           );
         })()}
-      </Collapsible>
-
+        </SettingsSection>
       )}
 
       {activeSettingsTab === 'notifications' && <>
-      <Collapsible title="Push notifications" {...sec("notifications")}>
+      <SettingsSection title="Notifications">
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           <p style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", margin: "0 0 12px", lineHeight: 1.6 }}>
             Get notified when a ticket sale starts — even when the app is closed. Uses <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>ntfy.sh</a>, a free open-source service.
@@ -5744,7 +5788,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <div>4. Pick a unique name — it's your private channel</div>
           </div>
           <SettingsRow label="Enable notifications" sub="Send ticket sale reminders via ntfy">
-            <SettingsOptionPills value={local.ntfyEnabled ? 'on' : 'off'} options={[{id:'on',label:'On'},{id:'off',label:'Off'}]} onChange={v => { lUpdate("ntfyEnabled", v === 'on'); onUpdate("ntfyEnabled", v === 'on'); }} />
+            <SettingsToggle checked={!!local.ntfyEnabled} onChange={checked => { lUpdate("ntfyEnabled", checked); onUpdate("ntfyEnabled", checked); }} />
           </SettingsRow>
           {local.ntfyEnabled && <>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>Your ntfy topic name</div>
@@ -5752,7 +5796,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               value={local.ntfyTopic || ""}
               onChange={e => lUpdate("ntfyTopic", e.target.value.trim())}
               placeholder="e.g. settracker-yourname"
-              style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: `1px solid ${local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic ? "#1a3a2a" : "#2e2e50"}`, borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12, marginBottom: 8 }}
+              style={{ width: "100%", boxSizing: "border-box", background: "rgba(167,139,250,0.05)", border: `1px solid ${local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic ? "#1a3a2a" : "#2e2e50"}`, borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12, marginBottom: 8 }}
             />
             <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
               <button onClick={async () => {
@@ -5779,27 +5823,26 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </div>
           </>}
         </div>
-      </Collapsible>
+      </SettingsSection>
       </>}
 
       {activeSettingsTab === 'data' && <>
-      <Collapsible title="Account & data" {...sec("account")}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={handleXlsxExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Export XLSX</button>
+      <SettingsSection title="Import & export">
+        <div>
+          <SettingsActionRow icon="DL" title="Export concerts" sub="Download as XLSX or JSON">
+            <button onClick={handleXlsxExport} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>XLSX</button>
             {!exportData
-              ? <button onClick={handleExport} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Export JSON</button>
-              : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Close</button>
+              ? <button onClick={handleExport} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace", marginLeft: 6 }}>JSON</button>
+              : <button onClick={() => setExportData(null)} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginLeft: 6 }}>Close</button>
             }
-          </div>
+          </SettingsActionRow>
           {exportData && (
-            <div style={{ marginBottom: 10 }}>
-              <textarea readOnly value={exportData} rows={4} style={{ width: "100%", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
+            <div style={{ padding: "0 16px 14px" }}>
+              <textarea readOnly value={exportData} rows={4} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
               <button onClick={handleCopy} style={{ width: "100%", padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied!" : "Copy to clipboard"}</button>
             </div>
           )}
-          <div style={{ borderTop: "1px solid #1a1a2e", paddingTop: 14 }}>
-            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Restore from backup</div>
+          <div style={{ padding: "0 16px 14px" }}>
             {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
             {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
             {importReport && (
@@ -5820,12 +5863,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
             <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
             <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
-            <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-              <button onClick={() => document.getElementById('import-xlsx').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Sans', sans-serif" }}>Import XLSX</button>
+          </div>
+          <SettingsActionRow icon="UP" title="Import concerts" sub="Load from XLSX, JSON, CSV, or paste">
+            <button onClick={() => document.getElementById('import-xlsx').click()} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>XLSX</button>
+          </SettingsActionRow>
+            <div style={{ display: "flex", gap: 8, margin: "0 16px 10px" }}>
               <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Import JSON</button>
               <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Import CSV</button>
             </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 8, margin: "0 16px 10px" }}>
               {[
                 { label: "CSV template", fn: () => {
                   const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','SeenAs','Notes'];
@@ -5841,11 +5887,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 <button key={label} onClick={fn} style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>↓ {label}</button>
               ))}
             </div>
-            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+            <div style={{ padding: "0 16px 16px" }}>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
             <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
+            </div>
           </div>
-        </div>
-      </Collapsible>
+      </SettingsSection>
 
       <Collapsible title="Help" {...sec("help")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>

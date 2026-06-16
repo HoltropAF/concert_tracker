@@ -5046,7 +5046,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [saved, setSaved] = useState(false);
   const [touched, setTouched] = useState(false);
   const [openSection, setOpenSection] = useState(null);
-  const [activeSettingsTab, setActiveSettingsTab] = useState('preferences');
+  const [activeSettingsTab, setActiveSettingsTab] = useState(null);
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
   const [showSavedVenues, setShowSavedVenues] = useState(false);
   const [showFriendGroups, setShowFriendGroups] = useState(false);
@@ -5512,7 +5512,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
-          { id: 'preferences', label: 'General' },
+          { id: 'preferences', label: 'Settings' },
           { id: 'tags', label: 'Tags' },
           { id: 'notifications', label: 'Notifications' },
           { id: 'data', label: 'Data' },
@@ -5528,14 +5528,54 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         ))}
       </div>
 
+      {!activeSettingsTab && (
+        <div>
+          <SettingsSection title="About settracker">
+            <div style={{ padding: "15px 16px", color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>
+              settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats in one dark mobile-first app.
+            </div>
+          </SettingsSection>
+
+          <SettingsSection title="Help">
+            {[
+              { label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+              { label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+              { label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+              { label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+            ].map(({ label, url }) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "13px 16px", borderBottom: "1px solid #232239" }}>
+                <span>{label}</span>
+                <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>open</span>
+              </a>
+            ))}
+          </SettingsSection>
+
+          <SettingsSection title="Social links">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8, padding: 14 }}>
+              {[
+                { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub" },
+                { href: "https://www.threads.com/@annuhfloor", label: "Threads" },
+                { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok" },
+                { href: "https://www.vinted.nl/member/50873825", label: "Vinted" },
+                { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify" },
+              ].map(({ href, label }) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ minHeight: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.24)", color: "#a78bfa", textDecoration: "none", fontSize: 10, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
+                  {label}
+                </a>
+              ))}
+            </div>
+          </SettingsSection>
+        </div>
+      )}
+
       {activeSettingsTab === 'preferences' && <>
-        <SettingsSection title="About settracker">
+        <div style={{ display: "none" }}><SettingsSection title="About settracker">
           <div style={{ padding: "15px 16px", color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>
             settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats in one dark mobile-first app.
           </div>
-        </SettingsSection>
+        </SettingsSection></div>
 
-        <SettingsSection title="Help">
+        <div style={{ display: "none" }}><SettingsSection title="Help">
           {[
             { label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
             { label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
@@ -5547,9 +5587,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>open</span>
             </a>
           ))}
-        </SettingsSection>
+        </SettingsSection></div>
 
-        <SettingsSection title="Social links">
+        <div style={{ display: "none" }}><SettingsSection title="Social links">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8, padding: 14 }}>
             {[
               { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub" },
@@ -5563,7 +5603,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               </a>
             ))}
           </div>
-        </SettingsSection>
+        </SettingsSection></div>
 
         <SettingsSection title="Default view">
           <SettingsRow label="Opening tab" sub="Which tab opens on launch">

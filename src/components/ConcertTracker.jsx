@@ -6088,6 +6088,27 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
   const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
   const allPast = concerts.filter(c => !isWish(c) && isPastDate(c.date))
+  const headerCounts = {
+    concerts: allPast.filter(c => c.type !== 'festival').length,
+    festivals: allPast.filter(c => c.type === 'festival').length,
+    upcoming: concerts.filter(c => !isWish(c) && !isPastDate(c.date)).length,
+  }
+  const isSummaryHeader = view === 'stats' && statsTab === 'summary'
+  const shellTitle = isSummaryHeader
+    ? 'concert tracker'
+    : view === 'home'
+      ? 'Shows'
+      : view === 'artists'
+        ? 'Artists'
+        : view === 'songs'
+          ? 'Songs'
+          : view === 'venues'
+            ? 'Venues'
+            : view === 'settings'
+              ? 'Settings'
+              : statsTab === 'friends'
+                ? 'Friends'
+                : 'Stats'
 
   const TabBtn = ({ id, icon, label }) => (
     <button onClick={() => { if (id === 'stats' && view === 'stats' && statsTab === 'charts') { setStatsTab('summary'); } else { setView(id); } }} style={{
@@ -6243,10 +6264,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       {/* Header */}
       <div style={{ flexShrink: 0, padding: '16px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
         <div style={{ marginBottom: 10, textAlign: 'center' }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>concert tracker</div>
-          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: isSummaryHeader ? 26 : 22, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
+          {isSummaryHeader && (
+            <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
             {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
-          </div>
+            </div>
+          )}
         </div>
 
         {view === 'home' && (

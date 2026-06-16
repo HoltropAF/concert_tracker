@@ -4,6 +4,14 @@ import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
+function readSplashCounts() {
+  try {
+    return JSON.parse(localStorage.getItem('splash_counts') || 'null')
+  } catch {
+    return null
+  }
+}
+
 class AppErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -49,6 +57,22 @@ function InstallBanner({ onInstall, onDismiss }) {
       </div>
       <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
       <button onClick={onInstall} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Install</button>
+    </div>
+  )
+}
+
+function LoadingSplash({ label, counts = null }) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+      <div style={{ textAlign: 'center', maxWidth: 340, width: '100%' }}>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
+        {counts && (
+          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>
+            {counts.concerts} concerts · {counts.festivals} festivals · {counts.upcoming} upcoming
+          </div>
+        )}
+        <div style={{ color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontSize: 13 }}>{label}</div>
+      </div>
     </div>
   )
 }
@@ -114,6 +138,7 @@ export default function App() {
   const [showBanner, setShowBanner] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
+  const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }
@@ -155,6 +180,17 @@ export default function App() {
   const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
   const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
   const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
+
+  useEffect(() => {
+    if (!loaded) return
+    const counts = {
+      concerts: concerts.filter(c => c.type !== 'festival' && !c.wishlist && new Date(c.date + 'T00:00:00') <= new Date()).length,
+      festivals: concerts.filter(c => c.type === 'festival' && !c.wishlist && new Date(c.date + 'T00:00:00') <= new Date()).length,
+      upcoming: concerts.filter(c => !c.wishlist && new Date(c.date + 'T00:00:00') > new Date()).length,
+    }
+    localStorage.setItem('splash_counts', JSON.stringify(counts))
+    setSplashCounts(counts)
+  }, [loaded, concerts])
 
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')
@@ -218,21 +254,11 @@ export default function App() {
     </div>
   )
 
-  if (authLoading) return (
-    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontSize: 13 }}>loading...</div>
-      {banner}
-    </div>
-  )
+  if (authLoading) return <><LoadingSplash label="loading..." counts={splashCounts} />{banner}</>
 
   if (!user) return <><AuthScreen onSignIn={signIn} onGuest={enterGuest} />{banner}</>
 
-  if (!loaded) return (
-    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontSize: 13 }}>loading your shows...</div>
-      {banner}
-    </div>
-  )
+  if (!loaded) return <><LoadingSplash label="loading your shows..." counts={splashCounts} />{banner}</>
 
   return (
     <>

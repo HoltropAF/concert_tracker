@@ -327,7 +327,7 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
   );
 }
 
-function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
+function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showVenue = true, showGenreTags = true }) {
   const past = isPast(concert.date) && !concert.wishlist;
   const effectiveCompact = compact || !past;
   const isFestival = concert.type === "festival";
@@ -394,9 +394,14 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
               ) : null;
             })()}
           </div>
-          <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+          <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
             {formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
           </div>
+          {!showVenue && (
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+              {formatDate(concert.date)}{concert.city ? ` · ${concert.city}` : ""}
+            </div>
+          )}
           {getFriends(concert).length > 0 && (
             <div style={{ fontSize: 11, color: "#5a5880", marginTop: 4 }}>
               w. {getFriends(concert).join(", ")}
@@ -422,6 +427,12 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true }) {
           )}
         </div>
       </div>
+      {showGenreTags && (getGenres(concert).length > 0 || concert.subgenre) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
+          {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
+        </div>
+      )}
     </button>
   );
 }
@@ -5054,6 +5065,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   const hasChanges = JSON.stringify(local) !== JSON.stringify(settings);
   const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
+  const defaultViewOptions = [{ id: "stats", label: "Stats" }, { id: "home", label: "Shows" }, { id: "artists", label: "Artists" }, { id: "songs", label: "Songs" }, { id: "venues", label: "Venues" }];
+  const defaultSortOptions = [{ id: "newest", label: "Date" }, { id: "oldest", label: "Oldest" }, { id: "alpha", label: "A-Z" }, { id: "price", label: "Price" }, { id: "rating", label: "Rating" }];
+  const cycleOption = (options, current) => {
+    const idx = Math.max(0, options.findIndex(o => o.id === current));
+    return options[(idx + 1) % options.length].id;
+  };
+  const optionLabel = (options, current) => options.find(o => o.id === current)?.label || options[0]?.label || "";
   const handleSettingsSave = async () => {
     const result = onUpdateAll
       ? await onUpdateAll(local)
@@ -5485,8 +5503,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   return (
     <div style={{ padding: "16px 10px 100px", width: "min(100%, 430px)", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", minHeight: 30, marginBottom: 14 }}>
         {(hasChanges || saved) && (
           <button onClick={handleSettingsSave} style={{
             background: saved ? "#a78bfa" : "#1a1a30",
@@ -5517,10 +5534,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {!activeSettingsTab && (
         <div>
-          <div style={{ color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: "6px 20px 16px", maxWidth: 350, margin: "0 auto" }}>
+          <div style={{ color: "#e2e0ff", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: "6px 20px 16px", maxWidth: 350, margin: "0 auto" }}>
             settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats.
           </div>
-
           <SettingsSection title="Help">
             {[
               { icon: "bug", label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
@@ -5528,7 +5544,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               { icon: "box", label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
               { icon: "book", label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
             ].map(({ icon, label, url }) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "11px 16px", borderBottom: "1px solid #232239" }}>
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "11px 16px", borderBottom: "1px solid #232239" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                   <span style={{ width: 22, height: 22, borderRadius: 7, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 9, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{icon}</span>
                 <span>{label}</span>
@@ -5557,19 +5573,46 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'preferences' && <>
-        <SettingsSection title="Default view">
-          <SettingsRow label="Opening tab" sub="Which tab opens on launch">
-            <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"},{id:"venues",label:"Venues"}]} onChange={v => lUpdate("defaultTab", v)} />
-          </SettingsRow>
+        <SettingsSection title="Defaults">
           <SettingsRow label="Show past concerts" sub="On by default when opening app">
             <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
           </SettingsRow>
           <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
             <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); onUpdate("defaultShowWishlist", v); }} />
           </SettingsRow>
+          <SettingsRow label="Default view" sub="What shows first on open">
+            <button onClick={() => lUpdate("defaultTab", cycleOption(defaultViewOptions, local.defaultTab))} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
+              <span>{optionLabel(defaultViewOptions, local.defaultTab)}</span>
+              <span style={{ color: "#7d7aa5", fontSize: 16, lineHeight: 1 }}>›</span>
+            </button>
+          </SettingsRow>
         </SettingsSection>
 
         <SettingsSection title="Display">
+          <SettingsRow label="Compact card view" sub="Smaller cards, more at once">
+            <SettingsToggle checked={!!local.compactView} onChange={checked => { lUpdate("compactView", checked); onUpdate("compactView", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Show venue" sub="Display venue name on cards">
+            <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); onUpdate("showVenueOnCards", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Show genre tags" sub="Tags visible on concert cards">
+            <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); onUpdate("showGenreTagsOnCards", checked); }} />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Sort & filter">
+          <SettingsRow label="Default sort" sub="How concerts are ordered">
+            <button onClick={() => { const next = cycleOption(defaultSortOptions, local.defaultSort || 'newest'); lUpdate("defaultSort", next); onUpdate("defaultSort", next); }} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
+              <span>{optionLabel(defaultSortOptions, local.defaultSort || 'newest')}</span>
+              <span style={{ color: "#7d7aa5", fontSize: 16, lineHeight: 1 }}>›</span>
+            </button>
+          </SettingsRow>
+          <SettingsRow label="Group by month" sub="Month headers in concert list">
+            <SettingsToggle checked={!!local.groupByMonth} onChange={checked => { lUpdate("groupByMonth", checked); onUpdate("groupByMonth", checked); }} />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="App">
           <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
@@ -5949,11 +5992,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [filterSubgenre, setFilterSubgenre] = useState('all')
   const [filterCountry, setFilterCountry] = useState('all')
   const [filterHasPhoto, setFilterHasPhoto] = useState(false)
-  const [sortOrder, setSortOrder] = useState('newest')
+  const [sortOrder, setSortOrder] = useState(settings.defaultSort || 'newest')
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
-  const [compact, setCompact] = useState(false)
+  const [compact, setCompact] = useState(!!settings.compactView)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
@@ -5968,6 +6011,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }, [])
 
   useEffect(() => { if (showsGroup.includes(view)) setShowsTab(view); }, [view])
+  useEffect(() => { setSortOrder(settings.defaultSort || 'newest'); }, [settings.defaultSort])
+  useEffect(() => { setCompact(!!settings.compactView); }, [settings.compactView])
 
   const allFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
 
@@ -6012,10 +6057,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
     filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto,
-    filterType !== 'all', compact
+    filterType !== 'all', compact !== !!settings.compactView
   ].filter(Boolean).length
-  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setCompact(false); setFilterHasPhoto(false); }
-  const resetSort = () => setSortOrder('newest')
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setCompact(!!settings.compactView); setFilterHasPhoto(false); }
+  const resetSort = () => setSortOrder(settings.defaultSort || 'newest')
 
   const filtered = concerts.filter(c => {
     if (isWish(c)) return false
@@ -6074,6 +6119,52 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               : statsTab === 'friends'
                 ? 'Friends'
                 : 'Stats'
+  const renderConcertList = (list, showPhoto) => {
+    if (!settings.groupByMonth) {
+      return list.map(c => (
+        <ConcertCard
+          key={c.id}
+          concert={c}
+          onOpen={handleOpenConcert}
+          compact={compact}
+          showPhoto={showPhoto}
+          showVenue={settings.showVenueOnCards !== false}
+          showGenreTags={settings.showGenreTagsOnCards !== false}
+        />
+      ))
+    }
+    const groups = []
+    list.forEach(c => {
+      const key = (c.date || '').slice(0, 7)
+      const last = groups[groups.length - 1]
+      if (!last || last.key !== key) {
+        groups.push({
+          key,
+          label: c.date ? new Date(c.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'Unknown',
+          items: [c],
+        })
+      } else {
+        last.items.push(c)
+      }
+    })
+    return groups.map(group => (
+      <div key={group.key}>
+        <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 4px 8px' }}>{group.label}</div>
+        {group.items.map(c => (
+          <ConcertCard
+            key={c.id}
+            concert={c}
+            onOpen={handleOpenConcert}
+            compact={compact}
+            showPhoto={showPhoto}
+            showVenue={settings.showVenueOnCards !== false}
+            showGenreTags={settings.showGenreTagsOnCards !== false}
+          />
+        ))}
+      </div>
+    ))
+  }
+  const defaultSortId = settings.defaultSort || 'newest'
 
   const TabBtn = ({ id, icon, label }) => (
     <button onClick={() => { if (id === 'stats' && view === 'stats' && statsTab === 'charts') { setStatsTab('summary'); } else { setView(id); } }} style={{
@@ -6284,8 +6375,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               )}
             </div>
             {/* Sort button */}
-            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ minHeight: 36, background: showSort || sortOrder !== 'newest' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== 'newest' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== 'newest' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== 'newest' ? 700 : 400, flexShrink: 0 }}>
-              Sort{sortOrder !== 'newest' ? ` ↕` : ''}
+            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ minHeight: 36, background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>
+              Sort{sortOrder !== defaultSortId ? ` ↕` : ''}
             </button>
             {/* Filters button */}
             <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ minHeight: 36, background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
@@ -6296,7 +6387,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {view === 'home' && showSort && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
-            {sortOrder !== 'newest' && <button onClick={resetSort} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            {sortOrder !== defaultSortId && <button onClick={resetSort} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[{id:'newest',label:'Newest'},{id:'oldest',label:'Oldest'},{id:'alpha',label:'A→Z'},{id:'price',label:'Price ↓'},{id:'rating',label:'Rating ↓'}].map(s => (
                 <button key={s.id} onClick={() => setSortOrder(s.id)} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortOrder === s.id ? '#a78bfa' : '#0c0c14', color: sortOrder === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortOrder === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
@@ -6415,14 +6506,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   </div>
                   <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                 </button>
-                {showWishlist && wishlist.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} showPhoto={false} />)}
+                {showWishlist && renderConcertList(wishlist, false)}
                 <div style={{ height: 1, background: '#0e0e1a', margin: '4px 0 16px' }} />
               </div>
             )}
             {upcoming.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 4 }}>Upcoming — {upcoming.length}</div>
-                {upcoming.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} showPhoto={settings.showListPhotos !== false} />)}
+                {renderConcertList(upcoming, settings.showListPhotos !== false)}
                 <div style={{ height: 1, background: '#0e0e1a', margin: '12px 0 16px' }} />
               </div>
             )}
@@ -6434,7 +6525,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 </div>
                 <span style={{ fontSize: 11, color: '#4a4870', transform: showPast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
               </button>
-              {(showPast || !!search) && past.map(c => <ConcertCard key={c.id} concert={c} onOpen={handleOpenConcert} compact={compact} showPhoto={settings.showListPhotos !== false} />)}
+              {(showPast || !!search) && renderConcertList(past, settings.showListPhotos !== false)}
             </div>
             </>}
           </>

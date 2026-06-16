@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
-import { requestPermission, scheduleTicketAlarm, clearTicketAlarm, reScheduleAll, canNotify } from '../lib/notifications'
 
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
@@ -4610,7 +4609,6 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const entry = { ...form, id }
     if (form.wishlist && !form.date) entry.date = '9999-12-31' // far future so isPast never fires
-    if (entry.wishlist && entry.ticketSaleAt) scheduleTicketAlarm(id, entry.ticketSaleAt, entry.artist)
     onSave(entry)
   }
 
@@ -4779,16 +4777,6 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   </div>
                   <input value={form.ticketSaleLink||''} onChange={e => update('ticketSaleLink', e.target.value)} placeholder="Ticket link (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
                   <input value={form.ticketSaleNote||''} onChange={e => update('ticketSaleNote', e.target.value)} placeholder="Note (e.g. presale code, queue link…)" style={{ ...inputStyle, marginBottom: 8 }} />
-                  {form.ticketSaleAt && (
-                    <button onClick={async () => {
-                      const perm = await requestPermission();
-                      if (perm !== 'granted') { alert('Enable notifications in your browser/phone settings to get ticket sale reminders.'); return; }
-                      scheduleTicketAlarm('preview', form.ticketSaleAt, form.artist || 'Artist');
-                      alert("Notifications enabled! You'll get a reminder 30 min before and at sale time.");
-                    }} style={{ width: '100%', background: 'none', border: '1px solid #34d399', borderRadius: 8, color: '#34d399', fontSize: 12, padding: '7px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
-                      🔔 {canNotify() ? 'Notifications on' : 'Enable sale reminder'}
-                    </button>
-                  )}
                 </div>
             </>
           );
@@ -5499,23 +5487,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
-      <div style={{ background: "linear-gradient(180deg, rgba(167,139,250,0.08), #13131f 34%)", border: "1px solid #25243a", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 12, boxShadow: "0 -18px 28px rgba(255,255,255,0.16), 0 14px 32px rgba(0,0,0,0.28)" }}>
-        <div style={{ width: 36, height: 36, borderRadius: 99, background: "#201a34", border: "1px solid #a78bfa", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
-          {(userEmail || "ST").slice(0, 2).toUpperCase()}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
-          <div style={{ color: "#7d7aa5", fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>personal account</div>
-          <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
-          { id: 'preferences', label: 'Settings' },
+          { id: 'preferences', label: 'Display' },
           { id: 'tags', label: 'Tags' },
-          { id: 'notifications', label: 'Notifications' },
-          { id: 'data', label: 'Data' },
+          { id: 'data', label: 'Account' },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
             minHeight: 34, borderRadius: 7, cursor: "pointer", fontSize: 10,
@@ -5848,60 +5824,20 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
       )}
 
-      {activeSettingsTab === 'notifications' && <>
-      <SettingsSection title="Notifications">
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
-          <p style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", margin: "0 0 12px", lineHeight: 1.6 }}>
-            Get notified when a ticket sale starts — even when the app is closed. Uses <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>ntfy.sh</a>, a free open-source service.
-          </p>
-          <div style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.7 }}>
-            <div style={{ color: "#c4c2f0", fontWeight: 700, marginBottom: 4 }}>Setup (5 min):</div>
-            <div>1. Install <strong style={{ color: "#c4c2f0" }}>ntfy</strong> on your phone</div>
-            <div style={{ color: "#6b6a8f", marginLeft: 12, marginBottom: 4 }}>Android: free · iOS: free + <strong style={{ color: "#fb923c" }}>€2 in-app</strong> for push delivery</div>
-            <div>2. Open ntfy → Subscribe → enter your topic name below</div>
-            <div>3. Paste that same topic name here and save</div>
-            <div>4. Pick a unique name — it's your private channel</div>
+      {activeSettingsTab === 'data' && <>
+      <SettingsSection title="Account">
+        <div style={{ background: "linear-gradient(180deg, rgba(167,139,250,0.08), #13131f 34%)", border: "1px solid #25243a", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 4, boxShadow: "0 -18px 28px rgba(255,255,255,0.12), 0 14px 32px rgba(0,0,0,0.24)" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 99, background: "#201a34", border: "1px solid #a78bfa", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+            {(userEmail || "ST").slice(0, 2).toUpperCase()}
           </div>
-          <SettingsRow label="Enable notifications" sub="Send ticket sale reminders via ntfy">
-            <SettingsToggle checked={!!local.ntfyEnabled} onChange={checked => { lUpdate("ntfyEnabled", checked); onUpdate("ntfyEnabled", checked); }} />
-          </SettingsRow>
-          {local.ntfyEnabled && <>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>Your ntfy topic name</div>
-            <input
-              value={local.ntfyTopic || ""}
-              onChange={e => lUpdate("ntfyTopic", e.target.value.trim())}
-              placeholder="e.g. settracker-yourname"
-              style={{ width: "100%", boxSizing: "border-box", background: "rgba(167,139,250,0.05)", border: `1px solid ${local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic ? "#1a3a2a" : "#2e2e50"}`, borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12, marginBottom: 8 }}
-            />
-            <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-              <button onClick={async () => {
-                const topic = (local.ntfyTopic || "").trim();
-                if (!topic) { onNotify("Enter a topic name first"); return; }
-                const result = await onUpdate("ntfyTopic", topic);
-                if (result?.error) { onNotify("Could not save topic", "error"); return; }
-                onNotify("Topic saved ✓");
-              }} style={{ flex: 1, background: local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#a78bfa" : "#1a1a30", border: `1px solid ${local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#a78bfa" : "#2e2e50"}`, borderRadius: 8, color: local.ntfyTopic && local.ntfyTopic !== settings.ntfyTopic ? "#0c0c14" : "#6b6a8f", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: 700, transition: "all 0.15s" }}>Save</button>
-              <button onClick={async () => {
-                const topic = (local.ntfyTopic || "").trim();
-                if (!topic) { onNotify("Enter a topic name first"); return; }
-                await onUpdate("ntfyTopic", topic);
-                const r = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, title: "🎶 settracker connected!", body: "Ticket sale notifications are set up.", tags: "musical_note" }) });
-                if (r.ok) onNotify("Test notification sent! Check your ntfy app.");
-                else onNotify("Could not reach ntfy — check your topic name", "error");
-              }} style={{ flex: 1, background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", fontSize: 12, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Test</button>
-            </div>
-            {local.ntfyTopic && local.ntfyTopic === settings.ntfyTopic && (
-              <div style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>✓ Saved — topic: {settings.ntfyTopic}</div>
-            )}
-            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
-              Keep this private — anyone who knows your topic can send you notifications.
-            </div>
-          </>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
+            <div style={{ color: "#7d7aa5", fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>personal account</div>
+            <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
+          </div>
         </div>
       </SettingsSection>
-      </>}
 
-      {activeSettingsTab === 'data' && <>
       <SettingsSection title="Import & export">
         <div>
           <SettingsActionRow icon="DL" title="Export concerts" sub="Download as XLSX or JSON">

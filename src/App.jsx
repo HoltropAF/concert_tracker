@@ -1,7 +1,6 @@
 import { Component, useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
-import { reScheduleAll } from './lib/notifications'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
@@ -156,7 +155,6 @@ export default function App() {
   const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
   const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
   const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
-  useEffect(() => { if (loaded && concerts.length) reScheduleAll(concerts) }, [loaded])
 
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')

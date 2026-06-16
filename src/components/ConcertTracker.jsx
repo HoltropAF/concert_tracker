@@ -5443,7 +5443,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   return (
     <div style={{ padding: "16px 20px 100px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
         {(hasChanges || saved) && (
           <button onClick={handleSettingsSave} style={{
@@ -5456,18 +5456,31 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14 }}>
+      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 99, background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+          {(userEmail || "ST").slice(0, 2).toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
+          <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 5, marginBottom: 14 }}>
         {[
           { id: 'preferences', label: 'General' },
           { id: 'tags', label: 'Tags' },
           { id: 'people', label: 'People' },
+          { id: 'notifications', label: 'Notifications' },
+          { id: 'data', label: 'Data' },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
-            minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 11,
+            minHeight: 38, borderRadius: 8, cursor: "pointer", fontSize: 10,
             fontFamily: "'DM Mono', monospace", fontWeight: activeSettingsTab === tab.id ? 700 : 400,
             background: activeSettingsTab === tab.id ? "#1a1a30" : "#13131f",
             border: `1px solid ${activeSettingsTab === tab.id ? "#a78bfa" : "#1f1f35"}`,
             color: activeSettingsTab === tab.id ? "#a78bfa" : "#6b6a8f",
+            padding: "6px 4px", overflow: "hidden", textOverflow: "ellipsis",
           }}>{tab.label}</button>
         ))}
       </div>
@@ -5716,7 +5729,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       )}
 
-      {activeSettingsTab === 'preferences' && <>
+      {activeSettingsTab === 'notifications' && <>
       <Collapsible title="Push notifications" {...sec("notifications")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           <p style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", margin: "0 0 12px", lineHeight: 1.6 }}>
@@ -5767,7 +5780,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </>}
         </div>
       </Collapsible>
+      </>}
 
+      {activeSettingsTab === 'data' && <>
       <Collapsible title="Account & data" {...sec("account")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -5828,12 +5843,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </div>
             <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "#0c0c14", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
             <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
-          </div>
-          <div style={{ borderTop: "1px solid #1a1a2e", marginTop: 14, paddingTop: 14 }}>
-            <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>
-              signed in as <span style={{ color: "#6b6a8f" }}>{userEmail}</span>
-            </div>
-            <button onClick={onSignOut} style={{ width: "100%", padding: "11px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", background: "none", border: "1px solid #f472b6", color: "#f472b6", fontFamily: "'DM Mono', monospace" }}>log out</button>
           </div>
         </div>
       </Collapsible>

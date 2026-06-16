@@ -3025,21 +3025,20 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   </div>
                 );
               }
-              const allSorted = [...concerts].sort((a,b) => a.date.localeCompare(b.date));
+              const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10).sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
               const W = 300, H = 80;
-              const firstMs = new Date(allSorted[0].date).getTime();
-              // extend x-axis to last upcoming show
-              const lastMs = new Date(allSorted[n-1].date).getTime();
-              const rangeMs = lastMs - firstMs || 1;
-              const todayMs = new Date().getTime();
+              const firstMs = new Date(allSorted[0].date + 'T00:00:00').getTime();
+              const lastMs = new Date(allSorted[n-1].date + 'T00:00:00').getTime();
+              const rangeMs = Math.max(lastMs - firstMs, 1);
+              const todayMs = Date.now();
               const todayX = Math.min(W - 3, ((todayMs - firstMs) / rangeMs) * (W - 6) + 3);
 
               const coords = allSorted.map((c, i) => ({
-                x: ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3,
+                x: ((new Date(c.date + 'T00:00:00').getTime() - firstMs) / rangeMs) * (W - 6) + 3,
                 y: H - 6 - ((i + 1) / n) * (H - 14),
-                isPast: isPast(c.date),
+                isPast: new Date(c.date + 'T00:00:00').getTime() <= todayMs,
               }));
 
               // Split into past and upcoming segments — join at today

@@ -5485,7 +5485,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   return (
-    <div style={{ padding: "16px 10px 100px" }}>
+    <div style={{ padding: "16px 10px 100px", width: "min(100%, 430px)", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e0ff" }}>Settings</div>
         {(hasChanges || saved) && (
@@ -5510,11 +5510,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
           { id: 'preferences', label: 'General' },
           { id: 'tags', label: 'Tags' },
-          { id: 'people', label: 'People' },
           { id: 'notifications', label: 'Notifications' },
           { id: 'data', label: 'Data' },
         ].map(tab => (
@@ -5530,6 +5529,42 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </div>
 
       {activeSettingsTab === 'preferences' && <>
+        <SettingsSection title="About settracker">
+          <div style={{ padding: "15px 16px", color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>
+            settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats in one dark mobile-first app.
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="Help">
+          {[
+            { label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+            { label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+            { label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+            { label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+          ].map(({ label, url }) => (
+            <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "13px 16px", borderBottom: "1px solid #232239" }}>
+              <span>{label}</span>
+              <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>open</span>
+            </a>
+          ))}
+        </SettingsSection>
+
+        <SettingsSection title="Social links">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8, padding: 14 }}>
+            {[
+              { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub" },
+              { href: "https://www.threads.com/@annuhfloor", label: "Threads" },
+              { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok" },
+              { href: "https://www.vinted.nl/member/50873825", label: "Vinted" },
+              { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify" },
+            ].map(({ href, label }) => (
+              <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ minHeight: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.24)", color: "#a78bfa", textDecoration: "none", fontSize: 10, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
+                {label}
+              </a>
+            ))}
+          </div>
+        </SettingsSection>
+
         <SettingsSection title="Default view">
           <SettingsRow label="Opening tab" sub="Which tab opens on launch">
             <SettingsOptionPills value={local.defaultTab} options={[{id:"stats",label:"Stats"},{id:"home",label:"Shows"},{id:"artists",label:"Artists"},{id:"songs",label:"Songs"},{id:"venues",label:"Venues"}]} onChange={v => lUpdate("defaultTab", v)} />
@@ -5604,7 +5639,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       ))}
       </>}
 
-      {activeSettingsTab === 'people' && <>
+      {activeSettingsTab === 'tags' && <>
       <Collapsible title={`Saved venues (${savedVenues.length})`} {...sec("venues")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           <button onClick={importVenuesFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>⤓ Import venues from my shows</button>
@@ -5645,7 +5680,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
-      <Collapsible title={`Friend groups (${friendGroups.length})`} {...sec("friendGroups")}>
+      {false && <Collapsible title={`Friend groups (${friendGroups.length})`} {...sec("friendGroups")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
           {friendGroups.length > 0 && (
             <div style={{ marginBottom: 14 }}>
@@ -5713,7 +5748,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           )}
           <button onClick={addFriendGroup} disabled={!newGroupName.trim() || newGroupFriends.length === 0} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", opacity: !newGroupName.trim() || newGroupFriends.length === 0 ? 0.4 : 1 }}>Add group</button>
         </div>
-      </Collapsible>
+      </Collapsible>}
 
       </>}
 
@@ -5894,7 +5929,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
       </SettingsSection>
 
-      <Collapsible title="Help" {...sec("help")}>
+      <div style={{ display: "none" }}><Collapsible title="Help" {...sec("help")}>
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
           {[
             { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
@@ -5908,12 +5943,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Configure summary blocks and charts in Settings → Stats display
           </div>
         </div>
-      </Collapsible>
+      </Collapsible></div>
 
       </>}
 
       {/* Follow me on */}
-      <div style={{ marginTop: 24, paddingBottom: 8, textAlign: "center" }}>
+      <div style={{ display: "none", marginTop: 24, paddingBottom: 8, textAlign: "center" }}>
         <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em", marginBottom: 10 }}>follow me on</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
           {[

@@ -5573,7 +5573,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       )}
 
       {activeSettingsTab === 'preferences' && <>
-        <SettingsSection title="Defaults">
+        <SettingsSection title="Opening defaults">
           <SettingsRow label="Show past concerts" sub="On by default when opening app">
             <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
           </SettingsRow>
@@ -5588,7 +5588,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Display">
+        <SettingsSection title="Concert cards">
           <SettingsRow label="Compact card view" sub="Smaller cards, more at once">
             <SettingsToggle checked={!!local.compactView} onChange={checked => { lUpdate("compactView", checked); onUpdate("compactView", checked); }} />
           </SettingsRow>
@@ -5600,7 +5600,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Sort & filter">
+        <SettingsSection title="Concert list">
           <SettingsRow label="Default sort" sub="How concerts are ordered">
             <button onClick={() => { const next = cycleOption(defaultSortOptions, local.defaultSort || 'newest'); lUpdate("defaultSort", next); onUpdate("defaultSort", next); }} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
               <span>{optionLabel(defaultSortOptions, local.defaultSort || 'newest')}</span>
@@ -5610,6 +5610,80 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Group by month" sub="Month headers in concert list">
             <SettingsToggle checked={!!local.groupByMonth} onChange={checked => { lUpdate("groupByMonth", checked); onUpdate("groupByMonth", checked); }} />
           </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Summary & stats">
+          <SettingsRow label="Stats tab" sub="Which stats view opens first">
+            <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
+          </SettingsRow>
+          <SettingsRow label="Summary scope" sub="Default time range on summary page">
+            <SettingsOptionPills
+              value={local.summaryYear || 'all'}
+              options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
+              onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
+            />
+          </SettingsRow>
+          <SettingsRow label="Top artists" sub="Rows shown in charts">
+            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); onUpdate("topArtistsRows", v); }} max={6} />
+          </SettingsRow>
+          <SettingsRow label="Top friends" sub="Rows shown in charts">
+            <SettingsStepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
+          </SettingsRow>
+          <SettingsRow label="Top venues" sub="Rows shown in charts">
+            <SettingsStepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
+          </SettingsRow>
+          <SettingsRow label="Most expensive" sub="Rows shown in list">
+            <SettingsStepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
+          </SettingsRow>
+          <SettingsRow label="Songs shown" sub="Default rows in Songs tab">
+            <SettingsStepper value={local.topSongsRows} onChange={v => lUpdate("topSongsRows", v)} min={3} max={50} />
+          </SettingsRow>
+          <div style={{ padding: '0 16px 16px' }}>
+          {(() => {
+            const hiddenBlocks = local.hiddenSummaryBlocks || [];
+            const hiddenGroups = local.hiddenChartGroups || [];
+            const hiddenChts = local.hiddenCharts || [];
+            const toggleBlock = id => { const next = hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]; onUpdate('hiddenSummaryBlocks', next); lUpdate('hiddenSummaryBlocks', next); };
+            const toggleGroup = id => { const next = hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]; onUpdate('hiddenChartGroups', next); lUpdate('hiddenChartGroups', next); };
+            const toggleChart = id => { const next = hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]; onUpdate('hiddenCharts', next); lUpdate('hiddenCharts', next); };
+            const pill = (label, active, onClick, small = false) => (
+              <button onClick={onClick} style={{
+                padding: small ? '2px 8px' : '3px 10px', borderRadius: 99, fontSize: small ? 9 : 10, cursor: 'pointer',
+                fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? '#a78bfa' : '#1f1f35'}`,
+                background: active ? '#1a1a30' : 'none', color: active ? '#a78bfa' : '#4a4870',
+              }}>{label}</button>
+            );
+            const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & venues' }, { id: 'upnext', label: 'Up next' }];
+            const ALL_CHART_GROUPS = [
+              { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: 'Genres' }, { id: 'shows', label: 'Shows over time' }, { id: 'artists', label: 'Top artists & ratings' }, { id: 'language', label: 'Language' }, { id: 'songs', label: 'Top songs' }, { id: 'covers', label: 'Covers' }] },
+              { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: 'Friends & group size' }] },
+              { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: 'Venues, size & countries' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
+              { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending & avg ticket' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }] },
+              { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: 'Merch' }] },
+            ];
+            return (
+              <>
+                <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Visible summary blocks</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
+                  {BLOCKS.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
+                </div>
+                <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Visible chart groups</div>
+                {ALL_CHART_GROUPS.map(g => (
+                  <div key={g.id} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
+                    </div>
+                    {!hiddenGroups.includes(g.id) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingLeft: 10, borderLeft: '2px solid #1f1f35' }}>
+                        {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>
+            );
+          })()}
+          </div>
         </SettingsSection>
 
         <SettingsSection title="App">
@@ -5626,32 +5700,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               ))}
             </div>
           </SettingsRow>
-          <SettingsRow label="Stats tab" sub="Which stats view opens first">
-            <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
-          </SettingsRow>
           <SettingsRow label="Rating system" sub="Stars used when rating shows">
             <SettingsOptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
           </SettingsRow>
           <SettingsRow label="Default country" sub="Pre-filled when adding a show">
             <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
-          </SettingsRow>
-        </SettingsSection>
-
-        <SettingsSection title="Chart limits">
-          <SettingsRow label="Top artists" sub="Rows shown in charts">
-            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); onUpdate("topArtistsRows", v); }} max={6} />
-          </SettingsRow>
-          <SettingsRow label="Top friends" sub="Rows shown in charts">
-            <SettingsStepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
-          </SettingsRow>
-          <SettingsRow label="Top venues" sub="Rows shown in charts">
-            <SettingsStepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
-          </SettingsRow>
-          <SettingsRow label="Most expensive" sub="Rows shown in list">
-            <SettingsStepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
-          </SettingsRow>
-          <SettingsRow label="Songs shown" sub="Default rows in Songs tab">
-            <SettingsStepper value={local.topSongsRows} onChange={v => lUpdate("topSongsRows", v)} min={3} max={50} />
           </SettingsRow>
         </SettingsSection>
       </>}
@@ -5788,7 +5841,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       </>}
 
-      {activeSettingsTab === 'preferences' && (
+      {false && activeSettingsTab === 'preferences' && (
         <SettingsSection title="Visible sections">
           <SettingsRow label="Summary scope" sub="Default time range on summary page">
             <SettingsOptionPills
@@ -5973,6 +6026,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const isPastDate = (dateStr) => new Date(dateStr + 'T00:00:00') <= today
 
   const showsGroup = ['home', 'artists', 'songs', 'venues']
+  const [showStartupScreen, setShowStartupScreen] = useState(true)
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
   const [selected, setSelected] = useState(null)
@@ -6102,6 +6156,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     concerts: allPast.filter(c => c.type !== 'festival').length,
     festivals: allPast.filter(c => c.type === 'festival').length,
     upcoming: concerts.filter(c => !isWish(c) && !isPastDate(c.date)).length,
+  }
+  const openSummaryFromStartup = () => {
+    setView('stats')
+    setStatsTab('summary')
+    setShowStartupScreen(false)
   }
   const isSummaryHeader = view === 'stats' && statsTab === 'summary'
   const shellTitle = isSummaryHeader
@@ -6311,6 +6370,23 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       <ChartGroupNav />
       <ShowsSubNav />
       <BottomNav />
+    </div>
+  )
+
+  if (showStartupScreen) return (
+    <div data-theme-shell="" style={appShell}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ textAlign: 'center', maxWidth: 340, width: '100%' }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
+          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>
+            {headerCounts.concerts} concerts · {headerCounts.festivals} festivals · {headerCounts.upcoming} upcoming
+          </div>
+          <button onClick={openSummaryFromStartup} style={{ minWidth: 168, minHeight: 42, borderRadius: 10, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '10px 18px', fontFamily: "'DM Mono', monospace" }}>
+            Open summary
+          </button>
+        </div>
+      </div>
+      <ToastHost toast={toast} onDismiss={() => setToast(null)} />
     </div>
   )
 

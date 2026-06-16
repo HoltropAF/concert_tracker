@@ -3319,18 +3319,27 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       })()}
-      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} />}
+      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} />}
       </>}
     </div>
   );
 }
 
-function FriendsView({ concerts, onOpen, settings = {} }) {
+function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [showSortPanel, setShowSortPanel] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(null); // { name, nickname, contact, note }
+
+  const friendProfiles = settings.friendProfiles || {};
+  const getProfile = name => friendProfiles[name] || {};
+  const saveProfile = (name, profile) => {
+    const updated = { ...friendProfiles, [name]: { ...getProfile(name), ...profile } };
+    onUpdateSetting?.('friendProfiles', updated);
+  };
+  const displayName = name => getProfile(name).nickname || name;
 
   const past = concerts.filter(c => isPast(c.date));
   const allFriends = [...new Set(past.flatMap(c => getFriends(c)))].sort();
@@ -3403,6 +3412,7 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
   if (selectedFriend) {
     const f = friendEntries.find(fd => fd.name === selectedFriend);
     if (!f) return null;
+    const profile = getProfile(f.name);
     const yearSpan = f.firstShow && f.lastShow && f.firstShow.date.slice(0,4) !== f.lastShow.date.slice(0,4)
       ? `${f.firstShow.date.slice(0,4)} – ${f.lastShow.date.slice(0,4)}`
       : f.firstShow ? f.firstShow.date.slice(0,4) : '';
@@ -3411,14 +3421,51 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
 
     return (
       <div style={{ padding: "0 0 100px" }}>
+        {/* Edit profile modal */}
+        {editingProfile && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
+            <div style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 40px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Edit profile</div>
+                <button onClick={() => setEditingProfile(null)} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              {[
+                { key: "nickname", label: "Nickname", placeholder: "e.g. Soph, DJ Max…" },
+                { key: "contact", label: "Contact", placeholder: "Phone, email, @handle…" },
+                { key: "note", label: "Note", placeholder: "Met at Lowlands, college friend…" },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{label}</div>
+                  <input
+                    value={editingProfile[key] || ""}
+                    onChange={e => setEditingProfile(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+                  />
+                </div>
+              ))}
+              <button onClick={() => {
+                saveProfile(f.name, editingProfile);
+                setEditingProfile(null);
+              }} style={{ width: "100%", background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 14, fontWeight: 700, padding: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Save</button>
+            </div>
+          </div>
+        )}
+
         <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{f.name}</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>
+              {displayName(f.name)}
+              {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
+            </div>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
               {f.shows.length} show{f.shows.length !== 1 ? 's' : ''} together{yearSpan ? ` · ${yearSpan}` : ''}
             </div>
+            {profile.contact && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{profile.contact}</div>}
+            {profile.note && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Sans', sans-serif", fontStyle: "italic", marginTop: 2 }}>{profile.note}</div>}
           </div>
+          <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
         <div style={{ padding: "16px 20px" }}>
@@ -3602,7 +3649,7 @@ function FriendsView({ concerts, onOpen, settings = {} }) {
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{name}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{displayName(name)}</div>
               {lastShow && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: topGenres.length ? 4 : 0 }}>last: {formatDate(lastShow.date)}</div>}
               {topGenres.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>

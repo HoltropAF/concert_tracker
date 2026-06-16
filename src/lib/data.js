@@ -131,6 +131,7 @@ export const DEFAULT_SETTINGS = {
   setlistfmApiKey: '',
   savedVenues: [],
   friendGroups: [],
+  friendProfiles: {},
   defaultCountry: '',
 }
 

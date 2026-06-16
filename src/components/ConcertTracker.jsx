@@ -2930,7 +2930,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
       {/* ── SUMMARY ── */}
       {statsTab === "summary" && (
-        <div style={{ padding: "16px 16px 0" }}>
+        <div style={{ padding: "16px 16px 0", flex: fillHeight ? 1 : undefined, overflowY: fillHeight ? "auto" : undefined, minHeight: 0 }}>
 
           {/* Year scope toggle */}
           {(() => {
@@ -3208,18 +3208,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-          {(() => {
-            const noSetlist = pastAll.filter(c => c.type !== "festival" && getSongList(c.setlist).length === 0).length;
-            const noPrice = pastAll.filter(c => !c.ticketPrice && c.ticketPrice !== 0).length;
-            const noRating = pastAll.filter(c => !c.rating).length;
-            const parts = [noSetlist > 0 && `${noSetlist} without setlist`, noPrice > 0 && `${noPrice} without price`, noRating > 0 && `${noRating} unrated`].filter(Boolean);
-            if (parts.length === 0) return null;
-            return (
-              <div style={{ marginTop: 12, fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "center" }}>
-                fill the gaps: {parts.join(" · ")}
-              </div>
-            );
-          })()}
 
         </div>
       )}
@@ -6060,7 +6048,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       {/* Content */}
-      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && statsTab === 'charts' ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && statsTab === 'charts' ? '0' : '0 16px', display: view === 'stats' && statsTab === 'charts' ? 'flex' : 'block', flexDirection: 'column' }}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'flex' : 'block', flexDirection: 'column' }}>
         {view === 'home' && (
           <>
             {concerts.length === 0 && (
@@ -6103,7 +6091,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             </>}
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts'} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}

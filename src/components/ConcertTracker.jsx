@@ -603,12 +603,23 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   );
 }
 
+function normalizeConcertForm(concert) {
+  return {
+    ...concert,
+    friends: Array.isArray(concert.friends) ? concert.friends : [],
+    support: Array.isArray(concert.support) ? concert.support : [],
+    merch: Array.isArray(concert.merch) ? concert.merch : [],
+    ticketAddons: Array.isArray(concert.ticketAddons) ? concert.ticketAddons : [],
+    acts: Array.isArray(concert.acts) ? concert.acts : [],
+  };
+}
+
 function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ ...concert });
-  useEffect(() => { setForm({ ...concert }); setEditing(false); }, [concert.id]);
+  const [form, setForm] = useState(() => normalizeConcertForm(concert));
+  useEffect(() => { setForm(normalizeConcertForm(concert)); setEditing(false); }, [concert.id]);
   const photoInputRef = useRef(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [friendInput, setFriendInput] = useState('');
@@ -5506,22 +5517,23 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {!activeSettingsTab && (
         <div>
-          <SettingsSection title="About settracker">
-            <div style={{ padding: "15px 16px", color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>
-              settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats in one dark mobile-first app.
-            </div>
-          </SettingsSection>
+          <div style={{ color: "#8f8bb8", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: "6px 20px 16px", maxWidth: 350, margin: "0 auto" }}>
+            settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats.
+          </div>
 
           <SettingsSection title="Help">
             {[
-              { icon: "bug", label: "Report", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-              { icon: "list", label: "Issues", url: "https://github.com/HoltropAF/concert_tracker/issues" },
-              { icon: "box", label: "Releases", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-              { icon: "book", label: "Docs", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+              { icon: "bug", label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+              { icon: "list", label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+              { icon: "box", label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+              { icon: "book", label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
             ].map(({ icon, label, url }) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "calc(50% - 4px)", minHeight: 38, color: "#e2e0ff", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "8px 10px", boxSizing: "border-box", borderBottom: "1px solid #232239", borderRight: "1px solid #232239" }}>
-                <span style={{ width: 18, height: 18, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 9, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{icon}</span>
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "11px 16px", borderBottom: "1px solid #232239" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                  <span style={{ width: 22, height: 22, borderRadius: 7, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 9, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{icon}</span>
                 <span>{label}</span>
+                </span>
+                <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>open</span>
               </a>
             ))}
           </SettingsSection>
@@ -5529,14 +5541,14 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsSection title="Social links">
             <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", padding: "12px 14px 14px" }}>
               {[
-                { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub", mark: "GH" },
-                { href: "https://www.threads.com/@annuhfloor", label: "Threads", mark: "@" },
-                { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok", mark: "♪" },
-                { href: "https://www.vinted.nl/member/50873825", label: "Vinted", mark: "V" },
-                { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify", mark: "♫" },
-              ].map(({ href, label, mark }) => (
-                <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ width: 38, height: 38, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "#13131f", border: "1px solid #25243a", color: "#a78bfa", textDecoration: "none", fontSize: mark.length > 1 ? 10 : 15, fontFamily: mark.length > 1 ? "'DM Mono', monospace" : "'Syne', sans-serif", fontWeight: 800, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
-                  {mark}
+                { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg> },
+                { href: "https://www.threads.com/@annuhfloor", label: "Threads", icon: <span style={{ fontSize: 17, fontWeight: 800, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>@</span> },
+                { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg> },
+                { href: "https://www.vinted.nl/member/50873825", label: "Vinted", icon: <span style={{ fontSize: 13, fontWeight: 800, fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>V</span> },
+                { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg> },
+              ].map(({ href, label, icon }) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ width: 38, height: 38, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "#13131f", border: "1px solid #25243a", color: "#a78bfa", textDecoration: "none", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+                  {icon}
                 </a>
               ))}
             </div>

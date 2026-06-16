@@ -2169,36 +2169,50 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       case "over-time": return (
         <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
           {(() => {
-            if (cumulative.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
-            const n = cumulative.length;
-            const maxC = cumulative[n-1].count;
-            const pts = cumulative.map((d, i) => `${(i/(n-1))*294+3},${96-(d.count/maxC)*88}`);
-            const linePath = "M " + pts.join(" L ");
-            const areaPath = linePath + ` L 297,96 L 3,96 Z`;
+            const allSorted = [...concerts].filter(c => !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
+            if (allSorted.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
+            const nowMs = Date.now();
+            const W = 300, H = 96;
+            const firstMs = new Date(allSorted[0].date).getTime();
+            const lastMs = new Date(allSorted[allSorted.length - 1].date).getTime();
+            const rangeMs = Math.max(lastMs - firstMs, 1);
+            const todayMs = Math.min(nowMs, lastMs);
+            const todayX = ((todayMs - firstMs) / rangeMs) * (W - 6) + 3;
+            const n = allSorted.length;
+            const xOf = c => ((new Date(c.date).getTime() - firstMs) / rangeMs) * (W - 6) + 3;
+            const yOf = i => H - 4 - ((i + 1) / n) * (H - 14);
+            const cumPast = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
+            const cumUp = allSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
+            const pastCoords = cumPast.map((c, i) => ({ x: xOf(c), y: yOf(i) }));
+            const upCoords = cumUp.map((c, i) => ({ x: xOf(c), y: yOf(cumPast.length + i) }));
+            const todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : yOf(-1);
+            const pastPath = pastCoords.length > 1 ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+            const upPath = upCoords.length > 0 ? `M ${todayX},${todayY} L ` + upCoords.map(p => `${p.x},${p.y}`).join(" L ") : null;
+            const areaPath = pastCoords.length > 1 ? pastPath + ` L ${todayX},${H} L ${pastCoords[0].x},${H} Z` : null;
             return (<>
               <div style={{ display: "flex", gap: 4 }}>
                 <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 120, paddingTop: 2, paddingBottom: 6 }}>
-                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxC}</span>
-                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{Math.round(maxC / 2)}</span>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{n}</span>
+                  <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{Math.round(n / 2)}</span>
                   <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
                 </div>
-                <svg style={{ flex: 1 }} height={120} viewBox="0 0 300 100" preserveAspectRatio="none">
+                <svg style={{ flex: 1 }} height={120} viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none">
                   <defs>
                     <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.25"/>
                       <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
                     </linearGradient>
                   </defs>
-                  <path d={areaPath} fill="url(#lineGrad)" />
-                  <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx={3} cy={96-(cumulative[0].count/maxC)*88} r="3" fill="#a78bfa" />
-                  <circle cx={297} cy={96-(cumulative[n-1].count/maxC)*88} r="3" fill="#a78bfa" />
+                  {areaPath && <path d={areaPath} fill="url(#lineGrad)" />}
+                  {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {upPath && <path d={upPath} fill="none" stroke="#34d399" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />}
+                  <line x1={todayX} y1={0} x2={todayX} y2={H} stroke="#2e2e50" strokeWidth="1" />
                 </svg>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[0]?.date.slice(0,7)}</span>
-                <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{past.length} total</span>
-                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{sortedPast[sortedPast.length-1]?.date.slice(0,7)}</span>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[0].date.slice(0,7)}</span>
+                <span style={{ fontSize: 10, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>{cumPast.length} past · {cumUp.length} upcoming</span>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{allSorted[allSorted.length-1].date.slice(0,7)}</span>
               </div>
             </>);
           })()}

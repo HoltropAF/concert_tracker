@@ -1408,10 +1408,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   // Merch per year
   const yearMerchSpend = {};
+  const yearOtherSpend = {};
   const totalMerch = past.reduce((sum, c) => {
     const m = (c.merch || []).reduce((s,x) => s + (parseFloat(x.price)||0), 0);
     const y = getYear(c.date);
     yearMerchSpend[y] = (yearMerchSpend[y] || 0) + m;
+    if (c.otherCost) yearOtherSpend[y] = (yearOtherSpend[y] || 0) + c.otherCost;
     return sum + m;
   }, 0);
   const totalTickets = past.reduce((sum,c) => sum + (c.ticketPrice||0), 0);
@@ -1990,14 +1992,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const activeYearsYS = years.filter(y => yearSpend[y] > 0).slice(-10);
         const maxSpendYS = Math.max(...activeYearsYS.map(y => yearSpend[y]), 1);
         const thisYearFS = String(new Date().getFullYear());
-        const allTicketsFS = past.filter(c => c.ticketPrice);
-        const thisYearTicketsFS = allTicketsFS.filter(c => getYear(c.date) === thisYearFS);
-        const avgThisYearFS = thisYearTicketsFS.length ? thisYearTicketsFS.reduce((s,c) => s + c.ticketPrice, 0) / thisYearTicketsFS.length : null;
+        const thisYearPast = past.filter(c => getYear(c.date) === thisYearFS);
+        const thisYearConcerts = thisYearPast.filter(c => c.type !== 'festival' && c.ticketPrice);
+        const thisYearFestivals = thisYearPast.filter(c => c.type === 'festival' && c.ticketPrice);
+        const avgTicketConcert = thisYearConcerts.length ? thisYearConcerts.reduce((s,c) => s + c.ticketPrice, 0) / thisYearConcerts.length : null;
+        const avgTicketFestival = thisYearFestivals.length ? thisYearFestivals.reduce((s,c) => s + c.ticketPrice, 0) / thisYearFestivals.length : null;
         const costOf = c => (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + (c.otherCost || 0);
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {avgThisYearFS && (
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textAlign: "right", marginBottom: 12 }}>avg ticket {thisYearFS}: <span style={{ color: "#38bdf8" }}>€{avgThisYearFS.toFixed(0)}</span></div>
+          {(avgTicketConcert || avgTicketFestival) && (
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textAlign: "right", marginBottom: 12 }}>
+              {avgTicketConcert && <div>avg ticket concert {thisYearFS}: <span style={{ color: "#38bdf8" }}>€{avgTicketConcert.toFixed(0)}</span></div>}
+              {avgTicketFestival && <div>avg ticket festival {thisYearFS}: <span style={{ color: "#fb923c" }}>€{avgTicketFestival.toFixed(0)}</span></div>}
+            </div>
           )}
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
           {ysView === "bars" && <>
@@ -2005,7 +2012,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {[
               { color: "#a78bfa", label: "Concerts" },
               { color: "#fb923c", label: "Festivals" },
-              { color: "#38bdf8", label: "Avg ticket" },
+              { color: "#38bdf8", label: "Other costs" },
               { color: "#34d399", label: "Merch" },
             ].map(({ color, label }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -2031,7 +2038,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 {activeYears.map(y => {
                   const concerts_ = yearConcertSpend[y] || 0;
                   const festivals_ = yearFestivalSpend[y] || 0;
-                  const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
+                  const other = yearOtherSpend[y] || 0;
                   const merch = yearMerchSpend[y] || 0;
                   const bar = (val, color, opacity = 1) => (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2045,7 +2052,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                         {concerts_ > 0 && bar(concerts_, "#a78bfa")}
                         {festivals_ > 0 && bar(festivals_, "#fb923c")}
-                        {avg && bar(avg, "#38bdf8", 0.8)}
+                        {other > 0 && bar(other, "#38bdf8", 0.8)}
                         {merch > 0 && bar(merch, "#34d399", 0.85)}
                       </div>
                     </div>
@@ -2073,15 +2080,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             const festivalPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearFestivalSpend[y] || 0), v: yearFestivalSpend[y] || 0 }));
             const concertPath = "M " + concertPts.map(p => `${p.x},${p.y}`).join(" L ");
             const festivalPath = festivalPts.some(p => p.v > 0) ? "M " + festivalPts.map(p => `${p.x},${p.y}`).join(" L ") : null;
-            const avgPts = activeYearsYS.map((y, i) => {
-              const avg = yearTicketCount[y] ? yearTicketSum[y] / yearTicketCount[y] : null;
-              return avg !== null ? { x: xOf(i), y: yOf(avg) } : null;
-            });
-            const avgPath = avgPts.reduce((acc, pt, i) => {
-              if (!pt) return acc;
-              if (i === 0 || !avgPts[i - 1]) return acc + `M ${pt.x},${pt.y}`;
-              return acc + ` L ${pt.x},${pt.y}`;
-            }, '');
+            const otherPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearOtherSpend[y] || 0), v: yearOtherSpend[y] || 0 }));
+            const otherPath = otherPts.some(p => p.v > 0) ? "M " + otherPts.map(p => `${p.x},${p.y}`).join(" L ") : null;
             const merchPts = activeYearsYS.map((y, i) => ({ x: xOf(i), y: yOf(yearMerchSpend[y] || 0) }));
             const merchPath = "M " + merchPts.map(p => `${p.x},${p.y}`).join(" L ");
             return (
@@ -2090,7 +2090,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   {[
                     { color: "#a78bfa", label: "Concerts" },
                     ...(festivalPath ? [{ color: "#fb923c", label: "Festivals" }] : []),
-                    { color: "#38bdf8", label: "Avg ticket" },
+                    ...(otherPath ? [{ color: "#38bdf8", label: "Other costs" }] : []),
                     { color: "#34d399", label: "Merch" },
                   ].map(({ color, label }) => (
                     <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -2120,9 +2120,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   {festivalPath && <path d={festivalPath + ` L ${festivalPts[n-1].x},${yBot} L ${festivalPts[0].x},${yBot} Z`} fill="url(#ysGradF)" />}
                   {festivalPath && <path d={festivalPath} fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
                   {festivalPath && festivalPts.map((pt, i) => pt.v > 0 && <circle key={activeYearsYS[i] + 'f'} cx={pt.x} cy={pt.y} r="3" fill="#fb923c" />)}
-                  {/* Avg ticket line */}
-                  {avgPath && <path d={avgPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                  {avgPts.map((pt, i) => pt && <circle key={activeYearsYS[i] + 'a'} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />)}
+                  {/* Other costs line */}
+                  {otherPath && <path d={otherPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                  {otherPath && otherPts.map((pt, i) => pt.v > 0 && <circle key={activeYearsYS[i] + 'o'} cx={pt.x} cy={pt.y} r="3" fill="#38bdf8" />)}
                   {/* Merch line */}
                   <path d={merchPath} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   {merchPts.map((pt, i) => <circle key={activeYearsYS[i] + 'm'} cx={pt.x} cy={pt.y} r="3" fill="#34d399" />)}

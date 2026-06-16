@@ -5514,29 +5514,29 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
           <SettingsSection title="Help">
             {[
-              { label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-              { label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
-              { label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-              { label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-            ].map(({ label, url }) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "13px 16px", borderBottom: "1px solid #232239" }}>
+              { icon: "bug", label: "Report", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+              { icon: "list", label: "Issues", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+              { icon: "box", label: "Releases", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+              { icon: "book", label: "Docs", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+            ].map(({ icon, label, url }) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "calc(50% - 4px)", minHeight: 38, color: "#e2e0ff", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "8px 10px", boxSizing: "border-box", borderBottom: "1px solid #232239", borderRight: "1px solid #232239" }}>
+                <span style={{ width: 18, height: 18, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 9, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{icon}</span>
                 <span>{label}</span>
-                <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>open</span>
               </a>
             ))}
           </SettingsSection>
 
           <SettingsSection title="Social links">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8, padding: 14 }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", padding: "12px 14px 14px" }}>
               {[
-                { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub" },
-                { href: "https://www.threads.com/@annuhfloor", label: "Threads" },
-                { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok" },
-                { href: "https://www.vinted.nl/member/50873825", label: "Vinted" },
-                { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify" },
-              ].map(({ href, label }) => (
-                <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ minHeight: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.24)", color: "#a78bfa", textDecoration: "none", fontSize: 10, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 4px" }}>
-                  {label}
+                { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub", mark: "GH" },
+                { href: "https://www.threads.com/@annuhfloor", label: "Threads", mark: "@" },
+                { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok", mark: "♪" },
+                { href: "https://www.vinted.nl/member/50873825", label: "Vinted", mark: "V" },
+                { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify", mark: "♫" },
+              ].map(({ href, label, mark }) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ width: 38, height: 38, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "#13131f", border: "1px solid #25243a", color: "#a78bfa", textDecoration: "none", fontSize: mark.length > 1 ? 10 : 15, fontFamily: mark.length > 1 ? "'DM Mono', monospace" : "'Syne', sans-serif", fontWeight: 800, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+                  {mark}
                 </a>
               ))}
             </div>

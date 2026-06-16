@@ -123,6 +123,40 @@ function StarRating({ value, onChange, max = 5 }) {
   );
 }
 
+function DropdownSelect({ options, selected, onToggle, multi = false, placeholder = "Select...", accentColor = "#a78bfa" }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+  const selectedArr = Array.isArray(selected) ? selected : selected ? [selected] : [];
+  const summary = selectedArr.length === 0 ? placeholder : selectedArr.join(', ');
+  return (
+    <div ref={ref} style={{ position: 'relative', marginBottom: 12 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ width: '100%', background: '#0c0c14', border: `1px solid ${open ? accentColor : '#2e2e50'}`, borderRadius: 8, color: selectedArr.length ? '#c4c2f0' : '#4a4870', padding: '8px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{summary}</span>
+        <span style={{ color: '#4a4870', fontSize: 10, marginLeft: 8, flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#13131f', border: `1px solid ${accentColor}44`, borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 24px #00000060' }}>
+          {options.map(opt => {
+            const isSelected = selectedArr.includes(opt);
+            return (
+              <button key={opt} onClick={() => { onToggle(opt); if (!multi) setOpen(false); }} style={{ width: '100%', background: isSelected ? `${accentColor}18` : 'none', border: 'none', borderBottom: '1px solid #1f1f35', color: isSelected ? '#e2e0ff' : '#6b6a8f', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 16, flexShrink: 0, color: '#34d399', fontSize: 14 }}>{isSelected ? '✓' : ''}</span>
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Badge({ children, color = "#1a2e26" }) {
   return (
     <span style={{
@@ -993,11 +1027,12 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
               <input value={form.country} onChange={e=>update("country",e.target.value)} placeholder="Country" style={inputStyle} />
             </div>
             <div style={labelStyle}>Venue size</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
-              {(settings.venueSizes||[]).map(vs => (
-                <button key={vs} onClick={()=>update("venueSize",form.venueSize===vs?null:vs)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.venueSize===vs ? "#a78bfa" : "#0c0c14", color: form.venueSize===vs ? "#0c0c14" : "#6b6a8f", border: `1px solid ${form.venueSize===vs ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>
-              ))}
-            </div>
+            <DropdownSelect
+              options={settings.venueSizes||[]}
+              selected={form.venueSize||[]}
+              onToggle={vs => update("venueSize", form.venueSize===vs ? null : vs)}
+              placeholder="Select venue size..."
+            />
           </> },
 
           /* ── LINEUP ── */
@@ -1034,25 +1069,29 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
               <button onClick={addSupport} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
             </div>
             <div style={labelStyle}>Genre</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom: 12 }}>
-              {(settings.genres||[]).map(g => (
-                <button key={g} onClick={()=>{ const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update("genre", next.length===0?null:next.length===1?next[0]:next); }} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: getGenres(form).includes(g) ? "#a78bfa" : "#0c0c14", color: getGenres(form).includes(g) ? "#0c0c14" : "#6b6a8f", border:`1px solid ${getGenres(form).includes(g) ? "#a78bfa" : "#2e2e50"}`, fontWeight: getGenres(form).includes(g) ? 700 : 400 }}>{g}</button>
-              ))}
-            </div>
+            <DropdownSelect
+              options={settings.genres||[]}
+              selected={getGenres(form)}
+              onToggle={g => { const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update("genre", next.length===0?null:next.length===1?next[0]:next); }}
+              multi
+              placeholder="Select genre(s)..."
+            />
             <div style={labelStyle}>Subgenre</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom: 12 }}>
-              {(settings.subgenres||[]).map(g => (
-                <button key={g} onClick={()=>update("subgenre",form.subgenre===g?null:g)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.subgenre===g ? "#38bdf8" : "#0c0c14", color: form.subgenre===g ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.subgenre===g ? "#38bdf8" : "#2e2e50"}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>
-              ))}
-            </div>
+            <DropdownSelect
+              options={settings.subgenres||[]}
+              selected={form.subgenre||[]}
+              onToggle={g => update("subgenre", form.subgenre===g ? null : g)}
+              placeholder="Select subgenre..."
+              accentColor="#38bdf8"
+            />
             <div style={labelStyle}>Language</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
-              {(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : [];
-                return (settings.languages||[]).map(l => { const on = langs.includes(l); return (
-                  <button key={l} onClick={()=>update("language", on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: on ? "#a78bfa" : "#0c0c14", color: on ? "#0c0c14" : "#6b6a8f", border:`1px solid ${on ? "#a78bfa" : "#2e2e50"}`, fontWeight: on ? 700 : 400 }}>{l}</button>
-                );});
-              })()}
-            </div>
+            <DropdownSelect
+              options={settings.languages||[]}
+              selected={Array.isArray(form.language) ? form.language : form.language ? [form.language] : []}
+              onToggle={l => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", langs.includes(l) ? langs.filter(x=>x!==l) : [...langs, l]); }}
+              multi
+              placeholder="Select language(s)..."
+            />
           </> },
 
           /* ── YOUR EXPERIENCE ── */

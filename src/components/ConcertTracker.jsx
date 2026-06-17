@@ -1831,7 +1831,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       const upH = grandTotal > 0 ? (upcoming / grandTotal) * barH : 0;
                       const wishH = grandTotal > 0 ? (wish / grandTotal) * barH : 0;
                       return (
-                        <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                        <div key={y} onClick={() => onUpdateSetting('summaryYear', y)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: "pointer" }}>
                           <div style={{ width: "100%", display: "flex", flexDirection: "column", borderRadius: "3px 3px 0 0", overflow: "hidden" }}>
                             {wishH > 0 && <div style={{ height: wishH, background: "#f472b6", opacity: 0.7 }} />}
                             {upH > 0 && <div style={{ height: upH, background: "#34d399" }} />}
@@ -2211,7 +2211,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {exList.map((c, i) => {
               const amount = exView === "merch" ? c.totalCost : c.ticketPrice;
               return (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <button key={c.id} onClick={() => onOpen(c)} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                   <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#c4c2f0", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
@@ -2221,7 +2221,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(12, (amount / exMax) * 50) }} />
                     <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 50, textAlign: "right" }}>€{amount?.toFixed(0)}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -2394,14 +2394,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
                 <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Most shows with</div>
                 {topFriends.map(([name, count], i) => (
-                  <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <button key={name} onClick={() => { setStatsTab("friends"); }} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                     <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
                     <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1 }}>{name}</span>
                     <div style={{ width: 80, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
                       <div style={{ height: "100%", borderRadius: 2, background: "#a78bfa", width: `${(count / (topFriends[0]?.[1] || 1)) * 100}%` }} />
                     </div>
                     <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}x</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -2423,7 +2423,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Favourite venues</div>
               <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
               {vItems.map(([name, count], i) => (
-                <button key={name} onClick={() => setSelectedVenue(vView === "room" ? name.split(" · ")[0] : name)} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+                <button key={name} onClick={() => onNavigate({ view: 'venues' })} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                   <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
                   <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                   <div style={{ width: 60, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
@@ -2508,7 +2508,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 if (counts.guest > 0) parts.push(`${counts.guest} guest`);
                 if (counts.festival > 0 && chartType !== 'festivals') parts.push(`${counts.festival} festival`);
                 return (
-                  <div key={name} style={{ marginBottom: hasSub ? 8 : 6 }}>
+                  <button key={name} onClick={() => onNavigate({ view: 'artists' })} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: hasSub ? 8 : 6 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: aView === "count" && i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
@@ -2523,7 +2523,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                         <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{parts.join(' · ')}</span>
                       </div>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -2813,14 +2813,25 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             ))}
             <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", margin: "14px 0 8px", paddingTop: 12, borderTop: "1px solid #1f1f35" }}>All covers witnessed · {coversList.length}</div>
-            {sorted.map((cv, i) => (
-              <button key={`${cv.concert.id}-${cv.name}-${i}`} onClick={() => onOpen(cv.concert)} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "5px 0", borderBottom: i < sorted.length - 1 ? "1px solid #16162a" : "none" }}>
-                <div style={{ color: "#c4c2f0", fontSize: 12 }}>{cv.name}</div>
-                <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>
-                  {cv.performer}{cv.original ? <span style={{ color: "#fb923c" }}> ↩ {cv.original}</span> : <span style={{ color: "#fb923c" }}> ↩ cover</span>} · {formatDate(cv.concert.date)}
+            {(() => {
+              const byArtist = {};
+              sorted.forEach(cv => { const k = cv.original || '—'; if (!byArtist[k]) byArtist[k] = []; byArtist[k].push(cv); });
+              const groups = Object.entries(byArtist).sort((a,b) => b[1].length - a[1].length);
+              return groups.map(([artist, covers]) => (
+                <div key={artist} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: "#fb923c", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↩ {artist}</span>
+                    <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{covers.length}×</span>
+                  </div>
+                  {covers.map((cv, i) => (
+                    <button key={`${cv.concert.id}-${cv.name}-${i}`} onClick={() => onOpen(cv.concert)} style={{ display: "flex", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "4px 0 4px 12px", borderBottom: i < covers.length - 1 ? "1px solid #16162a" : "none", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ color: "#c4c2f0", fontSize: 12, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cv.name}</div>
+                      <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{cv.performer} · {cv.concert.date.slice(0,4)}</div>
+                    </button>
+                  ))}
                 </div>
-              </button>
-            ))}
+              ));
+            })()}
           </div>
         );
       }
@@ -2995,18 +3006,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
           {/* Year scope toggle */}
           {(() => {
-            const curYr = String(new Date().getFullYear());
+            const allDataYears = [...new Set(pastAll.map(c => c.date.slice(0,4)).filter(Boolean))].sort();
+            const yearOptions = [{ id: 'all', label: 'All' }, ...allDataYears.map(y => ({ id: y, label: y }))];
             return (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                {[{ id: 'all', label: 'All time' }, { id: curYr, label: curYr }].map(({ id, label }) => (
+              <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
+                {yearOptions.map(({ id, label }) => (
                   <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    padding: "2px 8px",
+                    background: summaryYear === id ? "#a78bfa" : "none",
+                    border: `1px solid ${summaryYear === id ? "#a78bfa" : "#1f1f35"}`,
+                    borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
                     fontSize: 11, fontFamily: "'DM Mono', monospace",
-                    color: summaryYear === id ? "#a78bfa" : "#4a4870",
+                    color: summaryYear === id ? "#0c0c14" : "#4a4870",
                     fontWeight: summaryYear === id ? 700 : 400,
-                    borderBottom: summaryYear === id ? "1px solid #a78bfa" : "1px solid transparent",
-                    letterSpacing: "0.04em",
                   }}>{label}</button>
                 ))}
               </div>
@@ -3028,10 +3039,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 {[
                   { label: "shows", value: spShows.length, nav: { view: 'home', filterType: 'concerts' } },
                   { label: "festivals", value: spFests.length, nav: { view: 'home', filterType: 'festivals' } },
-                  { label: "countries", value: Object.keys(spCountries).length, nav: null },
+                  { label: "countries", value: Object.keys(spCountries).length, nav: { view: 'stats', chart: 'venues' } },
                   ...(spAvg !== null ? [{ label: "avg / year", value: spAvg, nav: null }] : []),
                 ].map(b => (
-                  <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
+                  <div key={b.label} onClick={b.nav ? () => { if (b.nav.chart) { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart(b.nav.chart); } else { onNavigate(b.nav); } } : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
                     <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
                     <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
                   </div>
@@ -3040,7 +3051,17 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-
+          {/* Financial snapshot */}
+          {totalSpent > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "6px 10px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8 }}>
+              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {summaryYear === 'all' ? 'total spent' : `spent in ${summaryYear}`}
+              </span>
+              <span style={{ fontSize: 13, color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
+                €{summaryPast.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0).toFixed(0)}
+              </span>
+            </div>
+          )}
 
           {/* Cumulative line chart */}
           {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
@@ -3241,8 +3262,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 {upcoming.map((c, i) => {
                   const days = Math.ceil((new Date(c.date).setHours(0,0,0,0) - todayMs) / 86400000);
                   return (
-                    <div key={c.id} style={{
-                      display: "flex", alignItems: "center", gap: 8,
+                    <button key={c.id} onClick={() => onOpen(c)} style={{
+                      display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
+                      background: "none", border: "none", cursor: "pointer",
                       paddingBottom: i < upcoming.length - 1 ? 6 : 0,
                       marginBottom: i < upcoming.length - 1 ? 6 : 0,
                       borderBottom: i < upcoming.length - 1 ? "1px solid #1a1a2e" : "none"
@@ -3262,7 +3284,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
                         {new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -3592,11 +3614,24 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
             </div>
           )}
 
+          {/* Highly rated shows together */}
+          {(() => {
+            const minRating = settings.ratingSystem === 10 ? 8 : 4;
+            const highlights = f.sortedShows.filter(c => c.rating && c.rating >= minRating);
+            if (highlights.length === 0) return null;
+            return (
+              <div style={card}>
+                <div style={sectionLabel}>Highlights together · {highlights.length}</div>
+                {[...highlights].sort((a,b) => b.date.localeCompare(a.date)).map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+              </div>
+            );
+          })()}
+
           {/* Upcoming together */}
           {f.upcoming.length > 0 && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ ...sectionLabel, marginBottom: 8 }}>Upcoming together</div>
-              {f.upcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+              {[...f.upcoming].sort((a,b) => a.date.localeCompare(b.date)).map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
             </div>
           )}
 
@@ -3672,7 +3707,12 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{displayName(name)}</div>
-              {lastShow && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: topGenres.length ? 4 : 0 }}>last: {formatDate(lastShow.date)}</div>}
+              {lastShow && (() => {
+                const monthsAgo = Math.floor((Date.now() - new Date(lastShow.date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24 * 30));
+                const recencyColor = monthsAgo <= 3 ? "#34d399" : monthsAgo <= 12 ? "#a78bfa" : "#4a4870";
+                const recencyLabel = monthsAgo === 0 ? "this month" : monthsAgo === 1 ? "1 month ago" : monthsAgo < 12 ? `${monthsAgo}m ago` : monthsAgo < 24 ? "1y ago" : `${Math.floor(monthsAgo/12)}y ago`;
+                return <div style={{ fontSize: 10, color: recencyColor, fontFamily: "'DM Mono', monospace", marginBottom: topGenres.length ? 4 : 0 }}>{recencyLabel} · {lastShow.artist}</div>;
+              })()}
               {topGenres.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                   {topGenres.slice(0, 3).map(([g]) => (

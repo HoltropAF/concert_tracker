@@ -5560,70 +5560,66 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         ))}
       </div>
 
-      {activeSettingsTab === null && (
-        <div>
-          {/* App blurb */}
-          <div style={{ textAlign: "center", padding: "4px 16px 14px" }}>
-            <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 700, marginBottom: 4 }}>settracker</div>
-            <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>your personal concert diary</div>
-          </div>
+      {activeSettingsTab === null && (() => {
+        const pastConcerts = concerts.filter(c => c.date && new Date(c.date + 'T00:00:00') <= new Date() && c.type !== 'wishlist');
+        const uniqueArtists = new Set(pastConcerts.map(c => c.artist).filter(Boolean)).size;
+        const uniqueVenues = new Set(pastConcerts.map(c => c.venue).filter(Boolean)).size;
+        const uniqueCountries = new Set(pastConcerts.map(c => c.country).filter(Boolean)).size;
+        return (
+          <div>
+            {/* App identity + personal stats */}
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 14, padding: "18px 16px 14px", marginBottom: 12, textAlign: "center" }}>
+              <div style={{ color: "#e2e0ff", fontSize: 15, fontFamily: "'Syne', sans-serif", fontWeight: 800, letterSpacing: "0.04em", marginBottom: 3 }}>settracker</div>
+              <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", marginBottom: 16 }}>your personal concert diary</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {[
+                  { value: pastConcerts.length, label: "shows" },
+                  { value: uniqueArtists, label: "artists" },
+                  { value: uniqueCountries > 0 ? uniqueCountries : uniqueVenues, label: uniqueCountries > 0 ? "countries" : "venues" },
+                ].map(({ value, label }) => (
+                  <div key={label} style={{ background: "#0c0c14", border: "1px solid #1a1a2e", borderRadius: 10, padding: "10px 6px" }}>
+                    <div style={{ color: "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, lineHeight: 1 }}>{value}</div>
+                    <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          {/* Quick nav to other tabs */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-            {[
-              { label: "Display", sub: "Views, cards, sorting", id: "preferences", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> },
-              { label: "Tags", sub: "Genres, venues, merch", id: "tags", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> },
-              { label: "Account", sub: "Import, export, sign out", id: "data", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-              { label: "GitHub", sub: "Source code & issues", href: "https://github.com/HoltropAF/concert_tracker", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg> },
-            ].map(({ label, sub, id, href, icon }) => {
-              const style = { display: "flex", flexDirection: "column", gap: 8, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", textDecoration: "none", cursor: "pointer" };
-              const inner = <>
-                <span style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(167,139,250,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
-                <div>
-                  <div style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: 2 }}>{label}</div>
-                  <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", lineHeight: 1.4 }}>{sub}</div>
-                </div>
-              </>;
-              return href
-                ? <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={style}>{inner}</a>
-                : <button key={label} onClick={() => { setActiveSettingsTab(id); setOpenSection(null); }} style={{ ...style, textAlign: "left", border: "1px solid #1f1f35" }}>{inner}</button>;
-            })}
-          </div>
-
-          {/* Help links */}
-          <SettingsSection title="Help">
-            {[
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-            ].map(({ svg, label, url }, i, arr) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a28" : "none" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
-                    <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
+            {/* Help links */}
+            <SettingsSection title="Help">
+              {[
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+              ].map(({ svg, label, url }, i, arr) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a28" : "none" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
+                      <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
+                    </span>
+                    <span>{label}</span>
                   </span>
-                  <span>{label}</span>
-                </span>
-                <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
-              </a>
-            ))}
-          </SettingsSection>
-
-          {/* Social links */}
-          <SettingsSection title="Find me online">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, padding: "14px" }}>
-              {socialLinks.map(({ href, label, icon }) => (
-                <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
-                  <span style={{ width: 44, height: 44, borderRadius: 12, background: "#1a1929", border: "1px solid #2a2840", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                    {icon}
-                  </span>
-                  <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: "#4a4870", textAlign: "center", letterSpacing: "0.03em" }}>{label}</span>
+                  <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
                 </a>
               ))}
-            </div>
-          </SettingsSection>
-        </div>
-      )}
+            </SettingsSection>
+
+            {/* Social links */}
+            <SettingsSection title="Find me online">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, padding: "14px" }}>
+                {socialLinks.map(({ href, label, icon }) => (
+                  <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
+                    <span style={{ width: 44, height: 44, borderRadius: 12, background: "#1a1929", border: "1px solid #2a2840", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                      {icon}
+                    </span>
+                    <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: "#4a4870", textAlign: "center", letterSpacing: "0.03em" }}>{label}</span>
+                  </a>
+                ))}
+              </div>
+            </SettingsSection>
+          </div>
+        );
+      })()}
 
       {activeSettingsTab === 'preferences' && <>
         <SettingsSection title="Opening defaults">
@@ -5949,113 +5945,118 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
       )}
 
-      {activeSettingsTab === 'data' && <>
-      <SettingsSection title="Account">
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 11, flexShrink: 0, letterSpacing: "0.05em" }}>
-            {(userEmail || "ST").slice(0, 2).toUpperCase()}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
-            <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 10, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
-          </div>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection title="Export">
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "14px 16px", borderBottom: exportData ? "1px solid #1f1f35" : "none" }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Download your concerts as a file</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleXlsxExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↓ XLSX</button>
-              {!exportData
-                ? <button onClick={handleExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↓ JSON</button>
-                : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>Close</button>
-              }
-            </div>
-          </div>
-          {exportData && (
-            <div style={{ padding: "14px 16px" }}>
-              <textarea readOnly value={exportData} rows={3} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
-              <button onClick={handleCopy} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied ✓" : "Copy to clipboard"}</button>
-            </div>
-          )}
-        </div>
-      </SettingsSection>
-
-      <SettingsSection title="Import">
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
-          <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
-          <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
-          <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Load concerts from a file</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => document.getElementById('import-xlsx').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↑ XLSX</button>
-              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↑ JSON</button>
-              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↑ CSV</button>
-            </div>
-          </div>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Or paste JSON directly</div>
-            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste JSON here..." rows={2} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
-            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
-          </div>
+      {activeSettingsTab === 'data' && (() => {
+        const [showAdvancedImport, setShowAdvancedImport] = React.useState(false);
+        return <>
+        {/* Profile */}
+        <SettingsSection title="Profile">
           <div style={{ padding: "14px 16px" }}>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Download blank templates</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[
-                { label: "CSV template", fn: () => {
-                  const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','SeenAs','Notes'];
-                  const example = ['c-example','2024-01-15','Artist Name','Venue Name','','City','Country','concert','Tour Name','Pop','','English','5','50','Friend One; Friend Two','','Mid-venue','Headliner','Great show'];
-                  const csv = [headers.join(','), example.map(v => `"${v}"`).join(',')].join('\n');
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'settracker-template.csv'; a.click();
-                }},
-                { label: "JSON template", fn: () => {
-                  const template = JSON.stringify([{ id: "c-example", date: "2024-01-15", artist: "Artist Name", venue: "Venue Name", room: "", city: "City", country: "Country", type: "concert", tour: "Tour Name", genre: "Pop", subgenre: "", language: ["English"], rating: 5, ticketPrice: 50, friends: ["Friend One"], solo: false, venueSize: "Mid-venue", seenAs: "Headliner", notes: "Great show", merch: [], support: [] }], null, 2);
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([template], { type: 'application/json' })); a.download = 'settracker-template.json'; a.click();
-                }},
-              ].map(({ label, fn }) => (
-                <button key={label} onClick={fn} style={{ flex: 1, padding: "8px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>↓ {label}</button>
-              ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13, flexShrink: 0, letterSpacing: "0.05em" }}>
+                {(userEmail || "ST").slice(0, 2).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
+                <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>signed in</div>
+              </div>
             </div>
+            <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 9, fontSize: 13, cursor: "pointer", background: "rgba(244,114,182,0.08)", border: "1px solid rgba(244,114,182,0.25)", color: "#f472b6", fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.03em" }}>
+              Sign out
+            </button>
           </div>
-          {(importStatus || importReport) && (
-            <div style={{ padding: "0 16px 14px" }}>
-              {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
-              {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
-              {importReport && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-                  {[["Rows", importReport.total], ["Added", importReport.imported], ["Skipped", importReport.skipped], ["Failed", importReport.failed]].map(([label, value]) => (
-                    <div key={label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "7px 4px", textAlign: "center" }}>
-                      <div style={{ color: label === "Failed" && value > 0 ? "#f472b6" : "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{value}</div>
-                      <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
-                    </div>
-                  ))}
+        </SettingsSection>
+
+        {/* Your data */}
+        <SettingsSection title="Your data">
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
+
+            {/* Export */}
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>Export</div>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Download a copy of your concerts</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleXlsxExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↓ XLSX</button>
+                {!exportData
+                  ? <button onClick={handleExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↓ JSON</button>
+                  : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>Close</button>
+                }
+              </div>
+              {exportData && (
+                <div style={{ marginTop: 10 }}>
+                  <textarea readOnly value={exportData} rows={3} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+                  <button onClick={handleCopy} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied ✓" : "Copy to clipboard"}</button>
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </SettingsSection>
 
-      <div style={{ display: "none" }}><Collapsible title="Help" {...sec("help")}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 4 }}>
-          {[
-            { label: "🐛 Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-            { label: "📋 View all issues & requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
-            { label: "📦 Releases & changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-            { label: "📖 Documentation (wiki)", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-          ].map(({ label, url }) => (
-            <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "#a78bfa", fontSize: 13, fontFamily: "'DM Sans', sans-serif", textDecoration: "none", paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #1a1a2e" }}>{label} ↗</a>
-          ))}
-          <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
-            Tips: CSV imports use the ID column to avoid duplicates · Tap any summary chart to jump to the full chart · Configure summary blocks and charts in Settings → Stats display
+            {/* Import */}
+            <div style={{ padding: "14px 16px" }}>
+              <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
+              <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
+              <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>Import</div>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Load concerts from a file</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <button onClick={() => document.getElementById('import-xlsx').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↑ XLSX</button>
+                <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↑ JSON</button>
+                <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↑ CSV</button>
+              </div>
+              <button onClick={() => setShowAdvancedImport(v => !v)} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 9 }}>{showAdvancedImport ? "▾" : "▸"}</span> advanced options
+              </button>
+            </div>
+
+            {/* Advanced: paste JSON + templates */}
+            {showAdvancedImport && (
+              <div style={{ padding: "14px 16px", borderTop: "1px solid #1f1f35" }}>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>Paste JSON directly</div>
+                <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste JSON here..." rows={2} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+                <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif", marginBottom: 14 }}>Restore from paste</button>
+                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>Download blank templates</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[
+                    { label: "CSV template", fn: () => {
+                      const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','SeenAs','Notes'];
+                      const example = ['c-example','2024-01-15','Artist Name','Venue Name','','City','Country','concert','Tour Name','Pop','','English','5','50','Friend One; Friend Two','','Mid-venue','Headliner','Great show'];
+                      const csv = [headers.join(','), example.map(v => `"${v}"`).join(',')].join('\n');
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'settracker-template.csv'; a.click();
+                    }},
+                    { label: "JSON template", fn: () => {
+                      const template = JSON.stringify([{ id: "c-example", date: "2024-01-15", artist: "Artist Name", venue: "Venue Name", room: "", city: "City", country: "Country", type: "concert", tour: "Tour Name", genre: "Pop", subgenre: "", language: ["English"], rating: 5, ticketPrice: 50, friends: ["Friend One"], solo: false, venueSize: "Mid-venue", seenAs: "Headliner", notes: "Great show", merch: [], support: [] }], null, 2);
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([template], { type: 'application/json' })); a.download = 'settracker-template.json'; a.click();
+                    }},
+                  ].map(({ label, fn }) => (
+                    <button key={label} onClick={fn} style={{ flex: 1, padding: "8px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>↓ {label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Import result */}
+            {(importStatus || importReport) && (
+              <div style={{ padding: "0 16px 14px" }}>
+                {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
+                {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
+                {importReport && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                    {[["Rows", importReport.total], ["Added", importReport.imported], ["Skipped", importReport.skipped], ["Failed", importReport.failed]].map(([label, value]) => (
+                      <div key={label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "7px 4px", textAlign: "center" }}>
+                        <div style={{ color: label === "Failed" && value > 0 ? "#f472b6" : "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{value}</div>
+                        <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      </Collapsible></div>
-
-      </>}
+        </SettingsSection>
+        </>;
+      })()}
 
       {/* Follow me on */}
       <div style={{ display: "none", marginTop: 24, paddingBottom: 8, textAlign: "center" }}>

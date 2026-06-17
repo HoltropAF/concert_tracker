@@ -5071,32 +5071,27 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     {
       href: "https://github.com/HoltropAF/concert_tracker",
       label: "GitHub",
-      bg: "#17171f",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#f5f4ff"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg>
+      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#9d9bc0"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg>
     },
     {
       href: "https://www.threads.com/@annuhfloor",
       label: "Threads",
-      bg: "#111116",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#f0efff"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.028-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.594 12c.022 3.086.713 5.496 2.051 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.689-2.044 1.616-1.707 1.594-3.957 1.332-5.005-.274-1.386-.995-2.367-2.181-2.973-.321 1.798-.908 3.192-1.763 4.134-.99 1.092-2.298 1.617-3.89 1.56-1.354-.046-2.553-.54-3.37-1.388-.95-.984-1.404-2.383-1.277-3.848.235-2.65 2.168-4.356 5.089-4.424.952-.022 1.929.099 2.898.361-.094-.499-.195-.967-.305-1.394-.348-1.358-.854-2.365-1.506-2.994-.705-.677-1.645-1.014-2.866-.997-1.53.024-2.717.533-3.529 1.512-.74.889-1.154 2.154-1.22 3.758l-2.1-.078c.083-2.076.614-3.757 1.58-4.997 1.14-1.44 2.817-2.185 4.982-2.216 1.79-.025 3.235.444 4.3 1.397.872.784 1.537 1.95 1.976 3.467.12.413.236.883.346 1.405a11.3 11.3 0 0 1 1.133.508c1.821.982 2.95 2.478 3.317 4.329.407 2.056.214 5.273-2.202 7.851C17.056 23.22 14.908 24 12.186 24z"/></svg>
+      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#9d9bc0"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.028-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.594 12c.022 3.086.713 5.496 2.051 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.689-2.044 1.616-1.707 1.594-3.957 1.332-5.005-.274-1.386-.995-2.367-2.181-2.973-.321 1.798-.908 3.192-1.763 4.134-.99 1.092-2.298 1.617-3.89 1.56-1.354-.046-2.553-.54-3.37-1.388-.95-.984-1.404-2.383-1.277-3.848.235-2.65 2.168-4.356 5.089-4.424.952-.022 1.929.099 2.898.361-.094-.499-.195-.967-.305-1.394-.348-1.358-.854-2.365-1.506-2.994-.705-.677-1.645-1.014-2.866-.997-1.53.024-2.717.533-3.529 1.512-.74.889-1.154 2.154-1.22 3.758l-2.1-.078c.083-2.076.614-3.757 1.58-4.997 1.14-1.44 2.817-2.185 4.982-2.216 1.79-.025 3.235.444 4.3 1.397.872.784 1.537 1.95 1.976 3.467.12.413.236.883.346 1.405a11.3 11.3 0 0 1 1.133.508c1.821.982 2.95 2.478 3.317 4.329.407 2.056.214 5.273-2.202 7.851C17.056 23.22 14.908 24 12.186 24z"/></svg>
     },
     {
       href: "https://www.tiktok.com/@annuhfloor98",
       label: "TikTok",
-      bg: "#161621",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#f5f4ff"><path d="M15.86 3c.2 1.695 1.154 3.466 3.14 4.434v2.305a8.11 8.11 0 0 1-3.14-.797v6.493A5.451 5.451 0 1 1 10.41 10c.234 0 .462.014.69.044v2.355a3.11 3.11 0 1 0 2.42 3.036V3h2.34Z"/></svg>
+      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#9d9bc0"><path d="M15.86 3c.2 1.695 1.154 3.466 3.14 4.434v2.305a8.11 8.11 0 0 1-3.14-.797v6.493A5.451 5.451 0 1 1 10.41 10c.234 0 .462.014.69.044v2.355a3.11 3.11 0 1 0 2.42 3.036V3h2.34Z"/></svg>
     },
     {
       href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm",
       label: "Spotify",
-      bg: "#0d1f15",
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.8c3.26-.92 7.7-.72 10.9 1.18" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/><path d="M7.8 12.5c2.73-.66 6.12-.49 8.68 1" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/><path d="M8.6 15.1c2.12-.46 4.52-.32 6.43.76" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/></svg>
+      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z" fill="#9d9bc0"/></svg>
     },
     {
       href: "https://www.vinted.nl/member/50873825",
       label: "Vinted",
-      bg: "#083c3f",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6.5 5.5h3.4v6.3c0 2.4.2 4.1.7 5 .5 1 1.3 1.5 2.4 1.5.8 0 1.6-.3 2.2-1 .6-.7 1.1-1.8 1.5-3.3l2.4-8.5c.1-.4.4-.7.8-.7h2.6l-3.2 11.4c-.7 2.4-1.7 4.2-2.9 5.4-1.2 1.2-2.7 1.8-4.4 1.8-2.1 0-3.8-.8-5-2.5-1.1-1.7-1.8-4.4-2-8.1L6.5 5.5Z" fill="#09B5B5"/></svg>
+      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6.5 5.5h3.4v6.3c0 2.4.2 4.1.7 5 .5 1 1.3 1.5 2.4 1.5.8 0 1.6-.3 2.2-1 .6-.7 1.1-1.8 1.5-3.3l2.4-8.5c.1-.4.4-.7.8-.7h2.6l-3.2 11.4c-.7 2.4-1.7 4.2-2.9 5.4-1.2 1.2-2.7 1.8-4.4 1.8-2.1 0-3.8-.8-5-2.5-1.1-1.7-1.8-4.4-2-8.1L6.5 5.5Z" fill="#9d9bc0"/></svg>
     },
   ];
   const cycleOption = (options, current) => {
@@ -5571,9 +5566,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
           <SettingsSection title="Help">
             {[
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>, label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 3H8"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>, label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
               { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
             ].map(({ svg, label, url }, i, arr) => (
               <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a28" : "none" }}>
@@ -5590,9 +5585,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
           <SettingsSection title="Find me online">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, padding: "14px" }}>
-              {socialLinks.map(({ href, label, bg, icon }) => (
+              {socialLinks.map(({ href, label, icon }) => (
                 <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
-                  <span style={{ width: 44, height: 44, borderRadius: 12, background: bg, border: "1px solid rgba(255,255,255,0.06)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 44, height: 44, borderRadius: 12, background: "#1a1929", border: "1px solid #2a2840", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                     {icon}
                   </span>
                   <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: "#4a4870", textAlign: "center", letterSpacing: "0.03em" }}>{label}</span>
@@ -5742,20 +5737,19 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {activeSettingsTab === 'tags' && <>
       {[
-        { label: "Genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
-        { label: "Subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
-        { label: "Languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
-        { label: "Venue sizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
-        { label: "Merch items", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
-        { label: "Ticket types", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
-        { label: "Ticket add-ons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
-      ].map(({ label, items, ...props }) => (
-        <div key={label} style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{`${label} (${items.length})`}</div>
+        { label: "Genres", id: "genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
+        { label: "Subgenres", id: "subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
+        { label: "Languages", id: "languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
+        { label: "Venue sizes", id: "venueSizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
+        { label: "Merch items", id: "merch", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        { label: "Ticket types", id: "ticketTypes", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
+        { label: "Ticket add-ons", id: "ticketAddons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
+      ].map(({ label, id, items, ...props }) => (
+        <Collapsible key={id} title={`${label} (${items.length})`} defaultOpen={false} {...sec(id)}>
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
             <TagManager items={items} {...props} />
           </div>
-        </div>
+        </Collapsible>
       ))}
       </>}
 

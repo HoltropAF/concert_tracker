@@ -5924,14 +5924,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {activeSettingsTab === 'data' && <>
       <SettingsSection title="Account">
-        <div style={{ background: "linear-gradient(180deg, rgba(167,139,250,0.08), #13131f 34%)", border: "1px solid #25243a", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, marginBottom: 4, boxShadow: "0 -18px 28px rgba(255,255,255,0.12), 0 14px 32px rgba(0,0,0,0.24)" }}>
-          <div style={{ width: 36, height: 36, borderRadius: 99, background: "#201a34", border: "1px solid #a78bfa", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 11, flexShrink: 0, letterSpacing: "0.05em" }}>
             {(userEmail || "ST").slice(0, 2).toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
-            <div style={{ color: "#7d7aa5", fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>personal account</div>
-            <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
+            <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
+            <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 10, fontFamily: "'DM Mono', monospace", padding: "3px 0 0", textAlign: "left" }}>sign out</button>
           </div>
         </div>
       </SettingsSection>

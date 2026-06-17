@@ -3051,17 +3051,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-          {/* Financial snapshot */}
-          {totalSpent > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "6px 10px", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8 }}>
-              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                {summaryYear === 'all' ? 'total spent' : `spent in ${summaryYear}`}
-              </span>
-              <span style={{ fontSize: 13, color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
-                €{summaryPast.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0).toFixed(0)}
-              </span>
-            </div>
-          )}
 
           {/* Cumulative line chart */}
           {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>

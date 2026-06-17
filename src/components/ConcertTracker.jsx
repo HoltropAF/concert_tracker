@@ -625,7 +625,7 @@ function normalizeConcertForm(concert) {
   };
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -745,9 +745,10 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
     })() : null;
 
     const statCards = [
-      past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—" },
-      concert.ticketPrice ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${concert.ticketPrice}` } : null,
-      past && { label: "With", value: companions.length === 0 ? "Solo" : companions.length === 1 ? companions[0] : `${companions.length} friends` },
+      past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—", nav: null },
+      concert.ticketPrice ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${concert.ticketPrice}`, nav: null } : null,
+      past && companions.length > 0 && { label: "With", value: companions.length === 1 ? companions[0] : `${companions.length} friends`, nav: 'friends' },
+      past && companions.length === 0 && { label: "With", value: "Solo", nav: null },
     ].filter(Boolean);
     return (
       <div style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
@@ -755,7 +756,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         <div style={{ position: "sticky", top: 0, background: "#0c0c14", borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{concert.artist}</div>
+            <button onClick={() => onNavigate({ view: 'artists' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {concert.city}</div>
           </div>
           <button onClick={handleShare} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
@@ -765,7 +766,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         {/* Venue + tour hero */}
         <div style={{ padding: "20px 20px 0" }}>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 16, color: "#c4c2f0", fontWeight: 600 }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""}</div>
+            <button onClick={() => onNavigate({ view: 'venues' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
             <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
             {concert.tour && <div style={{ fontSize: 12, color: "#4a4870", marginTop: 4 }}>{concert.tour}</div>}
           </div>
@@ -781,9 +782,9 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           {/* Stat cards */}
           {statCards.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
-              {statCards.map(({ label, value }) => (
-                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: label === "Rating" ? 13 : 15, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+              {statCards.map(({ label, value, nav }) => (
+                <div key={label} onClick={nav ? () => onNavigate({ view: nav }) : undefined} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: nav ? "pointer" : "default" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: label === "Rating" ? 13 : 15, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}{nav ? <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span> : null}</div>
                   <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
                 </div>
               ))}
@@ -899,7 +900,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 9, color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>{role}</span>
-                          <span style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 500 }}>{name}</span>
+                          <span onClick={e => { e.stopPropagation(); onNavigate({ view: 'artists' }); }} style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{name}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                           {songs.length > 0
@@ -3697,7 +3698,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   );
 }
 
-function ArtistsView({ concerts, onOpen }) {
+function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
@@ -3892,8 +3893,8 @@ function ArtistsView({ concerts, onOpen }) {
               </div>
             )}
             {topFriend && (
-              <div style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{topFriend[0]}</div>
+              <div onClick={() => onNavigate({ view: 'friends' })} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: "pointer" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{topFriend[0]} ›</div>
                 <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>top friend · {topFriend[1]}×</div>
               </div>
             )}
@@ -4279,7 +4280,7 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
-function VenuesView({ concerts, onOpen, settings }) {
+function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
@@ -4365,8 +4366,8 @@ function VenuesView({ concerts, onOpen, settings }) {
             </div>
           )}
           {topFriend && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topFriend[0]}</div>
+            <div onClick={() => onNavigate({ view: 'friends' })} style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center', cursor: 'pointer' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topFriend[0]} ›</div>
               <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>top friend · {topFriend[1]}×</div>
             </div>
           )}
@@ -6468,7 +6469,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} allArtists={[...new Set([
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -6719,8 +6720,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} />}
-        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>
 

@@ -4971,9 +4971,9 @@ function SettingsOptionPills({ value, options, onChange }) {
 
 function SettingsSection({ title, children }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.14em", margin: "0 0 8px 2px" }}>{title}</div>
-      <div style={{ background: "#13131f", border: "1px solid #25243a", borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 28px rgba(0,0,0,0.16)" }}>{children}</div>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 6px 2px" }}>{title}</div>
+      <div style={{ background: "#13131f", border: "1px solid #25243a", borderRadius: 12, overflow: "hidden" }}>{children}</div>
     </div>
   );
 }
@@ -5924,7 +5924,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {activeSettingsTab === 'data' && <>
       <SettingsSection title="Account">
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 11, flexShrink: 0, letterSpacing: "0.05em" }}>
             {(userEmail || "ST").slice(0, 2).toUpperCase()}
           </div>

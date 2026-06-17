@@ -5060,6 +5060,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
   const [showSavedVenues, setShowSavedVenues] = useState(false);
   const [showFriendGroups, setShowFriendGroups] = useState(false);
+  const [showAdvancedImport, setShowAdvancedImport] = useState(false);
 
   useEffect(() => { if (!touched) setLocal({ ...settings }); }, [settings]);
 
@@ -5945,9 +5946,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
       )}
 
-      {activeSettingsTab === 'data' && (() => {
-        const [showAdvancedImport, setShowAdvancedImport] = React.useState(false);
-        return <>
+      {activeSettingsTab === 'data' && <>
         {/* Profile */}
         <SettingsSection title="Profile">
           <div style={{ padding: "14px 16px" }}>
@@ -6055,8 +6054,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             )}
           </div>
         </SettingsSection>
-        </>;
-      })()}
+      </>}
 
       {/* Follow me on */}
       <div style={{ display: "none", marginTop: 24, paddingBottom: 8, textAlign: "center" }}>

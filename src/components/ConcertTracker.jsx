@@ -2903,39 +2903,158 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const cs = past.filter(c => c.type === "concert");
         const fs = past.filter(c => c.type === "festival");
         const avg = (arr, f) => { const v = arr.map(f).filter(x => x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; };
+        const med = (arr, f) => { const v = arr.map(f).filter(x => x > 0).sort((a,b)=>a-b); return v.length ? v[Math.floor(v.length/2)] : null; };
         const merchOf = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
         const totalOf = c => (c.ticketPrice || 0) + merchOf(c) + (c.otherCost || 0);
-        const rows = [
-          { section: "Concerts", color: "#a78bfa", items: [
-            ["avg ticket", avg(cs, c => c.ticketPrice || 0)],
-            ["avg merch (when bought)", avg(cs, merchOf)],
-            ["avg other costs (when logged)", avg(cs, c => c.otherCost || 0)],
-            ["avg total / show", avg(cs, totalOf)],
-          ]},
-          { section: "Festivals", color: "#fb923c", items: [
-            ["avg ticket", avg(fs, c => c.ticketPrice || 0)],
-            ["avg merch (when bought)", avg(fs, merchOf)],
-            ["avg travel & other (when logged)", avg(fs, c => c.otherCost || 0)],
-            ["avg total / festival", avg(fs, totalOf)],
-          ]},
-        ];
+        const avgTotalAll = avg(past, totalOf);
+        const avgTotalC = avg(cs, totalOf);
+        const avgTotalF = avg(fs, totalOf);
+        const avgTicketC = avg(cs, c => c.ticketPrice || 0);
+        const avgTicketF = avg(fs, c => c.ticketPrice || 0);
+        const medTicketC = med(cs, c => c.ticketPrice || 0);
+        const avgMerchC = avg(cs.filter(c => merchOf(c) > 0), merchOf);
+        const avgMerchF = avg(fs.filter(c => merchOf(c) > 0), merchOf);
+        const avgOtherC = avg(cs.filter(c => c.otherCost > 0), c => c.otherCost || 0);
+        const avgOtherF = avg(fs.filter(c => c.otherCost > 0), c => c.otherCost || 0);
+        const withMerchPct = past.length ? Math.round((past.filter(c => merchOf(c) > 0).length / past.length) * 100) : 0;
+        // Ticket price trend years
+        const ticketTrendYears = Object.keys(yearTicketCount).sort().slice(-6);
+        const ticketTrendAvgs = ticketTrendYears.map(y => yearTicketSum[y] / yearTicketCount[y]);
+        const ticketMax = Math.max(...ticketTrendAvgs, 1);
+        const ticketMin = Math.min(...ticketTrendAvgs.filter(x => x > 0));
+        // Most expensive month on average
+        const monthSpend = {}; const monthCount2 = {};
+        past.filter(c => c.ticketPrice).forEach(c => {
+          const m = parseInt(c.date.slice(5,7)) - 1;
+          monthSpend[m] = (monthSpend[m] || 0) + c.ticketPrice;
+          monthCount2[m] = (monthCount2[m] || 0) + 1;
+        });
+        const monthAvgs = Object.entries(monthSpend).map(([m, s]) => [parseInt(m), s / monthCount2[m]]);
+        const priceyMonth = monthAvgs.sort((a,b) => b[1]-a[1])[0];
+        const monthNames2 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const maxComparison = Math.max(avgTotalC || 0, avgTotalF || 0, 1);
+        const StatLabel = ({ children }) => (
+          <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{children}</div>
+        );
+        const Row = ({ label, value, sub }) => value == null ? null : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #16162a" }}>
+            <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
+            <div style={{ textAlign: "right" }}>
+              <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>€{value.toFixed(0)}</span>
+              {sub != null && <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginLeft: 6 }}>median €{sub.toFixed(0)}</span>}
+            </div>
+          </div>
+        );
         return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            {rows.map(({ section, color, items }) => {
-              const visible = items.filter(([, v]) => v !== null);
-              if (visible.length === 0) return null;
-              return (
-                <div key={section} style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{section}</div>
-                  {visible.map(([label, v]) => (
-                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #16162a" }}>
-                      <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0" }}>€{v.toFixed(2)}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Hero — avg cost per show */}
+            {avgTotalAll != null && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px 14px" }}>
+                <StatLabel>avg cost per show · all</StatLabel>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 32, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>€{avgTotalAll.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+                  ticket · merch · other combined · {past.filter(c => totalOf(c) > 0).length} shows with cost logged
+                </div>
+              </div>
+            )}
+
+            {/* Concert vs Festival comparison bars */}
+            {(avgTotalC != null || avgTotalF != null) && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>avg total cost · concerts vs festivals</StatLabel>
+                {avgTotalC != null && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                      <span style={{ fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>concerts</span>
+                      <span style={{ fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>€{avgTotalC.toFixed(0)}</span>
                     </div>
+                    <div style={{ height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#a78bfa", borderRadius: 3, width: `${(avgTotalC / maxComparison) * 100}%`, transition: "width 0.5s" }} />
+                    </div>
+                  </div>
+                )}
+                {avgTotalF != null && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                      <span style={{ fontSize: 11, color: "#fb923c", fontFamily: "'DM Mono', monospace" }}>festivals</span>
+                      <span style={{ fontSize: 11, color: "#fb923c", fontFamily: "'DM Mono', monospace" }}>€{avgTotalF.toFixed(0)}</span>
+                    </div>
+                    <div style={{ height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#fb923c", borderRadius: 3, width: `${(avgTotalF / maxComparison) * 100}%`, transition: "width 0.5s" }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Ticket price trend sparkline */}
+            {ticketTrendYears.length >= 2 && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>avg ticket price per year</StatLabel>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 48, marginBottom: 6 }}>
+                  {ticketTrendYears.map((y, i) => {
+                    const v = ticketTrendAvgs[i];
+                    const h = Math.max(4, (v / ticketMax) * 44);
+                    const isLast = i === ticketTrendYears.length - 1;
+                    return (
+                      <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 2 }}>
+                        <span style={{ fontSize: 8, color: isLast ? "#a78bfa" : "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>€{Math.round(v)}</span>
+                        <div style={{ width: "100%", height: h, background: isLast ? "#a78bfa" : "#2e2e50", borderRadius: "2px 2px 0 0" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {ticketTrendYears.map(y => (
+                    <div key={y} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{y.slice(2)}</div>
                   ))}
                 </div>
-              );
-            })}
+                {medTicketC != null && avgTicketC != null && (
+                  <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 8 }}>
+                    all-time avg <span style={{ color: "#c4c2f0" }}>€{avgTicketC.toFixed(0)}</span> · median <span style={{ color: "#c4c2f0" }}>€{medTicketC.toFixed(0)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Breakdown — concerts */}
+            {cs.length > 0 && (avgTicketC || avgMerchC || avgOtherC) && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>concerts · breakdown</StatLabel>
+                <Row label="avg ticket" value={avgTicketC} sub={medTicketC} />
+                <Row label={`avg merch (${cs.filter(c=>merchOf(c)>0).length} shows)`} value={avgMerchC} />
+                <Row label={`avg other (${cs.filter(c=>c.otherCost>0).length} shows)`} value={avgOtherC} />
+              </div>
+            )}
+
+            {/* Breakdown — festivals */}
+            {fs.length > 0 && (avgTicketF || avgMerchF || avgOtherF) && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>festivals · breakdown</StatLabel>
+                <Row label="avg ticket" value={avgTicketF} />
+                <Row label={`avg merch (${fs.filter(c=>merchOf(c)>0).length} shows)`} value={avgMerchF} />
+                <Row label={`avg travel & other (${fs.filter(c=>c.otherCost>0).length} shows)`} value={avgOtherF} />
+              </div>
+            )}
+
+            {/* Quick facts */}
+            {(withMerchPct > 0 || priceyMonth) && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>patterns</StatLabel>
+                {withMerchPct > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #16162a" }}>
+                    <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>shows where you bought merch</span>
+                    <span style={{ fontSize: 12, color: "#34d399", fontFamily: "'DM Mono', monospace" }}>{withMerchPct}%</span>
+                  </div>
+                )}
+                {priceyMonth && (
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0" }}>
+                    <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>priciest month on avg</span>
+                    <span style={{ fontSize: 12, color: "#fbbf24", fontFamily: "'DM Mono', monospace" }}>{monthNames2[priceyMonth[0]]} · €{priceyMonth[1].toFixed(0)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       }

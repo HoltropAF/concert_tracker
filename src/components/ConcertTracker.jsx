@@ -2059,6 +2059,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const avgTicketConcert = thisYearConcerts.length ? thisYearConcerts.reduce((s,c) => s + c.ticketPrice, 0) / thisYearConcerts.length : null;
         const avgTicketFestival = thisYearFestivals.length ? thisYearFestivals.reduce((s,c) => s + c.ticketPrice, 0) / thisYearFestivals.length : null;
         const costOf = c => (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + (c.otherCost || 0);
+        // Upcoming spend per year (committed costs not yet past)
+        const upcomingConcertSpend = {};
+        const upcomingFestivalSpend = {};
+        concerts.filter(c => !isWish(c) && !isPast(c.date) && c.ticketPrice).forEach(c => {
+          const y = getYear(c.date);
+          const spend = (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) + (c.otherCost || 0);
+          if (c.type === 'festival') upcomingFestivalSpend[y] = (upcomingFestivalSpend[y] || 0) + spend;
+          else upcomingConcertSpend[y] = (upcomingConcertSpend[y] || 0) + spend;
+        });
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           {(avgTicketConcert || avgTicketFestival) && (
@@ -2069,23 +2078,29 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           )}
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
           {ysView === "bars" && <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
             {[
-              { color: "#a78bfa", label: "Concerts" },
-              { color: "#fb923c", label: "Festivals" },
-              { color: "#38bdf8", label: "Other costs" },
-              { color: "#34d399", label: "Merch" },
-            ].map(({ color, label }) => (
+              { color: "#a78bfa", label: "Concerts", striped: false },
+              { color: "#fb923c", label: "Festivals", striped: false },
+              { color: "#38bdf8", label: "Other", striped: false },
+              { color: "#34d399", label: "Merch", striped: false },
+              { color: "#a78bfa", label: "Upcoming", striped: true },
+            ].map(({ color, label, striped }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: striped ? `repeating-linear-gradient(45deg, ${color}55 0px, ${color}55 3px, transparent 3px, transparent 7px)` : color, border: striped ? `1px solid ${color}88` : "none" }} />
                 <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
               </div>
             ))}
           </div>
           {(() => {
-            const activeYears = years.filter(y => yearSpend[y] > 0).slice(-10);
-            const maxSpend = Math.max(...activeYears.map(y => yearSpend[y]), 1);
+            const allUpcomingYears = [...new Set([...Object.keys(upcomingConcertSpend), ...Object.keys(upcomingFestivalSpend)])];
+            const activeYears = [...new Set([...years.filter(y => yearSpend[y] > 0), ...allUpcomingYears])].sort().slice(-10);
+            const maxSpend = Math.max(
+              ...activeYears.map(y => (yearSpend[y] || 0) + (upcomingConcertSpend[y] || 0) + (upcomingFestivalSpend[y] || 0)),
+              1
+            );
             const midSpend = Math.round(maxSpend / 2);
+            const stripe = color => `repeating-linear-gradient(45deg, ${color}55 0px, ${color}55 3px, transparent 3px, transparent 7px)`;
             return (
               <>
                 <div style={{ display: "flex", marginBottom: 4 }}>
@@ -2101,10 +2116,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   const festivals_ = yearFestivalSpend[y] || 0;
                   const other = yearOtherSpend[y] || 0;
                   const merch = yearMerchSpend[y] || 0;
-                  const bar = (val, color, opacity = 1) => (
+                  const upConcerts = upcomingConcertSpend[y] || 0;
+                  const upFestivals = upcomingFestivalSpend[y] || 0;
+                  const bar = (val, color, opacity = 1, striped = false) => (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ height: 7, borderRadius: 3, background: color, width: `${Math.max(2, (val / maxSpend) * 100)}%`, opacity, transition: "width 0.5s ease" }} />
-                      <span style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(val)}</span>
+                      <div style={{
+                        height: 7, borderRadius: 3,
+                        background: striped ? stripe(color) : color,
+                        border: striped ? `1px solid ${color}88` : "none",
+                        width: `${Math.max(2, (val / maxSpend) * 100)}%`,
+                        opacity: striped ? 1 : opacity,
+                        transition: "width 0.5s ease"
+                      }} />
+                      <span style={{ fontSize: 10, color: striped ? color + "99" : color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(val)}</span>
                     </div>
                   );
                   return (
@@ -2112,7 +2136,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                         {concerts_ > 0 && bar(concerts_, "#a78bfa")}
+                        {upConcerts > 0 && bar(upConcerts, "#a78bfa", 1, true)}
                         {festivals_ > 0 && bar(festivals_, "#fb923c")}
+                        {upFestivals > 0 && bar(upFestivals, "#fb923c", 1, true)}
                         {other > 0 && bar(other, "#38bdf8", 0.8)}
                         {merch > 0 && bar(merch, "#34d399", 0.85)}
                       </div>
@@ -2122,10 +2148,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </>
             );
           })()}
-          <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total</span>
-            <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(Object.values(yearSpend).reduce((s, v) => s + v, 0))}</span>
-          </div>
+          {(() => {
+            const pastTotal = Object.values(yearSpend).reduce((s, v) => s + v, 0);
+            const upTotal = [...Object.values(upcomingConcertSpend), ...Object.values(upcomingFestivalSpend)].reduce((s, v) => s + v, 0);
+            return (
+              <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total{upTotal > 0 ? " · past" : ""}</span>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(pastTotal)}</span>
+                  {upTotal > 0 && <div style={{ fontSize: 10, color: "#a78bfa99", fontFamily: "'DM Mono', monospace" }}>+€{Math.round(upTotal)} upcoming</div>}
+                </div>
+              </div>
+            );
+          })()}
           </>}
           {ysView === "line" && (() => {
             const n = activeYearsYS.length;

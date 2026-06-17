@@ -5955,18 +5955,22 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>
-                  {local.userInitials || (userEmail || "ST").slice(0, 2).toUpperCase()}
+                  {local.userInitials || (userEmail === 'guest' ? '?' : (userEmail || "ST").slice(0, 2).toUpperCase())}
                 </div>
-                <button onClick={() => { setInitialsInput(local.userInitials || (userEmail || "ST").slice(0, 2).toUpperCase()); setEditingInitials(true); }} style={{ position: "absolute", bottom: -4, right: -4, width: 16, height: 16, borderRadius: 99, background: "#30284d", border: "1px solid #5e4c8f", color: "#a78bfa", fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 }}>✎</button>
+                <button onClick={() => { setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase())); setEditingInitials(true); }} style={{ position: "absolute", bottom: -4, right: -4, width: 16, height: 16, borderRadius: 99, background: "#30284d", border: "1px solid #5e4c8f", color: "#a78bfa", fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 }}>✎</button>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {local.userName
                   ? <div style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{local.userName}</div>
-                  : <button onClick={() => { setInitialsInput(local.userInitials || (userEmail || "ST").slice(0, 2).toUpperCase()); setEditingInitials(true); }} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: 0, textAlign: "left" }}>+ add name</button>
+                  : <button onClick={() => { setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase())); setEditingInitials(true); }} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: 0, textAlign: "left" }}>+ add name</button>
                 }
-                <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: local.userName ? 2 : 0 }}>{userEmail}</div>
+                <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: local.userName ? 2 : 0 }}>
+                  {userEmail === 'guest' ? 'guest mode · data stored locally' : userEmail}
+                </div>
               </div>
-              <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: "4px 0", flexShrink: 0 }}>sign out</button>
+              <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: "4px 0", flexShrink: 0 }}>
+                {userEmail === 'guest' ? 'exit' : 'sign out'}
+              </button>
             </div>
           </div>
         </SettingsSection>

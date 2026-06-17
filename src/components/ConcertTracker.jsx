@@ -5952,7 +5952,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         {/* Profile */}
         <SettingsSection title="Profile">
           <div style={{ padding: "14px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>
                   {local.userInitials || (userEmail || "ST").slice(0, 2).toUpperCase()}
@@ -5960,42 +5960,55 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 <button onClick={() => { setInitialsInput(local.userInitials || (userEmail || "ST").slice(0, 2).toUpperCase()); setEditingInitials(true); }} style={{ position: "absolute", bottom: -4, right: -4, width: 16, height: 16, borderRadius: 99, background: "#30284d", border: "1px solid #5e4c8f", color: "#a78bfa", fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 }}>✎</button>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</div>
-                <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>signed in</div>
+                {local.userName
+                  ? <div style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{local.userName}</div>
+                  : <button onClick={() => { setInitialsInput(local.userInitials || (userEmail || "ST").slice(0, 2).toUpperCase()); setEditingInitials(true); }} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: 0, textAlign: "left" }}>+ add name</button>
+                }
+                <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: local.userName ? 2 : 0 }}>{userEmail}</div>
               </div>
+              <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: "4px 0", flexShrink: 0 }}>sign out</button>
             </div>
-            <button onClick={onSignOut} style={{ width: "100%", padding: "10px", borderRadius: 9, fontSize: 13, cursor: "pointer", background: "rgba(244,114,182,0.08)", border: "1px solid rgba(244,114,182,0.25)", color: "#f472b6", fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.03em" }}>
-              Sign out
-            </button>
           </div>
         </SettingsSection>
 
-        {/* Initials edit bottom sheet */}
+        {/* Profile edit bottom sheet */}
         {editingInitials && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
             <div style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 40px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Edit initials</div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Edit profile</div>
                 <button onClick={() => setEditingInitials(false)} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
                 <div style={{ width: 52, height: 52, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 16, letterSpacing: "0.05em", flexShrink: 0 }}>
                   {initialsInput.slice(0, 3) || "?"}
                 </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Initials</div>
+                  <input
+                    value={initialsInput}
+                    onChange={e => setInitialsInput(e.target.value.toUpperCase().slice(0, 3))}
+                    placeholder="e.g. AF"
+                    maxLength={3}
+                    autoFocus
+                    style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 16, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                  />
+                </div>
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Name</div>
                 <input
-                  value={initialsInput}
-                  onChange={e => setInitialsInput(e.target.value.toUpperCase().slice(0, 3))}
-                  placeholder="e.g. AF"
-                  maxLength={3}
-                  autoFocus
-                  style={{ flex: 1, background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                  value={local.userName || ""}
+                  onChange={e => lUpdate("userName", e.target.value)}
+                  placeholder="e.g. Annuh Floor"
+                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
                 />
               </div>
-              <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>1–3 characters · auto uppercased</div>
               <button onClick={() => {
                 const val = initialsInput.trim().slice(0, 3);
                 lUpdate("userInitials", val);
                 onUpdate("userInitials", val);
+                onUpdate("userName", local.userName || "");
                 setEditingInitials(false);
               }} style={{ width: "100%", background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 14, fontWeight: 700, padding: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Save</button>
             </div>

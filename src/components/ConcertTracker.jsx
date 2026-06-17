@@ -5936,51 +5936,48 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Import & export">
-        <div>
-          <SettingsActionRow icon="DL" title="Export concerts" sub="Download as XLSX or JSON">
-            <button onClick={handleXlsxExport} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>XLSX</button>
-            {!exportData
-              ? <button onClick={handleExport} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace", marginLeft: 6 }}>JSON</button>
-              : <button onClick={() => setExportData(null)} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginLeft: 6 }}>Close</button>
-            }
-          </SettingsActionRow>
+      <SettingsSection title="Export">
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: exportData ? "1px solid #1f1f35" : "none" }}>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Download your concerts as a file</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleXlsxExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↓ XLSX</button>
+              {!exportData
+                ? <button onClick={handleExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↓ JSON</button>
+                : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>Close</button>
+              }
+            </div>
+          </div>
           {exportData && (
-            <div style={{ padding: "0 16px 14px" }}>
-              <textarea readOnly value={exportData} rows={4} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 6 }} />
-              <button onClick={handleCopy} style={{ width: "100%", padding: "8px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied!" : "Copy to clipboard"}</button>
+            <div style={{ padding: "14px 16px" }}>
+              <textarea readOnly value={exportData} rows={3} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+              <button onClick={handleCopy} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: exportStatus === "copied" ? "#a78bfa" : "#1a1a30", border: `1px solid ${exportStatus === "copied" ? "#a78bfa" : "#2e2e50"}`, color: exportStatus === "copied" ? "#0c0c14" : "#a78bfa", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{exportStatus === "copied" ? "Copied ✓" : "Copy to clipboard"}</button>
             </div>
           )}
-          <div style={{ padding: "0 16px 14px" }}>
-            {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
-            {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
-            {importReport && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
-                {[
-                  ["Rows", importReport.total],
-                  ["Added", importReport.imported],
-                  ["Skipped", importReport.skipped],
-                  ["Failed", importReport.failed],
-                ].map(([label, value]) => (
-                  <div key={label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "7px 4px", textAlign: "center" }}>
-                    <div style={{ color: label === "Failed" && value > 0 ? "#f472b6" : "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{value}</div>
-                    <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
-            <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
-            <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
-          </div>
-          <SettingsActionRow icon="UP" title="Import concerts" sub="Load from XLSX, JSON, CSV, or paste">
-            <button onClick={() => document.getElementById('import-xlsx').click()} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>XLSX</button>
-          </SettingsActionRow>
-            <div style={{ display: "flex", gap: 8, margin: "0 16px 10px" }}>
-              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Import JSON</button>
-              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>Import CSV</button>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Import">
+        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
+          <input type="file" accept=".json" id="import-json" onChange={handleFileImport} style={{ display: "none" }} />
+          <input type="file" accept=".csv" id="import-csv" onChange={handleFileImport} style={{ display: "none" }} />
+          <input type="file" accept=".xlsx" id="import-xlsx" onChange={handleXlsxImport} style={{ display: "none" }} />
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Load concerts from a file</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => document.getElementById('import-xlsx').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↑ XLSX</button>
+              <button onClick={() => document.getElementById('import-json').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↑ JSON</button>
+              <button onClick={() => document.getElementById('import-csv').click()} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↑ CSV</button>
             </div>
-            <div style={{ display: "flex", gap: 8, margin: "0 16px 10px" }}>
+          </div>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Or paste JSON directly</div>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste JSON here..." rows={2} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
+            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
+          </div>
+          <div style={{ padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>Download blank templates</div>
+            <div style={{ display: "flex", gap: 8 }}>
               {[
                 { label: "CSV template", fn: () => {
                   const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','SeenAs','Notes'];
@@ -5993,14 +5990,27 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([template], { type: 'application/json' })); a.download = 'settracker-template.json'; a.click();
                 }},
               ].map(({ label, fn }) => (
-                <button key={label} onClick={fn} style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>↓ {label}</button>
+                <button key={label} onClick={fn} style={{ flex: 1, padding: "8px", borderRadius: 8, fontSize: 11, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>↓ {label}</button>
               ))}
             </div>
-            <div style={{ padding: "0 16px 16px" }}>
-            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Or paste JSON here..." rows={2} style={{ width: "100%", background: "rgba(167,139,250,0.05)", border: `1px solid ${importStatus === "error" ? "#f472b6" : "#1f1f35"}`, borderRadius: 8, color: "#c4c2f0", padding: "10px", fontSize: 10, fontFamily: "'DM Mono', monospace", resize: "none", boxSizing: "border-box", marginBottom: 8 }} />
-            <button onClick={handleImport} disabled={!importText.trim()} style={{ width: "100%", padding: "9px", borderRadius: 8, fontSize: 12, cursor: importText.trim() ? "pointer" : "not-allowed", background: "none", border: "1px solid #1f1f35", color: importText.trim() ? "#c4c2f0" : "#2e2e4a", fontFamily: "'DM Sans', sans-serif" }}>Restore from paste</button>
-            </div>
           </div>
+          {(importStatus || importReport) && (
+            <div style={{ padding: "0 16px 14px" }}>
+              {importStatus === "success" && <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>{importMessage}</div>}
+              {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
+              {importReport && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                  {[["Rows", importReport.total], ["Added", importReport.imported], ["Skipped", importReport.skipped], ["Failed", importReport.failed]].map(([label, value]) => (
+                    <div key={label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "7px 4px", textAlign: "center" }}>
+                      <div style={{ color: label === "Failed" && value > 0 ? "#f472b6" : "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{value}</div>
+                      <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </SettingsSection>
 
       <div style={{ display: "none" }}><Collapsible title="Help" {...sec("help")}>

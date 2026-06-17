@@ -5067,36 +5067,36 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
   const defaultViewOptions = [{ id: "stats", label: "Stats" }, { id: "home", label: "Shows" }, { id: "artists", label: "Artists" }, { id: "songs", label: "Songs" }, { id: "venues", label: "Venues" }];
   const defaultSortOptions = [{ id: "newest", label: "Date" }, { id: "oldest", label: "Oldest" }, { id: "alpha", label: "A-Z" }, { id: "price", label: "Price" }, { id: "rating", label: "Rating" }];
-  const socialTile = (bg, icon) => (
-    <span style={{ width: 22, height: 22, borderRadius: 7, background: bg, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" }}>
-      {icon}
-    </span>
-  );
   const socialLinks = [
     {
       href: "https://github.com/HoltropAF/concert_tracker",
       label: "GitHub",
-      icon: socialTile("#17171f", <svg width="14" height="14" viewBox="0 0 24 24" fill="#f5f4ff"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg>)
+      bg: "#17171f",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#f5f4ff"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg>
     },
     {
       href: "https://www.threads.com/@annuhfloor",
       label: "Threads",
-      icon: socialTile("#111111", <svg width="14" height="14" viewBox="0 0 24 24" fill="#ffffff"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.028-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.594 12c.022 3.086.713 5.496 2.051 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.689-2.044 1.616-1.707 1.594-3.957 1.332-5.005-.274-1.386-.995-2.367-2.181-2.973-.321 1.798-.908 3.192-1.763 4.134-.99 1.092-2.298 1.617-3.89 1.56-1.354-.046-2.553-.54-3.37-1.388-.95-.984-1.404-2.383-1.277-3.848.235-2.65 2.168-4.356 5.089-4.424.952-.022 1.929.099 2.898.361-.094-.499-.195-.967-.305-1.394-.348-1.358-.854-2.365-1.506-2.994-.705-.677-1.645-1.014-2.866-.997-1.53.024-2.717.533-3.529 1.512-.74.889-1.154 2.154-1.22 3.758l-2.1-.078c.083-2.076.614-3.757 1.58-4.997 1.14-1.44 2.817-2.185 4.982-2.216 1.79-.025 3.235.444 4.3 1.397.872.784 1.537 1.95 1.976 3.467.12.413.236.883.346 1.405a11.3 11.3 0 0 1 1.133.508c1.821.982 2.95 2.478 3.317 4.329.407 2.056.214 5.273-2.202 7.851C17.056 23.22 14.908 24 12.186 24z"/></svg>)
+      bg: "#111116",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#f0efff"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.028-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.594 12c.022 3.086.713 5.496 2.051 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.689-2.044 1.616-1.707 1.594-3.957 1.332-5.005-.274-1.386-.995-2.367-2.181-2.973-.321 1.798-.908 3.192-1.763 4.134-.99 1.092-2.298 1.617-3.89 1.56-1.354-.046-2.553-.54-3.37-1.388-.95-.984-1.404-2.383-1.277-3.848.235-2.65 2.168-4.356 5.089-4.424.952-.022 1.929.099 2.898.361-.094-.499-.195-.967-.305-1.394-.348-1.358-.854-2.365-1.506-2.994-.705-.677-1.645-1.014-2.866-.997-1.53.024-2.717.533-3.529 1.512-.74.889-1.154 2.154-1.22 3.758l-2.1-.078c.083-2.076.614-3.757 1.58-4.997 1.14-1.44 2.817-2.185 4.982-2.216 1.79-.025 3.235.444 4.3 1.397.872.784 1.537 1.95 1.976 3.467.12.413.236.883.346 1.405a11.3 11.3 0 0 1 1.133.508c1.821.982 2.95 2.478 3.317 4.329.407 2.056.214 5.273-2.202 7.851C17.056 23.22 14.908 24 12.186 24z"/></svg>
     },
     {
       href: "https://www.tiktok.com/@annuhfloor98",
       label: "TikTok",
-      icon: socialTile("#161621", <svg width="14" height="14" viewBox="0 0 24 24" fill="#f5f4ff"><path d="M15.86 3c.2 1.695 1.154 3.466 3.14 4.434v2.305a8.11 8.11 0 0 1-3.14-.797v6.493A5.451 5.451 0 1 1 10.41 10c.234 0 .462.014.69.044v2.355a3.11 3.11 0 1 0 2.42 3.036V3h2.34Z"/></svg>)
-    },
-    {
-      href: "https://www.vinted.nl/member/50873825",
-      label: "Vinted",
-      icon: socialTile("#0f8f97", <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6.5 5.5h3.4v6.3c0 2.4.2 4.1.7 5 .5 1 1.3 1.5 2.4 1.5.8 0 1.6-.3 2.2-1 .6-.7 1.1-1.8 1.5-3.3l2.4-8.5c.1-.4.4-.7.8-.7h2.6l-3.2 11.4c-.7 2.4-1.7 4.2-2.9 5.4-1.2 1.2-2.7 1.8-4.4 1.8-2.1 0-3.8-.8-5-2.5-1.1-1.7-1.8-4.4-2-8.1L6.5 5.5Z" fill="#ffffff"/></svg>)
+      bg: "#161621",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="#f5f4ff"><path d="M15.86 3c.2 1.695 1.154 3.466 3.14 4.434v2.305a8.11 8.11 0 0 1-3.14-.797v6.493A5.451 5.451 0 1 1 10.41 10c.234 0 .462.014.69.044v2.355a3.11 3.11 0 1 0 2.42 3.036V3h2.34Z"/></svg>
     },
     {
       href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm",
       label: "Spotify",
-      icon: socialTile("#1c9c59", <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6.5 9.1c3.26-.92 7.7-.72 10.9 1.18" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round"/><path d="M7.5 12.2c2.73-.66 6.12-.49 8.68 1" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round"/><path d="M8.45 15.1c2.12-.46 4.52-.32 6.43.76" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round"/></svg>)
+      bg: "#0d1f15",
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.8c3.26-.92 7.7-.72 10.9 1.18" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/><path d="M7.8 12.5c2.73-.66 6.12-.49 8.68 1" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/><path d="M8.6 15.1c2.12-.46 4.52-.32 6.43.76" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/></svg>
+    },
+    {
+      href: "https://www.vinted.nl/member/50873825",
+      label: "Vinted",
+      bg: "#083c3f",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6.5 5.5h3.4v6.3c0 2.4.2 4.1.7 5 .5 1 1.3 1.5 2.4 1.5.8 0 1.6-.3 2.2-1 .6-.7 1.1-1.8 1.5-3.3l2.4-8.5c.1-.4.4-.7.8-.7h2.6l-3.2 11.4c-.7 2.4-1.7 4.2-2.9 5.4-1.2 1.2-2.7 1.8-4.4 1.8-2.1 0-3.8-.8-5-2.5-1.1-1.7-1.8-4.4-2-8.1L6.5 5.5Z" fill="#09B5B5"/></svg>
     },
   ];
   const cycleOption = (options, current) => {
@@ -5571,26 +5571,31 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
           <SettingsSection title="Help">
             {[
-              { icon: "bug", label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-              { icon: "list", label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
-              { icon: "box", label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-              { icon: "book", label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-            ].map(({ icon, label, url }) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textDecoration: "none", padding: "11px 16px", borderBottom: "1px solid #232239" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 7, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", color: "#a78bfa", fontSize: 9, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{icon}</span>
-                <span>{label}</span>
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>, label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 3H8"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+            ].map(({ svg, label, url }, i, arr) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a28" : "none" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
+                    <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
+                  </span>
+                  <span>{label}</span>
                 </span>
-                <span style={{ color: "#6b6a8f", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>open</span>
+                <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
               </a>
             ))}
           </SettingsSection>
 
-          <SettingsSection title="Social links">
-            <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", padding: "12px 14px 14px" }}>
-              {socialLinks.map(({ href, label, icon }) => (
-                <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ width: 38, height: 38, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "#13131f", border: "1px solid #25243a", color: "#a78bfa", textDecoration: "none", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
-                  {icon}
+          <SettingsSection title="Find me online">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, padding: "14px" }}>
+              {socialLinks.map(({ href, label, bg, icon }) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
+                  <span style={{ width: 44, height: 44, borderRadius: 12, background: bg, border: "1px solid rgba(255,255,255,0.06)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                    {icon}
+                  </span>
+                  <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: "#4a4870", textAlign: "center", letterSpacing: "0.03em" }}>{label}</span>
                 </a>
               ))}
             </div>

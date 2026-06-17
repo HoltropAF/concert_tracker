@@ -5542,13 +5542,14 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
+          { id: null, label: 'General' },
           { id: 'preferences', label: 'Display' },
           { id: 'tags', label: 'Tags' },
           { id: 'data', label: 'Account' },
         ].map(tab => (
-          <button key={tab.id} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
+          <button key={String(tab.id)} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
             minHeight: 34, borderRadius: 7, cursor: "pointer", fontSize: 10,
             fontFamily: "'DM Mono', monospace", fontWeight: activeSettingsTab === tab.id ? 700 : 400,
             background: activeSettingsTab === tab.id ? "#30284d" : "transparent",
@@ -5559,15 +5560,40 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         ))}
       </div>
 
-      {!activeSettingsTab && (
+      {activeSettingsTab === null && (
         <div>
-          <div style={{ color: "#e2e0ff", fontSize: 12, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: "6px 20px 16px", maxWidth: 350, margin: "0 auto" }}>
-            settracker is a personal concert diary for tracking shows, festivals, setlists, ticket costs, venues, friends, merch, photos, and stats.
+          {/* App blurb */}
+          <div style={{ textAlign: "center", padding: "4px 16px 14px" }}>
+            <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 700, marginBottom: 4 }}>settracker</div>
+            <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>your personal concert diary</div>
           </div>
+
+          {/* Quick nav to other tabs */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+            {[
+              { label: "Display", sub: "Views, cards, sorting", id: "preferences", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> },
+              { label: "Tags", sub: "Genres, venues, merch", id: "tags", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> },
+              { label: "Account", sub: "Import, export, sign out", id: "data", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+              { label: "GitHub", sub: "Source code & issues", href: "https://github.com/HoltropAF/concert_tracker", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg> },
+            ].map(({ label, sub, id, href, icon }) => {
+              const style = { display: "flex", flexDirection: "column", gap: 8, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", textDecoration: "none", cursor: "pointer" };
+              const inner = <>
+                <span style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(167,139,250,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</span>
+                <div>
+                  <div style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: 2 }}>{label}</div>
+                  <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", lineHeight: 1.4 }}>{sub}</div>
+                </div>
+              </>;
+              return href
+                ? <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={style}>{inner}</a>
+                : <button key={label} onClick={() => { setActiveSettingsTab(id); setOpenSection(null); }} style={{ ...style, textAlign: "left", border: "1px solid #1f1f35" }}>{inner}</button>;
+            })}
+          </div>
+
+          {/* Help links */}
           <SettingsSection title="Help">
             {[
               { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-              { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>, label: "View all issues and requests", url: "https://github.com/HoltropAF/concert_tracker/issues" },
               { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
               { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
             ].map(({ svg, label, url }, i, arr) => (
@@ -5583,6 +5609,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             ))}
           </SettingsSection>
 
+          {/* Social links */}
           <SettingsSection title="Find me online">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, padding: "14px" }}>
               {socialLinks.map(({ href, label, icon }) => (
@@ -6205,7 +6232,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               ? 'Settings'
               : statsTab === 'friends'
                 ? 'Friends'
-                : 'Stats'
+                : 'Statx'
   const renderConcertList = (list, showPhoto) => {
     if (!settings.groupByMonth) {
       return list.map(c => (
@@ -6343,7 +6370,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const BottomNav = () => (
     <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
-      {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
+      {navBtn('stats', '◎', 'Statx',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
       {navBtn('summary', '▤', 'Summary', view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
       {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
       {navBtn('settings', '⚙', 'Settings', view === 'settings',                    () => setView('settings'))}

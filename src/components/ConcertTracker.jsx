@@ -6192,7 +6192,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }
   const isSummaryHeader = view === 'stats' && statsTab === 'summary'
   const shellTitle = isSummaryHeader
-    ? 'concert tracker'
+    ? 'all the music'
     : view === 'home'
       ? 'Shows'
       : view === 'artists'
@@ -6425,9 +6425,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <div data-theme-shell="" style={appShell}>
 
       {/* Header */}
-      <div style={{ flexShrink: 0, padding: '28px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
-        <div style={{ marginBottom: 18, textAlign: 'center' }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: isSummaryHeader ? 26 : 22, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
+      <div style={{ flexShrink: 0, padding: '36px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
+        <div style={{ marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
           {isSummaryHeader && (
             <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
             {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isPastDate(c.date)).length} upcoming

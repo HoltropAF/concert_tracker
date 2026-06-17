@@ -6395,13 +6395,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   if (showStartupScreen) return (
     <div data-theme-shell="" style={appShell}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-        <div style={{ textAlign: 'center', maxWidth: 340, width: '100%' }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', boxSizing: 'border-box' }}>
+        <div style={{ textAlign: 'center', maxWidth: 340, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: 118, height: 118, borderRadius: 30, background: '#13131f', border: '1px solid #272544', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 24px 56px rgba(0,0,0,0.48), 0 0 48px rgba(167,139,250,0.2), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+            <img src="/icon-192.png" alt="" style={{ width: 92, height: 92, borderRadius: 23, display: 'block' }} />
+          </div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 29, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
           <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>
             {headerCounts.concerts} concerts · {headerCounts.festivals} festivals · {headerCounts.upcoming} upcoming
           </div>
-          <button onClick={openSummaryFromStartup} style={{ minWidth: 168, minHeight: 42, borderRadius: 10, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '10px 18px', fontFamily: "'DM Mono', monospace" }}>
+          <button onClick={openSummaryFromStartup} style={{ minWidth: 172, minHeight: 44, borderRadius: 11, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '10px 18px', fontFamily: "'DM Mono', monospace", boxShadow: '0 12px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
             Open summary
           </button>
         </div>

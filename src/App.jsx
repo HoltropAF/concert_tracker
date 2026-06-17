@@ -63,15 +63,18 @@ function InstallBanner({ onInstall, onDismiss }) {
 
 function LoadingSplash({ label, counts = null }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-      <div style={{ textAlign: 'center', maxWidth: 340, width: '100%' }}>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
+    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', boxSizing: 'border-box' }}>
+      <div style={{ textAlign: 'center', maxWidth: 340, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ width: 112, height: 112, borderRadius: 28, background: '#13131f', border: '1px solid #272544', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 22px 50px rgba(0,0,0,0.45), 0 0 44px rgba(167,139,250,0.18), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+          <img src="/icon-192.png" alt="" style={{ width: 88, height: 88, borderRadius: 22, display: 'block' }} />
+        </div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 29, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
         {counts && (
           <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>
             {counts.concerts} concerts · {counts.festivals} festivals · {counts.upcoming} upcoming
           </div>
         )}
-        <div style={{ color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontSize: 13 }}>{label}</div>
+        <div style={{ minHeight: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', borderRadius: 99, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.22)', color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{label}</div>
       </div>
     </div>
   )

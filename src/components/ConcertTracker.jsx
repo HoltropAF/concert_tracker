@@ -1687,40 +1687,40 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     {
       id: "activity", label: "Activity",
       charts: [
-        { id: "artists",    label: "🎤 Artist overview" },
-        { id: "shows",      label: "📅 Shows over time" },
-        { id: "genres-pie", label: "🥧 Genres" },
-        { id: "language",   label: "🗣️ Language" },
-        { id: "ratings",    label: "⭐ Ratings" },
+        { id: "artists",    label: "Artist overview" },
+        { id: "shows",      label: "Shows over time" },
+        { id: "genres-pie", label: "Genres" },
+        { id: "language",   label: "Language" },
+        { id: "ratings",    label: "Ratings" },
       ]
     },
     {
       id: "friends", label: "Friends",
       charts: [
-        { id: "solo", label: "👯 Friends & group size" },
+        { id: "solo", label: "Friends & group size" },
       ]
     },
     {
       id: "places", label: "Places",
       charts: [
-        { id: "venues",        label: "📍 Top venues" },
-        { id: "venue-loyalty", label: "💜 Venue loyalty" },
+        { id: "venues",        label: "Top venues" },
+        { id: "venue-loyalty", label: "Venue loyalty" },
       ]
     },
     {
       id: "financial", label: "Financial",
       charts: [
-        { id: "year-spend", label: "💸 Spending per year" },
-        { id: "averages",   label: "💶 Averages" },
-        { id: "expensive",  label: "💰 Most expensive shows" },
-        { id: "merch-overview", label: "🛍️ Merch" },
+        { id: "year-spend", label: "Spending per year" },
+        { id: "averages",   label: "Averages" },
+        { id: "expensive",  label: "Most expensive shows" },
+        { id: "merch-overview", label: "Merch" },
       ]
     },
     {
       id: "music", label: "Music",
       charts: [
-        ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
-        ...(coversList.length > 0 ? [{ id: "covers", label: "↩️ Covers" }] : []),
+        ...(topSongs.length > 0 ? [{ id: "songs", label: "Top songs" }] : []),
+        ...(coversList.length > 0 ? [{ id: "covers", label: "Covers" }] : []),
       ].filter(Boolean)
     },
   ].filter(g => g.charts.length > 0);
@@ -6343,11 +6343,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           );
           const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
           const ALL_CHART_GROUPS = [
-            { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: '🎤 Artist overview' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'genres-pie', label: '🥧 Genres' }, { id: 'language', label: '🗣️ Language' }, { id: 'ratings', label: '⭐ Ratings' }] },
-            { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Friends & group size' }] },
-            { id: 'places', label: 'Places', charts: [{ id: 'venues', label: '📍 Top venues' }, { id: 'venue-loyalty', label: '💜 Venue loyalty' }] },
-            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending per year' }, { id: 'averages', label: '💶 Averages' }, { id: 'expensive', label: '💰 Most expensive shows' }, { id: 'merch-overview', label: '🛍️ Merch' }] },
-            { id: 'music', label: 'Music', charts: [{ id: 'songs', label: '🎵 Top songs' }, { id: 'covers', label: '↩️ Covers' }] },
+            { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: 'Artist overview' }, { id: 'shows', label: 'Shows over time' }, { id: 'genres-pie', label: 'Genres' }, { id: 'language', label: 'Language' }, { id: 'ratings', label: 'Ratings' }] },
+            { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: 'Friends & group size' }] },
+            { id: 'places', label: 'Places', charts: [{ id: 'venues', label: 'Top venues' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
+            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending per year' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }, { id: 'merch-overview', label: 'Merch' }] },
+            { id: 'music', label: 'Music', charts: [{ id: 'songs', label: 'Top songs' }, { id: 'covers', label: 'Covers' }] },
           ];
           return (
             <div style={{ padding: '14px 16px' }}>

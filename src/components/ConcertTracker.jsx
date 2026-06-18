@@ -2872,7 +2872,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                             ...top4.map(([, n], i) => ({ value: n, color: colors[i] })),
                             ...(others > 0 ? [{ value: others, color: "#4a4870" }] : []),
                           ]} />
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: "100%" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 6px", width: "100%" }}>
                             {[...top4, ...(others > 0 ? [["Others", others]] : [])].map(([name], i) => (
                               <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
                                 <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 4 ? colors[i] : "#4a4870", flexShrink: 0 }} />

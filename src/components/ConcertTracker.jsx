@@ -3743,6 +3743,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   const [sortBy, setSortBy] = useState('most-shows');
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null); // { name, nickname, contact, note }
+  const [filterType, setFilterType] = useState('all');
 
   const friendProfiles = settings.friendProfiles || {};
   const getProfile = name => friendProfiles[name] || {};
@@ -3781,6 +3782,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
 
   const filtered = friendEntries
     .filter(f => !search || f.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(f => filterType === 'all' || (filterType === 'concerts' ? f.concertCount > 0 : f.festivalCount > 0))
     .sort((a, b) => {
       if (sortBy === 'most-shows') return b.shows.length - a.shows.length;
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
@@ -4023,6 +4025,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>}
         </div>
         <div style={{ display: "flex", gap: 6, paddingBottom: 10, alignItems: "center" }}>
+          {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
+            <button key={id} onClick={() => setFilterType(id)} style={{ background: filterType===id?'#a78bfa':'none', border: `1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
+          ))}
+          <div style={{ flex: 1 }} />
           <button onClick={() => setShowSortPanel(p => !p)} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-shows' ? ' ↕' : ''}
           </button>
@@ -4505,10 +4511,14 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <button onClick={() => setFilterGenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === 'all' ? '#a78bfa' : '#0c0c14', color: filterGenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
-                  {allGenres.map(g => (
-                    <button key={g} onClick={() => setFilterGenre(filterGenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === g ? '#a78bfa' : '#0c0c14', color: filterGenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === g ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
-                  ))}
+                  {(() => {
+                    const _top = allGenres.slice(0,3); const _rest = allGenres.slice(3);
+                    return (<>
+                      <button onClick={() => setFilterGenre('all')} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre==='all'?'#a78bfa':'#0c0c14', color:filterGenre==='all'?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre==='all'?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>All</button>
+                      {_top.map(g => <button key={g} onClick={() => setFilterGenre(filterGenre===g?'all':g)} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre===g?'#a78bfa':'#0c0c14', color:filterGenre===g?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre===g?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>{g}</button>)}
+                      {_rest.length > 0 && <select value={_rest.includes(filterGenre)?filterGenre:''} onChange={e => e.target.value && setFilterGenre(e.target.value)} style={{ background:_rest.includes(filterGenre)?'#a78bfa':'#0c0c14', border:`1px solid ${_rest.includes(filterGenre)?'#a78bfa':'#1f1f35'}`, borderRadius:99, color:_rest.includes(filterGenre)?'#0c0c14':'#6b6a8f', fontFamily:"'DM Mono', monospace", fontSize:11, padding:'4px 8px', cursor:'pointer', WebkitAppearance:'none', appearance:'none' }}><option value=''>more ▾</option>{_rest.map(g => <option key={g} value={g}>{g}</option>)}</select>}
+                    </>);
+                  })()}
                 </div>
               </div>
             )}
@@ -4576,10 +4586,11 @@ function SongsView({ concerts, onOpen, settings }) {
   const [sortBy, setSortBy] = useState('count');
   const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [filterType, setFilterType] = useState('all');
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
 
   const songCount = {};
-  past.forEach(c => {
+  past.filter(c => filterType === 'all' || (filterType === 'concerts' ? c.type !== 'festival' : c.type === 'festival')).forEach(c => {
     const tally = (s, performer) => {
       const n = getSongName(s); if (!n) return;
       const cov = getSongCover(s);
@@ -4661,6 +4672,9 @@ function SongsView({ concerts, onOpen, settings }) {
           {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
+              <button key={id} onClick={() => setFilterType(id)} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterType===id?'#a78bfa':'none', color:filterType===id?'#0c0c14':'#6b6a8f', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400 }}>{label}</button>
+            ))}
           <div style={{ display: 'flex', gap: 6 }}>
             {[{id:'count',label:'Most heard'},{id:'alpha',label:'A–Z'}].map(o => (
               <button key={o.id} onClick={() => setSortBy(o.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy===o.id ? '#a78bfa' : 'none', color: sortBy===o.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy===o.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: sortBy===o.id ? 700 : 400 }}>{o.label}</button>
@@ -4739,6 +4753,7 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
   const [showSort, setShowSort] = useState(false);
+  const [filterType, setFilterType] = useState('all');
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
@@ -4766,6 +4781,7 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
 
   const sorted = venueEntries
     .filter(v => !search || v.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(v => filterType === 'all' || (filterType === 'concerts' ? v.past.some(c => c.type !== 'festival') : v.past.some(c => c.type === 'festival')))
     .sort((a, b) => {
       if (sortBy === 'most-visited') return b.pastCount - a.pastCount || a.name.localeCompare(b.name);
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
@@ -4876,8 +4892,14 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
 
   return (
     <div style={{ padding: '0 0 100px' }}>
+      {/* Type pills */}
+      <div style={{ padding: '10px 12px 0', display: 'flex', gap: 6 }}>
+        {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
+          <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
+        ))}
+      </div>
       {/* Search + sort */}
-      <div style={{ padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ padding: '8px 12px 0', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search venues..."
@@ -7008,13 +7030,21 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 {filterYear === 'all' ? 'Year' : filterYear}
                 <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
               </button>
-              {showYearDropdown && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 90 }}>
-                  {['all', ...years].map((y, i) => (
-                    <button key={y} onClick={() => { setFilterYear(y); setShowYearDropdown(false) }} style={{ width: '100%', background: filterYear === y ? '#1a1a30' : 'none', border: 'none', borderBottom: i < years.length ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: filterYear === y ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{y === 'all' ? 'All years' : y}</button>
-                  ))}
-                </div>
-              )}
+              {showYearDropdown && (() => {
+                const _curYr = String(new Date().getFullYear());
+                const _recentYrs = [_curYr, String(_curYr-1), String(_curYr-2)].filter(y => years.includes(y));
+                const _olderYrs = years.filter(y => !_recentYrs.includes(y));
+                const _opts = ['all', ..._recentYrs, ..._olderYrs];
+                return (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 90 }}>
+                    {_opts.map((y, i) => (
+                      <button key={y} onClick={() => { setFilterYear(y); setShowYearDropdown(false); }} style={{ width: '100%', background: filterYear===y?'#1a1a30':'none', border:'none', borderBottom: i < _opts.length-1 ? '1px solid #0c0c14' : 'none', padding: _olderYrs.includes(y)?'7px 14px':'9px 14px', paddingLeft: _olderYrs.includes(y)?'22px':'14px', cursor:'pointer', textAlign:'left', color: filterYear===y?'#a78bfa':_olderYrs.includes(y)?'#4a4870':'#c4c2f0', fontFamily:"'DM Mono', monospace", fontSize:12 }}>
+                        {y === 'all' ? 'All years' : y}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
             {/* Sort button */}
             <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ minHeight: 36, background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>
@@ -7095,10 +7125,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  <button onClick={() => setFilterGenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === 'all' ? '#a78bfa' : '#0c0c14', color: filterGenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
-                  {(settings.genres||[]).map(g => (
-                    <button key={g} onClick={() => setFilterGenre(filterGenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterGenre === g ? '#a78bfa' : '#0c0c14', color: filterGenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterGenre === g ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
-                  ))}
+                  {(() => {
+                    const _g = settings.genres||[]; const _top = _g.slice(0,3); const _rest = _g.slice(3);
+                    return (<>
+                      <button onClick={() => setFilterGenre('all')} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre==='all'?'#a78bfa':'#0c0c14', color:filterGenre==='all'?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre==='all'?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>All</button>
+                      {_top.map(g => <button key={g} onClick={() => setFilterGenre(filterGenre===g?'all':g)} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre===g?'#a78bfa':'#0c0c14', color:filterGenre===g?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre===g?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>{g}</button>)}
+                      {_rest.length > 0 && <select value={_rest.includes(filterGenre)?filterGenre:''} onChange={e => e.target.value && setFilterGenre(e.target.value)} style={{ background:_rest.includes(filterGenre)?'#a78bfa':'#0c0c14', border:`1px solid ${_rest.includes(filterGenre)?'#a78bfa':'#1f1f35'}`, borderRadius:99, color:_rest.includes(filterGenre)?'#0c0c14':'#6b6a8f', fontFamily:"'DM Mono', monospace", fontSize:11, padding:'4px 8px', cursor:'pointer', WebkitAppearance:'none', appearance:'none' }}><option value=''>more ▾</option>{_rest.map(g => <option key={g} value={g}>{g}</option>)}</select>}
+                    </>);
+                  })()}
                 </div>
               </div>
             )}

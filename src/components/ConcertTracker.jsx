@@ -1687,11 +1687,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     {
       id: "artists", label: "Artists",
       charts: [
-        { id: "genres-pie",   label: "🥧 Genres" },
-        { id: "shows",        label: "📅 Shows over time" },
-        { id: "top-artists",  label: "🎤 Top artists" },
-        { id: "ratings",      label: "⭐ Ratings" },
-        { id: "language",     label: "🗣️ Language" },
+        { id: "genres-pie", label: "🥧 Genres" },
+        { id: "shows",      label: "📅 Shows over time" },
+        { id: "artists",    label: "🎤 Top artists & ratings" },
+        { id: "language",   label: "🗣️ Language" },
         ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
         ...(coversList.length > 0 ? [{ id: "covers", label: "↩️ Covers" }] : []),
       ]
@@ -1699,29 +1698,22 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     {
       id: "friends", label: "Friends",
       charts: [
-        { id: "solo-donut",   label: "👯 Solo vs friends" },
-        { id: "group-size",   label: "👥 Group size" },
-        { id: "friends-list", label: "🏆 Most shows with" },
+        { id: "solo", label: "👯 Friends & group size" },
       ]
     },
     {
       id: "venues", label: "Venues",
       charts: [
-        { id: "top-venues",    label: "📍 Top venues" },
-        { id: "venue-size",    label: "🏟 Venue size" },
-        { id: "countries",     label: "🌍 Countries" },
+        { id: "venues",        label: "📍 Venues, size & countries" },
         { id: "venue-loyalty", label: "💜 Venue loyalty" },
       ]
     },
     {
       id: "financial", label: "Financial",
       charts: [
-        { id: "year-spend",   label: "💸 Spending per year" },
-        { id: "avg-hero",     label: "💶 Avg cost per show" },
-        { id: "avg-trend",    label: "📈 Ticket price trend" },
-        { id: "avg-breakdown",label: "🔍 Cost breakdown" },
-        { id: "avg-patterns", label: "🧩 Patterns" },
-        { id: "expensive",    label: "💰 Most expensive shows" },
+        { id: "year-spend", label: "💸 Spending & avg ticket per year" },
+        { id: "averages",   label: "💶 Averages" },
+        { id: "expensive",  label: "💰 Most expensive shows" },
       ]
     },
     {
@@ -2381,207 +2373,197 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
       }
       case "friends-chart": return null; // merged into solo card below
-      case "solo-donut":
       case "solo": {
         const groupSizeLabels = ["0","1","2","3","4","5","6+"];
         const groupSizeColors = ["#6b6a8f","#a78bfa","#818cf8","#60a5fa","#34d399","#fbbf24","#f472b6"];
         const gsLegendLabels = groupSizeLabels.map(k => k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`);
         const allGs = groupSizeLabels.map((k, i) => ({ label: gsLegendLabels[i], count: groupSizeDist[k] || 0, color: groupSizeColors[i] })).filter(x => x.count > 0).sort((a,b) => b.count - a.count);
+        const top4Gs = allGs.slice(0, 4);
+        const othersGs = allGs.slice(4).reduce((s, x) => s + x.count, 0);
         return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={80} centerText={[String(past.length), "shows"]} />
-              <div style={{ flex: 1 }}>
-                {[{ label: `With friends`, value: withFriends.length, color: "#a78bfa" }, { label: `Solo`, value: solo.length, color: "#6b6a8f" }].map(s => (
-                  <div key={s.label} style={{ marginBottom: 6 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: 1, background: s.color, flexShrink: 0 }} />
-                      <span style={{ color: "#c4c2f0", fontSize: 12 }}>{s.label}</span>
+          <div>
+            {/* Solo vs with friends */}
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={80} centerText={[String(past.length), "shows"]} />
+                <div style={{ flex: 1 }}>
+                  {[{ label: `With friends`, value: withFriends.length, color: "#a78bfa" }, { label: `Solo`, value: solo.length, color: "#6b6a8f" }].map(s => (
+                    <div key={s.label} style={{ marginBottom: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 1, background: s.color, flexShrink: 0 }} />
+                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{s.label}</span>
+                      </div>
+                      <div style={{ marginLeft: 11, height: 4, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 3, background: s.color, width: `${past.length ? (s.value / past.length) * 100 : 0}%` }} />
+                      </div>
+                      <div style={{ marginLeft: 11, fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{s.value} · {past.length ? Math.round(s.value / past.length * 100) : 0}%</div>
                     </div>
-                    <div style={{ marginLeft: 11, height: 4, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", borderRadius: 3, background: s.color, width: `${past.length ? (s.value / past.length) * 100 : 0}%` }} />
-                    </div>
-                    <div style={{ marginLeft: 11, fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{s.value} · {past.length ? Math.round(s.value / past.length * 100) : 0}%</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      }
-      case "group-size": {
-        const groupSizeLabels2 = ["0","1","2","3","4","5","6+"];
-        const groupSizeColors2 = ["#6b6a8f","#a78bfa","#818cf8","#60a5fa","#34d399","#fbbf24","#f472b6"];
-        const gsLegendLabels2 = groupSizeLabels2.map(k => k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`);
-        const allGs2 = groupSizeLabels2.map((k, i) => ({ label: gsLegendLabels2[i], count: groupSizeDist[k] || 0, color: groupSizeColors2[i] })).filter(x => x.count > 0).sort((a,b) => b.count - a.count);
-        const top4Gs2 = allGs2.slice(0, 4);
-        const othersGs2 = allGs2.slice(4).reduce((s, x) => s + x.count, 0);
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Donut showLabels size={80} centerText={["Group", "size"]} segments={[
-                ...top4Gs2.map(x => ({ value: x.count, color: x.color })),
-                ...(othersGs2 > 0 ? [{ value: othersGs2, color: "#4a4870" }] : [])
-              ]} />
-              <div style={{ flex: 1 }}>
-                {[...top4Gs2, ...(othersGs2 > 0 ? [{ label: "Others", color: "#4a4870", count: othersGs2 }] : [])].map(x => (
-                  <div key={x.label} style={{ marginBottom: 4 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
-                      <span style={{ color: x.label === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{x.label}</span>
-                    </div>
-                    <div style={{ marginLeft: 11, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", borderRadius: 2, background: x.color, width: `${past.length ? (x.count / past.length) * 100 : 0}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      }
-      case "friends-list": {
-        return topFriends.length > 0 ? (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Most shows with</div>
-            {topFriends.map(([name, count], i) => (
-              <button key={name} onClick={() => { setStatsTab("friends"); }} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
-                <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-                <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1 }}>{name}</span>
-                <div style={{ width: 80, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
-                  <div style={{ height: "100%", borderRadius: 2, background: "#a78bfa", width: `${(count / (topFriends[0]?.[1] || 1)) * 100}%` }} />
+                  ))}
                 </div>
-                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}x</span>
-              </button>
-            ))}
+              </div>
+            </div>
+            {/* Group size */}
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Donut showLabels size={80} centerText={["Group", "size"]} segments={[
+                  ...top4Gs.map(x => ({ value: x.count, color: x.color })),
+                  ...(othersGs > 0 ? [{ value: othersGs, color: "#4a4870" }] : [])
+                ]} />
+                <div style={{ flex: 1 }}>
+                  {[...top4Gs, ...(othersGs > 0 ? [{ label: "Others", color: "#4a4870", count: othersGs }] : [])].map(x => (
+                    <div key={x.label} style={{ marginBottom: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
+                        <span style={{ color: x.label === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{x.label}</span>
+                      </div>
+                      <div style={{ marginLeft: 11, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 2, background: x.color, width: `${past.length ? (x.count / past.length) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Most shows with */}
+            {topFriends.length > 0 && (
+              <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Most shows with</div>
+                {topFriends.map(([name, count], i) => (
+                  <button key={name} onClick={() => { setStatsTab("friends"); }} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+                    <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
+                    <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1 }}>{name}</span>
+                    <div style={{ width: 80, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 2, background: "#a78bfa", width: `${(count / (topFriends[0]?.[1] || 1)) * 100}%` }} />
+                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}x</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        ) : null;
+        );
       }
       case "venue-size": return null; // merged into venues below
       case "countries": return null; // merged into venues below
-      case "top-venues":
       case "venues": {
         const vView = chartOpt("venues", "venue");
         const vItems = vView === "room" ? topVenuesByRoom : topVenues;
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Favourite venues</div>
-            <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
-            {vItems.map(([name, count], i) => (
-              <button key={name} onClick={() => onNavigate({ view: 'venues' })} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
-                <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
-                <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                <div style={{ width: 60, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
-                  <div style={{ height: "100%", borderRadius: 2, background: "#a78bfa", width: `${(count / (vItems[0]?.[1] || 1)) * 100}%` }} />
-                </div>
-                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 24, textAlign: "right", flexShrink: 0 }}>{count}x</span>
-              </button>
-            ))}
-          </div>
-        );
-      }
-      case "venue-size": {
         const top4VS = venueEntries.slice(0, 4);
         const othersVS = venueEntries.slice(4).reduce((s,[,n])=>s+n,0);
-        return venueEntries.length > 0 ? (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px" }}>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Venue size</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Donut showLabels size={80} centerText={["Venue", "size"]} segments={[
-                ...top4VS.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i] })),
-                ...(othersVS > 0 ? [{ value: othersVS, color: "#4a4870" }] : [])
-              ]} />
-              <div style={{ flex: 1 }}>
-                {[...top4VS, ...(othersVS > 0 ? [["Others", othersVS]] : [])].map(([name, count], i) => (
-                  <div key={name} style={{ marginBottom: 4 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                      <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+        const maxCountry = Math.max(...Object.values(countryCount), 1);
+        return (
+          <div>
+            {/* Fav venues */}
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Favourite venues</div>
+              <ChartToggle options={[{id:"venue",label:"By venue"},{id:"room",label:"By room"}]} value={vView} onChange={v => setChartOpt("venues", v)} />
+              {vItems.map(([name, count], i) => (
+                <button key={name} onClick={() => onNavigate({ view: 'venues' })} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+                  <span style={{ fontSize: 9, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                  <div style={{ width: 60, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+                    <div style={{ height: "100%", borderRadius: 2, background: "#a78bfa", width: `${(count / (vItems[0]?.[1] || 1)) * 100}%` }} />
+                  </div>
+                  <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 24, textAlign: "right", flexShrink: 0 }}>{count}x</span>
+                </button>
+              ))}
+            </div>
+            {/* Venue size */}
+            {venueEntries.length > 0 && (
+              <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 14px", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Donut showLabels size={80} centerText={["Venue", "size"]} segments={[
+                    ...top4VS.map(([name, n], i) => ({ value: n, color: VENUE_COLORS[i] })),
+                    ...(othersVS > 0 ? [{ value: othersVS, color: "#4a4870" }] : [])
+                  ]} />
+                  <div style={{ flex: 1 }}>
+                    {[...top4VS, ...(othersVS > 0 ? [["Others", othersVS]] : [])].map(([name, count], i) => (
+                      <div key={name} style={{ marginBottom: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
+                          <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 11 }}>{name}</span>
+                        </div>
+                        <div style={{ marginLeft: 11, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 2, background: i < 4 ? VENUE_COLORS[i] : "#4a4870", width: `${(count / (venueEntries[0]?.[1] || 1)) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Countries */}
+            {Object.keys(countryCount).length > 0 && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Countries</div>
+                {Object.entries(countryCount).sort((a,b)=>b[1]-a[1]).map(([country, count]) => (
+                  <div key={country} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 90, flexShrink: 0 }}>{country}</span>
+                    <div style={{ flex: 1, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 2, background: "#38bdf8", width: `${(count / maxCountry) * 100}%` }} />
                     </div>
-                    <div style={{ marginLeft: 11, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", borderRadius: 2, background: i < 4 ? VENUE_COLORS[i] : "#4a4870", width: `${(count / (venueEntries[0]?.[1] || 1)) * 100}%` }} />
-                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
-        ) : null;
+        );
       }
-      case "countries": {
-        const maxCountry = Math.max(...Object.values(countryCount), 1);
-        return Object.keys(countryCount).length > 0 ? (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Countries · {Object.keys(countryCount).length}</div>
-            {Object.entries(countryCount).sort((a,b)=>b[1]-a[1]).map(([country, count]) => (
-              <div key={country} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 90, flexShrink: 0 }}>{country}</span>
-                <div style={{ flex: 1, height: 4, background: "#0e0e1a", borderRadius: 2, overflow: "hidden" }}>
-                  <div style={{ height: "100%", borderRadius: 2, background: "#38bdf8", width: `${(count / maxCountry) * 100}%` }} />
-                </div>
-                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{count}</span>
-              </div>
-            ))}
-          </div>
-        ) : null;
-      }
-      case "top-artists":
+      case "ratings": return null; // merged into artists card below
       case "artists": {
         const aView = chartOpt("artists", "count");
         const artistItems = aView === "alpha"
           ? [...topArtists].sort((a, b) => a[0].localeCompare(b[0]))
           : topArtists;
         const medals = ["🥇","🥈","🥉"];
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Top artists</div>
-            <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
-            {artistItems.map(([name, counts], i) => {
-              const total = counts.headliner + counts.support + counts.guest + (counts.festival || 0);
-              const hasSub = (counts.support > 0 || counts.guest > 0 || counts.festival > 0)
-                && !(chartType === 'festivals' && counts.festival === total);
-              const parts = [];
-              if (counts.headliner > 0) parts.push(`${counts.headliner} headliner`);
-              if (counts.support > 0) parts.push(`${counts.support} support`);
-              if (counts.guest > 0) parts.push(`${counts.guest} guest`);
-              if (counts.festival > 0 && chartType !== 'festivals') parts.push(`${counts.festival} festival`);
-              return (
-                <button key={name} onClick={() => onNavigate({ view: 'artists' })} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: hasSub ? 8 : 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: aView === "count" && i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
-                        {aView === "count" && i < 3 ? medals[i] : `#${i+1}`}
-                      </span>
-                      <span style={{ color: "#c4c2f0", fontSize: 13 }}>{name}</span>
-                    </div>
-                    <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{total}x</span>
-                  </div>
-                  {hasSub && parts.length > 0 && (
-                    <div style={{ paddingLeft: 28, marginTop: 2 }}>
-                      <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{parts.join(' · ')}</span>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        );
-      }
-      case "ratings": {
         const rView = chartOpt("ratings", "dist");
         const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
         const ratingYears = Object.keys(ratingByYear).sort();
+        const maxAvgRating = 5;
         const ratingColors = { 5:"#a78bfa", 4:"#818cf8", 3:"#38bdf8", 2:"#34d399", 1:"#6b6a8f" };
         const rAll = [5,4,3,2,1].filter(n => ratingDist[n]).map(n => ({ stars: n, count: ratingDist[n], color: ratingColors[n] })).sort((a,b) => b.count - a.count);
         const top4R = rAll.slice(0, 4);
         const othersR = rAll.slice(4).reduce((s,x) => s+x.count, 0);
         const rSegs = [...top4R.map(x => ({ value: x.count, color: x.color })), ...(othersR > 0 ? [{ value: othersR, color: "#4a4870" }] : [])];
         const rLegend = [...top4R, ...(othersR > 0 ? [{ stars: 0, color: "#4a4870" }] : [])];
-        if (rated.length === 0) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>No rated shows yet</div>;
         return (
-          <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ratings</div>
-            {/* dummy so the block below compiles */ true && (
+          <div>
+            {/* Top artists */}
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Top artists</div>
+              <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
+              {artistItems.map(([name, counts], i) => {
+                const total = counts.headliner + counts.support + counts.guest + (counts.festival || 0);
+                const hasSub = (counts.support > 0 || counts.guest > 0 || counts.festival > 0)
+                  && !(chartType === 'festivals' && counts.festival === total); // hide if all are festival
+                const parts = [];
+                if (counts.headliner > 0) parts.push(`${counts.headliner} headliner`);
+                if (counts.support > 0) parts.push(`${counts.support} support`);
+                if (counts.guest > 0) parts.push(`${counts.guest} guest`);
+                if (counts.festival > 0 && chartType !== 'festivals') parts.push(`${counts.festival} festival`);
+                return (
+                  <button key={name} onClick={() => onNavigate({ view: 'artists' })} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: hasSub ? 8 : 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: aView === "count" && i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
+                          {aView === "count" && i < 3 ? medals[i] : `#${i+1}`}
+                        </span>
+                        <span style={{ color: "#c4c2f0", fontSize: 13 }}>{name}</span>
+                      </div>
+                      <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{total}x</span>
+                    </div>
+                    {hasSub && parts.length > 0 && (
+                      <div style={{ paddingLeft: 28, marginTop: 2 }}>
+                        <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{parts.join(' · ')}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Ratings */}
+            {rated.length > 0 && (
               <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
                 <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ratings</div>
                 <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"pie",label:"Pie"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
@@ -2917,37 +2899,77 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
-      case "avg-hero":
       case "averages": {
         const cs = past.filter(c => c.type === "concert");
         const fs = past.filter(c => c.type === "festival");
         const avg = (arr, f) => { const v = arr.map(f).filter(x => x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; };
+        const med = (arr, f) => { const v = arr.map(f).filter(x => x > 0).sort((a,b)=>a-b); return v.length ? v[Math.floor(v.length/2)] : null; };
         const merchOf = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
         const totalOf = c => (c.ticketPrice || 0) + merchOf(c) + (c.otherCost || 0);
         const avgTotalAll = avg(past, totalOf);
         const avgTotalC = avg(cs, totalOf);
         const avgTotalF = avg(fs, totalOf);
+        const avgTicketC = avg(cs, c => c.ticketPrice || 0);
+        const avgTicketF = avg(fs, c => c.ticketPrice || 0);
+        const medTicketC = med(cs, c => c.ticketPrice || 0);
+        const avgMerchC = avg(cs.filter(c => merchOf(c) > 0), merchOf);
+        const avgMerchF = avg(fs.filter(c => merchOf(c) > 0), merchOf);
+        const avgOtherC = avg(cs.filter(c => c.otherCost > 0), c => c.otherCost || 0);
+        const avgOtherF = avg(fs.filter(c => c.otherCost > 0), c => c.otherCost || 0);
+        const withMerchPct = past.length ? Math.round((past.filter(c => merchOf(c) > 0).length / past.length) * 100) : 0;
+        // Ticket price trend years
+        const ticketTrendYears = Object.keys(yearTicketCount).sort().slice(-6);
+        const ticketTrendAvgs = ticketTrendYears.map(y => yearTicketSum[y] / yearTicketCount[y]);
+        const ticketMax = Math.max(...ticketTrendAvgs, 1);
+        const ticketMin = Math.min(...ticketTrendAvgs.filter(x => x > 0));
+        // Most expensive month on average
+        const monthSpend = {}; const monthCount2 = {};
+        past.filter(c => c.ticketPrice).forEach(c => {
+          const m = parseInt(c.date.slice(5,7)) - 1;
+          monthSpend[m] = (monthSpend[m] || 0) + c.ticketPrice;
+          monthCount2[m] = (monthCount2[m] || 0) + 1;
+        });
+        const monthAvgs = Object.entries(monthSpend).map(([m, s]) => [parseInt(m), s / monthCount2[m]]);
+        const priceyMonth = monthAvgs.sort((a,b) => b[1]-a[1])[0];
+        const monthNames2 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
         const maxComparison = Math.max(avgTotalC || 0, avgTotalF || 0, 1);
+        const StatLabel = ({ children }) => (
+          <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{children}</div>
+        );
+        const Row = ({ label, value, sub }) => value == null ? null : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #16162a" }}>
+            <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
+            <div style={{ textAlign: "right" }}>
+              <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>€{value.toFixed(0)}</span>
+              {sub != null && <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginLeft: 6 }}>median €{sub.toFixed(0)}</span>}
+            </div>
+          </div>
+        );
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Hero — avg cost per show */}
             {avgTotalAll != null && (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px 14px" }}>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>avg cost per show</div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>€{avgTotalAll.toFixed(0)}</div>
-                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 6 }}>ticket + merch + other · {past.filter(c => totalOf(c) > 0).length} shows logged</div>
+                <StatLabel>avg cost per show · all</StatLabel>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 32, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>€{avgTotalAll.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+                  ticket · merch · other combined · {past.filter(c => totalOf(c) > 0).length} shows with cost logged
+                </div>
               </div>
             )}
+
+            {/* Concert vs Festival comparison bars */}
             {(avgTotalC != null || avgTotalF != null) && (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>concerts vs festivals</div>
+                <StatLabel>avg total cost · concerts vs festivals</StatLabel>
                 {avgTotalC != null && (
-                  <div style={{ marginBottom: 10 }}>
+                  <div style={{ marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                       <span style={{ fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>concerts</span>
                       <span style={{ fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>€{avgTotalC.toFixed(0)}</span>
                     </div>
-                    <div style={{ height: 8, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", background: "#a78bfa", borderRadius: 3, width: `${(avgTotalC / maxComparison) * 100}%` }} />
+                    <div style={{ height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#a78bfa", borderRadius: 3, width: `${(avgTotalC / maxComparison) * 100}%`, transition: "width 0.5s" }} />
                     </div>
                   </div>
                 )}
@@ -2957,148 +2979,80 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       <span style={{ fontSize: 11, color: "#fb923c", fontFamily: "'DM Mono', monospace" }}>festivals</span>
                       <span style={{ fontSize: 11, color: "#fb923c", fontFamily: "'DM Mono', monospace" }}>€{avgTotalF.toFixed(0)}</span>
                     </div>
-                    <div style={{ height: 8, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", background: "#fb923c", borderRadius: 3, width: `${(avgTotalF / maxComparison) * 100}%` }} />
+                    <div style={{ height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#fb923c", borderRadius: 3, width: `${(avgTotalF / maxComparison) * 100}%`, transition: "width 0.5s" }} />
                     </div>
                   </div>
                 )}
               </div>
             )}
-          </div>
-        );
-      }
-      case "avg-trend": {
-        const ticketTrendYears = Object.keys(yearTicketCount).sort().slice(-7);
-        const ticketTrendAvgs = ticketTrendYears.map(y => yearTicketSum[y] / yearTicketCount[y]);
-        const ticketMax2 = Math.max(...ticketTrendAvgs, 1);
-        const cs2 = past.filter(c => c.type === "concert");
-        const avg2 = (arr, f) => { const v = arr.map(f).filter(x => x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; };
-        const med2 = (arr, f) => { const v = arr.map(f).filter(x => x > 0).sort((a,b)=>a-b); return v.length ? v[Math.floor(v.length/2)] : null; };
-        const avgTicketC2 = avg2(cs2, c => c.ticketPrice || 0);
-        const medTicketC2 = med2(cs2, c => c.ticketPrice || 0);
-        if (ticketTrendYears.length < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need ticket data from at least 2 years</div>;
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>avg ticket price per year</div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80, marginBottom: 6 }}>
-              {ticketTrendYears.map((y, i) => {
-                const v = ticketTrendAvgs[i];
-                const h = Math.max(4, (v / ticketMax2) * 76);
-                const isLast = i === ticketTrendYears.length - 1;
-                return (
-                  <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
-                    <span style={{ fontSize: 9, color: isLast ? "#a78bfa" : "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>€{Math.round(v)}</span>
-                    <div style={{ width: "100%", height: h, background: isLast ? "#a78bfa" : "#2e2e50", borderRadius: "3px 3px 0 0" }} />
+
+            {/* Ticket price trend sparkline */}
+            {ticketTrendYears.length >= 2 && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>avg ticket price per year</StatLabel>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 48, marginBottom: 6 }}>
+                  {ticketTrendYears.map((y, i) => {
+                    const v = ticketTrendAvgs[i];
+                    const h = Math.max(4, (v / ticketMax) * 44);
+                    const isLast = i === ticketTrendYears.length - 1;
+                    return (
+                      <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 2 }}>
+                        <span style={{ fontSize: 8, color: isLast ? "#a78bfa" : "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>€{Math.round(v)}</span>
+                        <div style={{ width: "100%", height: h, background: isLast ? "#a78bfa" : "#2e2e50", borderRadius: "2px 2px 0 0" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {ticketTrendYears.map(y => (
+                    <div key={y} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{y.slice(2)}</div>
+                  ))}
+                </div>
+                {medTicketC != null && avgTicketC != null && (
+                  <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 8 }}>
+                    all-time avg <span style={{ color: "#c4c2f0" }}>€{avgTicketC.toFixed(0)}</span> · median <span style={{ color: "#c4c2f0" }}>€{medTicketC.toFixed(0)}</span>
                   </div>
-                );
-              })}
-            </div>
-            <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
-              {ticketTrendYears.map(y => (
-                <div key={y} style={{ flex: 1, textAlign: "center", fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{y.slice(2)}</div>
-              ))}
-            </div>
-            {avgTicketC2 != null && (
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>all-time avg</span>
-                <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>€{avgTicketC2.toFixed(0)}</span>
+                )}
               </div>
             )}
-            {medTicketC2 != null && (
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #16162a" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>median ticket</span>
-                <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>€{medTicketC2.toFixed(0)}</span>
-              </div>
-            )}
-          </div>
-        );
-      }
-      case "avg-breakdown": {
-        const cs3 = past.filter(c => c.type === "concert");
-        const fs3 = past.filter(c => c.type === "festival");
-        const avg3 = (arr, f) => { const v = arr.map(f).filter(x => x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; };
-        const med3 = (arr, f) => { const v = arr.map(f).filter(x => x > 0).sort((a,b)=>a-b); return v.length ? v[Math.floor(v.length/2)] : null; };
-        const mOf = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-        const avgTicketC3 = avg3(cs3, c => c.ticketPrice || 0);
-        const avgTicketF3 = avg3(fs3, c => c.ticketPrice || 0);
-        const medTicketC3 = med3(cs3, c => c.ticketPrice || 0);
-        const avgMerchC3 = avg3(cs3.filter(c => mOf(c) > 0), mOf);
-        const avgMerchF3 = avg3(fs3.filter(c => mOf(c) > 0), mOf);
-        const avgOtherC3 = avg3(cs3.filter(c => c.otherCost > 0), c => c.otherCost || 0);
-        const avgOtherF3 = avg3(fs3.filter(c => c.otherCost > 0), c => c.otherCost || 0);
-        const BRow = ({ label, value, sub }) => value == null ? null : (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #16162a" }}>
-            <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
-            <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>€{value.toFixed(0)}</span>
-              {sub != null && <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginLeft: 8 }}>med €{sub.toFixed(0)}</span>}
-            </div>
-          </div>
-        );
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {cs3.length > 0 && (avgTicketC3 || avgMerchC3 || avgOtherC3) && (
+
+            {/* Breakdown — concerts */}
+            {cs.length > 0 && (avgTicketC || avgMerchC || avgOtherC) && (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-                <div style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>concerts</div>
-                <BRow label="avg ticket" value={avgTicketC3} sub={medTicketC3} />
-                <BRow label={`avg merch (${cs3.filter(c=>mOf(c)>0).length} shows)`} value={avgMerchC3} />
-                <BRow label={`avg other (${cs3.filter(c=>c.otherCost>0).length} shows)`} value={avgOtherC3} />
+                <StatLabel>concerts · breakdown</StatLabel>
+                <Row label="avg ticket" value={avgTicketC} sub={medTicketC} />
+                <Row label={`avg merch (${cs.filter(c=>merchOf(c)>0).length} shows)`} value={avgMerchC} />
+                <Row label={`avg other (${cs.filter(c=>c.otherCost>0).length} shows)`} value={avgOtherC} />
               </div>
             )}
-            {fs3.length > 0 && (avgTicketF3 || avgMerchF3 || avgOtherF3) && (
+
+            {/* Breakdown — festivals */}
+            {fs.length > 0 && (avgTicketF || avgMerchF || avgOtherF) && (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-                <div style={{ fontSize: 9, color: "#fb923c", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>festivals</div>
-                <BRow label="avg ticket" value={avgTicketF3} />
-                <BRow label={`avg merch (${fs3.filter(c=>mOf(c)>0).length} shows)`} value={avgMerchF3} />
-                <BRow label={`avg travel & other (${fs3.filter(c=>c.otherCost>0).length} shows)`} value={avgOtherF3} />
+                <StatLabel>festivals · breakdown</StatLabel>
+                <Row label="avg ticket" value={avgTicketF} />
+                <Row label={`avg merch (${fs.filter(c=>merchOf(c)>0).length} shows)`} value={avgMerchF} />
+                <Row label={`avg travel & other (${fs.filter(c=>c.otherCost>0).length} shows)`} value={avgOtherF} />
               </div>
             )}
-          </div>
-        );
-      }
-      case "avg-patterns": {
-        const cs4 = past.filter(c => c.type === "concert");
-        const avg4 = (arr, f) => { const v = arr.map(f).filter(x => x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; };
-        const mOf4 = c => (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-        const totalOf4 = c => (c.ticketPrice || 0) + mOf4(c) + (c.otherCost || 0);
-        const withMerchPct = past.length ? Math.round((past.filter(c => mOf4(c) > 0).length / past.length) * 100) : 0;
-        const mSpend = {}; const mCnt = {};
-        past.filter(c => c.ticketPrice).forEach(c => {
-          const m = parseInt(c.date.slice(5,7)) - 1;
-          mSpend[m] = (mSpend[m] || 0) + c.ticketPrice;
-          mCnt[m] = (mCnt[m] || 0) + 1;
-        });
-        const mAvgs = Object.entries(mSpend).map(([m, s]) => [parseInt(m), s / mCnt[m]]);
-        const priceyM = mAvgs.sort((a,b) => b[1]-a[1])[0];
-        const mNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        const avgTotalPat = avg4(past, totalOf4);
-        const dataYears = [...new Set(past.map(c => c.date.slice(0,4)))];
-        const avgShowsPerYear = dataYears.length ? (past.length / dataYears.length).toFixed(1) : null;
-        return (
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-            <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>patterns</div>
-            {withMerchPct > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #16162a" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>shows where you bought merch</span>
-                <span style={{ fontSize: 13, color: "#34d399", fontFamily: "'DM Mono', monospace" }}>{withMerchPct}%</span>
-              </div>
-            )}
-            {priceyM && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #16162a" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>priciest month (avg ticket)</span>
-                <span style={{ fontSize: 13, color: "#fbbf24", fontFamily: "'DM Mono', monospace" }}>{mNames[priceyM[0]]} · €{priceyM[1].toFixed(0)}</span>
-              </div>
-            )}
-            {avgShowsPerYear && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #16162a" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg shows per year</span>
-                <span style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{avgShowsPerYear}</span>
-              </div>
-            )}
-            {avgTotalPat != null && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg cost per show</span>
-                <span style={{ fontSize: 13, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>€{avgTotalPat.toFixed(0)}</span>
+
+            {/* Quick facts */}
+            {(withMerchPct > 0 || priceyMonth) && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>patterns</StatLabel>
+                {withMerchPct > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #16162a" }}>
+                    <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>shows where you bought merch</span>
+                    <span style={{ fontSize: 12, color: "#34d399", fontFamily: "'DM Mono', monospace" }}>{withMerchPct}%</span>
+                  </div>
+                )}
+                {priceyMonth && (
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0" }}>
+                    <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>priciest month on avg</span>
+                    <span style={{ fontSize: 12, color: "#fbbf24", fontFamily: "'DM Mono', monospace" }}>{monthNames2[priceyMonth[0]]} · €{priceyMonth[1].toFixed(0)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -3508,7 +3462,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {/* Swipeable chart area */}
             <div
               ref={chartAreaRef}
-              style={{ flex: 1, padding: "0 16px", overflowY: "hidden", overflowX: "hidden", minHeight: 0 }}
+              style={{ flex: 1, padding: "0 16px", overflowY: "auto", overflowX: "hidden", minHeight: 0 }}
               onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
               onTouchEnd={e => {
                 const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
@@ -3531,9 +3485,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 }
               }}
             >
-              <div style={{ height: "100%", overflowY: "auto" }}>
-                {renderChart(activeChart?.id, chartHeight)}
-              </div>
+              {renderChart(activeChart?.id, chartHeight)}
             </div>
 
             {/* Dots */}

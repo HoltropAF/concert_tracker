@@ -1904,7 +1904,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const todayYear = new Date().getFullYear().toString();
 
         const BarsChart = ({ w = 300, h = 160 }) => {
-          const BAR_H = Math.max(80, h - 60);
+          const BAR_H = Math.max(80, h - 120); // 14+14 padding + 24 legend + 18 x-labels + 10 border/gap slack
           const Y_PAD = 28; // left space for y-axis labels
           const hasWish = Object.keys(wishYearCount).length > 0;
           const midVal = Math.round(maxAllWithWish / 2);
@@ -2054,7 +2054,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           const cumPast = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
           const cumUpcoming = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
           const n = cumSorted.length;
-          const W = Math.max(200, w - 28), H = Math.max(70, h - 60);
+          const W = Math.max(200, w - 28), H = Math.max(70, h - 110); // 14+14 padding + 20 date labels + 16 count line + 16 legend + slack
           const firstMs = new Date(cumSorted[0].date + 'T00:00:00').getTime();
           const lastMs = new Date(cumSorted[n - 1].date + 'T00:00:00').getTime();
           const rangeMs = Math.max(lastMs - firstMs, 1);

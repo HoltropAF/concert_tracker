@@ -2196,7 +2196,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         // Upcoming spend per year (committed costs not yet past)
         const upcomingConcertSpend = {};
         const upcomingFestivalSpend = {};
-        concerts.filter(c => !isWish(c) && !isPast(c.date) && c.ticketPrice).forEach(c => {
+        concerts.filter(c => !isWish(c) && !isPast(c.date) && c.ticketPrice && typeMatch(c)).forEach(c => {
           const y = getYear(c.date);
           const spend = (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) + (c.otherCost || 0);
           if (c.type === 'festival') upcomingFestivalSpend[y] = (upcomingFestivalSpend[y] || 0) + spend;

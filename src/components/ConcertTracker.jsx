@@ -2299,22 +2299,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </>
             );
           })()}
-          {(() => {
-            const pastTotal = Object.values(yearSpend).reduce((s, v) => s + v, 0);
-            const upTotal = [...Object.values(upcomingConcertSpend), ...Object.values(upcomingFestivalSpend)].reduce((s, v) => s + v, 0);
-            return (
-              <>
-                <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total{upTotal > 0 ? " · past" : ""}</span>
-                  <div style={{ textAlign: "right" }}>
-                    <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(pastTotal)}</span>
-                    {upTotal > 0 && <div style={{ fontSize: 10, color: "#a78bfa99", fontFamily: "'DM Mono', monospace" }}>+€{Math.round(upTotal)} upcoming</div>}
-                  </div>
-                </div>
-
-              </>
-            );
-          })()}
           </>}
           {ysView === "line" && (() => {
             const n = activeYearsYS.length;

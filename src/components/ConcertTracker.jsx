@@ -2184,8 +2184,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       }
       case "year-spend": {
         const ysView = chartOpt("year-spend", "bars");
-        const _nextYear = String(new Date().getFullYear() + 1);
-        const _upcomingYearsAll = [...new Set([...Object.keys(upcomingConcertSpend), ...Object.keys(upcomingFestivalSpend)])];
         const activeYearsYS = years.filter(y => yearSpend[y] > 0);
         const maxSpendYS = Math.max(...activeYearsYS.map(y => yearSpend[y]), 1);
         const thisYearFS = String(new Date().getFullYear());
@@ -2204,6 +2202,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           if (c.type === 'festival') upcomingFestivalSpend[y] = (upcomingFestivalSpend[y] || 0) + spend;
           else upcomingConcertSpend[y] = (upcomingConcertSpend[y] || 0) + spend;
         });
+        const _nextYear = String(new Date().getFullYear() + 1);
+        const _upcomingYearsAll = [...new Set([...Object.keys(upcomingConcertSpend), ...Object.keys(upcomingFestivalSpend)])];
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />

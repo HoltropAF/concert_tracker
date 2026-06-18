@@ -1862,14 +1862,17 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const [chartHeight, setChartHeight] = useState(400);
   useEffect(() => {
     if (!fillHeight) return;
-    const el = chartAreaRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(() => {
-      setChartHeight(el.clientHeight);
-    });
-    obs.observe(el);
-    setChartHeight(el.clientHeight);
-    return () => obs.disconnect();
+    const update = () => {
+      const el = chartAreaRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.height > 0) setChartHeight(rect.height);
+    };
+    update();
+    const obs = new ResizeObserver(update);
+    if (chartAreaRef.current) obs.observe(chartAreaRef.current);
+    window.addEventListener('resize', update);
+    return () => { obs.disconnect(); window.removeEventListener('resize', update); };
   }, [fillHeight, statsTab]);
 
   const hiddenChartGroups = settings.hiddenChartGroups || [];
@@ -3173,7 +3176,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   };
 
   return (
-    <div style={{ padding: fillHeight ? "0" : "0 0 100px", height: fillHeight ? "100%" : undefined, display: fillHeight ? "flex" : undefined, flexDirection: fillHeight ? "column" : undefined }}>
+    <div style={{ padding: fillHeight ? "0" : "0 0 100px", flex: fillHeight ? 1 : undefined, display: fillHeight ? "flex" : undefined, flexDirection: fillHeight ? "column" : undefined, minHeight: fillHeight ? 0 : undefined }}>
       {selectedSong && (() => {
         const matchSong = (s, performer) => {
           if (getSongName(s) !== selectedSong.name) return false;
@@ -3596,7 +3599,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const displayCharts = charts;
 
         return (
-          <div style={{ padding: "0", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+          <div style={{ padding: "0", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: 0 }}>
             {/* Header */}
             <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5, flexShrink: 0 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
@@ -7163,7 +7166,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       {/* Content */}
-      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'flex' : 'block', flexDirection: 'column' }}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {view === 'home' && (
           <>
             {concerts.length === 0 && (

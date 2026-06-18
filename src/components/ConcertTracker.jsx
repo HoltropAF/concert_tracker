@@ -3676,6 +3676,60 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             })()}
             {!reorderMode && (
               <>
+                {/* Chart label */}
+                <div style={{ padding: "0 16px 6px", flexShrink: 0 }}>
+                  <div
+                    style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer" }}
+                    onTouchStart={() => { longPressTimer.current = setTimeout(() => { setReorderMode(true); }, 600); }}
+                    onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                    onTouchMove={() => clearTimeout(longPressTimer.current)}
+                  >
+                    {activeChart?.label}
+                  </div>
+                </div>
+
+                {/* Swipeable chart area */}
+                <div
+                  ref={chartAreaRef}
+                  style={{ flex: 1, padding: "0 16px", overflowY: "auto", overflowX: "hidden", minHeight: 0 }}
+                  onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
+                  onTouchEnd={e => {
+                    const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
+                    const dy = e.changedTouches[0].clientY - carouselSwipeStart.y;
+                    if (Math.abs(dx) < 30 || Math.abs(dy) > Math.abs(dx) * 1.2) return;
+                    if (dx < 0) {
+                      if (chartIdx < charts.length - 1) goTo(chartIdx + 1);
+                      else {
+                        const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+                        if (gIdx < visibleChartGroups.length - 1) { const nextG = visibleChartGroups[gIdx + 1]; setChartGroup(nextG.id); setSelectedChart(getOrderedCharts(nextG)[0]?.id); }
+                      }
+                    } else {
+                      if (chartIdx > 0) goTo(chartIdx - 1);
+                      else {
+                        const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+                        if (gIdx > 0) { const prevG = visibleChartGroups[gIdx - 1]; const prevCharts = getOrderedCharts(prevG); setChartGroup(prevG.id); setSelectedChart(prevCharts[prevCharts.length - 1]?.id); }
+                      }
+                    }
+                  }}
+                >
+                  {renderChart(activeChart?.id, chartHeight)}
+                </div>
+
+                {/* Dots */}
+                {charts.length > 1 && (
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, padding: "14px 0 8px", flexShrink: 0 }}>
+                    {charts.map((c, i) => (
+                      <button key={c.id} onClick={() => goTo(i)} style={{
+                        width: i === chartIdx ? 18 : 7,
+                        height: 7,
+                        borderRadius: 99,
+                        background: i === chartIdx ? "#a78bfa" : "#2e2e50",
+                        border: "none", cursor: "pointer", padding: 0,
+                        transition: "all 0.2s",
+                      }} />
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -1789,8 +1789,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const hmMax = Math.max(...hmAllYears.flatMap(y => Array.from({length:12}, (_,m) => allYearMonthCount[y]?.[m] || 0)), 1);
         const todayYear = new Date().getFullYear().toString();
 
-        const BarsChart = () => {
-          const BAR_H = 100;
+        const BarsChart = ({ w = 300, h = 160 }) => {
+          const BAR_H = Math.max(80, h - 60);
           const Y_PAD = 28; // left space for y-axis labels
           const hasWish = Object.keys(wishYearCount).length > 0;
           const midVal = Math.round(maxAllWithWish / 2);
@@ -1855,13 +1855,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           );
         };
 
-        const LineChart = () => {
+        const LineChart = ({ w = 300, h = 160 }) => {
           const sortedYearsAsc = Object.keys(allYearCount).sort();
           const maxAll = Math.max(...Object.values(allYearCount), 1);
           const midAll = Math.round(maxAll / 2);
           const n = sortedYearsAsc.length;
           if (n < 2) return <div style={{ color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Need at least 2 years of data</div>;
-          const W = 240, H = 90;
+          const W = Math.max(200, w - 32), H = Math.max(60, h - 70);
           const Y_PAD = 28;
           const xOf = i => (i / (n - 1)) * (W - 6) + 3;
           const yOf = v => H - 4 - (v / maxAll) * (H - 14);
@@ -1905,7 +1905,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           );
         };
 
-        const Heatmap = () => (
+        const Heatmap = ({ w = 300, h = 160 }) => (
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
             <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Monthly heatmap</div>
             <div style={{ display: "flex", marginLeft: 28 }}>
@@ -1921,7 +1921,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   const intensity = count / hmMax;
                   const color = isUpcoming ? `rgba(52,211,153,${0.15 + intensity * 0.85})` : `rgba(167,139,250,${0.15 + intensity * 0.85})`;
                   const textColor = intensity > 0.55 ? "#0c0c14" : (isUpcoming ? "#34d399" : "#a78bfa");
-                  const cellH = Math.max(16, Math.floor((h - 60) / Math.max(hmAllYears.length, 1)) - 3);
+                  const cellH = Math.max(14, Math.floor((h - 65) / Math.max(hmAllYears.length, 1)) - 2);
                   return (
                     <div key={m} style={{ flex: 1, height: cellH, borderRadius: 2, margin: "0 1px", background: count > 0 ? color : "#0e0e1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {count > 0 && <span style={{ fontSize: Math.max(6, Math.min(10, cellH - 6)), color: textColor, fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{count}</span>}
@@ -1993,54 +1993,55 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         };
 
         const showsViews = [
-          { id: "bars",       icon: "▮▮▮", label: "Bars" },
-          { id: "line",       icon: "╱╲╱", label: "Line" },
-          { id: "heatmap",    icon: "▦",   label: "Heat" },
-          { id: "cumulative", icon: "∫",   label: "Cumul" },
+          { id: "bars",       label: "Bars" },
+          { id: "line",       label: "Line" },
+          { id: "heatmap",    label: "Heat" },
+          { id: "cumulative", label: "Cumul" },
         ];
 
         return (
           <div>
-            {/* Icon toggle */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-              {showsViews.map(({ id, icon, label }) => (
+            {/* Toggle */}
+            <div style={{ display: "flex", background: "#0c0c14", borderRadius: 10, padding: 3, marginBottom: 10, gap: 2 }}>
+              {showsViews.map(({ id, label }) => (
                 <button key={id} onClick={() => setChartOpt("shows", id)} style={{
                   flex: 1, padding: "6px 4px", borderRadius: 8, fontSize: 11,
-                  cursor: "pointer", fontFamily: "'DM Mono', monospace",
-                  background: sView === id ? "#a78bfa" : "#13131f",
-                  border: `1px solid ${sView === id ? "#a78bfa" : "#1f1f35"}`,
+                  cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: sView === id ? 700 : 400,
+                  background: sView === id ? "#a78bfa" : "none",
+                  border: "none",
                   color: sView === id ? "#0c0c14" : "#4a4870",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                  letterSpacing: "0.03em",
                 }}>
-                  <span style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>
-                  <span style={{ fontSize: 8, letterSpacing: "0.04em" }}>{label}</span>
+                  {label}
                 </button>
               ))}
             </div>
-            {/* Measure container width + fill */}
+            {/* Measure container and fill available height */}
             {(() => {
               const ref = React.useRef(null);
-              const [dims, setDims] = React.useState({ w: 300, h: 160 });
+              const [dims, setDims] = React.useState({ w: 300, h: 200 });
               React.useEffect(() => {
                 const el = ref.current;
                 if (!el) return;
                 const measure = () => {
-                  const w = el.offsetWidth;
-                  // Available height: viewport - bottom nav (~56px) - top nav (~44px) - toggle (~60px) - group tabs (~40px) - padding
-                  const h = Math.max(120, window.innerHeight - 56 - 44 - 60 - 40 - 80);
+                  const rect = el.getBoundingClientRect();
+                  const w = rect.width || el.offsetWidth;
+                  // Fill from current top to bottom nav, minus toggle height (~44px) and padding
+                  const h = Math.max(140, window.innerHeight - rect.top - 56 - 44);
                   setDims({ w, h });
                 };
                 measure();
                 const ro = new ResizeObserver(measure);
                 ro.observe(el);
-                return () => ro.disconnect();
+                window.addEventListener('resize', measure);
+                return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
               }, []);
               return (
                 <div ref={ref} style={{ width: "100%" }}>
-                  {sView === "bars" && <BarsChart w={dims.w} h={dims.h} />}
-                  {sView === "line" && <LineChart w={dims.w} h={dims.h} />}
-                  {sView === "heatmap" && <Heatmap w={dims.w} h={dims.h} />}
-                  {sView === "cumulative" && <CumulativeChart w={dims.w} h={dims.h} />}
+                  {sView === "bars"       && <BarsChart       w={dims.w} h={dims.h} />}
+                  {sView === "line"       && <LineChart        w={dims.w} h={dims.h} />}
+                  {sView === "heatmap"    && <Heatmap          w={dims.w} h={dims.h} />}
+                  {sView === "cumulative" && <CumulativeChart  w={dims.w} h={dims.h} />}
                 </div>
               );
             })()}

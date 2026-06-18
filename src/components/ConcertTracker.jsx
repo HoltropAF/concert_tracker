@@ -2118,29 +2118,43 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   const merch = yearMerchSpend[y] || 0;
                   const upConcerts = upcomingConcertSpend[y] || 0;
                   const upFestivals = upcomingFestivalSpend[y] || 0;
-                  const bar = (val, color, opacity = 1, striped = false) => (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{
-                        height: 7, borderRadius: 3,
-                        background: striped ? stripe(color) : color,
-                        border: striped ? `1px solid ${color}88` : "none",
-                        width: `${Math.max(2, (val / maxSpend) * 100)}%`,
-                        opacity: striped ? 1 : opacity,
-                        transition: "width 0.5s ease"
-                      }} />
-                      <span style={{ fontSize: 10, color: striped ? color + "99" : color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>€{Math.round(val)}</span>
-                    </div>
-                  );
+                  // Stacked bar: solid past + striped upcoming extension joined as one bar
+                  const stackedBar = (past_, upcoming_, color, opacity = 1) => {
+                    if (past_ === 0 && upcoming_ === 0) return null;
+                    const totalVal = past_ + upcoming_;
+                    const pastW = (past_ / maxSpend) * 100;
+                    const upW = (upcoming_ / maxSpend) * 100;
+                    const totalW = Math.max(2, (totalVal / maxSpend) * 100);
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ width: `${totalW}%`, height: 7, borderRadius: 3, overflow: "hidden", display: "flex", transition: "width 0.5s ease", flexShrink: 0 }}>
+                          {past_ > 0 && <div style={{ width: `${(pastW / totalW) * 100}%`, height: "100%", background: color, opacity, flexShrink: 0 }} />}
+                          {upcoming_ > 0 && <div style={{ flex: 1, height: "100%", background: stripe(color), flexShrink: 0 }} />}
+                        </div>
+                        <span style={{ fontSize: 10, color, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", opacity }}>
+                          €{Math.round(past_)}{upcoming_ > 0 ? <span style={{ opacity: 0.5 }}> +€{Math.round(upcoming_)}</span> : null}
+                        </span>
+                      </div>
+                    );
+                  };
                   return (
                     <div key={y} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                       <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 36, flexShrink: 0 }}>{y}</span>
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                        {concerts_ > 0 && bar(concerts_, "#a78bfa")}
-                        {upConcerts > 0 && bar(upConcerts, "#a78bfa", 1, true)}
-                        {festivals_ > 0 && bar(festivals_, "#fb923c")}
-                        {upFestivals > 0 && bar(upFestivals, "#fb923c", 1, true)}
-                        {other > 0 && bar(other, "#38bdf8", 0.8)}
-                        {merch > 0 && bar(merch, "#34d399", 0.85)}
+                        {stackedBar(concerts_, upConcerts, "#a78bfa")}
+                        {stackedBar(festivals_, upFestivals, "#fb923c")}
+                        {other > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: `${Math.max(2, (other / maxSpend) * 100)}%`, height: 7, borderRadius: 3, background: "#38bdf8", opacity: 0.8, transition: "width 0.5s ease" }} />
+                            <span style={{ fontSize: 10, color: "#38bdf8", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", opacity: 0.8 }}>€{Math.round(other)}</span>
+                          </div>
+                        )}
+                        {merch > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: `${Math.max(2, (merch / maxSpend) * 100)}%`, height: 7, borderRadius: 3, background: "#34d399", opacity: 0.85, transition: "width 0.5s ease" }} />
+                            <span style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", opacity: 0.85 }}>€{Math.round(merch)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

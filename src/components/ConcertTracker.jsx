@@ -1746,6 +1746,20 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
   const [chartOptions, setChartOptions] = useState({});
   const [showMoreArtistStats, setShowMoreArtistStats] = useState(false);
+  // Chart reorder state
+  const [chartOrder, setChartOrder] = useState(settings.chartOrder || {});
+  const [reorderMode, setReorderMode] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const longPressTimer = useRef(null);
+  const getOrderedCharts = (group) => {
+    const order = chartOrder[group.id];
+    if (!order) return group.charts;
+    return [...group.charts].sort((a, b) => {
+      const ai = order.indexOf(a.id); const bi = order.indexOf(b.id);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  };
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
@@ -3488,70 +3502,175 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         </div>
       )}
       {statsTab === "charts" && activeGroup && (() => {
-        const charts = activeGroup.charts;
+        const charts = getOrderedCharts(activeGroup);
         const chartIdx = Math.max(0, charts.findIndex(c => c.id === (activeChart?.id)));
         const carouselSwipeStart = { x: 0, y: 0 };
         const goTo = (idx) => { if (charts[idx]) setSelectedChart(charts[idx].id); };
+
+        const saveOrder = (newCharts) => {
+          const newOrder = { ...chartOrder, [activeGroup.id]: newCharts.map(c => c.id) };
+          setChartOrder(newOrder);
+          onUpdateSetting('chartOrder', newOrder);
+        };
+
+        // Compute display order with drag preview
+        const displayCharts = dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx
+          ? (() => {
+              const arr = [...charts];
+              const [moved] = arr.splice(dragIdx, 1);
+              arr.splice(dragOverIdx, 0, moved);
+              return arr;
+            })()
+          : charts;
+
         return (
           <div style={{ padding: "0", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             {/* Header */}
             <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "#0c0c14", zIndex: 5, flexShrink: 0 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>{activeGroup.label}</div>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                {[['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
+              <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+                {!reorderMode && [['all','All'],['concerts','Conc'],['festivals','Fest']].map(([id, label]) => (
                   <button key={id} onClick={() => setChartType(id)} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: chartType === id ? 700 : 400, background: chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : 'none', color: chartType === id ? '#0c0c14' : '#5a5880', border: `1px solid ${chartType === id ? (id === 'festivals' ? '#f472b6' : '#a78bfa') : '#1f1f35'}` }}>{label}</button>
                 ))}
+                {charts.length > 1 && (
+                  <button onClick={() => { setReorderMode(r => !r); setDragIdx(null); setDragOverIdx(null); }} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: reorderMode ? 700 : 400, background: reorderMode ? "#a78bfa" : "none", color: reorderMode ? "#0c0c14" : "#5a5880", border: `1px solid ${reorderMode ? "#a78bfa" : "#1f1f35"}` }}>
+                    {reorderMode ? "Done" : "⠿ Edit"}
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Chart label */}
-            <div style={{ padding: "0 16px 6px", flexShrink: 0 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{activeChart?.label}</div>
-            </div>
-
-            {/* Swipeable chart area */}
-            <div
-              ref={chartAreaRef}
-              style={{ flex: 1, padding: "0 16px", overflowY: "auto", overflowX: "hidden", minHeight: 0 }}
-              onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
-              onTouchEnd={e => {
-                const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
-                const dy = e.changedTouches[0].clientY - carouselSwipeStart.y;
-                if (Math.abs(dx) < 30 || Math.abs(dy) > Math.abs(dx) * 1.2) return;
-                if (dx < 0) {
-                  if (chartIdx < charts.length - 1) goTo(chartIdx + 1);
-                  else {
-                    // at last chart — switch to next group
-                    const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
-                    if (gIdx < visibleChartGroups.length - 1) { setChartGroup(visibleChartGroups[gIdx + 1].id); setSelectedChart(visibleChartGroups[gIdx + 1].charts[0]?.id); }
-                  }
-                } else {
-                  if (chartIdx > 0) goTo(chartIdx - 1);
-                  else {
-                    // at first chart — switch to prev group
-                    const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
-                    if (gIdx > 0) { const prevG = visibleChartGroups[gIdx - 1]; setChartGroup(prevG.id); setSelectedChart(prevG.charts[prevG.charts.length - 1]?.id); }
-                  }
-                }
-              }}
-            >
-              {renderChart(activeChart?.id, chartHeight)}
-            </div>
-
-            {/* Dots */}
-            {charts.length > 1 && (
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, padding: "14px 0 8px", flexShrink: 0 }}>
-                {charts.map((c, i) => (
-                  <button key={c.id} onClick={() => goTo(i)} style={{
-                    width: i === chartIdx ? 18 : 7,
-                    height: 7,
-                    borderRadius: 99,
-                    background: i === chartIdx ? "#a78bfa" : "#2e2e50",
-                    border: "none", cursor: "pointer", padding: 0,
-                    transition: "all 0.2s",
-                  }} />
-                ))}
+            {/* Reorder mode — drag list */}
+            {reorderMode ? (
+              <div style={{ flex: 1, padding: "0 16px", overflowY: "auto" }}>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                  Long press &amp; drag to reorder
+                </div>
+                {displayCharts.map((c, i) => {
+                  const isLifted = dragIdx !== null && charts[dragIdx]?.id === c.id && i !== (dragOverIdx ?? dragIdx);
+                  const isTarget = dragOverIdx === i && dragIdx !== null && dragIdx !== i;
+                  const origChart = charts[dragOverIdx ?? i];
+                  return (
+                    <div
+                      key={c.id}
+                      draggable
+                      onDragStart={() => { setDragIdx(i); }}
+                      onDragOver={e => { e.preventDefault(); setDragOverIdx(i); }}
+                      onDragEnd={() => {
+                        if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+                          const arr = [...charts];
+                          const [moved] = arr.splice(dragIdx, 1);
+                          arr.splice(dragOverIdx, 0, moved);
+                          saveOrder(arr);
+                          goTo(displayCharts.findIndex(ch => ch.id === charts[dragIdx]?.id));
+                        }
+                        setDragIdx(null); setDragOverIdx(null);
+                      }}
+                      onTouchStart={e => {
+                        longPressTimer.current = setTimeout(() => { setDragIdx(i); }, 300);
+                      }}
+                      onTouchMove={e => {
+                        if (dragIdx === null) { clearTimeout(longPressTimer.current); return; }
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const els = document.elementsFromPoint(touch.clientX, touch.clientY);
+                        const row = els.find(el => el.dataset?.dragIdx !== undefined);
+                        if (row) setDragOverIdx(parseInt(row.dataset.dragIdx));
+                      }}
+                      onTouchEnd={() => {
+                        clearTimeout(longPressTimer.current);
+                        if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+                          const arr = [...charts];
+                          const [moved] = arr.splice(dragIdx, 1);
+                          arr.splice(dragOverIdx, 0, moved);
+                          saveOrder(arr);
+                        }
+                        setDragIdx(null); setDragOverIdx(null);
+                      }}
+                      data-drag-idx={i}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        background: isTarget ? "#1a1a30" : "#13131f",
+                        border: `1px solid ${isTarget ? "#a78bfa" : "#1f1f35"}`,
+                        borderRadius: 12, padding: "12px 14px", marginBottom: 8,
+                        cursor: "grab", userSelect: "none",
+                        opacity: isLifted ? 0.35 : 1,
+                        transform: isLifted ? "scale(0.97)" : "scale(1)",
+                        transition: "transform 0.15s, opacity 0.15s, border-color 0.15s, background 0.15s",
+                        boxShadow: dragIdx === i ? "0 8px 24px rgba(0,0,0,0.5)" : "none",
+                      }}
+                    >
+                      <span style={{ color: "#2e2e50", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>⠿</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, color: isTarget ? "#a78bfa" : "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{c.label}</div>
+                        {isTarget && origChart && origChart.id !== c.id && (
+                          <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                            swaps with {origChart.label}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace" }}>#{i + 1}</span>
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              <>
+                {/* Chart label */}
+                <div style={{ padding: "0 16px 6px", flexShrink: 0 }}>
+                  <div
+                    style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer" }}
+                    onTouchStart={() => { longPressTimer.current = setTimeout(() => { setReorderMode(true); }, 600); }}
+                    onTouchEnd={() => clearTimeout(longPressTimer.current)}
+                    onTouchMove={() => clearTimeout(longPressTimer.current)}
+                  >
+                    {activeChart?.label}
+                  </div>
+                </div>
+
+                {/* Swipeable chart area */}
+                <div
+                  ref={chartAreaRef}
+                  style={{ flex: 1, padding: "0 16px", overflowY: "auto", overflowX: "hidden", minHeight: 0 }}
+                  onTouchStart={e => { carouselSwipeStart.x = e.touches[0].clientX; carouselSwipeStart.y = e.touches[0].clientY; }}
+                  onTouchEnd={e => {
+                    const dx = e.changedTouches[0].clientX - carouselSwipeStart.x;
+                    const dy = e.changedTouches[0].clientY - carouselSwipeStart.y;
+                    if (Math.abs(dx) < 30 || Math.abs(dy) > Math.abs(dx) * 1.2) return;
+                    if (dx < 0) {
+                      if (chartIdx < charts.length - 1) goTo(chartIdx + 1);
+                      else {
+                        const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+                        if (gIdx < visibleChartGroups.length - 1) { setChartGroup(visibleChartGroups[gIdx + 1].id); setSelectedChart(visibleChartGroups[gIdx + 1].charts[0]?.id); }
+                      }
+                    } else {
+                      if (chartIdx > 0) goTo(chartIdx - 1);
+                      else {
+                        const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
+                        if (gIdx > 0) { const prevG = visibleChartGroups[gIdx - 1]; setChartGroup(prevG.id); setSelectedChart(prevG.charts[prevG.charts.length - 1]?.id); }
+                      }
+                    }
+                  }}
+                >
+                  {renderChart(activeChart?.id, chartHeight)}
+                </div>
+
+                {/* Dots */}
+                {charts.length > 1 && (
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, padding: "14px 0 8px", flexShrink: 0 }}>
+                    {charts.map((c, i) => (
+                      <button key={c.id} onClick={() => goTo(i)} style={{
+                        width: i === chartIdx ? 18 : 7,
+                        height: 7,
+                        borderRadius: 99,
+                        background: i === chartIdx ? "#a78bfa" : "#2e2e50",
+                        border: "none", cursor: "pointer", padding: 0,
+                        transition: "all 0.2s",
+                      }} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         );

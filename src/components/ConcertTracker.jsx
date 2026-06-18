@@ -49,11 +49,11 @@ function PhotoAdjust({ path, pos, onChange }) {
 const APP_VERSION = '1.0.1'
 
 const CHART_GROUP_IDS = [
-  { id: "artists",  label: "Artists"   },
-  { id: "friends",  label: "Friends"   },
-  { id: "venues",   label: "Venues"    },
-  { id: "financial",label: "Financial" },
-  { id: "merch",    label: "Merch"     },
+  { id: "activity",  label: "Activity"  },
+  { id: "friends",   label: "Friends"   },
+  { id: "places",    label: "Places"    },
+  { id: "financial", label: "Financial" },
+  { id: "music",     label: "Music"     },
 ];
 
 function useBackButton(onBack, enabled = true) {
@@ -1738,7 +1738,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     if (dx < 0 && idx < visibleChartGroups.length - 1) { const nextG = visibleChartGroups[idx + 1]; setChartGroup(nextG.id); setSelectedChart(getOrderedCharts(nextG)[0]?.id); }
     else if (dx > 0 && idx > 0) { const prevG = visibleChartGroups[idx - 1]; const prevCharts = getOrderedCharts(prevG); setChartGroup(prevG.id); setSelectedChart(prevCharts[prevCharts.length - 1]?.id); }
   };
-  const [selectedChart, setSelectedChart] = useState("activity");
+  const [selectedChart, setSelectedChart] = useState("shows");
   const [selectedSong, setSelectedSong] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -3277,7 +3277,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   { label: "countries", value: Object.keys(spCountries).length, nav: { view: 'stats', chart: 'venues' } },
                   ...(spAvg !== null ? [{ label: "avg / year", value: spAvg, nav: null }] : []),
                 ].map(b => (
-                  <div key={b.label} onClick={b.nav ? () => { if (b.nav.chart) { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart(b.nav.chart); } else { onNavigate(b.nav); } } : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
+                  <div key={b.label} onClick={b.nav ? () => { if (b.nav.chart) { setStatsTab("charts"); setChartGroup('places'); setSelectedChart(b.nav.chart); } else { onNavigate(b.nav); } } : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
                     <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
                     <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
                   </div>
@@ -3288,7 +3288,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
 
           {/* Cumulative line chart */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
+          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup('activity'); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>{summaryYear === 'all' ? "cumulative shows" : "shows per month"}</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -3422,7 +3422,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, marginBottom: 12, display: "flex", overflow: "hidden" }}>
                 {/* Genre */}
-                <div onClick={() => { setStatsTab("charts"); setChartGroup("artists"); setSelectedChart("genres-pie"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer", borderRight: "1px solid #1f1f35" }}>
+                <div onClick={() => { setStatsTab("charts"); setChartGroup('activity'); setSelectedChart("genres-pie"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer", borderRight: "1px solid #1f1f35" }}>
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
@@ -3446,7 +3446,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 </div>
 
                 {/* Venue size */}
-                <div onClick={() => { setStatsTab("charts"); setChartGroup("venues"); setSelectedChart("venue-size"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer" }}>
+                <div onClick={() => { setStatsTab("charts"); setChartGroup('places'); setSelectedChart("venue-size"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ flex: 1, padding: "12px", cursor: "pointer" }}>
                   {venueEntries.length === 0 ? (
                     <div style={placeholderStyle}>set venue size on shows</div>
                   ) : (
@@ -6071,11 +6071,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             );
             const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & venues' }, { id: 'upnext', label: 'Up next' }];
             const ALL_CHART_GROUPS = [
-              { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: 'Genres' }, { id: 'shows', label: 'Shows over time' }, { id: 'artists', label: 'Top artists & ratings' }, { id: 'language', label: 'Language' }, { id: 'songs', label: 'Top songs' }, { id: 'covers', label: 'Covers' }] },
+              { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: 'Artist overview' }, { id: 'shows', label: 'Shows over time' }, { id: 'genres-pie', label: 'Genres' }, { id: 'language', label: 'Language' }, { id: 'ratings', label: 'Ratings' }] },
               { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: 'Friends & group size' }] },
-              { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: 'Venues, size & countries' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
-              { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending & avg ticket' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }] },
-              { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: 'Merch' }] },
+              { id: 'places', label: 'Places', charts: [{ id: 'venues', label: 'Top venues' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
+              { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending per year' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }, { id: 'merch-overview', label: 'Merch' }] },
+              { id: 'music', label: 'Music', charts: [{ id: 'songs', label: 'Top songs' }, { id: 'covers', label: 'Covers' }] },
             ];
             return (
               <>
@@ -6281,11 +6281,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           );
           const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
           const ALL_CHART_GROUPS = [
-            { id: 'artists', label: 'Artists', charts: [{ id: 'genres-pie', label: '🥧 Genres' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'artists', label: '🎤 Top artists & ratings' }, { id: 'language', label: '🗣️ Language' }, { id: 'songs', label: '🎵 Top songs' }, { id: 'covers', label: '↩️ Covers' }] },
+            { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: '🎤 Artist overview' }, { id: 'shows', label: '📅 Shows over time' }, { id: 'genres-pie', label: '🥧 Genres' }, { id: 'language', label: '🗣️ Language' }, { id: 'ratings', label: '⭐ Ratings' }] },
             { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: '👯 Friends & group size' }] },
-            { id: 'venues', label: 'Venues', charts: [{ id: 'venues', label: '📍 Venues, size & countries' }, { id: 'venue-loyalty', label: '💜 Venue loyalty' }] },
-            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending & avg ticket' }, { id: 'averages', label: '💶 Averages' }, { id: 'expensive', label: '💰 Most expensive shows' }] },
-            { id: 'merch', label: 'Merch', charts: [{ id: 'merch-overview', label: '🛍️ Merch' }] },
+            { id: 'places', label: 'Places', charts: [{ id: 'venues', label: '📍 Top venues' }, { id: 'venue-loyalty', label: '💜 Venue loyalty' }] },
+            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: '💸 Spending per year' }, { id: 'averages', label: '💶 Averages' }, { id: 'expensive', label: '💰 Most expensive shows' }, { id: 'merch-overview', label: '🛍️ Merch' }] },
+            { id: 'music', label: 'Music', charts: [{ id: 'songs', label: '🎵 Top songs' }, { id: 'covers', label: '↩️ Covers' }] },
           ];
           return (
             <div style={{ padding: '14px 16px' }}>
@@ -6504,7 +6504,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [selected, setSelected] = useState(null)
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
-  const [chartGroup, setChartGroup] = useState('artists')
+  const [chartGroup, setChartGroup] = useState('activity')
   const [search, setSearch] = useState('')
   const [filterYear, setFilterYear] = useState('all')
   const [filterType, setFilterType] = useState('all')

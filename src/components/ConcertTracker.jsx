@@ -3534,7 +3534,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 ))}
                 {charts.length > 1 && (
                   <button onClick={() => { setReorderMode(r => !r); setDragIdx(null); setDragOverIdx(null); }} style={{ padding: "3px 9px", borderRadius: 99, fontSize: 9, cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: reorderMode ? 700 : 400, background: reorderMode ? "#a78bfa" : "none", color: reorderMode ? "#0c0c14" : "#5a5880", border: `1px solid ${reorderMode ? "#a78bfa" : "#1f1f35"}` }}>
-                    {reorderMode ? "Done" : "⠿ Edit"}
+                    {reorderMode ? "Done" : "✎ edit"}
                   </button>
                 )}
               </div>
@@ -3600,7 +3600,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                         boxShadow: dragIdx === i ? "0 8px 24px rgba(0,0,0,0.5)" : "none",
                       }}
                     >
-                      <span style={{ color: "#2e2e50", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>⠿</span>
+                      <span style={{ color: "#2e2e50", fontSize: 14, lineHeight: 1, flexShrink: 0 }}>≡</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, color: isTarget ? "#a78bfa" : "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{c.label}</div>
                         {isTarget && origChart && origChart.id !== c.id && (

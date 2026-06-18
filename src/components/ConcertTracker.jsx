@@ -6483,7 +6483,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               ? 'Settings'
               : statsTab === 'friends'
                 ? 'Friends'
-                : 'Statx'
+                : 'Stats'
   const renderConcertList = (list, showPhoto) => {
     if (!settings.groupByMonth) {
       return list.map(c => (
@@ -6621,7 +6621,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const BottomNav = () => (
     <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
-      {navBtn('stats', '◎', 'Statx',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
+      {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
       {navBtn('summary', '▤', 'Summary', view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
       {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
       {navBtn('settings', '⚙', 'Settings', view === 'settings',                    () => setView('settings'))}

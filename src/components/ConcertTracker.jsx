@@ -2204,15 +2204,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         });
         return (
         <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
-          {(avgTicketConcert || avgTicketFestival) && (
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textAlign: "right", marginBottom: 12 }}>
-              {avgTicketConcert && <div>avg ticket concert {thisYearFS}: <span style={{ color: "#38bdf8" }}>€{avgTicketConcert.toFixed(0)}</span></div>}
-              {avgTicketFestival && <div>avg ticket festival {thisYearFS}: <span style={{ color: "#fb923c" }}>€{avgTicketFestival.toFixed(0)}</span></div>}
-            </div>
-          )}
           <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"}]} value={ysView} onChange={v => setChartOpt("year-spend", v)} />
           {ysView === "bars" && <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "flex", flexWrap: "nowrap", gap: 8, marginBottom: 14, overflowX: "auto" }}>
             {[
               { color: "#a78bfa", label: "Concerts", striped: false },
               { color: "#fb923c", label: "Festivals", striped: false },

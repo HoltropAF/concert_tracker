@@ -2184,7 +2184,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       }
       case "year-spend": {
         const ysView = chartOpt("year-spend", "bars");
-        const activeYearsYS = years.filter(y => yearSpend[y] > 0).slice(-10);
+        const _nextYear = String(new Date().getFullYear() + 1);
+        const _upcomingYearsAll = [...new Set([...Object.keys(upcomingConcertSpend), ...Object.keys(upcomingFestivalSpend)])];
+        const activeYearsYS = years.filter(y => yearSpend[y] > 0);
         const maxSpendYS = Math.max(...activeYearsYS.map(y => yearSpend[y]), 1);
         const thisYearFS = String(new Date().getFullYear());
         const thisYearPast = past.filter(c => getYear(c.date) === thisYearFS);
@@ -2221,8 +2223,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             ))}
           </div>
           {(() => {
-            const allUpcomingYears = [...new Set([...Object.keys(upcomingConcertSpend), ...Object.keys(upcomingFestivalSpend)])];
-            const activeYears = [...new Set([...years.filter(y => yearSpend[y] > 0), ...allUpcomingYears])].sort().slice(-10);
+            const allUpcomingYears = _upcomingYearsAll.filter(y => y <= _nextYear);
+            const activeYears = [...new Set([...years.filter(y => yearSpend[y] > 0), ...allUpcomingYears])].sort();
             const maxSpend = Math.max(
               ...activeYears.map(y => (yearSpend[y] || 0) + (upcomingConcertSpend[y] || 0) + (upcomingFestivalSpend[y] || 0)),
               1

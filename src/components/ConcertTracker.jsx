@@ -1846,22 +1846,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     const measure = () => {
       const rect = el.getBoundingClientRect();
       const w = rect.width || el.offsetWidth;
-      // Measure actual remaining space below this element to bottom of viewport
-      // accounting for safe area inset (iOS home bar etc)
-      const safeBottom = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0') || 0;
-      const bottomNav = document.querySelector('[data-bottom-nav]');
-      const chartGroupNav = document.querySelector('[data-chart-group-nav]');
-      const bottomNavH = bottomNav ? bottomNav.getBoundingClientRect().height : 58;
-      const chartGroupNavH = chartGroupNav ? chartGroupNav.getBoundingClientRect().height : 0;
-      const h = Math.max(140, window.innerHeight - rect.top - bottomNavH - chartGroupNavH - safeBottom - 8);
+      // Use the chartAreaRef height (already bounded by flex layout) as h
+      const areaEl = chartAreaRef.current;
+      const h = areaEl ? Math.max(140, areaEl.getBoundingClientRect().height - 32) : Math.max(140, window.innerHeight * 0.55);
       setShowsChartDims({ w, h });
     };
-    measure();
+    // Delay slightly to let layout settle
+    const t = setTimeout(measure, 50);
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     window.addEventListener('resize', measure);
-    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-  }, [statsTab]);
+    return () => { clearTimeout(t); ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [statsTab, chartGroup]);
   const summaryPast = pastAll.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
 
   // Measure available chart height so content never overflows

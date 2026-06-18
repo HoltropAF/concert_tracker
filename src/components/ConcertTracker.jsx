@@ -6186,9 +6186,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         <SettingsSection title="Concert cards">
-          <SettingsRow label="Compact card view" sub="Smaller cards, more at once">
-            <SettingsToggle checked={!!local.compactView} onChange={checked => { lUpdate("compactView", checked); onUpdate("compactView", checked); }} />
-          </SettingsRow>
           <SettingsRow label="Show venue" sub="Display venue name on cards">
             <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); onUpdate("showVenueOnCards", checked); }} />
           </SettingsRow>
@@ -6198,12 +6195,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         <SettingsSection title="Concert list">
-          <SettingsRow label="Default sort" sub="How concerts are ordered">
-            <button onClick={() => { const next = cycleOption(defaultSortOptions, local.defaultSort || 'newest'); lUpdate("defaultSort", next); onUpdate("defaultSort", next); }} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
-              <span>{optionLabel(defaultSortOptions, local.defaultSort || 'newest')}</span>
-              <span style={{ color: "#7d7aa5", fontSize: 16, lineHeight: 1 }}>›</span>
-            </button>
-          </SettingsRow>
           <SettingsRow label="Group by month" sub="Month headers in concert list">
             <SettingsToggle checked={!!local.groupByMonth} onChange={checked => { lUpdate("groupByMonth", checked); onUpdate("groupByMonth", checked); }} />
           </SettingsRow>
@@ -6235,52 +6226,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Songs shown" sub="Default rows in Songs tab">
             <SettingsStepper value={local.topSongsRows} onChange={v => lUpdate("topSongsRows", v)} min={3} max={50} />
           </SettingsRow>
-          <div style={{ padding: '0 16px 16px' }}>
-          {(() => {
-            const hiddenBlocks = local.hiddenSummaryBlocks || [];
-            const hiddenGroups = local.hiddenChartGroups || [];
-            const hiddenChts = local.hiddenCharts || [];
-            const toggleBlock = id => { const next = hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]; onUpdate('hiddenSummaryBlocks', next); lUpdate('hiddenSummaryBlocks', next); };
-            const toggleGroup = id => { const next = hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]; onUpdate('hiddenChartGroups', next); lUpdate('hiddenChartGroups', next); };
-            const toggleChart = id => { const next = hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]; onUpdate('hiddenCharts', next); lUpdate('hiddenCharts', next); };
-            const pill = (label, active, onClick, small = false) => (
-              <button onClick={onClick} style={{
-                padding: small ? '2px 8px' : '3px 10px', borderRadius: 99, fontSize: small ? 9 : 10, cursor: 'pointer',
-                fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? '#a78bfa' : '#1f1f35'}`,
-                background: active ? '#1a1a30' : 'none', color: active ? '#a78bfa' : '#4a4870',
-              }}>{label}</button>
-            );
-            const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & venues' }, { id: 'upnext', label: 'Up next' }];
-            const ALL_CHART_GROUPS = [
-              { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: 'Artist overview' }, { id: 'shows', label: 'Shows over time' }, { id: 'genres-pie', label: 'Genres & Ratings' }, { id: 'language', label: 'Language' }] },
-              { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: 'Friends & group size' }] },
-              { id: 'places', label: 'Places', charts: [{ id: 'venues', label: 'Top venues' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
-              { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending per year' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }, { id: 'merch-overview', label: 'Merch' }] },
-              { id: 'music', label: 'Music', charts: [{ id: 'songs', label: 'Top songs' }, { id: 'covers', label: 'Covers' }] },
-            ];
-            return (
-              <>
-                <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Visible summary blocks</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
-                  {BLOCKS.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
-                </div>
-                <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Visible chart groups</div>
-                {ALL_CHART_GROUPS.map(g => (
-                  <div key={g.id} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
-                    </div>
-                    {!hiddenGroups.includes(g.id) && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingLeft: 10, borderLeft: '2px solid #1f1f35' }}>
-                        {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </>
-            );
-          })()}
-          </div>
         </SettingsSection>
 
         <SettingsSection title="App">

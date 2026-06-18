@@ -4027,6 +4027,24 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
 
   return (
     <div style={{ padding: "0 0 100px" }}>
+      {/* Stat tiles */}
+      {!search && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
+            {[
+              { value: allFriends.length, label: "friends" },
+              { value: friendEntries.filter(f => f.shows.length > 1).length, label: "regulars" },
+              { value: past.filter(c => getFriends(c).length === 0).length, label: "solo" },
+              { value: friendEntries.sort((a,b) => b.shows.length - a.shows.length)[0]?.shows.length ?? "—", label: friendEntries.sort((a,b) => b.shows.length - a.shows.length)[0] ? `w. ${(friendEntries.sort((a,b) => b.shows.length - a.shows.length)[0]?.name || '').split(' ')[0]}` : "top" },
+            ].map(({ value, label }) => (
+              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Search + sort */}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
         <div style={{ position: "relative", marginBottom: 8 }}>
@@ -4672,6 +4690,22 @@ function SongsView({ concerts, onOpen, settings }) {
   return (
     <div style={{ padding: '0 0 100px' }}>
       <div style={{ padding: '14px 16px 10px' }}>
+        {/* Stat tiles */}
+        {!search && totalUnique > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 12 }}>
+            {[
+              { value: totalUnique, label: "unique" },
+              { value: totalHeard, label: "heard" },
+              { value: byCount[0]?.count ?? "—", label: byCount[0] ? byCount[0].name.slice(0, 8) : "top" },
+              { value: [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length, label: "artists" },
+            ].map(({ value, label }) => (
+              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff' }}>Songs</div>
           {totalUnique > 0 && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{totalUnique} unique · {totalHeard} total</div>}
@@ -4901,8 +4935,31 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
     );
   }
 
+  const totalVenues = venueEntries.filter(v => v.pastCount > 0).length;
+  const uniqueCountries = [...new Set(venueEntries.flatMap(v => v.shows.map(c => c.country)).filter(Boolean))].length;
+  const uniqueCities = [...new Set(venueEntries.flatMap(v => v.shows.map(c => c.city)).filter(Boolean))].length;
+  const mostVisited = venueEntries.sort((a,b) => b.pastCount - a.pastCount)[0];
+
   return (
     <div style={{ padding: '0 0 100px' }}>
+      {/* Stat tiles */}
+      {!search && (
+        <div style={{ padding: '10px 12px 0', marginBottom: 2 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
+            {[
+              { value: totalVenues, label: "venues" },
+              { value: uniqueCities, label: "cities" },
+              { value: uniqueCountries, label: "countries" },
+              { value: mostVisited?.pastCount ?? "—", label: mostVisited ? mostVisited.name.slice(0, 8) : "top" },
+            ].map(({ value, label }) => (
+              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Type pills */}
       <div style={{ padding: '10px 12px 0', display: 'flex', gap: 6 }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (

@@ -3271,10 +3271,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {/* Year scope toggle */}
           {(() => {
             const allDataYears = [...new Set(pastAll.map(c => c.date.slice(0,4)).filter(Boolean))].sort();
-            const yearOptions = [{ id: 'all', label: 'All' }, ...allDataYears.map(y => ({ id: y, label: y }))];
+            const curYear = String(new Date().getFullYear());
+            const recentYears = [curYear, String(curYear - 1), String(curYear - 2)].filter(y => allDataYears.includes(y));
+            const olderYears = allDataYears.filter(y => !recentYears.includes(y)).reverse();
+            const pills = [{ id: 'all', label: 'All' }, ...recentYears.map(y => ({ id: y, label: y }))];
             return (
-              <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
-                {yearOptions.map(({ id, label }) => (
+              <div style={{ display: "flex", gap: 4, marginBottom: 10, alignItems: "center" }}>
+                {pills.map(({ id, label }) => (
                   <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
                     background: summaryYear === id ? "#a78bfa" : "none",
                     border: `1px solid ${summaryYear === id ? "#a78bfa" : "#1f1f35"}`,
@@ -3284,6 +3287,23 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     fontWeight: summaryYear === id ? 700 : 400,
                   }}>{label}</button>
                 ))}
+                {olderYears.length > 0 && (
+                  <select
+                    value={olderYears.includes(summaryYear) ? summaryYear : ''}
+                    onChange={e => e.target.value && onUpdateSetting('summaryYear', e.target.value)}
+                    style={{
+                      background: olderYears.includes(summaryYear) ? "#a78bfa" : "#0c0c14",
+                      border: `1px solid ${olderYears.includes(summaryYear) ? "#a78bfa" : "#1f1f35"}`,
+                      borderRadius: 99, cursor: "pointer", padding: "3px 10px",
+                      fontSize: 11, fontFamily: "'DM Mono', monospace",
+                      color: olderYears.includes(summaryYear) ? "#0c0c14" : "#4a4870",
+                      WebkitAppearance: "none", appearance: "none",
+                    }}
+                  >
+                    <option value="">older ▾</option>
+                    {olderYears.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                )}
               </div>
             );
           })()}

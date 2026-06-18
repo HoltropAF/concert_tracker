@@ -1750,9 +1750,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const [chartOrder, setChartOrder] = useState(settings.chartOrder || {});
   const [sectionOrder, setSectionOrder] = useState(settings.sectionOrder || {});
   const [sectionEditChart, setSectionEditChart] = useState(null); // which chart is in section-edit mode
-  const [secDragIdx, setSecDragIdx] = useState(null);
-  const [secDragOverIdx, setSecDragOverIdx] = useState(null);
-  const secLongPressTimer = useRef(null);
 
   const getOrderedSections = (chartId, sections) => {
     const order = sectionOrder[chartId];
@@ -1828,8 +1825,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     );
   };
   const [reorderMode, setReorderMode] = useState(false);
-  const longPressTimer = useRef(null);
-  const getOrderedCharts = (group) => {
+  const longPressTimer = useRef(null); = (group) => {
     const order = chartOrder[group.id];
     if (!order) return group.charts;
     return [...group.charts].sort((a, b) => {
@@ -3534,14 +3530,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         };
 
         // Compute display order with drag preview
-        const displayCharts = dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx
-          ? (() => {
-              const arr = [...charts];
-              const [moved] = arr.splice(dragIdx, 1);
-              arr.splice(dragOverIdx, 0, moved);
-              return arr;
-            })()
-          : charts;
+        const displayCharts = charts;
 
         return (
           <div style={{ padding: "0", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>

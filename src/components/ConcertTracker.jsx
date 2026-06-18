@@ -2844,11 +2844,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               {gpView === "list" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
-                    <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>MAIN</div>
                     {topGenres.length === 0 ? <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>none</div> : <ListStat title="" items={topGenres} suffix="x" />}
                   </div>
                   <div>
-                    <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>SUB</div>
                     {topSubgenres.length === 0 ? <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>none</div> : <ListStat title="" items={topSubgenres} suffix="x" />}
                   </div>
                 </div>
@@ -2859,7 +2857,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     { title: "Subgenres", top4: top4S, others: othersS, source: topSubgenres, centerText: [String(topSubgenres.length), "sub", "genres"] },
                   ].map(({ title, top4, others, source, centerText }) => (
                     <div key={title} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                      <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
                       {source.length === 0
                         ? <div style={{ color: "#2e2e4a", fontSize: 10, fontFamily: "'DM Mono', monospace", textAlign: "center" }}>none tagged</div>
                         : <>

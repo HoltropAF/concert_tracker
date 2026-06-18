@@ -1744,6 +1744,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
   const [chartOptions, setChartOptions] = useState({});
+  const [showMoreArtistStats, setShowMoreArtistStats] = useState(false);
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
@@ -2601,7 +2602,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           const months = Math.floor((Date.now() - new Date(last.date + 'T00:00:00').getTime()) / (1000*60*60*24*30));
           return { name, months };
         }).filter(Boolean).filter(a => a.months > 6).sort((a,b) => b.months - a.months)[0];
-        const [showMoreStats, setShowMoreStats] = useState(false);
+        const [showMoreStats, setShowMoreStats] = [showMoreArtistStats, setShowMoreArtistStats];
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {/* Callout lines */}

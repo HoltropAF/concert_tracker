@@ -1767,11 +1767,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const SectionReorder = ({ chartId, sections }) => {
     const isEditing = sectionEditChart === chartId;
     const ordered = getOrderedSections(chartId, sections);
-    const display = secDragIdx !== null && secDragOverIdx !== null && secDragIdx !== secDragOverIdx && sectionEditChart === chartId
-      ? (() => { const arr = [...ordered]; const [m] = arr.splice(secDragIdx, 1); arr.splice(secDragOverIdx, 0, m); return arr; })()
-      : ordered;
-    const rowRefs = useRef([]);
-    const containerRef = useRef(null);
 
     const saveOrder = (newSections) => {
       const newOrder = { ...sectionOrder, [chartId]: newSections.map(s => s.id) };
@@ -1779,102 +1774,60 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       onUpdateSetting('sectionOrder', newOrder);
     };
 
-    const getRowAtY = (y) => {
-      let closest = null;
-      let closestDist = Infinity;
-      rowRefs.current.forEach((el, i) => {
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const mid = rect.top + rect.height / 2;
-        const dist = Math.abs(y - mid);
-        if (dist < closestDist) { closestDist = dist; closest = i; }
-      });
-      return closest;
-    };
-
-    const handleTouchStart = (i) => (e) => {
-      e.stopPropagation();
-      setSecDragIdx(i);
-      setSecDragOverIdx(i);
-    };
-
-    const handleTouchMove = (e) => {
-      if (secDragIdx === null) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const y = e.touches[0].clientY;
-      const over = getRowAtY(y);
-      if (over !== null) setSecDragOverIdx(over);
-    };
-
-    const handleTouchEnd = () => {
-      if (secDragIdx !== null && secDragOverIdx !== null && secDragIdx !== secDragOverIdx) {
-        const arr = [...ordered];
-        const [m] = arr.splice(secDragIdx, 1);
-        arr.splice(secDragOverIdx, 0, m);
-        saveOrder(arr);
-      }
-      setSecDragIdx(null);
-      setSecDragOverIdx(null);
+    const moveTo = (fromIdx, toPos) => {
+      // toPos is 1-based
+      const toIdx = toPos - 1;
+      if (toIdx === fromIdx) return;
+      const arr = [...ordered];
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      saveOrder(arr);
     };
 
     return (
       <div>
         {/* Edit toggle */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
-          <button onClick={() => { setSectionEditChart(isEditing ? null : chartId); setSecDragIdx(null); setSecDragOverIdx(null); }}
+          <button onClick={() => setSectionEditChart(isEditing ? null : chartId)}
             style={{ background: isEditing ? "#a78bfa" : "none", border: `1px solid ${isEditing ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99, padding: "3px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace", color: isEditing ? "#0c0c14" : "#5a5880", fontWeight: isEditing ? 700 : 400 }}>
             {isEditing ? "Done" : "✎ edit"}
           </button>
         </div>
 
         {isEditing ? (
-          <div ref={containerRef} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: "none" }}>
-            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Hold &amp; drag to reorder</div>
-            {display.map((s, i) => {
-              const isLifted = secDragIdx !== null && secDragIdx !== i && ordered[secDragIdx]?.id === s.id;
-              const isTarget = secDragOverIdx === i && secDragIdx !== null && secDragIdx !== i;
-              const swapWith = isTarget ? display[secDragIdx] : null;
-              return (
-                <div
-                  key={s.id}
-                  ref={el => rowRefs.current[i] = el}
-                  onTouchStart={handleTouchStart(i)}
+          <div>
+            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+              Set position with the number
+            </div>
+            {ordered.map((s, i) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "11px 14px", marginBottom: 8 }}>
+                <select
+                  value={i + 1}
+                  onChange={e => moveTo(i, parseInt(e.target.value))}
                   style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    background: isTarget ? "#1a1a30" : "#13131f",
-                    border: `1px solid ${isTarget ? "#a78bfa" : isLifted ? "#3a3860" : "#1f1f35"}`,
-                    borderRadius: 12, padding: "12px 14px", marginBottom: 8,
-                    cursor: "grab", userSelect: "none", touchAction: "none",
-                    opacity: isLifted ? 0.35 : 1,
-                    transform: secDragIdx === i ? "scale(1.02)" : "scale(1)",
-                    transition: "transform 0.1s, opacity 0.1s, border-color 0.1s, background 0.1s",
-                    boxShadow: secDragIdx === i ? "0 6px 20px rgba(0,0,0,0.5)" : "none",
+                    background: "#0c0c14", border: "1px solid #a78bfa", borderRadius: 8,
+                    color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontSize: 14,
+                    fontWeight: 700, padding: "4px 6px", cursor: "pointer", flexShrink: 0,
+                    WebkitAppearance: "none", appearance: "none", textAlign: "center", width: 44,
                   }}
                 >
-                  <span style={{ color: secDragIdx === i ? "#a78bfa" : "#3a3860", fontSize: 18, lineHeight: 1, flexShrink: 0 }}>≡</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: isTarget ? "#a78bfa" : "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{s.label}</div>
-                    {isTarget && swapWith && (
-                      <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>swaps with {swapWith.label}</div>
-                    )}
-                  </div>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace" }}>#{i + 1}</span>
-                </div>
-              );
-            })}
+                  {ordered.map((_, j) => (
+                    <option key={j + 1} value={j + 1}>{j + 1}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, flex: 1 }}>{s.label}</div>
+              </div>
+            ))}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {display.map(s => <div key={s.id}>{s.content}</div>)}
+            {ordered.map(s => <div key={s.id}>{s.content}</div>)}
           </div>
         )}
       </div>
     );
   };
   const [reorderMode, setReorderMode] = useState(false);
-  const [dragIdx, setDragIdx] = useState(null);
-  const [dragOverIdx, setDragOverIdx] = useState(null);
   const longPressTimer = useRef(null);
   const getOrderedCharts = (group) => {
     const order = chartOrder[group.id];
@@ -3608,72 +3561,40 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             </div>
 
             {/* Reorder mode — drag list */}
-            {reorderMode && (() => {
-              const slideRowRefs = [];
-              const getSlideRowAtY = (y) => {
-                let closest = null, closestDist = Infinity;
-                slideRowRefs.forEach((el, i) => {
-                  if (!el) return;
-                  const rect = el.getBoundingClientRect();
-                  const mid = rect.top + rect.height / 2;
-                  const dist = Math.abs(y - mid);
-                  if (dist < closestDist) { closestDist = dist; closest = i; }
-                });
-                return closest;
-              };
-              return (
-                <div style={{ flex: 1, padding: "0 16px", overflowY: "auto" }}
-                  onTouchMove={e => {
-                    if (dragIdx === null) return;
-                    e.preventDefault();
-                    const over = getSlideRowAtY(e.touches[0].clientY);
-                    if (over !== null) setDragOverIdx(over);
-                  }}
-                  onTouchEnd={() => {
-                    if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
-                      const arr = [...charts];
-                      const [moved] = arr.splice(dragIdx, 1);
-                      arr.splice(dragOverIdx, 0, moved);
-                      saveOrder(arr);
-                    }
-                    setDragIdx(null); setDragOverIdx(null);
-                  }}
-                >
-                  <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
-                    Hold &amp; drag to reorder
-                  </div>
-                  {displayCharts.map((c, i) => {
-                    const isLifted = dragIdx !== null && charts[dragIdx]?.id === c.id && i !== (dragOverIdx ?? dragIdx);
-                    const isTarget = dragOverIdx === i && dragIdx !== null && dragIdx !== i;
-                    const origChart = displayCharts[dragIdx ?? i];
-                    return (
-                      <div key={c.id} ref={el => slideRowRefs[i] = el}
-                        onTouchStart={e => { e.stopPropagation(); setDragIdx(i); setDragOverIdx(i); }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          background: isTarget ? "#1a1a30" : "#13131f",
-                          border: `1px solid ${isTarget ? "#a78bfa" : "#1f1f35"}`,
-                          borderRadius: 12, padding: "12px 14px", marginBottom: 8,
-                          cursor: "grab", userSelect: "none", touchAction: "none",
-                          opacity: isLifted ? 0.35 : 1,
-                          transform: dragIdx === i ? "scale(1.02)" : "scale(1)",
-                          transition: "transform 0.1s, opacity 0.1s, border-color 0.1s",
-                          boxShadow: dragIdx === i ? "0 8px 24px rgba(0,0,0,0.5)" : "none",
-                        }}>
-                        <span style={{ color: dragIdx === i ? "#a78bfa" : "#3a3860", fontSize: 18, lineHeight: 1, flexShrink: 0 }}>≡</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, color: isTarget ? "#a78bfa" : "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{c.label}</div>
-                          {isTarget && origChart && origChart.id !== c.id && (
-                            <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>swaps with {origChart.label}</div>
-                          )}
-                        </div>
-                        <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace" }}>#{i + 1}</span>
-                      </div>
-                    );
-                  })}
+            {reorderMode && (
+              <div style={{ flex: 1, padding: "0 16px", overflowY: "auto" }}>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                  Set position with the number
                 </div>
-              );
-            })()}
+                {charts.map((c, i) => (
+                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "11px 14px", marginBottom: 8 }}>
+                    <select
+                      value={i + 1}
+                      onChange={e => {
+                        const toIdx = parseInt(e.target.value) - 1;
+                        if (toIdx === i) return;
+                        const arr = [...charts];
+                        const [moved] = arr.splice(i, 1);
+                        arr.splice(toIdx, 0, moved);
+                        saveOrder(arr);
+                        goTo(arr.findIndex(ch => ch.id === c.id));
+                      }}
+                      style={{
+                        background: "#0c0c14", border: "1px solid #a78bfa", borderRadius: 8,
+                        color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontSize: 14,
+                        fontWeight: 700, padding: "4px 6px", cursor: "pointer", flexShrink: 0,
+                        WebkitAppearance: "none", appearance: "none", textAlign: "center", width: 44,
+                      }}
+                    >
+                      {charts.map((_, j) => (
+                        <option key={j + 1} value={j + 1}>{j + 1}</option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, flex: 1 }}>{c.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             {!reorderMode && (
               <>
                 {/* Chart label */}

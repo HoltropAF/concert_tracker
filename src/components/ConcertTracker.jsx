@@ -1825,7 +1825,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     );
   };
   const [reorderMode, setReorderMode] = useState(false);
-  const longPressTimer = useRef(null); = (group) => {
+  const longPressTimer = useRef(null);
+  const getOrderedCharts = (group) => {
     const order = chartOrder[group.id];
     if (!order) return group.charts;
     return [...group.charts].sort((a, b) => {

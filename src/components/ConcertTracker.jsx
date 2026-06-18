@@ -2577,23 +2577,80 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const rView = chartOpt("ratings", "dist");
         const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
         const ratingYears = Object.keys(ratingByYear).sort();
-        const maxAvgRating = 5;
         const ratingColors = { 5:"#a78bfa", 4:"#818cf8", 3:"#38bdf8", 2:"#34d399", 1:"#6b6a8f" };
         const rAll = [5,4,3,2,1].filter(n => ratingDist[n]).map(n => ({ stars: n, count: ratingDist[n], color: ratingColors[n] })).sort((a,b) => b.count - a.count);
         const top4R = rAll.slice(0, 4);
         const othersR = rAll.slice(4).reduce((s,x) => s+x.count, 0);
         const rSegs = [...top4R.map(x => ({ value: x.count, color: x.color })), ...(othersR > 0 ? [{ value: othersR, color: "#4a4870" }] : [])];
         const rLegend = [...top4R, ...(othersR > 0 ? [{ stars: 0, color: "#4a4870" }] : [])];
+        // Extra stats
+        const mostSeenA = topArtists[0];
+        const withUpcomingA = [...new Set(concerts.filter(c => !isWish(c) && !isPast(c.date)).map(c => c.artist))].length;
+        const thisYearA = String(new Date().getFullYear());
+        const newThisYearA = Object.entries(
+          past.reduce((m, c) => { if (!m[c.artist]) m[c.artist] = c.date; else if (c.date < m[c.artist]) m[c.artist] = c.date; return m; }, {})
+        ).filter(([, d]) => d.startsWith(thisYearA)).length;
+        const supportDiscoveredA = [...new Set(past.flatMap(c => (c.support||[]).map(s => getSupportName(s)).filter(Boolean)))]
+          .filter(n => !past.some(c => c.artist === n)).length;
+        const headlinerOnlyA = topArtists.filter(([name]) =>
+          !past.some(c => (c.support||[]).some(s => getSupportName(s) === name))
+        ).length;
+        const longestGapA = topArtists.map(([name]) => {
+          const last = past.filter(c => c.artist === name).sort((a,b) => b.date.localeCompare(a.date))[0];
+          if (!last) return null;
+          const months = Math.floor((Date.now() - new Date(last.date + 'T00:00:00').getTime()) / (1000*60*60*24*30));
+          return { name, months };
+        }).filter(Boolean).filter(a => a.months > 6).sort((a,b) => b.months - a.months)[0];
+        const [showMoreStats, setShowMoreStats] = useState(false);
         return (
-          <div>
-            {/* Top artists */}
-            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px", marginBottom: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {/* Callout lines */}
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+              {mostSeenA && (mostSeenA[1].headliner + mostSeenA[1].support + (mostSeenA[1].festival||0)) > 1 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: withUpcomingA > 0 ? 6 : 0, marginBottom: withUpcomingA > 0 ? 6 : 0, borderBottom: withUpcomingA > 0 ? "1px solid #1a1a2e" : "none" }}>
+                  <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>most seen</span>
+                  <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>
+                    {mostSeenA[0]} <span style={{ color: "#a78bfa" }}>{mostSeenA[1].headliner + mostSeenA[1].support + (mostSeenA[1].festival||0)}×</span>
+                  </span>
+                </div>
+              )}
+              {withUpcomingA > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>with upcoming shows</span>
+                  <span style={{ fontSize: 12, color: "#34d399", fontFamily: "'DM Mono', monospace" }}>{withUpcomingA} artist{withUpcomingA !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+            </div>
+            {/* Collapsible */}
+            <div>
+              <button onClick={() => setShowMoreStats(o => !o)} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 0 4px", cursor: "pointer" }}>
+                <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>more stats</span>
+                <span style={{ fontSize: 11, color: "#4a4870" }}>{showMoreStats ? "▴" : "▾"}</span>
+              </button>
+              {showMoreStats && (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                  {[
+                    newThisYearA > 0 && ["new this year", `${newThisYearA} artist${newThisYearA !== 1 ? "s" : ""}`],
+                    supportDiscoveredA > 0 && ["discovered as support", `${supportDiscoveredA} artist${supportDiscoveredA !== 1 ? "s" : ""}`],
+                    headlinerOnlyA > 0 && ["headliner only", `${headlinerOnlyA} artist${headlinerOnlyA !== 1 ? "s" : ""}`],
+                    longestGapA && ["longest gap", `${longestGapA.name} · ${longestGapA.months < 12 ? `${longestGapA.months}m` : `${Math.floor(longestGapA.months/12)}y`} ago`],
+                  ].filter(Boolean).map(([label, value]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #16162a" }}>
+                      <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Artist list */}
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Top artists</div>
               <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
               {artistItems.map(([name, counts], i) => {
                 const total = counts.headliner + counts.support + counts.guest + (counts.festival || 0);
                 const hasSub = (counts.support > 0 || counts.guest > 0 || counts.festival > 0)
-                  && !(chartType === 'festivals' && counts.festival === total); // hide if all are festival
+                  && !(chartType === 'festivals' && counts.festival === total);
                 const parts = [];
                 if (counts.headliner > 0) parts.push(`${counts.headliner} headliner`);
                 if (counts.support > 0) parts.push(`${counts.support} support`);
@@ -2638,61 +2695,24 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <div style={{ borderTop: "1px solid #1e3028", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
                       <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
+
                     </div>
                   </>
                 ) : rView === "pie" ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <Donut showLabels size={90} centerText={`${avgRating}★`} segments={rSegs} />
-                    <div style={{ flex: 1 }}>
-                      {rLegend.map((x, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 4 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
-                          <span style={{ color: x.stars ? "#c4c2f0" : "#4a4870", fontSize: 11 }}>{x.stars ? "★".repeat(x.stars) : "Others"}</span>
+                  <Donut showLabels size={110} centerText={[String(rated.length), "rated"]} segments={rSegs} />
+                ) : (
+                  <div>
+                    {ratingYears.map(y => (
+                      <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 32, flexShrink: 0 }}>{y}</span>
+                        <div style={{ flex: 1, height: 6, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingByYear[y] / 5) * 100}%` }} />
                         </div>
-                      ))}
-                    </div>
+                        <span style={{ color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{ratingByYear[y].toFixed(1)} ★</span>
+                      </div>
+                    ))}
                   </div>
-                ) : (() => {
-                  const BAR_H = 90;
-                  const maxAvg = settings.ratingSystem === 10 ? 10 : 5;
-                  const midAvg = maxAvg / 2;
-                  return (
-                    <div style={{ display: "flex" }}>
-                      {/* Y axis */}
-                      <div style={{ width: 26, display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 18, flexShrink: 0 }}>
-                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{maxAvg}★</span>
-                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>{midAvg}★</span>
-                        <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>0</span>
-                      </div>
-                      <div style={{ flex: 1, position: "relative" }}>
-                        {/* Gridlines */}
-                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, borderTop: "1px solid #1f1f35" }} />
-                        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, borderTop: "1px dashed #1a1a2e" }} />
-                        <div style={{ position: "absolute", bottom: 18, left: 0, right: 0, borderTop: "1px solid #1f1f35" }} />
-                        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: BAR_H, paddingBottom: 1 }}>
-                          {ratingYears.map(y => {
-                            const avg = ratingByYear[y].sum / ratingByYear[y].count;
-                            const barH = Math.max(2, (avg / maxAvg) * (BAR_H - 2));
-                            return (
-                              <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                                <span style={{ fontSize: 8, color: "#a78bfa", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{avg.toFixed(1)}</span>
-                                <div style={{ width: "100%", height: barH, background: "#a78bfa", borderRadius: "3px 3px 0 0" }} />
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {/* X axis */}
-                        <div style={{ display: "flex", gap: 4, borderTop: "1px solid #1f1f35", paddingTop: 3 }}>
-                          {ratingYears.map(y => (
-                            <div key={y} style={{ flex: 1, textAlign: "center" }}>
-                              <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{y.slice(2)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+                )}
               </div>
             )}
           </div>
@@ -3947,7 +3967,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
   const [filterUpcoming, setFilterUpcoming] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
-  const statsOverviewOpen = useState(false);
 
   // Group headliner shows by artist (festivals excluded — their name is not an artist)
   const artistMap = {};
@@ -4271,48 +4290,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
             ))}
           </div>
 
-          {/* Callout lines */}
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
-            {mostSeen && mostSeen.pastCount > 1 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, marginBottom: 6, borderBottom: "1px solid #1a1a2e" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>most seen</span>
-                <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{mostSeen.name} <span style={{ color: "#a78bfa" }}>{mostSeen.pastCount}×</span></span>
-              </div>
-            )}
-            {withUpcoming > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: supportDiscovered > 0 || longestGap ? 6 : 0, marginBottom: supportDiscovered > 0 || longestGap ? 6 : 0, borderBottom: supportDiscovered > 0 || longestGap ? "1px solid #1a1a2e" : "none" }}>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>upcoming shows</span>
-                <span style={{ fontSize: 12, color: "#34d399", fontFamily: "'DM Mono', monospace" }}>{withUpcoming} artist{withUpcoming !== 1 ? "s" : ""}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Collapsible secondary stats */}
-          {(() => {
-            const [open, setOpen] = statsOverviewOpen;
-            return (
-              <div style={{ marginBottom: 8 }}>
-                <button onClick={() => setOpen(o => !o)} style={{ width: "100%", background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", cursor: "pointer" }}>
-                  <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>more stats</span>
-                  <span style={{ fontSize: 11, color: "#4a4870" }}>{open ? "▴" : "▾"}</span>
-                </button>
-                {open && (
-                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px", marginTop: 4 }}>
-                    {[
-                      supportDiscovered > 0 && ["discovered as support", `${supportDiscovered} artist${supportDiscovered !== 1 ? "s" : ""}`],
-                      headlinerOnly > 0 && ["headliner only", `${headlinerOnly} artist${headlinerOnly !== 1 ? "s" : ""}`],
-                      longestGap && ["longest gap", `${longestGap.name} · ${longestGap.gap < 12 ? `${longestGap.gap}m` : `${Math.floor(longestGap.gap/12)}y`} ago`],
-                    ].filter(Boolean).map(([label, value]) => (
-                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #16162a" }}>
-                        <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{label}</span>
-                        <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 

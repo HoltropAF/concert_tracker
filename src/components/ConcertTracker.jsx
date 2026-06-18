@@ -96,6 +96,7 @@ const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 
 const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee","#facc15","#fb7185"];
 const GENRE_COLORS = DONUT_PALETTE;
+const GENRE_COLORS_PASTEL = ["#d4c4fd","#fbb3d4","#9dd9f9","#96e9cd","#fdc898","#bbbcf9","#f3b6fb","#90eaf7","#fde98a","#fdb4bf"];
 const VENUE_COLORS = DONUT_PALETTE;
 
 const loadXlsx = () => import('xlsx');
@@ -2860,22 +2861,22 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {[
-                    { title: "Genres", top4: top4G, others: othersG, source: topGenres, centerText: [String(topGenres.length), "genres"] },
-                    { title: "Subgenres", top4: top4S, others: othersS, source: topSubgenres, centerText: [String(topSubgenres.length), "sub", "genres"] },
-                  ].map(({ title, top4, others, source, centerText }) => (
+                    { title: "Genres", top4: top4G, others: othersG, source: topGenres, centerText: [String(topGenres.length), "genres"], colors: GENRE_COLORS },
+                    { title: "Subgenres", top4: top4S, others: othersS, source: topSubgenres, centerText: [String(topSubgenres.length), "sub", "genres"], colors: GENRE_COLORS_PASTEL },
+                  ].map(({ title, top4, others, source, centerText, colors }) => (
                     <div key={title} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                       {source.length === 0
                         ? <div style={{ color: "#2e2e4a", fontSize: 10, fontFamily: "'DM Mono', monospace", textAlign: "center" }}>none tagged</div>
                         : <>
                           <Donut size={80} showLabels centerText={centerText} segments={[
-                            ...top4.map(([, n], i) => ({ value: n, color: GENRE_COLORS[i] })),
+                            ...top4.map(([, n], i) => ({ value: n, color: colors[i] })),
                             ...(others > 0 ? [{ value: others, color: "#4a4870" }] : []),
                           ]} />
-                          <div style={{ width: "100%" }}>
+                          <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "2px 4px" }}>
                             {[...top4, ...(others > 0 ? [["Others", others]] : [])].map(([name], i) => (
-                              <div key={name} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
-                                <div style={{ width: 6, height: 6, borderRadius: 1, background: i < 4 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                                <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                              <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                                <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 4 ? colors[i] : "#4a4870", flexShrink: 0 }} />
+                                <span style={{ color: name === "Others" ? "#4a4870" : "#c4c2f0", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                               </div>
                             ))}
                           </div>

@@ -2293,10 +2293,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {(() => {
             const pastTotal = Object.values(yearSpend).reduce((s, v) => s + v, 0);
             const upTotal = [...Object.values(upcomingConcertSpend), ...Object.values(upcomingFestivalSpend)].reduce((s, v) => s + v, 0);
-            const topConcert = past.filter(c => c.type !== 'festival' && c.ticketPrice).sort((a,b) => b.ticketPrice - a.ticketPrice)[0];
-            const topFestival = past.filter(c => c.type === 'festival' && c.ticketPrice).sort((a,b) => b.ticketPrice - a.ticketPrice)[0];
-            const showConcert = chartType !== 'festivals' && topConcert;
-            const showFestival = chartType !== 'concerts' && topFestival;
             return (
               <>
                 <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -2306,28 +2302,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     {upTotal > 0 && <div style={{ fontSize: 10, color: "#a78bfa99", fontFamily: "'DM Mono', monospace" }}>+€{Math.round(upTotal)} upcoming</div>}
                   </div>
                 </div>
-                {(showConcert || showFestival) && (
-                  <div style={{ marginTop: 10, background: "#0c0c14", border: "1px solid #1a1a2e", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 5 }}>
-                    {showConcert && (
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ minWidth: 0 }}>
-                          <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 6 }}>priciest concert</span>
-                          <span style={{ fontSize: 11, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{topConcert.artist}</span>
-                        </div>
-                        <span style={{ fontSize: 12, color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>€{topConcert.ticketPrice}</span>
-                      </div>
-                    )}
-                    {showFestival && (
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ minWidth: 0 }}>
-                          <span style={{ fontSize: 9, color: "#fb923c", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 6 }}>priciest festival</span>
-                          <span style={{ fontSize: 11, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{topFestival.artist}</span>
-                        </div>
-                        <span style={{ fontSize: 12, color: "#fb923c", fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>€{topFestival.ticketPrice}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+
               </>
             );
           })()}
@@ -3158,6 +3133,36 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               {priceyMonth && (<div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0" }}><span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>priciest month on avg</span><span style={{ fontSize: 12, color: "#fbbf24", fontFamily: "'DM Mono', monospace" }}>{monthNames2[priceyMonth[0]]} · €{priceyMonth[1].toFixed(0)}</span></div>)}
             </div>
           )},
+          (() => {
+            const topC = past.filter(c => c.type !== 'festival' && c.ticketPrice).sort((a,b) => b.ticketPrice - a.ticketPrice)[0];
+            const topF = past.filter(c => c.type === 'festival' && c.ticketPrice).sort((a,b) => b.ticketPrice - a.ticketPrice)[0];
+            const showC = chartType !== 'festivals' && topC;
+            const showF = chartType !== 'concerts' && topF;
+            if (!showC && !showF) return null;
+            return { id: "avg-priciest", label: "Priciest shows", content: (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+                <StatLabel>priciest shows</StatLabel>
+                {showC && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: showF ? "1px solid #16162a" : "none" }}>
+                    <div>
+                      <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em" }}>concert</span>
+                      <div style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", marginTop: 1 }}>{topC.artist}</div>
+                    </div>
+                    <span style={{ fontSize: 13, color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{topC.ticketPrice}</span>
+                  </div>
+                )}
+                {showF && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0" }}>
+                    <div>
+                      <span style={{ fontSize: 9, color: "#fb923c", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em" }}>festival</span>
+                      <div style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", marginTop: 1 }}>{topF.artist}</div>
+                    </div>
+                    <span style={{ fontSize: 13, color: "#fb923c", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{topF.ticketPrice}</span>
+                  </div>
+                )}
+              </div>
+            )};
+          })(),
         ].filter(Boolean);
         return <SectionReorder chartId="averages" sections={avgSections} />;
       }

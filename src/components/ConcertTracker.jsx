@@ -3477,7 +3477,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={80} showLabels labelPad={0.06} centerText="Genres" segments={[
+                        <Donut size={62} showLabels labelPad={0.06} centerText="Genres" segments={[
                           ...topGenres.slice(0,3).map(([g,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
                           ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
@@ -3501,7 +3501,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={80} showLabels labelPad={0.06} centerText={["VENUE", "SIZE"]} segments={[
+                        <Donut size={62} showLabels labelPad={0.06} centerText={["VENUE", "SIZE"]} segments={[
                           ...venueEntries.slice(0,3).map(([name,n],i) => ({ value: n, color: VENUE_COLORS[i] })),
                           ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />

@@ -1689,7 +1689,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       charts: [
         { id: "genres-pie", label: "🥧 Genres" },
         { id: "shows",      label: "📅 Shows over time" },
-        { id: "artists",    label: "🎤 Top artists & ratings" },
         { id: "language",   label: "🗣️ Language" },
         ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
         ...(coversList.length > 0 ? [{ id: "covers", label: "↩️ Covers" }] : []),
@@ -2570,20 +2569,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       }
       case "ratings": return null; // merged into artists card below
       case "artists": {
-        const aView = chartOpt("artists", "count");
-        const artistItems = aView === "alpha"
-          ? [...topArtists].sort((a, b) => a[0].localeCompare(b[0]))
-          : topArtists;
-        const medals = ["🥇","🥈","🥉"];
-        const rView = chartOpt("ratings", "dist");
-        const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
-        const ratingYears = Object.keys(ratingByYear).sort();
-        const ratingColors = { 5:"#a78bfa", 4:"#818cf8", 3:"#38bdf8", 2:"#34d399", 1:"#6b6a8f" };
-        const rAll = [5,4,3,2,1].filter(n => ratingDist[n]).map(n => ({ stars: n, count: ratingDist[n], color: ratingColors[n] })).sort((a,b) => b.count - a.count);
-        const top4R = rAll.slice(0, 4);
-        const othersR = rAll.slice(4).reduce((s,x) => s+x.count, 0);
-        const rSegs = [...top4R.map(x => ({ value: x.count, color: x.color })), ...(othersR > 0 ? [{ value: othersR, color: "#4a4870" }] : [])];
-        const rLegend = [...top4R, ...(othersR > 0 ? [{ stars: 0, color: "#4a4870" }] : [])];
         // Extra stats
         const mostSeenA = topArtists[0];
         const withUpcomingA = [...new Set(concerts.filter(c => !isWish(c) && !isPast(c.date)).map(c => c.artist))].length;
@@ -2644,78 +2629,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 </div>
               )}
             </div>
-            {/* Artist list */}
-            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Top artists</div>
-              <ChartToggle options={[{id:"count",label:"Most seen"},{id:"alpha",label:"A–Z"}]} value={aView} onChange={v => setChartOpt("artists", v)} />
-              {artistItems.map(([name, counts], i) => {
-                const total = counts.headliner + counts.support + counts.guest + (counts.festival || 0);
-                const hasSub = (counts.support > 0 || counts.guest > 0 || counts.festival > 0)
-                  && !(chartType === 'festivals' && counts.festival === total);
-                const parts = [];
-                if (counts.headliner > 0) parts.push(`${counts.headliner} headliner`);
-                if (counts.support > 0) parts.push(`${counts.support} support`);
-                if (counts.guest > 0) parts.push(`${counts.guest} guest`);
-                if (counts.festival > 0 && chartType !== 'festivals') parts.push(`${counts.festival} festival`);
-                return (
-                  <button key={name} onClick={() => onNavigate({ view: 'artists' })} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: hasSub ? 8 : 6 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: aView === "count" && i < 3 ? 14 : 10, width: 20, textAlign: "center", flexShrink: 0, color: "#2e2e50", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>
-                          {aView === "count" && i < 3 ? medals[i] : `#${i+1}`}
-                        </span>
-                        <span style={{ color: "#c4c2f0", fontSize: 13 }}>{name}</span>
-                      </div>
-                      <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{total}x</span>
-                    </div>
-                    {hasSub && parts.length > 0 && (
-                      <div style={{ paddingLeft: 28, marginTop: 2 }}>
-                        <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{parts.join(' · ')}</span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Ratings */}
-            {rated.length > 0 && (
-              <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ratings</div>
-                <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"pie",label:"Pie"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
-                {rView === "dist" ? (
-                  <>
-                    {[5,4,3,2,1].map(n => (
-                      <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                        <span style={{ color: "#a78bfa", fontSize: 11, width: 56, flexShrink: 0, letterSpacing: "-1px" }}>{"★".repeat(n)}</span>
-                        <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingDist[n]/maxRatingDist)*100}%` }} />
-                        </div>
-                        <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{ratingDist[n]}</span>
-                      </div>
-                    ))}
-                    <div style={{ borderTop: "1px solid #1e3028", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
-                      <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
-
-                    </div>
-                  </>
-                ) : rView === "pie" ? (
-                  <Donut showLabels size={110} centerText={[String(rated.length), "rated"]} segments={rSegs} />
-                ) : (
-                  <div>
-                    {ratingYears.map(y => (
-                      <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                        <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 32, flexShrink: 0 }}>{y}</span>
-                        <div style={{ flex: 1, height: 6, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${((ratingByYear[y].sum / ratingByYear[y].count) / 5) * 100}%` }} />
-                        </div>
-                        <span style={{ color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{(ratingByYear[y].sum / ratingByYear[y].count).toFixed(1)} ★</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         );
       }

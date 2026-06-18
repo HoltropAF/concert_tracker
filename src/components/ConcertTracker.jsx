@@ -2293,14 +2293,42 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {(() => {
             const pastTotal = Object.values(yearSpend).reduce((s, v) => s + v, 0);
             const upTotal = [...Object.values(upcomingConcertSpend), ...Object.values(upcomingFestivalSpend)].reduce((s, v) => s + v, 0);
+            const topConcert = past.filter(c => c.type !== 'festival' && c.ticketPrice).sort((a,b) => b.ticketPrice - a.ticketPrice)[0];
+            const topFestival = past.filter(c => c.type === 'festival' && c.ticketPrice).sort((a,b) => b.ticketPrice - a.ticketPrice)[0];
+            const showConcert = chartType !== 'festivals' && topConcert;
+            const showFestival = chartType !== 'concerts' && topFestival;
             return (
-              <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total{upTotal > 0 ? " · past" : ""}</span>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(pastTotal)}</span>
-                  {upTotal > 0 && <div style={{ fontSize: 10, color: "#a78bfa99", fontFamily: "'DM Mono', monospace" }}>+€{Math.round(upTotal)} upcoming</div>}
+              <>
+                <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>total{upTotal > 0 ? " · past" : ""}</span>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{Math.round(pastTotal)}</span>
+                    {upTotal > 0 && <div style={{ fontSize: 10, color: "#a78bfa99", fontFamily: "'DM Mono', monospace" }}>+€{Math.round(upTotal)} upcoming</div>}
+                  </div>
                 </div>
-              </div>
+                {(showConcert || showFestival) && (
+                  <div style={{ marginTop: 10, background: "#0c0c14", border: "1px solid #1a1a2e", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 5 }}>
+                    {showConcert && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 6 }}>priciest concert</span>
+                          <span style={{ fontSize: 11, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{topConcert.artist}</span>
+                        </div>
+                        <span style={{ fontSize: 12, color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>€{topConcert.ticketPrice}</span>
+                      </div>
+                    )}
+                    {showFestival && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ fontSize: 9, color: "#fb923c", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 6 }}>priciest festival</span>
+                          <span style={{ fontSize: 11, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif" }}>{topFestival.artist}</span>
+                        </div>
+                        <span style={{ fontSize: 12, color: "#fb923c", fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>€{topFestival.ticketPrice}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             );
           })()}
           </>}

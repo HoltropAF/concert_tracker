@@ -2859,7 +2859,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   ))}
                 </div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "start" }}>
                   {[
                     { title: "Genres", top4: top4G, others: othersG, source: topGenres, centerText: [String(topGenres.length), "genres"], colors: GENRE_COLORS },
                     { title: "Subgenres", top4: top4S, others: othersS, source: topSubgenres, centerText: [String(topSubgenres.length), "sub", "genres"], colors: GENRE_COLORS_PASTEL },
@@ -2872,7 +2872,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                             ...top4.map(([, n], i) => ({ value: n, color: colors[i] })),
                             ...(others > 0 ? [{ value: others, color: "#4a4870" }] : []),
                           ]} />
-                          <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "2px 4px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: "100%" }}>
                             {[...top4, ...(others > 0 ? [["Others", others]] : [])].map(([name], i) => (
                               <div key={name} style={{ display: "flex", alignItems: "center", gap: 3 }}>
                                 <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 4 ? colors[i] : "#4a4870", flexShrink: 0 }} />

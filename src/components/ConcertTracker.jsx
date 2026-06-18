@@ -1921,9 +1921,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   const intensity = count / hmMax;
                   const color = isUpcoming ? `rgba(52,211,153,${0.15 + intensity * 0.85})` : `rgba(167,139,250,${0.15 + intensity * 0.85})`;
                   const textColor = intensity > 0.55 ? "#0c0c14" : (isUpcoming ? "#34d399" : "#a78bfa");
+                  const cellH = Math.max(16, Math.floor((h - 60) / Math.max(hmAllYears.length, 1)) - 3);
                   return (
-                    <div key={m} style={{ flex: 1, aspectRatio: "1", borderRadius: 2, margin: "0 1px", background: count > 0 ? color : "#0e0e1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {count > 0 && <span style={{ fontSize: 7, color: textColor, fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{count}</span>}
+                    <div key={m} style={{ flex: 1, height: cellH, borderRadius: 2, margin: "0 1px", background: count > 0 ? color : "#0e0e1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {count > 0 && <span style={{ fontSize: Math.max(6, Math.min(10, cellH - 6)), color: textColor, fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{count}</span>}
                     </div>
                   );
                 })}
@@ -1932,14 +1933,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
 
-        const CumulativeChart = () => {
+        const CumulativeChart = ({ w = 300, h = 160 }) => {
           const cumSorted = [...concertsT].filter(c => !isWish(c) && c.date && c.date.length === 10).sort((a, b) => a.date.localeCompare(b.date));
           if (cumSorted.length < 2) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
           const nowMs = Date.now();
           const cumPast = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
           const cumUpcoming = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() > nowMs);
           const n = cumSorted.length;
-          const W = 300, H = 90;
+          const W = Math.max(200, w - 28), H = Math.max(70, h - 60);
           const firstMs = new Date(cumSorted[0].date + 'T00:00:00').getTime();
           const lastMs = new Date(cumSorted[n - 1].date + 'T00:00:00').getTime();
           const rangeMs = Math.max(lastMs - firstMs, 1);
@@ -1991,12 +1992,58 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           );
         };
 
+        const showsViews = [
+          { id: "bars",       icon: "▮▮▮", label: "Bars" },
+          { id: "line",       icon: "╱╲╱", label: "Line" },
+          { id: "heatmap",    icon: "▦",   label: "Heat" },
+          { id: "cumulative", icon: "∫",   label: "Cumul" },
+        ];
+
         return (
           <div>
-            <ChartToggle options={[{id:"bars",label:"Bars"},{id:"line",label:"Line"},{id:"cumulative",label:"Cumulative"}]} value={sView} onChange={v => setChartOpt("shows", v)} />
-            {sView === "bars" && <><BarsChart /><Heatmap /></>}
-            {sView === "line" && <><LineChart /><Heatmap /></>}
-            {sView === "cumulative" && <CumulativeChart />}
+            {/* Icon toggle */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              {showsViews.map(({ id, icon, label }) => (
+                <button key={id} onClick={() => setChartOpt("shows", id)} style={{
+                  flex: 1, padding: "6px 4px", borderRadius: 8, fontSize: 11,
+                  cursor: "pointer", fontFamily: "'DM Mono', monospace",
+                  background: sView === id ? "#a78bfa" : "#13131f",
+                  border: `1px solid ${sView === id ? "#a78bfa" : "#1f1f35"}`,
+                  color: sView === id ? "#0c0c14" : "#4a4870",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                }}>
+                  <span style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>
+                  <span style={{ fontSize: 8, letterSpacing: "0.04em" }}>{label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Measure container width + fill */}
+            {(() => {
+              const ref = React.useRef(null);
+              const [dims, setDims] = React.useState({ w: 300, h: 160 });
+              React.useEffect(() => {
+                const el = ref.current;
+                if (!el) return;
+                const measure = () => {
+                  const w = el.offsetWidth;
+                  // Available height: viewport - bottom nav (~56px) - top nav (~44px) - toggle (~60px) - group tabs (~40px) - padding
+                  const h = Math.max(120, window.innerHeight - 56 - 44 - 60 - 40 - 80);
+                  setDims({ w, h });
+                };
+                measure();
+                const ro = new ResizeObserver(measure);
+                ro.observe(el);
+                return () => ro.disconnect();
+              }, []);
+              return (
+                <div ref={ref} style={{ width: "100%" }}>
+                  {sView === "bars" && <BarsChart w={dims.w} h={dims.h} />}
+                  {sView === "line" && <LineChart w={dims.w} h={dims.h} />}
+                  {sView === "heatmap" && <Heatmap w={dims.w} h={dims.h} />}
+                  {sView === "cumulative" && <CumulativeChart w={dims.w} h={dims.h} />}
+                </div>
+              );
+            })()}
           </div>
         );
       }

@@ -2836,19 +2836,26 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {/* Two donuts side by side */}
-            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>Genres</div>
+            <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
                 <ChartToggle options={[{id:"pie",label:"Pie"},{id:"list",label:"List"}]} value={gpView} onChange={v => setChartOpt("gp-view", v)} />
               </div>
               {gpView === "list" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    {topGenres.length === 0 ? <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>none</div> : <ListStat title="" items={topGenres} suffix="x" />}
-                  </div>
-                  <div>
-                    {topSubgenres.length === 0 ? <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>none</div> : <ListStat title="" items={topSubgenres} suffix="x" />}
-                  </div>
+                  {[{ label: "Genres", items: topGenres }, { label: "Subgenres", items: topSubgenres }].map(({ label, items }) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{label}</div>
+                      {items.length === 0
+                        ? <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>none</div>
+                        : items.slice(0, 5).map(([name, count]) => (
+                            <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                              <span style={{ fontSize: 11, color: "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: 6 }}>{name}</span>
+                              <span style={{ fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}x</span>
+                            </div>
+                          ))
+                      }
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

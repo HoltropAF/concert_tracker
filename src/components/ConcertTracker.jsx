@@ -2706,9 +2706,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                         <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 32, flexShrink: 0 }}>{y}</span>
                         <div style={{ flex: 1, height: 6, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingByYear[y] / 5) * 100}%` }} />
+                          <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${((ratingByYear[y].sum / ratingByYear[y].count) / 5) * 100}%` }} />
                         </div>
-                        <span style={{ color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{ratingByYear[y].toFixed(1)} ★</span>
+                        <span style={{ color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{(ratingByYear[y].sum / ratingByYear[y].count).toFixed(1)} ★</span>
                       </div>
                     ))}
                   </div>

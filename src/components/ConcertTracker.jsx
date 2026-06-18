@@ -3523,6 +3523,20 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const chartIdx = Math.max(0, charts.findIndex(c => c.id === (activeChart?.id)));
         const carouselSwipeStart = { x: 0, y: 0 };
         const goTo = (idx) => { if (charts[idx]) setSelectedChart(charts[idx].id); };
+        const hiddenCharts = settings.hiddenCharts || [];
+        const hiddenChartGroups = settings.hiddenChartGroups || [];
+
+        // All charts in the group (including hidden) for edit mode
+        const allGroupCharts = getOrderedCharts({ ...activeGroup, charts: CHART_GROUPS.find(g => g.id === activeGroup.id)?.charts || activeGroup.charts });
+
+        const toggleChart = (id) => {
+          const next = hiddenCharts.includes(id) ? hiddenCharts.filter(x => x !== id) : [...hiddenCharts, id];
+          onUpdateSetting('hiddenCharts', next);
+        };
+        const toggleGroup = (id) => {
+          const next = hiddenChartGroups.includes(id) ? hiddenChartGroups.filter(x => x !== id) : [...hiddenChartGroups, id];
+          onUpdateSetting('hiddenChartGroups', next);
+        };
 
         const saveOrder = (newCharts) => {
           const newOrder = { ...chartOrder, [activeGroup.id]: newCharts.map(c => c.id) };
@@ -3530,7 +3544,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           onUpdateSetting('chartOrder', newOrder);
         };
 
-        // Compute display order with drag preview
         const displayCharts = charts;
 
         return (
@@ -3553,36 +3566,58 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             {/* Reorder mode — drag list */}
             {reorderMode && (
               <div style={{ flex: 1, padding: "0 16px", overflowY: "auto" }}>
-                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
-                  Set position with the number
-                </div>
-                {charts.map((c, i) => (
-                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "11px 14px", marginBottom: 8 }}>
-                    <select
-                      value={i + 1}
-                      onChange={e => {
-                        const toIdx = parseInt(e.target.value) - 1;
-                        if (toIdx === i) return;
-                        const arr = [...charts];
-                        const [moved] = arr.splice(i, 1);
-                        arr.splice(toIdx, 0, moved);
-                        saveOrder(arr);
-                        goTo(arr.findIndex(ch => ch.id === c.id));
-                      }}
-                      style={{
-                        background: "#0c0c14", border: "1px solid #a78bfa", borderRadius: 8,
-                        color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontSize: 14,
-                        fontWeight: 700, padding: "4px 6px", cursor: "pointer", flexShrink: 0,
-                        WebkitAppearance: "none", appearance: "none", textAlign: "center", width: 44,
-                      }}
-                    >
-                      {charts.map((_, j) => (
-                        <option key={j + 1} value={j + 1}>{j + 1}</option>
-                      ))}
-                    </select>
-                    <div style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, flex: 1 }}>{c.label}</div>
+                {/* Hide entire group */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "11px 14px", marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{activeGroup.label}</div>
+                    <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>entire group</div>
                   </div>
-                ))}
+                  <button onClick={() => toggleGroup(activeGroup.id)} style={{ background: hiddenChartGroups.includes(activeGroup.id) ? "none" : "rgba(167,139,250,0.1)", border: `1px solid ${hiddenChartGroups.includes(activeGroup.id) ? "#2e2e50" : "#a78bfa"}`, borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", color: hiddenChartGroups.includes(activeGroup.id) ? "#4a4870" : "#a78bfa" }}>
+                    {hiddenChartGroups.includes(activeGroup.id) ? "hidden" : "visible"}
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  Charts — set position &amp; visibility
+                </div>
+                {allGroupCharts.map((c, i) => {
+                  const isHidden = hiddenCharts.includes(c.id);
+                  const visibleCharts = allGroupCharts.filter(ch => !hiddenCharts.includes(ch.id));
+                  const visibleIdx = visibleCharts.findIndex(ch => ch.id === c.id);
+                  return (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#13131f", border: `1px solid ${isHidden ? "#1a1a1a" : "#1f1f35"}`, borderRadius: 12, padding: "11px 14px", marginBottom: 8, opacity: isHidden ? 0.45 : 1 }}>
+                      {!isHidden ? (
+                        <select
+                          value={visibleIdx + 1}
+                          onChange={e => {
+                            const toVisibleIdx = parseInt(e.target.value) - 1;
+                            if (toVisibleIdx === visibleIdx) return;
+                            const arr = [...visibleCharts];
+                            const [moved] = arr.splice(visibleIdx, 1);
+                            arr.splice(toVisibleIdx, 0, moved);
+                            // Merge back with hidden charts in their relative positions
+                            const newOrder = [...allGroupCharts];
+                            let vi = 0;
+                            newOrder.forEach((ch, ni) => { if (!hiddenCharts.includes(ch.id)) { newOrder[ni] = arr[vi++]; } });
+                            saveOrder(newOrder);
+                            goTo(arr.findIndex(ch => ch.id === c.id));
+                          }}
+                          style={{ background: "#0c0c14", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontSize: 14, fontWeight: 700, padding: "4px 6px", cursor: "pointer", flexShrink: 0, WebkitAppearance: "none", appearance: "none", textAlign: "center", width: 44 }}
+                        >
+                          {visibleCharts.map((_, j) => <option key={j+1} value={j+1}>{j+1}</option>)}
+                        </select>
+                      ) : (
+                        <div style={{ width: 44, height: 34, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ color: "#2e2e50", fontSize: 16 }}>—</span>
+                        </div>
+                      )}
+                      <div style={{ flex: 1, fontSize: 13, color: isHidden ? "#4a4870" : "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{c.label}</div>
+                      <button onClick={() => toggleChart(c.id)} style={{ background: isHidden ? "none" : "rgba(167,139,250,0.1)", border: `1px solid ${isHidden ? "#2e2e50" : "#a78bfa"}`, borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontSize: 11, fontFamily: "'DM Mono', monospace", color: isHidden ? "#4a4870" : "#a78bfa", flexShrink: 0 }}>
+                        {isHidden ? "off" : "on"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!reorderMode && (

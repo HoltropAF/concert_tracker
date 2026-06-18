@@ -1846,7 +1846,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     const measure = () => {
       const rect = el.getBoundingClientRect();
       const w = rect.width || el.offsetWidth;
-      const h = Math.max(140, window.innerHeight - rect.top - 56 - 44);
+      // Measure actual remaining space below this element to bottom of viewport
+      // accounting for safe area inset (iOS home bar etc)
+      const safeBottom = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0') || 0;
+      const bottomNav = document.querySelector('[data-bottom-nav]');
+      const chartGroupNav = document.querySelector('[data-chart-group-nav]');
+      const bottomNavH = bottomNav ? bottomNav.getBoundingClientRect().height : 58;
+      const chartGroupNavH = chartGroupNav ? chartGroupNav.getBoundingClientRect().height : 0;
+      const h = Math.max(140, window.innerHeight - rect.top - bottomNavH - chartGroupNavH - safeBottom - 8);
       setShowsChartDims({ w, h });
     };
     measure();
@@ -1854,7 +1861,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     ro.observe(el);
     window.addEventListener('resize', measure);
     return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-  }, []);
+  }, [statsTab]);
   const summaryPast = pastAll.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
 
   // Measure available chart height so content never overflows
@@ -6855,7 +6862,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
 
   const ChartGroupNav = () => view === 'stats' && statsTab === 'charts' ? (
-    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
+    <div data-chart-group-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
       {visibleStatGroups.map(g => (
         <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
           flex: 1, background: chartGroup === g.id ? '#1a1a30' : 'none',
@@ -6901,7 +6908,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   )
 
   const BottomNav = () => (
-    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+    <div data-bottom-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
       {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
       {navBtn('summary', '▤', 'Summary', view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}

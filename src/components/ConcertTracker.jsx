@@ -1685,13 +1685,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   const CHART_GROUPS = [
     {
-      id: "artists", label: "Artists",
+      id: "activity", label: "Activity",
       charts: [
-        { id: "genres-pie", label: "🥧 Genres" },
+        { id: "artists",    label: "🎤 Artist overview" },
         { id: "shows",      label: "📅 Shows over time" },
+        { id: "genres-pie", label: "🥧 Genres" },
         { id: "language",   label: "🗣️ Language" },
-        ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
-        ...(coversList.length > 0 ? [{ id: "covers", label: "↩️ Covers" }] : []),
+        { id: "ratings",    label: "⭐ Ratings" },
       ]
     },
     {
@@ -1701,27 +1701,29 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       ]
     },
     {
-      id: "venues", label: "Venues",
+      id: "places", label: "Places",
       charts: [
-        { id: "venues",        label: "📍 Venues, size & countries" },
+        { id: "venues",        label: "📍 Top venues" },
         { id: "venue-loyalty", label: "💜 Venue loyalty" },
       ]
     },
     {
       id: "financial", label: "Financial",
       charts: [
-        { id: "year-spend", label: "💸 Spending & avg ticket per year" },
+        { id: "year-spend", label: "💸 Spending per year" },
         { id: "averages",   label: "💶 Averages" },
         { id: "expensive",  label: "💰 Most expensive shows" },
-      ]
-    },
-    {
-      id: "merch", label: "Merch",
-      charts: [
         { id: "merch-overview", label: "🛍️ Merch" },
       ]
     },
-  ];
+    {
+      id: "music", label: "Music",
+      charts: [
+        ...(topSongs.length > 0 ? [{ id: "songs", label: "🎵 Top songs" }] : []),
+        ...(coversList.length > 0 ? [{ id: "covers", label: "↩️ Covers" }] : []),
+      ].filter(Boolean)
+    },
+  ].filter(g => g.charts.length > 0);
 
   useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
@@ -1736,7 +1738,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     if (dx < 0 && idx < visibleChartGroups.length - 1) setChartGroup(visibleChartGroups[idx + 1].id);
     else if (dx > 0 && idx > 0) setChartGroup(visibleChartGroups[idx - 1].id);
   };
-  const [selectedChart, setSelectedChart] = useState("artists");
+  const [selectedChart, setSelectedChart] = useState("activity");
   const [selectedSong, setSelectedSong] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -2567,7 +2569,52 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       }
-      case "ratings": return null; // merged into artists card below
+      case "ratings": {
+        if (rated.length === 0) return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "20px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>No rated shows yet</div>
+            <div style={{ fontSize: 11, color: "#2e2e50", fontFamily: "'DM Mono', monospace" }}>Rate shows by opening one and tapping the stars</div>
+          </div>
+        );
+        const maxRatingDist = Math.max(...Object.values(ratingDist), 1);
+        const rView = chartOpt("ratings", "dist");
+        const ratingYears = Object.keys(ratingByYear).sort();
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ratings · {rated.length} shows</div>
+            <ChartToggle options={[{id:"dist",label:"Distribution"},{id:"year",label:"By year"}]} value={rView} onChange={v => setChartOpt("ratings", v)} />
+            {rView === "dist" ? (
+              <>
+                {[5,4,3,2,1].map(n => (
+                  <div key={n} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#a78bfa", fontSize: 11, width: 56, flexShrink: 0, letterSpacing: "-1px" }}>{"★".repeat(n)}</span>
+                    <div style={{ flex: 1, height: 7, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${(ratingDist[n] / maxRatingDist) * 100}%` }} />
+                    </div>
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 20, textAlign: "right" }}>{ratingDist[n]}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop: "1px solid #1f1f35", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>average</span>
+                  <span style={{ color: "#a78bfa", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>{avgRating} ★</span>
+                </div>
+              </>
+            ) : (
+              <div>
+                {ratingYears.map(y => (
+                  <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 32, flexShrink: 0 }}>{y}</span>
+                    <div style={{ flex: 1, height: 6, background: "#0e0e1a", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: "#a78bfa", width: `${((ratingByYear[y].sum / ratingByYear[y].count) / 5) * 100}%` }} />
+                    </div>
+                    <span style={{ color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{(ratingByYear[y].sum / ratingByYear[y].count).toFixed(1)} ★</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
       case "artists": {
         // Extra stats
         const mostSeenA = topArtists[0];
@@ -2801,6 +2848,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
       }
       case "songs": {
+        if (topSongs.length === 0) return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "20px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>No setlist data yet</div>
+            <div style={{ fontSize: 11, color: "#2e2e50", fontFamily: "'DM Mono', monospace" }}>Add songs when logging a show to see them here</div>
+          </div>
+        );
         const medals = ["🥇","🥈","🥉"];
         return (
           <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "14px" }}>
@@ -2822,6 +2875,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
       }
       case "covers": {
+        if (coversList.length === 0) return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "20px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>No covers logged yet</div>
+            <div style={{ fontSize: 11, color: "#2e2e50", fontFamily: "'DM Mono', monospace" }}>Mark songs as covers when adding setlists</div>
+          </div>
+        );
         const byOriginal = {};
         coversList.forEach(cv => { const k = cv.original || "unknown original"; byOriginal[k] = (byOriginal[k] || 0) + 1; });
         const topOriginals = Object.entries(byOriginal).sort((a,b) => b[1]-a[1]).slice(0, 5);

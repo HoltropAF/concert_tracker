@@ -1735,8 +1735,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     const dt = Date.now() - swipeTouchStart.current.t;
     const idx = visibleChartGroups.findIndex(g => g.id === chartGroup);
     if (idx < 0 || Math.abs(dx) < 12 || Math.abs(dy) > Math.abs(dx) * 2) return;
-    if (dx < 0 && idx < visibleChartGroups.length - 1) setChartGroup(visibleChartGroups[idx + 1].id);
-    else if (dx > 0 && idx > 0) setChartGroup(visibleChartGroups[idx - 1].id);
+    if (dx < 0 && idx < visibleChartGroups.length - 1) { const nextG = visibleChartGroups[idx + 1]; setChartGroup(nextG.id); setSelectedChart(getOrderedCharts(nextG)[0]?.id); }
+    else if (dx > 0 && idx > 0) { const prevG = visibleChartGroups[idx - 1]; const prevCharts = getOrderedCharts(prevG); setChartGroup(prevG.id); setSelectedChart(prevCharts[prevCharts.length - 1]?.id); }
   };
   const [selectedChart, setSelectedChart] = useState("activity");
   const [selectedSong, setSelectedSong] = useState(null);
@@ -1805,7 +1805,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     .map(g => ({ ...g, charts: g.charts.filter(c => !hiddenCharts.includes(c.id)) }))
     .filter(g => g.charts.length > 0);
   const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0] || null;
-  const activeChart = activeGroup?.charts.find(c => c.id === selectedChart) || activeGroup?.charts[0];
+  const activeGroupCharts = activeGroup ? getOrderedCharts(activeGroup) : [];
+  const activeChart = activeGroupCharts.find(c => c.id === selectedChart) || activeGroupCharts[0];
 
   const renderChart = (id, chartHeight = 400) => {
     switch(id) {
@@ -3641,13 +3642,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       if (chartIdx < charts.length - 1) goTo(chartIdx + 1);
                       else {
                         const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
-                        if (gIdx < visibleChartGroups.length - 1) { setChartGroup(visibleChartGroups[gIdx + 1].id); setSelectedChart(visibleChartGroups[gIdx + 1].charts[0]?.id); }
+                        if (gIdx < visibleChartGroups.length - 1) { const nextG = visibleChartGroups[gIdx + 1]; setChartGroup(nextG.id); setSelectedChart(getOrderedCharts(nextG)[0]?.id); }
                       }
                     } else {
                       if (chartIdx > 0) goTo(chartIdx - 1);
                       else {
                         const gIdx = visibleChartGroups.findIndex(g => g.id === chartGroup);
-                        if (gIdx > 0) { const prevG = visibleChartGroups[gIdx - 1]; setChartGroup(prevG.id); setSelectedChart(prevG.charts[prevG.charts.length - 1]?.id); }
+                        if (gIdx > 0) { const prevG = visibleChartGroups[gIdx - 1]; const prevCharts = getOrderedCharts(prevG); setChartGroup(prevG.id); setSelectedChart(prevCharts[prevCharts.length - 1]?.id); }
                       }
                     }
                   }}

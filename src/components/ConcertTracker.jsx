@@ -1748,6 +1748,23 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
   const summaryFinType = settings.summaryFinType || 'all';
+  const showsChartRef = useRef(null);
+  const [showsChartDims, setShowsChartDims] = useState({ w: 300, h: 200 });
+  useEffect(() => {
+    const el = showsChartRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || el.offsetWidth;
+      const h = Math.max(140, window.innerHeight - rect.top - 56 - 44);
+      setShowsChartDims({ w, h });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
   const summaryPast = pastAll.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
 
   // Measure available chart height so content never overflows
@@ -2016,35 +2033,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 </button>
               ))}
             </div>
-            {/* Measure container and fill available height */}
-            {(() => {
-              const ref = React.useRef(null);
-              const [dims, setDims] = React.useState({ w: 300, h: 200 });
-              React.useEffect(() => {
-                const el = ref.current;
-                if (!el) return;
-                const measure = () => {
-                  const rect = el.getBoundingClientRect();
-                  const w = rect.width || el.offsetWidth;
-                  // Fill from current top to bottom nav, minus toggle height (~44px) and padding
-                  const h = Math.max(140, window.innerHeight - rect.top - 56 - 44);
-                  setDims({ w, h });
-                };
-                measure();
-                const ro = new ResizeObserver(measure);
-                ro.observe(el);
-                window.addEventListener('resize', measure);
-                return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-              }, []);
-              return (
-                <div ref={ref} style={{ width: "100%" }}>
-                  {sView === "bars"       && <BarsChart       w={dims.w} h={dims.h} />}
-                  {sView === "line"       && <LineChart        w={dims.w} h={dims.h} />}
-                  {sView === "heatmap"    && <Heatmap          w={dims.w} h={dims.h} />}
-                  {sView === "cumulative" && <CumulativeChart  w={dims.w} h={dims.h} />}
-                </div>
-              );
-            })()}
+            {/* Fill available height using component-level ref */}
+            <div ref={showsChartRef} style={{ width: "100%" }}>
+              {sView === "bars"       && <BarsChart       w={showsChartDims.w} h={showsChartDims.h} />}
+              {sView === "line"       && <LineChart        w={showsChartDims.w} h={showsChartDims.h} />}
+              {sView === "heatmap"    && <Heatmap          w={showsChartDims.w} h={showsChartDims.h} />}
+              {sView === "cumulative" && <CumulativeChart  w={showsChartDims.w} h={showsChartDims.h} />}
+            </div>
           </div>
         );
       }

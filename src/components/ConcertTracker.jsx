@@ -2087,7 +2087,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               { color: "#a78bfa", label: "Upcoming", striped: true },
             ].map(({ color, label, striped }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: striped ? `repeating-linear-gradient(45deg, ${color}55 0px, ${color}55 3px, transparent 3px, transparent 7px)` : color, border: striped ? `1px solid ${color}88` : "none" }} />
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: striped ? `repeating-linear-gradient(45deg, ${color} 0px, ${color} 3px, ${color}33 3px, ${color}33 7px)` : color, border: striped ? `1px solid ${color}88` : "none" }} />
                 <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
               </div>
             ))}
@@ -2100,7 +2100,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               1
             );
             const midSpend = Math.round(maxSpend / 2);
-            const stripe = color => `repeating-linear-gradient(45deg, ${color}55 0px, ${color}55 3px, transparent 3px, transparent 7px)`;
+            const stripe = color => `repeating-linear-gradient(45deg, ${color} 0px, ${color} 3px, ${color}33 3px, ${color}33 7px)`;
             return (
               <>
                 <div style={{ display: "flex", marginBottom: 4 }}>

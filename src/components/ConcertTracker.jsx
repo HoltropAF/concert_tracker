@@ -4114,6 +4114,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
   const [filterUpcoming, setFilterUpcoming] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
+  const [filterType, setFilterType] = useState('all');
 
   // Group headliner shows by artist (festivals excluded — their name is not an artist)
   const artistMap = {};
@@ -4173,6 +4174,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
       if (filterGenre !== 'all' && a.topGenre !== filterGenre) return false;
       if (filterMinSeen > 0 && (a.pastCount + a.supportCount + a.guestCount + a.festivalCount) < filterMinSeen) return false;
       if (filterUpcoming && a.upcomingShows.length === 0) return false;
+      if (filterType === 'concerts' && a.pastCount === 0) return false;
+      if (filterType === 'festivals' && a.festivalCount === 0) return false;
       return true;
     })
     .sort((a, b) => {
@@ -4464,6 +4467,10 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
 
         {/* Sort + Filter pill row */}
         <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
+          {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id, label]) => (
+            <button key={id} onClick={() => setFilterType(id)} style={{ background: filterType === id ? '#a78bfa' : 'none', border: `1px solid ${filterType === id ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterType === id ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterType === id ? 700 : 400, flexShrink: 0 }}>{label}</button>
+          ))}
+          <div style={{ flex: 1 }} />
           <button onClick={() => { setShowSort(s => !s); setShowFilters(false); }} style={{ background: showSort || sortBy !== 'most-seen' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortBy !== 'most-seen' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-seen' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-seen' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-seen' ? ' ↕' : ''}
           </button>

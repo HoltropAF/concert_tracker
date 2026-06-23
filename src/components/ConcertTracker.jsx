@@ -83,6 +83,14 @@ const getYear = (dateStr) => dateStr.slice(0, 4);
 const today = new Date();
 const isPast = (dateStr) => new Date(dateStr + "T00:00:00") <= today;
 const isWish = c => !!c?.wishlist;
+const isOnline = c => c?.attendanceMode === 'online';
+const ONLINE_COLOR = "#22d3ee";
+const onlineTypeLabel = c => c?.onlineType === 'fanmeeting' ? 'Fanmeeting' : 'Concert';
+const formatOnlineLocation = c => {
+  const bits = [onlineTypeLabel(c)];
+  if (c?.platform) bits.push(c.platform);
+  return bits.join(' · ');
+};
 
 const getSupportName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'support');
@@ -332,7 +340,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   const past = isPast(concert.date) && !concert.wishlist;
   const effectiveCompact = compact || !past;
   const isFestival = concert.type === "festival";
-  const accentColor = isFestival ? "#f472b6" : past ? "#a78bfa" : concert.wishlist ? "#34d399" : "#818cf8";
+  const online = isOnline(concert);
+  const accentColor = online ? ONLINE_COLOR : isFestival ? "#f472b6" : past ? "#a78bfa" : concert.wishlist ? "#34d399" : "#818cf8";
 
   if (effectiveCompact) {
     return (
@@ -346,6 +355,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#e2e0ff", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {concert.artist}
         </span>
+        {online && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: "#0a2a30", color: ONLINE_COLOR, flexShrink: 0 }}>ONLINE</span>}
         <span style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
           {concert.date && concert.date !== '9999-12-31' ? formatDate(concert.date) : ''}
         </span>
@@ -385,6 +395,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
               fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700,
               color: "#e2e0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
             }}>{concert.artist}</span>
+            {online && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: "#0a2a30", color: ONLINE_COLOR, flexShrink: 0 }}>ONLINE</span>}
             {concert.seenAs && !isFestival && (() => {
               const cfg = {
                 Support: { bg: "#1a2a3d", color: "#60a5fa" },
@@ -396,7 +407,9 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
             })()}
           </div>
           <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-            {formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
+            {online
+              ? <>{formatDate(concert.date)} · {formatOnlineLocation(concert)}</>
+              : <>{formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}</>}
           </div>
           {!showVenue && (
             <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
@@ -448,6 +461,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const [fetchError, setFetchError] = useState('');
   const [editCoverIdx, setEditCoverIdx] = useState(null);
   const [coverInput, setCoverInput] = useState('');
+  const [editNoteIdx, setEditNoteIdx] = useState(null);
+  const [noteInput, setNoteInput] = useState('');
 
   useEffect(() => { setSongs(getSongList(sourceSongs)); }, [effectKey, overrideSongs, concert.setlist]);
 
@@ -474,6 +489,18 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     }));
     setEditCoverIdx(null);
     setCoverInput('');
+  };
+
+  const applyNote = (idx, note) => {
+    save(songs.map((s, i) => {
+      if (i !== idx) return s;
+      const name = getSongName(s); const cover = getSongCover(s);
+      const trimmed = (note || '').trim();
+      if (!trimmed) return cover ? { name, cover } : name;
+      return cover ? { name, info: trimmed, cover } : { name, info: trimmed };
+    }));
+    setEditNoteIdx(null);
+    setNoteInput('');
   };
 
   const coverSuggestions = coverInput.length > 0
@@ -519,8 +546,9 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const info = getSongInfo(song);
             const cover = getSongCover(song);
             const isEditingCover = editCoverIdx === i;
+            const isEditingNote = editNoteIdx === i;
             return (
-              <div key={`${name}-${i}`} style={{ marginBottom: isEditingCover ? 8 : (info || cover ? 6 : 4) }}>
+              <div key={`${name}-${i}`} style={{ marginBottom: (isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4) }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
@@ -529,11 +557,32 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {typeof cover === 'string' ? cover : 'cover'}</div>}
                   </div>
                   {!readOnly && (
-                    <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); } }}
+                    <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); } }}
+                      style={{ background: 'none', border: 'none', color: info || isEditingNote ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✎</button>
+                  )}
+                  {!readOnly && (
+                    <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); setEditNoteIdx(null); } }}
                       style={{ background: 'none', border: 'none', color: cover || isEditingCover ? '#fb923c' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>↩</button>
                   )}
                   {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
                 </div>
+                {isEditingNote && (
+                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
+                    <input
+                      autoFocus value={noteInput}
+                      onChange={e => setNoteInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') applyNote(i, noteInput); if (e.key === 'Escape') { setEditNoteIdx(null); setNoteInput(''); } }}
+                      placeholder="Note, e.g. switched lyrics, acoustic version…"
+                      style={{ width: '100%', background: '#0c0c14', border: '1px solid #a78bfa44', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button onMouseDown={() => applyNote(i, noteInput)} style={{ background: 'none', border: '1px solid #a78bfa55', borderRadius: 6, color: '#a78bfa', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                        Save note
+                      </button>
+                      {info && <button onMouseDown={() => applyNote(i, '')} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
+                    </div>
+                  </div>
+                )}
                 {isEditingCover && (
                   <div style={{ paddingLeft: 26, marginTop: 4 }}>
                     <div style={{ position: 'relative' }}>
@@ -703,6 +752,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
 
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
   const isFestival = concert.type === "festival";
+  const online = isOnline(concert);
   const past = isPast(concert.date);
 
   const labelStyle = { fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" };
@@ -758,7 +808,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <button onClick={() => onNavigate({ view: 'artists' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {concert.city}</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
           <button onClick={handleShare} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
           <button onClick={() => setEditing(true)} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Edit</button>
@@ -767,8 +817,17 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
         {/* Venue + tour hero */}
         <div style={{ padding: "20px 20px 0" }}>
           <div style={{ marginBottom: 14 }}>
-            <button onClick={() => onNavigate({ view: 'venues' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
-            <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
+            {online ? (
+              <>
+                <div style={{ fontSize: 16, color: "#c4c2f0", fontWeight: 600 }}>{onlineTypeLabel(concert)} <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: "#0a2a30", color: ONLINE_COLOR, marginLeft: 4 }}>ONLINE</span></div>
+                {concert.platform && <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.platform}</div>}
+              </>
+            ) : (
+              <>
+                <button onClick={() => onNavigate({ view: 'venues' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
+                <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
+              </>
+            )}
             {concert.tour && <div style={{ fontSize: 12, color: "#4a4870", marginTop: 4 }}>{concert.tour}</div>}
           </div>
 
@@ -795,6 +854,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           {/* Tag pills */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
+            {online && <Badge color="#0a2a30">💻 Online</Badge>}
             {concert.wishlist ? <Badge color="#0a1a12">want to go</Badge> : !past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
             {(concert.ticketAddons || []).map(a => <Badge key={a} color="#1a1030">{a}</Badge>)}
@@ -1011,6 +1071,25 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
             )}
           </> }] : []),
 
+          /* ── WAY OF ATTENDING ── */
+          { title: 'Way of attending', content: <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: form.attendanceMode === 'online' ? 12 : 0 }}>
+              <button onClick={() => update('attendanceMode', 'in_person')} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: form.attendanceMode !== 'online' ? '#1a1a30' : '#0c0c14', border: `1px solid ${form.attendanceMode !== 'online' ? '#a78bfa' : '#2e2e50'}`, color: form.attendanceMode !== 'online' ? '#a78bfa' : '#6b6a8f', fontWeight: form.attendanceMode !== 'online' ? 700 : 400, fontFamily: "'DM Sans',sans-serif" }}>📍 In person</button>
+              <button onClick={() => update('attendanceMode', 'online')} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: form.attendanceMode === 'online' ? '#0a2a30' : '#0c0c14', border: `1px solid ${form.attendanceMode === 'online' ? ONLINE_COLOR : '#2e2e50'}`, color: form.attendanceMode === 'online' ? ONLINE_COLOR : '#6b6a8f', fontWeight: form.attendanceMode === 'online' ? 700 : 400, fontFamily: "'DM Sans',sans-serif" }}>💻 Online</button>
+            </div>
+            {form.attendanceMode === 'online' && (
+              <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  {[{ id: 'concert', label: 'Concert' }, { id: 'fanmeeting', label: 'Fanmeeting' }].map(t => (
+                    <button key={t.id} onClick={() => update('onlineType', t.id)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: (form.onlineType || 'concert') === t.id ? '#0a2a30' : '#0c0c14', border: `1px solid ${(form.onlineType || 'concert') === t.id ? ONLINE_COLOR : '#2e2e50'}`, color: (form.onlineType || 'concert') === t.id ? ONLINE_COLOR : '#6b6a8f', fontWeight: (form.onlineType || 'concert') === t.id ? 700 : 400, fontFamily: "'DM Sans',sans-serif" }}>{t.label}</button>
+                  ))}
+                </div>
+                <div style={labelStyle}>Platform</div>
+                <input value={form.platform || ''} onChange={e => update('platform', e.target.value)} placeholder="e.g. Beyond Live, Netflix, Weverse… (optional)" style={inputStyle} />
+              </>
+            )}
+          </> },
+
           /* ── SHOW ── */
           { title: form.type === 'festival' ? 'Festival' : 'Show', content: <>
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -1033,7 +1112,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           </> },
 
           /* ── VENUE ── */
-          { title: 'Venue', content: <>
+          ...(form.attendanceMode !== 'online' ? [{ title: 'Venue', content: <>
             {(settings.savedVenues || []).length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                 {(settings.savedVenues || []).map((v, i) => {
@@ -1056,7 +1135,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
               onToggle={vs => update("venueSize", form.venueSize===vs ? null : vs)}
               placeholder="Select venue size..."
             />
-          </> },
+          </> }] : []),
 
           /* ── LINEUP ── */
           { title: 'Lineup', content: <>
@@ -5018,7 +5097,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     rating: null, ticketPrice: null, otherCost: null, merch: [], notes: '',
     ticketType: null, ticketAddons: [],
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
-    acts: [],
+    acts: [], attendanceMode: 'in_person', onlineType: 'concert', platform: '',
   })
   const [supportInput, setSupportInput] = useState('')
   const [supportRole, setSupportRole] = useState('support')
@@ -5164,9 +5243,9 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
     const e = {}
     if (!form.artist.trim()) e.artist = true
     if (!form.wishlist && !form.date) e.date = true
-    if (!form.wishlist && !form.venue.trim()) e.venue = true
-    if (!form.wishlist && !form.city.trim()) e.city = true
-    if (!form.wishlist && !form.country.trim()) e.country = true
+    if (!form.wishlist && form.attendanceMode !== 'online' && !form.venue.trim()) e.venue = true
+    if (!form.wishlist && form.attendanceMode !== 'online' && !form.city.trim()) e.city = true
+    if (!form.wishlist && form.attendanceMode !== 'online' && !form.country.trim()) e.country = true
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -5316,7 +5395,21 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                   </a>
                 )}
                 <button disabled={!form.artist || !form.date || sfStatus === 'loading'} onClick={autoFillFromSearch} style={{ width: '100%', marginBottom: 12, background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: (!form.artist || !form.date) ? '#2e2e4a' : '#a78bfa', fontSize: 12, padding: '8px', cursor: (!form.artist || !form.date) ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? 'Searching setlist.fm…' : '✨ Auto-fill from setlist.fm (artist + date)'}</button>
-{!form.wishlist && <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <button onClick={() => update('attendanceMode', 'in_person')} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: form.attendanceMode !== 'online' ? '#1a1a30' : '#0c0c14', border: `1px solid ${form.attendanceMode !== 'online' ? '#a78bfa' : '#2e2e50'}`, color: form.attendanceMode !== 'online' ? '#a78bfa' : '#6b6a8f', fontWeight: form.attendanceMode !== 'online' ? 700 : 400 }}>📍 In person</button>
+                  <button onClick={() => update('attendanceMode', 'online')} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: form.attendanceMode === 'online' ? '#0a2a30' : '#0c0c14', border: `1px solid ${form.attendanceMode === 'online' ? ONLINE_COLOR : '#2e2e50'}`, color: form.attendanceMode === 'online' ? ONLINE_COLOR : '#6b6a8f', fontWeight: form.attendanceMode === 'online' ? 700 : 400 }}>💻 Online</button>
+                </div>
+                {form.attendanceMode === 'online' && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      {[{ id: 'concert', label: 'Concert' }, { id: 'fanmeeting', label: 'Fanmeeting' }].map(t => (
+                        <button key={t.id} onClick={() => update('onlineType', t.id)} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: (form.onlineType || 'concert') === t.id ? '#0a2a30' : '#0c0c14', border: `1px solid ${(form.onlineType || 'concert') === t.id ? ONLINE_COLOR : '#2e2e50'}`, color: (form.onlineType || 'concert') === t.id ? ONLINE_COLOR : '#6b6a8f', fontWeight: (form.onlineType || 'concert') === t.id ? 700 : 400 }}>{t.label}</button>
+                      ))}
+                    </div>
+                    <input value={form.platform || ''} onChange={e => update('platform', e.target.value)} placeholder="Platform (optional)" style={inputStyle} />
+                  </div>
+                )}
+{!form.wishlist && form.attendanceMode !== 'online' && <>
                 {fieldLabel('Venue *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
                   <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
@@ -5436,7 +5529,24 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                 {fieldLabel('Tour')}
                 <input value={form.tour} onChange={e => update('tour', e.target.value)} placeholder="Tour name (optional)" style={inputStyle} />
               </>)}
-              {card('Venue', <>
+              {card('Way of attending', <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: form.attendanceMode === 'online' ? 12 : 0 }}>
+                  <button onClick={() => update('attendanceMode', 'in_person')} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: form.attendanceMode !== 'online' ? '#1a1a30' : '#0c0c14', border: `1px solid ${form.attendanceMode !== 'online' ? '#a78bfa' : '#2e2e50'}`, color: form.attendanceMode !== 'online' ? '#a78bfa' : '#6b6a8f', fontWeight: form.attendanceMode !== 'online' ? 700 : 400 }}>📍 In person</button>
+                  <button onClick={() => update('attendanceMode', 'online')} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: form.attendanceMode === 'online' ? '#0a2a30' : '#0c0c14', border: `1px solid ${form.attendanceMode === 'online' ? ONLINE_COLOR : '#2e2e50'}`, color: form.attendanceMode === 'online' ? ONLINE_COLOR : '#6b6a8f', fontWeight: form.attendanceMode === 'online' ? 700 : 400 }}>💻 Online</button>
+                </div>
+                {form.attendanceMode === 'online' && (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                      {[{ id: 'concert', label: 'Concert' }, { id: 'fanmeeting', label: 'Fanmeeting' }].map(t => (
+                        <button key={t.id} onClick={() => update('onlineType', t.id)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: (form.onlineType || 'concert') === t.id ? '#0a2a30' : '#0c0c14', border: `1px solid ${(form.onlineType || 'concert') === t.id ? ONLINE_COLOR : '#2e2e50'}`, color: (form.onlineType || 'concert') === t.id ? ONLINE_COLOR : '#6b6a8f', fontWeight: (form.onlineType || 'concert') === t.id ? 700 : 400 }}>{t.label}</button>
+                      ))}
+                    </div>
+                    {fieldLabel('Platform')}
+                    <input value={form.platform || ''} onChange={e => update('platform', e.target.value)} placeholder="e.g. Beyond Live, Netflix, Weverse… (optional)" style={inputStyle} />
+                  </>
+                )}
+              </>)}
+              {form.attendanceMode !== 'online' && card('Venue', <>
                 {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue===v.name && form.city===v.city && form.country===v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, room: v.room||f.room, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</button>; })}</div>}
                 {fieldLabel('Venue name *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>

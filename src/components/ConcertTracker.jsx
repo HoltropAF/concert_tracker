@@ -6833,12 +6833,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                   {[
                     { label: "CSV template", fn: () => {
                       const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','SeenAs','Notes'];
-                      const example = ['c-example','2024-01-15','Artist Name','Venue Name','','City','Country','concert','Tour Name','Pop','','English','5','50','Friend One; Friend Two','','Mid-venue','Headliner','Great show'];
+                      const example = ['c-example','2024-01-15','Artist Name','Venue Name','','City','Country','concert','Tour Name','Pop','','English','5','50','Friend One; Friend Two','','Large','Headliner','Great show'];
                       const csv = [headers.join(','), example.map(v => `"${v}"`).join(',')].join('\n');
                       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'settracker-template.csv'; a.click();
                     }},
                     { label: "JSON template", fn: () => {
-                      const template = JSON.stringify([{ id: "c-example", date: "2024-01-15", artist: "Artist Name", venue: "Venue Name", room: "", city: "City", country: "Country", type: "concert", tour: "Tour Name", genre: "Pop", subgenre: "", language: ["English"], rating: 5, ticketPrice: 50, friends: ["Friend One"], solo: false, venueSize: "Mid-venue", seenAs: "Headliner", notes: "Great show", merch: [], support: [] }], null, 2);
+                      const template = JSON.stringify([{ id: "c-example", date: "2024-01-15", artist: "Artist Name", venue: "Venue Name", room: "", city: "City", country: "Country", type: "concert", tour: "Tour Name", genre: "Pop", subgenre: "", language: ["English"], rating: 5, ticketPrice: 50, friends: ["Friend One"], solo: false, venueSize: "Large", seenAs: "Headliner", notes: "Great show", merch: [], support: [] }], null, 2);
                       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([template], { type: 'application/json' })); a.download = 'settracker-template.json'; a.click();
                     }},
                   ].map(({ label, fn }) => (

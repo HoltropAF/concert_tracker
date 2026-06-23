@@ -120,7 +120,7 @@ export const DEFAULT_SETTINGS = {
   genres: ['Pop','K-pop','Rock','Electronic','Country','Hip-Hop','R&B','Metal','Folk','Jazz','Classical','Other'],
   subgenres: ['Indie pop','Dutch pop','Latin pop','Pop punk','Indie rock','Alternative rock','Folk rock','Drum & Bass','EDM','Dance','Singer-songwriter','Electropop'],
   languages: ['English','Dutch','Spanish','French','German','Korean','Japanese','Portuguese','Other'],
-  venueSizes: ['Club', 'Small hall', 'Mid-venue', 'Arena', 'Stadium'],
+  venueSizes: ['Small', 'Medium', 'Large', 'Arena', 'Stadium'],
   colorTheme: 'purple',
   compactView: false,
   showVenueOnCards: true,

@@ -131,8 +131,10 @@ function StarRating({ value, onChange, max = 5 }) {
   );
 }
 
-function DropdownSelect({ options, selected, onToggle, multi = false, placeholder = "Select...", accentColor = "#a78bfa" }) {
+function DropdownSelect({ options, selected, onToggle, multi = false, placeholder = "Select...", accentColor = "#a78bfa", onAddNew = null }) {
   const [open, setOpen] = useState(false);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newValue, setNewValue] = useState('');
   const ref = useRef(null);
   useEffect(() => {
     if (!open) return;
@@ -142,6 +144,13 @@ function DropdownSelect({ options, selected, onToggle, multi = false, placeholde
   }, [open]);
   const selectedArr = Array.isArray(selected) ? selected : selected ? [selected] : [];
   const summary = selectedArr.length === 0 ? placeholder : selectedArr.join(', ');
+  const submitNew = () => {
+    const v = newValue.trim();
+    if (v && onAddNew) onAddNew(v);
+    setNewValue('');
+    setAddingNew(false);
+    if (!multi) setOpen(false);
+  };
   return (
     <div ref={ref} style={{ position: 'relative', marginBottom: 12 }}>
       <button onClick={() => setOpen(o => !o)} style={{ width: '100%', background: '#0c0c14', border: `1px solid ${open ? accentColor : '#2e2e50'}`, borderRadius: 8, color: selectedArr.length ? '#c4c2f0' : '#4a4870', padding: '8px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -159,6 +168,20 @@ function DropdownSelect({ options, selected, onToggle, multi = false, placeholde
               </button>
             );
           })}
+          {onAddNew && (
+            addingNew ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px' }}>
+                <input
+                  autoFocus value={newValue} onChange={e => setNewValue(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') submitNew(); if (e.key === 'Escape') { setNewValue(''); setAddingNew(false); } }}
+                  placeholder="New option…" style={{ flex: 1, background: '#0c0c14', border: `1px solid ${accentColor}`, borderRadius: 6, color: '#e2e0ff', padding: '5px 8px', fontFamily: "'DM Mono', monospace", fontSize: 12, outline: 'none' }}
+                />
+                <button onClick={submitNew} style={{ background: 'none', border: 'none', color: accentColor, fontSize: 15, cursor: 'pointer', padding: '0 4px' }}>✓</button>
+              </div>
+            ) : (
+              <button onClick={() => setAddingNew(true)} style={{ width: '100%', background: 'none', border: 'none', color: accentColor, padding: '9px 12px', fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>+ Add new…</button>
+            )
+          )}
         </div>
       )}
     </div>
@@ -200,6 +223,47 @@ function SaveTagPrompt({ value, label, onConfirm, onDismiss }) {
           <button onClick={onConfirm} style={{ flex: 1, padding: "10px", borderRadius: 9, background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save it</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// "+ Add new" pill that expands into a small inline text input. Used next to genre/subgenre/
+// language/venue-size pill rows so a brand-new option can be typed directly on a show, instead
+// of only being addable from Settings. On confirm, calls onAdd(value) which the caller is
+// expected to use to both apply the value to the current show AND offer SaveTagPrompt.
+function AddNewTagPill({ onAdd, accentColor = '#a78bfa' }) {
+  const [adding, setAdding] = useState(false);
+  const [value, setValue] = useState('');
+
+  if (!adding) {
+    return (
+      <button onClick={() => setAdding(true)} style={{
+        padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+        background: 'none', color: accentColor, border: `1px dashed ${accentColor}66`, fontWeight: 600
+      }}>+ Add new</button>
+    );
+  }
+
+  const submit = () => {
+    const v = value.trim();
+    if (v) onAdd(v);
+    setValue('');
+    setAdding(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <input
+        autoFocus value={value} onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setValue(''); setAdding(false); } }}
+        onBlur={() => { if (!value.trim()) setAdding(false); }}
+        placeholder="New…" style={{
+          width: 90, padding: '4px 8px', borderRadius: 99, fontSize: 12,
+          background: '#0c0c14', border: `1px solid ${accentColor}`, color: '#e2e0ff',
+          fontFamily: "'DM Mono', monospace", outline: 'none'
+        }}
+      />
+      <button onClick={submit} style={{ background: 'none', border: 'none', color: accentColor, fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>✓</button>
     </div>
   );
 }
@@ -706,7 +770,8 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
-  const [pendingMerchTag, setPendingMerchTag] = useState(null); // value typed in the custom-item input, offered for saving
+  // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
+  const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState(() => normalizeConcertForm(concert));
   useEffect(() => { setForm(normalizeConcertForm(concert)); setEditing(false); }, [concert.id]);
   const photoInputRef = useRef(null);
@@ -1161,6 +1226,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
               selected={form.venueSize||[]}
               onToggle={vs => update("venueSize", form.venueSize===vs ? null : vs)}
               placeholder="Select venue size..."
+              onAddNew={v => { update("venueSize", v); setPendingTag({ value: v, settingsKey: 'venueSizes', label: 'venue sizes' }); }}
             />
           </> }] : []),
 
@@ -1204,6 +1270,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
               onToggle={g => { const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update("genre", next.length===0?null:next.length===1?next[0]:next); }}
               multi
               placeholder="Select genre(s)..."
+              onAddNew={v => { const cur=getGenres(form); update("genre", [...cur, v]); setPendingTag({ value: v, settingsKey: 'genres', label: 'genres' }); }}
             />
             <div style={labelStyle}>Subgenre</div>
             <DropdownSelect
@@ -1212,6 +1279,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
               onToggle={g => update("subgenre", form.subgenre===g ? null : g)}
               placeholder="Select subgenre..."
               accentColor="#38bdf8"
+              onAddNew={v => { update("subgenre", v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }}
             />
             <div style={labelStyle}>Language</div>
             <DropdownSelect
@@ -1220,6 +1288,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
               onToggle={l => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", langs.includes(l) ? langs.filter(x=>x!==l) : [...langs, l]); }}
               multi
               placeholder="Select language(s)..."
+              onAddNew={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }}
             />
           </> },
 
@@ -1280,7 +1349,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
               {(form.merch || []).map((m, i) => (
                 <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
                   <div style={{ flex:1, position:"relative" }}>
-                    <select value={merchCategories.includes(m.item) ? m.item : "__custom__"} onChange={e => { if (e.target.value !== "__custom__") updateMerch(i, "item", e.target.value); }} style={{ ...inputStyle, width:"100%", appearance:"none", paddingRight:24 }}>
+                    <select value={merchCategories.includes(m.item) ? m.item : "__custom__"} onChange={e => updateMerch(i, "item", e.target.value)} style={{ ...inputStyle, width:"100%", appearance:"none", paddingRight:24 }}>
                       {merchCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       <option value="__custom__">Custom...</option>
                     </select>
@@ -1293,7 +1362,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                       onChange={e => updateMerch(i, "item", e.target.value)}
                       onBlur={e => {
                         const v = e.target.value.trim();
-                        if (v && !merchCategories.some(c => c.toLowerCase() === v.toLowerCase())) setPendingMerchTag(v);
+                        if (v && !merchCategories.some(c => c.toLowerCase() === v.toLowerCase())) setPendingTag({ value: v, settingsKey: 'merchCategories', label: 'merch tags' });
                       }}
                       style={{ ...inputStyle, flex:1 }} autoFocus
                     />
@@ -1417,14 +1486,14 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
           </div>
         )}
       </div>
-      {pendingMerchTag && (
+      {pendingTag && (
         <SaveTagPrompt
-          value={pendingMerchTag}
-          label="merch tags"
-          onDismiss={() => setPendingMerchTag(null)}
+          value={pendingTag.value}
+          label={pendingTag.label}
+          onDismiss={() => setPendingTag(null)}
           onConfirm={() => {
-            if (onUpdateSetting) onUpdateSetting('merchCategories', [...merchCategories, pendingMerchTag.trim()]);
-            setPendingMerchTag(null);
+            if (onUpdateSetting) onUpdateSetting(pendingTag.settingsKey, [...(settings[pendingTag.settingsKey] || []), pendingTag.value.trim()]);
+            setPendingTag(null);
           }}
         />
       )}
@@ -5168,7 +5237,7 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
 
 function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', concerts = [] }) {
   useBackButton(onClose);
-  const [pendingMerchTag, setPendingMerchTag] = useState(null);
+  const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
     type: initialType === 'wish' ? 'concert' : initialType, wishlist: initialType === 'wish', tour: '', support: [], friends: [], solo: false,
@@ -5403,13 +5472,13 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {(form.merch || []).map((m, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div style={{ flex: 1, position: 'relative' }}>
-                      <select value={merchCategories.includes(m.item) ? m.item : '__custom__'} onChange={e => { if (e.target.value !== '__custom__') updateMerch(i, 'item', e.target.value); }} style={{ ...inputStyle, width: '100%', appearance: 'none', paddingRight: 24 }}>
+                      <select value={merchCategories.includes(m.item) ? m.item : '__custom__'} onChange={e => updateMerch(i, 'item', e.target.value)} style={{ ...inputStyle, width: '100%', appearance: 'none', paddingRight: 24 }}>
                         {merchCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         <option value='__custom__'>Custom…</option>
                       </select>
                       <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#6b6a8f', fontSize: 10, pointerEvents: 'none' }}>▾</span>
                     </div>
-                    {(!merchCategories.includes(m.item) || m.item === '') && <input value={m.item === '__custom__' ? '' : m.item} placeholder="Custom item…" onChange={e => updateMerch(i, 'item', e.target.value)} onBlur={e => { const v = e.target.value.trim(); if (v && !merchCategories.some(c => c.toLowerCase() === v.toLowerCase())) setPendingMerchTag(v); }} style={{ ...inputStyle, flex: 1 }} autoFocus />}
+                    {(!merchCategories.includes(m.item) || m.item === '') && <input value={m.item === '__custom__' ? '' : m.item} placeholder="Custom item…" onChange={e => updateMerch(i, 'item', e.target.value)} onBlur={e => { const v = e.target.value.trim(); if (v && !merchCategories.some(c => c.toLowerCase() === v.toLowerCase())) setPendingTag({ value: v, settingsKey: 'merchCategories', label: 'merch tags' }); }} style={{ ...inputStyle, flex: 1 }} autoFocus />}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ color: '#6b6a8f', fontSize: 12 }}>€</span><input type="number" value={m.price} placeholder="0" onChange={e => updateMerch(i, 'price', e.target.value)} style={{ ...inputStyle, width: 70 }} /></div>
                     <button onClick={() => removeMerch(i)} style={{ background: 'none', border: 'none', color: '#4a6a5a', fontSize: 16, cursor: 'pointer', padding: 0 }}>×</button>
                   </div>
@@ -5637,7 +5706,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                   <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 {fieldLabel('Venue size')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(settings.venueSizes||[]).map(vs => <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.venueSize===vs ? '#a78bfa' : '#0c0c14', color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(settings.venueSizes||[]).map(vs => <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.venueSize===vs ? '#a78bfa' : '#0c0c14', color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>)}<AddNewTagPill onAdd={v => { update('venueSize', v); setPendingTag({ value: v, settingsKey: 'venueSizes', label: 'venue sizes' }); }} /></div>
               </>)}
               {foldCard('Lineup & genre', <>
                 {fieldLabel('Seen as')}
@@ -5647,11 +5716,11 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>{['support','guest'].map(r => <button key={r} onClick={() => setSupportRole(r)} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: supportRole===r ? '#a78bfa' : '#0c0c14', color: supportRole===r ? '#0c0c14' : '#6b6a8f', border: `1px solid ${supportRole===r ? '#a78bfa' : '#2e2e50'}`, fontWeight: supportRole===r ? 700 : 400, fontFamily: "'DM Mono',monospace" }}>{r}</button>)}</div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}><input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key==='Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} /><button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button></div>
                 {fieldLabel('Genre')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.genres||[]).map(g => <button key={g} onClick={()=>{ const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update('genre', next.length===0?null:next.length===1?next[0]:next); }} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: getGenres(form).includes(g) ? '#a78bfa' : '#0c0c14', color: getGenres(form).includes(g) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${getGenres(form).includes(g) ? '#a78bfa' : '#2e2e50'}`, fontWeight: getGenres(form).includes(g) ? 700 : 400 }}>{g}</button>)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.genres||[]).map(g => <button key={g} onClick={()=>{ const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update('genre', next.length===0?null:next.length===1?next[0]:next); }} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: getGenres(form).includes(g) ? '#a78bfa' : '#0c0c14', color: getGenres(form).includes(g) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${getGenres(form).includes(g) ? '#a78bfa' : '#2e2e50'}`, fontWeight: getGenres(form).includes(g) ? 700 : 400 }}>{g}</button>)}<AddNewTagPill onAdd={v => { const cur=getGenres(form); update('genre', [...cur, v]); setPendingTag({ value: v, settingsKey: 'genres', label: 'genres' }); }} /></div>
                 {fieldLabel('Subgenre')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}<AddNewTagPill accentColor="#38bdf8" onAdd={v => { update('subgenre', v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }} /></div>
                 {fieldLabel('Language')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
               </>)}
               {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
               {foldCard('Financial', financialContent, !!(form.ticketPrice || form.otherCost || (form.merch || []).length))}
@@ -5660,14 +5729,14 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           );
         })()}
       </div>
-      {pendingMerchTag && (
+      {pendingTag && (
         <SaveTagPrompt
-          value={pendingMerchTag}
-          label="merch tags"
-          onDismiss={() => setPendingMerchTag(null)}
+          value={pendingTag.value}
+          label={pendingTag.label}
+          onDismiss={() => setPendingTag(null)}
           onConfirm={() => {
-            if (onUpdateSetting) onUpdateSetting('merchCategories', [...merchCategories, pendingMerchTag.trim()]);
-            setPendingMerchTag(null);
+            if (onUpdateSetting) onUpdateSetting(pendingTag.settingsKey, [...(settings[pendingTag.settingsKey] || []), pendingTag.value.trim()]);
+            setPendingTag(null);
           }}
         />
       )}

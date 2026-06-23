@@ -175,6 +175,35 @@ function Badge({ children, color = "#1a2e26" }) {
   );
 }
 
+// Small confirmation popup: "Add 'X' to your saved [tags]?" — used when someone types
+// a brand-new custom value (merch category, genre, etc.) directly on a show, so they
+// can optionally promote it to a permanent, reusable option without going to Settings.
+function SaveTagPrompt({ value, label, onConfirm, onDismiss }) {
+  if (!value || !value.trim()) return null;
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 400,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+    }} onClick={onDismiss}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#13131f", border: "1px solid #2e2e50", borderRadius: 14,
+        padding: "20px 18px", maxWidth: 320, width: "100%", textAlign: "center"
+      }}>
+        <div style={{ fontSize: 14, color: "#e2e0ff", marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>
+          Save <span style={{ color: "#a78bfa", fontWeight: 700 }}>"{value.trim()}"</span> to your {label}?
+        </div>
+        <div style={{ fontSize: 12, color: "#6b6a8f", marginBottom: 18, fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+          You'll be able to pick it from the list next time.
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onDismiss} style={{ flex: 1, padding: "10px", borderRadius: 9, background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontSize: 13, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Just this once</button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: "10px", borderRadius: 9, background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save it</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ToastHost({ toast, onDismiss }) {
   if (!toast) return null;
   const palette = toast.type === 'error'
@@ -673,10 +702,11 @@ function normalizeConcertForm(concert) {
   };
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSetting = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
+  const [pendingMerchTag, setPendingMerchTag] = useState(null); // value typed in the custom-item input, offered for saving
   const [form, setForm] = useState(() => normalizeConcertForm(concert));
   useEffect(() => { setForm(normalizeConcertForm(concert)); setEditing(false); }, [concert.id]);
   const photoInputRef = useRef(null);
@@ -1257,7 +1287,16 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
                     <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", color:"#6b6a8f", fontSize:10, pointerEvents:"none" }}>▾</span>
                   </div>
                   {(!merchCategories.includes(m.item) || m.item === "") && (
-                    <input value={m.item === "__custom__" ? "" : m.item} placeholder="Custom item..." onChange={e => updateMerch(i, "item", e.target.value)} style={{ ...inputStyle, flex:1 }} autoFocus />
+                    <input
+                      value={m.item === "__custom__" ? "" : m.item}
+                      placeholder="Custom item..."
+                      onChange={e => updateMerch(i, "item", e.target.value)}
+                      onBlur={e => {
+                        const v = e.target.value.trim();
+                        if (v && !merchCategories.some(c => c.toLowerCase() === v.toLowerCase())) setPendingMerchTag(v);
+                      }}
+                      style={{ ...inputStyle, flex:1 }} autoFocus
+                    />
                   )}
                   <div style={{ display:"flex", alignItems:"center", gap:4 }}>
                     <span style={{ color:"#6b6a8f", fontSize:12 }}>€</span>
@@ -1378,6 +1417,17 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           </div>
         )}
       </div>
+      {pendingMerchTag && (
+        <SaveTagPrompt
+          value={pendingMerchTag}
+          label="merch tags"
+          onDismiss={() => setPendingMerchTag(null)}
+          onConfirm={() => {
+            if (onUpdateSetting) onUpdateSetting('merchCategories', [...merchCategories, pendingMerchTag.trim()]);
+            setPendingMerchTag(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -5116,8 +5166,9 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
   );
 }
 
-function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', concerts = [] }) {
+function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', concerts = [] }) {
   useBackButton(onClose);
+  const [pendingMerchTag, setPendingMerchTag] = useState(null);
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
     type: initialType === 'wish' ? 'concert' : initialType, wishlist: initialType === 'wish', tour: '', support: [], friends: [], solo: false,
@@ -5358,7 +5409,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
                       </select>
                       <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#6b6a8f', fontSize: 10, pointerEvents: 'none' }}>▾</span>
                     </div>
-                    {(!merchCategories.includes(m.item) || m.item === '') && <input value={m.item === '__custom__' ? '' : m.item} placeholder="Custom item…" onChange={e => updateMerch(i, 'item', e.target.value)} style={{ ...inputStyle, flex: 1 }} autoFocus />}
+                    {(!merchCategories.includes(m.item) || m.item === '') && <input value={m.item === '__custom__' ? '' : m.item} placeholder="Custom item…" onChange={e => updateMerch(i, 'item', e.target.value)} onBlur={e => { const v = e.target.value.trim(); if (v && !merchCategories.some(c => c.toLowerCase() === v.toLowerCase())) setPendingMerchTag(v); }} style={{ ...inputStyle, flex: 1 }} autoFocus />}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ color: '#6b6a8f', fontSize: 12 }}>€</span><input type="number" value={m.price} placeholder="0" onChange={e => updateMerch(i, 'price', e.target.value)} style={{ ...inputStyle, width: 70 }} /></div>
                     <button onClick={() => removeMerch(i)} style={{ background: 'none', border: 'none', color: '#4a6a5a', fontSize: 16, cursor: 'pointer', padding: 0 }}>×</button>
                   </div>
@@ -5609,6 +5660,17 @@ function AddConcertForm({ onSave, onClose, settings = {}, friends = [], allArtis
           );
         })()}
       </div>
+      {pendingMerchTag && (
+        <SaveTagPrompt
+          value={pendingMerchTag}
+          label="merch tags"
+          onDismiss={() => setPendingMerchTag(null)}
+          onConfirm={() => {
+            if (onUpdateSetting) onUpdateSetting('merchCategories', [...merchCategories, pendingMerchTag.trim()]);
+            setPendingMerchTag(null);
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -6215,17 +6277,18 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   return (
     <div style={{ padding: "16px 10px 100px", width: "min(100%, 430px)", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", minHeight: 30, marginBottom: 14 }}>
-        {(hasChanges || saved) && (
-          <button onClick={handleSettingsSave} style={{
-            background: saved ? "#a78bfa" : "#1a1a30",
-            border: `1px solid ${saved ? "#a78bfa" : "#2e2e50"}`,
-            color: saved ? "#0c0c14" : "#a78bfa",
-            borderRadius: 8, padding: "4px 12px", fontSize: 11, fontWeight: 700,
-            cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s"
-          }}>{saved ? "Saved ✓" : "Save"}</button>
-        )}
-      </div>
+      <div style={{ minHeight: 30, marginBottom: 14 }} />
+      {(hasChanges || saved) && (
+        <button onClick={handleSettingsSave} style={{
+          position: "fixed", top: "calc(12px + env(safe-area-inset-top, 0px))", right: 14, zIndex: 300,
+          background: saved ? "#a78bfa" : "#1a1a30",
+          border: `1px solid ${saved ? "#a78bfa" : "#a78bfa"}`,
+          color: saved ? "#0c0c14" : "#a78bfa",
+          borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700,
+          cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5)"
+        }}>{saved ? "Saved ✓" : "Save"}</button>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
@@ -7070,6 +7133,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           onClose={() => setShowAdd(null)}
           initialType={showAdd}
           settings={settings}
+          onUpdateSetting={onUpdateSetting}
           friends={allFriends}
           concerts={concerts}
           allArtists={[...new Set([
@@ -7095,7 +7159,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); } }} allArtists={[...new Set([
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),

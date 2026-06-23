@@ -472,7 +472,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
 
   const addSong = () => {
     const t = songInput.trim();
-    if (!t || songs.some(s => getSongName(s) === t)) return;
+    if (!t) return;
     save([...songs, t]);
     setSongInput('');
   };
@@ -3269,11 +3269,21 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         };
         const appearances = past.flatMap(c => {
           const result = [];
-          const mainSong = getSongList(c.setlist).find(s => matchSong(s, c.artist));
-          if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), cover: getSongCover(mainSong), isSupport: false });
+          const mainMatches = getSongList(c.setlist).filter(s => matchSong(s, c.artist));
+          mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: getSongInfo(s), cover: getSongCover(s), isSupport: false }));
           Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
-            const s = getSongList(songs).find(x => matchSong(x, artistName));
-            if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true });
+            const matches = getSongList(songs).filter(x => matchSong(x, artistName));
+            matches.forEach(s => result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true }));
+          });
+          // Tag each occurrence with its position among repeats in the same show, so
+          // "played twice in one show" is visible (e.g. festival version + acoustic encore).
+          const perConcertCount = {};
+          result.forEach(r => { perConcertCount[r.concert.id] = (perConcertCount[r.concert.id] || 0) + 1; });
+          let seen = {};
+          result.forEach(r => {
+            seen[r.concert.id] = (seen[r.concert.id] || 0) + 1;
+            r.occurrenceIndex = seen[r.concert.id];
+            r.occurrenceTotal = perConcertCount[r.concert.id];
           });
           return result;
         }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
@@ -3287,17 +3297,20 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             </div>
             <div style={{ padding: "14px 16px" }}>
-              {appearances.map(({ concert: c, artist, info, cover, isSupport }, i) => {
+              {appearances.map(({ concert: c, artist, info, cover, isSupport, occurrenceIndex, occurrenceTotal }, i) => {
                 const online = isOnline(c);
                 return (
-                <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
+                <button key={`${c.id}-${artist}-${occurrenceIndex}`} onClick={() => onOpen(c)} style={{
                   width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35",
                   borderLeft: `3px solid ${online ? ONLINE_COLOR : isSupport ? "#3d3564" : "#a78bfa"}`,
                   borderRadius: 10, padding: "11px 14px", cursor: "pointer", marginBottom: 6, display: "flex", flexDirection: "column", gap: 2
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(c.date)}</span>
-                    {isSupport && <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#1a1a30", borderRadius: 99 }}>support</span>}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {occurrenceTotal > 1 && <span style={{ fontSize: 9, color: "#34d399", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#0a1a12", borderRadius: 99 }}>{occurrenceIndex}/{occurrenceTotal} this show</span>}
+                      {isSupport && <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#1a1a30", borderRadius: 99 }}>support</span>}
+                    </div>
                   </div>
                   <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 600 }}>{artist}{cover ? <span style={{ color: "#fb923c", fontWeight: 400 }}> · cover</span> : null}</div>
                   <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{online ? formatOnlineLocation(c) : <>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</>}</div>
@@ -4728,11 +4741,19 @@ function SongsView({ concerts, onOpen, settings }) {
     };
     const appearances = past.flatMap(c => {
       const result = [];
-      const mainSong = getSongList(c.setlist).find(s => matchSong(s, c.artist));
-      if (mainSong) result.push({ concert: c, artist: c.artist, info: getSongInfo(mainSong), cover: getSongCover(mainSong), isSupport: false });
+      const mainMatches = getSongList(c.setlist).filter(s => matchSong(s, c.artist));
+      mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: getSongInfo(s), cover: getSongCover(s), isSupport: false }));
       Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
-        const s = getSongList(songs).find(x => matchSong(x, artistName));
-        if (s) result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true });
+        const matches = getSongList(songs).filter(x => matchSong(x, artistName));
+        matches.forEach(s => result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true }));
+      });
+      const perConcertCount = {};
+      result.forEach(r => { perConcertCount[r.concert.id] = (perConcertCount[r.concert.id] || 0) + 1; });
+      let seen = {};
+      result.forEach(r => {
+        seen[r.concert.id] = (seen[r.concert.id] || 0) + 1;
+        r.occurrenceIndex = seen[r.concert.id];
+        r.occurrenceTotal = perConcertCount[r.concert.id];
       });
       return result;
     }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
@@ -4746,24 +4767,26 @@ function SongsView({ concerts, onOpen, settings }) {
           </div>
         </div>
         <div style={{ padding: '14px 16px' }}>
-          {appearances.map(({ concert: c, artist, info, cover, isSupport }) => {
+          {appearances.map(({ concert: c, artist, info, cover, isSupport, occurrenceIndex, occurrenceTotal }) => {
             const online = isOnline(c);
             return (
-            <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
+            <button key={`${c.id}-${artist}-${occurrenceIndex}`} onClick={() => onOpen(c)} style={{
               width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35',
               borderLeft: `3px solid ${online ? ONLINE_COLOR : isSupport ? '#3d3564' : '#a78bfa'}`,
               borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 2
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{formatDate(c.date)}</span>
-                {isSupport && <span style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: '#1a1a30', borderRadius: 99 }}>support</span>}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {occurrenceTotal > 1 && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: '#0a1a12', borderRadius: 99 }}>{occurrenceIndex}/{occurrenceTotal} this show</span>}
+                  {isSupport && <span style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: '#1a1a30', borderRadius: 99 }}>support</span>}
+                </div>
               </div>
               <div style={{ fontSize: 12, color: '#c4c2f0', fontWeight: 600 }}>{artist}{cover ? <span style={{ color: '#fb923c', fontWeight: 400 }}> · cover</span> : null}</div>
               <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{online ? formatOnlineLocation(c) : <>{c.venue}{c.room ? ` · ${c.room}` : ''} · {c.city}</>}</div>
               {info && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{info}</div>}
             </button>
           )})}
-          ))}
         </div>
       </div>
     );
@@ -6823,9 +6846,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
     filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto,
-    filterType !== 'all', compact !== !!settings.compactView
+    filterType !== 'all'
   ].filter(Boolean).length
-  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setCompact(!!settings.compactView); setFilterHasPhoto(false); }
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); }
   const resetSort = () => setSortOrder(settings.defaultSort || 'newest')
 
   const filtered = concerts.filter(c => {
@@ -7181,6 +7204,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ minHeight: 36, background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
               {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
             </button>
+            {/* Compact / figures toggle */}
+            <button onClick={() => setCompact(c => !c)} style={{ marginLeft: 'auto', background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+              {compact ? '▤' : '☰'}
+            </button>
           </div>
         )}
 
@@ -7205,10 +7232,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   <button key={id} onClick={() => setFilterType(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterType === id ? '#a78bfa' : '#0c0c14', color: filterType === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
                 ))}
               </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Compact mode</div>
-              <button onClick={() => setCompact(c => !c)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: compact ? '#a78bfa' : '#0c0c14', color: compact ? '#0c0c14' : '#6b6a8f', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>⊟ Compact</button>
             </div>
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Friend</div>

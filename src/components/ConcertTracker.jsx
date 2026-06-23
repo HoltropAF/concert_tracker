@@ -355,7 +355,6 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#e2e0ff", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {concert.artist}
         </span>
-        {online && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: "#0a2a30", color: ONLINE_COLOR, flexShrink: 0 }}>ONLINE</span>}
         <span style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
           {concert.date && concert.date !== '9999-12-31' ? formatDate(concert.date) : ''}
         </span>
@@ -395,7 +394,6 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
               fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700,
               color: "#e2e0ff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
             }}>{concert.artist}</span>
-            {online && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: "#0a2a30", color: ONLINE_COLOR, flexShrink: 0 }}>ONLINE</span>}
             {concert.seenAs && !isFestival && (() => {
               const cfg = {
                 Support: { bg: "#1a2a3d", color: "#60a5fa" },
@@ -741,7 +739,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
   const handleShare = () => {
     const lines = [
       `🎤 ${concert.artist}${concert.tour ? ` — ${concert.tour}` : ''}`,
-      `📅 ${formatDate(concert.date)} · ${concert.venue}${concert.room ? ` · ${concert.room}` : ''} · ${concert.city}`,
+      `📅 ${formatDate(concert.date)} · ${isOnline(concert) ? formatOnlineLocation(concert) : `${concert.venue}${concert.room ? ` · ${concert.room}` : ''} · ${concert.city}`}`,
       getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
       concert.rating ? `⭐ ${'★'.repeat(concert.rating)}` : null,
       concert.notes ? `📝 ${concert.notes}` : null,
@@ -819,7 +817,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           <div style={{ marginBottom: 14 }}>
             {online ? (
               <>
-                <div style={{ fontSize: 16, color: "#c4c2f0", fontWeight: 600 }}>{onlineTypeLabel(concert)} <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 99, background: "#0a2a30", color: ONLINE_COLOR, marginLeft: 4 }}>ONLINE</span></div>
+                <div style={{ fontSize: 16, color: "#c4c2f0", fontWeight: 600 }}>{onlineTypeLabel(concert)}</div>
                 {concert.platform && <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.platform}</div>}
               </>
             ) : (
@@ -854,7 +852,6 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, friends = [], 
           {/* Tag pills */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
-            {online && <Badge color="#0a2a30">💻 Online</Badge>}
             {concert.wishlist ? <Badge color="#0a1a12">want to go</Badge> : !past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
             {(concert.ticketAddons || []).map(a => <Badge key={a} color="#1a1030">{a}</Badge>)}
@@ -2467,7 +2464,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18, flexShrink: 0 }}>#{i+1}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: "#c4c2f0", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
-                    <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)} · {c.venue}</div>
+                    <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(12, (amount / exMax) * 50) }} />
@@ -3290,10 +3287,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             </div>
             <div style={{ padding: "14px 16px" }}>
-              {appearances.map(({ concert: c, artist, info, cover, isSupport }, i) => (
+              {appearances.map(({ concert: c, artist, info, cover, isSupport }, i) => {
+                const online = isOnline(c);
+                return (
                 <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
                   width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35",
-                  borderLeft: `3px solid ${isSupport ? "#3d3564" : "#a78bfa"}`,
+                  borderLeft: `3px solid ${online ? ONLINE_COLOR : isSupport ? "#3d3564" : "#a78bfa"}`,
                   borderRadius: 10, padding: "11px 14px", cursor: "pointer", marginBottom: 6, display: "flex", flexDirection: "column", gap: 2
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -3301,10 +3300,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     {isSupport && <span style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace", padding: "1px 5px", background: "#1a1a30", borderRadius: 99 }}>support</span>}
                   </div>
                   <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 600 }}>{artist}{cover ? <span style={{ color: "#fb923c", fontWeight: 400 }}> · cover</span> : null}</div>
-                  <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</div>
+                  <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{online ? formatOnlineLocation(c) : <>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</>}</div>
                   {info && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{info}</div>}
                 </button>
-              ))}
+              )})}
             </div>
           </div>
         );
@@ -3642,7 +3641,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.artist}</div>
-                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{c.venue} · {c.city}</div>
+                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>{isOnline(c) ? formatOnlineLocation(c) : `${c.venue} · ${c.city}`}</div>
                       </div>
                       <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
                         {new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
@@ -4393,7 +4392,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
                   {photos.map(c => (
                     <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
                       <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
-                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {c.venue}</div>
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
                     </button>
                   ))}
                 </div>
@@ -4485,7 +4484,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Support, guest & festival</div>
               {supportApps.map(({ concert: c, role }) => {
                 const isFestRole = role === 'festival';
-                const borderColor = role === 'guest' ? '#f472b6' : isFestRole ? '#f472b633' : '#3d3564';
+                const online = isOnline(c);
+                const borderColor = online ? ONLINE_COLOR : role === 'guest' ? '#f472b6' : isFestRole ? '#f472b633' : '#3d3564';
                 const badgeBg = role === 'guest' ? '#1a1030' : isFestRole ? '#1a1030' : '#1a1a30';
                 const badgeColor = role === 'guest' ? '#f472b6' : isFestRole ? '#f472b6' : '#a78bfa';
                 return (
@@ -4502,7 +4502,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
                       </div>
                       <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 500 }}>{c.artist}</div>
                       <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-                        {c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}
+                        {online ? formatOnlineLocation(c) : <>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</>}
                       </div>
                     </div>
                   </button>
@@ -4746,10 +4746,12 @@ function SongsView({ concerts, onOpen, settings }) {
           </div>
         </div>
         <div style={{ padding: '14px 16px' }}>
-          {appearances.map(({ concert: c, artist, info, cover, isSupport }) => (
+          {appearances.map(({ concert: c, artist, info, cover, isSupport }) => {
+            const online = isOnline(c);
+            return (
             <button key={`${c.id}-${artist}`} onClick={() => onOpen(c)} style={{
               width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35',
-              borderLeft: `3px solid ${isSupport ? '#3d3564' : '#a78bfa'}`,
+              borderLeft: `3px solid ${online ? ONLINE_COLOR : isSupport ? '#3d3564' : '#a78bfa'}`,
               borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 2
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -4757,9 +4759,10 @@ function SongsView({ concerts, onOpen, settings }) {
                 {isSupport && <span style={{ fontSize: 9, color: '#a78bfa', fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: '#1a1a30', borderRadius: 99 }}>support</span>}
               </div>
               <div style={{ fontSize: 12, color: '#c4c2f0', fontWeight: 600 }}>{artist}{cover ? <span style={{ color: '#fb923c', fontWeight: 400 }}> · cover</span> : null}</div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{c.venue}{c.room ? ` · ${c.room}` : ''} · {c.city}</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{online ? formatOnlineLocation(c) : <>{c.venue}{c.room ? ` · ${c.room}` : ''} · {c.city}</>}</div>
               {info && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{info}</div>}
             </button>
+          )})}
           ))}
         </div>
       </div>
@@ -4843,12 +4846,13 @@ function SongsView({ concerts, onOpen, settings }) {
 function ArtistShowRow({ concert, onOpen }) {
   const past = isPast(concert.date);
   const isFestival = concert.type === "festival";
+  const online = isOnline(concert);
   return (
     <button onClick={() => onOpen(concert)} style={{
       width: "100%", textAlign: "left",
       background: isFestival ? "#0e0e16" : past ? "#0e0e1a" : "#13131f",
       border: `1px solid ${isFestival ? "#2a1f35" : "#1f1f35"}`,
-      borderLeft: `3px solid ${isFestival ? "#f472b6" : "#2e2e4a"}`,
+      borderLeft: `3px solid ${online ? ONLINE_COLOR : isFestival ? "#f472b6" : "#2e2e4a"}`,
       borderRadius: 10, padding: "11px 14px",
       cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", gap: 12
     }}>
@@ -4858,7 +4862,7 @@ function ArtistShowRow({ concert, onOpen }) {
           <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(concert.date)}</span>
         </div>
         <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-          {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}
+          {online ? formatOnlineLocation(concert) : <>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}</>}
         </div>
         {concert.tour && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>{concert.tour}</div>}
         {getFriends(concert).length > 0 && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 2 }}>w. {getFriends(concert).join(", ")}</div>}

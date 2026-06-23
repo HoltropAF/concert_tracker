@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
 
 function PhotoImg({ path, style, pos }) {
@@ -428,6 +428,137 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
     </div>
   );
 }
+
+// Month-grid calendar with status/mode dot indicators per day, plus a list of that
+// day's shows underneath. Operates on the full concerts list (not the filtered/sorted
+// list used by the regular Shows list) so every status — want to go, upcoming, went,
+// online, offline — stays visible regardless of the List view's filters/sort.
+function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDate, onOpen }) {
+  const { year, month: monthIdx } = month;
+
+  const byDate = useMemo(() => {
+    const map = {};
+    for (const c of concerts) {
+      if (!c.date) continue;
+      const key = c.date.slice(0, 10);
+      if (!map[key]) map[key] = [];
+      map[key].push(c);
+    }
+    return map;
+  }, [concerts]);
+
+  const statusOf = (c) => isWish(c) ? 'wish' : isPast(c.date) ? 'went' : 'upcoming';
+  const STATUS_COLOR = { wish: '#34d399', upcoming: '#818cf8', went: '#a78bfa' };
+
+  const firstOfMonth = new Date(year, monthIdx, 1);
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const startWeekday = firstOfMonth.getDay(); // 0 = Sunday
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const monthLabel = firstOfMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const goPrevMonth = () => onMonthChange(monthIdx === 0 ? { year: year - 1, month: 11 } : { year, month: monthIdx - 1 });
+  const goNextMonth = () => onMonthChange(monthIdx === 11 ? { year: year + 1, month: 0 } : { year, month: monthIdx + 1 });
+
+  const selectedShows = selectedDate ? (byDate[selectedDate] || []) : [];
+
+  return (
+    <div style={{ paddingTop: 8 }}>
+      {/* Month header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <button onClick={goPrevMonth} style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 8, color: '#6b6a8f', width: 30, height: 30, cursor: 'pointer', fontSize: 14 }}>‹</button>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, color: '#e2e0ff' }}>{monthLabel}</div>
+        <button onClick={goNextMonth} style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 8, color: '#6b6a8f', width: 30, height: 30, cursor: 'pointer', fontSize: 14 }}>›</button>
+      </div>
+
+      {/* Weekday labels */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+          <div key={i} style={{ textAlign: 'center', fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", padding: '4px 0' }}>{d}</div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 16 }}>
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} />;
+          const dateKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const shows = byDate[dateKey] || [];
+          const isToday = dateKey === todayKey;
+          const isSelected = dateKey === selectedDate;
+          const statuses = [...new Set(shows.map(statusOf))];
+          const hasOnline = shows.some(isOnline);
+          const hasOffline = shows.some(c => !isOnline(c));
+          return (
+            <button
+              key={i}
+              onClick={() => onSelectDate(shows.length > 0 ? (isSelected ? null : dateKey) : null)}
+              style={{
+                aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                background: isSelected ? '#1a1a30' : 'none',
+                border: isToday ? '1px solid #a78bfa' : isSelected ? '1px solid #2e2e50' : '1px solid transparent',
+                borderRadius: 8, cursor: shows.length > 0 ? 'pointer' : 'default', padding: 0, position: 'relative'
+              }}
+            >
+              <span style={{ fontSize: 12, color: isToday ? '#a78bfa' : shows.length > 0 ? '#e2e0ff' : '#4a4870', fontWeight: isToday ? 700 : 400 }}>{d}</span>
+              {shows.length > 0 && (
+                <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+                  {statuses.slice(0, 2).map(s => (
+                    <span key={s} style={{ width: 4, height: 4, borderRadius: 99, background: STATUS_COLOR[s], display: 'inline-block' }} />
+                  ))}
+                  {(hasOnline && hasOffline) ? (
+                    <>
+                      <span style={{ width: 4, height: 4, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />
+                      <span style={{ width: 4, height: 4, borderRadius: 99, background: '#6b6a8f', display: 'inline-block' }} />
+                    </>
+                  ) : hasOnline ? (
+                    <span style={{ width: 4, height: 4, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />
+                  ) : null}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 16, fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
+        {[['wish', 'Want to go'], ['upcoming', 'Upcoming'], ['went', 'Went']].map(([k, label]) => (
+          <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: STATUS_COLOR[k], display: 'inline-block' }} />{label}
+          </span>
+        ))}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />Online
+        </span>
+      </div>
+
+      {/* Selected day's shows */}
+      <div style={{ borderTop: '1px solid #1f1f35', paddingTop: 14 }}>
+        {!selectedDate ? (
+          <div style={{ textAlign: 'center', color: '#4a4870', fontSize: 12, fontFamily: "'DM Mono', monospace", padding: '20px 0' }}>
+            Tap a date with a dot to see its shows.
+          </div>
+        ) : selectedShows.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#4a4870', fontSize: 12, fontFamily: "'DM Mono', monospace", padding: '20px 0' }}>
+            No shows on {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>
+              {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} — {selectedShows.length} show{selectedShows.length > 1 ? 's' : ''}
+            </div>
+            {selectedShows.map(c => <ConcertCard key={c.id} concert={c} onOpen={onOpen} compact={false} />)}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showVenue = true, showGenreTags = true }) {
   const past = isPast(concert.date) && !concert.wishlist;
@@ -6918,6 +7049,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [compact, setCompact] = useState(!!settings.compactView)
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })
+  const [selectedDate, setSelectedDate] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
@@ -7290,10 +7424,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             </div>
             <button onClick={() => setShowAdd('concert')} style={{ minHeight: 38, background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ Show</button>
             <button onClick={() => setShowAdd('festival')} style={{ minHeight: 38, background: '#1a1030', border: '1px solid #f472b6', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: '#f472b6', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ Fest</button>
+            <button onClick={() => setShowCalendar(c => !c)} style={{ minHeight: 38, background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', fontSize: 14, flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
+              📅
+            </button>
           </div>
         )}
 
-        {view === 'home' && (
+        {view === 'home' && !showCalendar && (
           <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
             {/* Type dropdown */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -7452,10 +7589,20 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {concerts.length === 0 && (
               <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
             )}
-            {concerts.length > 0 && filtered.length === 0 && (
+            {concerts.length > 0 && showCalendar && (
+              <CalendarMode
+                concerts={concerts}
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                onOpen={handleOpenConcert}
+              />
+            )}
+            {concerts.length > 0 && !showCalendar && filtered.length === 0 && (
               <EmptyState title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYear('all'); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
-            {filtered.length > 0 && <>
+            {!showCalendar && filtered.length > 0 && <>
             {wishlist.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px 10px', marginBottom: showWishlist ? 4 : 0 }}>

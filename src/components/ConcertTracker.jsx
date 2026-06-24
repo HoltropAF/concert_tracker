@@ -438,11 +438,29 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
 
   const byDate = useMemo(() => {
     const map = {};
-    for (const c of concerts) {
-      if (!c.date) continue;
-      const key = c.date.slice(0, 10);
+    const addToDay = (key, c) => {
       if (!map[key]) map[key] = [];
       map[key].push(c);
+    };
+    for (const c of concerts) {
+      if (!c.date) continue;
+      const startKey = c.date.slice(0, 10);
+      // Festivals (and any show with a later endDate) span multiple days — register
+      // the show on every day in its range, not just the start date, so a 3-day
+      // festival shows dots and appears in the day-list for each of its days.
+      if (c.endDate && c.endDate > c.date) {
+        let cursor = new Date(startKey + 'T00:00:00');
+        const end = new Date(c.endDate.slice(0, 10) + 'T00:00:00');
+        let guard = 0;
+        while (cursor <= end && guard < 60) { // 60-day cap as a sanity guard against bad data
+          const key = cursor.toISOString().slice(0, 10);
+          addToDay(key, c);
+          cursor.setDate(cursor.getDate() + 1);
+          guard++;
+        }
+      } else {
+        addToDay(startKey, c);
+      }
     }
     return map;
   }, [concerts]);
@@ -551,7 +569,23 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
             <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>
               {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} — {selectedShows.length} show{selectedShows.length > 1 ? 's' : ''}
             </div>
-            {selectedShows.map(c => <ConcertCard key={c.id} concert={c} onOpen={onOpen} compact={false} />)}
+            {selectedShows.map(c => {
+              const isMultiDay = c.endDate && c.endDate > c.date;
+              let dayLabel = null;
+              if (isMultiDay) {
+                const dayNum = Math.round((new Date(selectedDate + 'T00:00:00') - new Date(c.date.slice(0, 10) + 'T00:00:00')) / 86400000) + 1;
+                const totalDays = Math.round((new Date(c.endDate.slice(0, 10) + 'T00:00:00') - new Date(c.date.slice(0, 10) + 'T00:00:00')) / 86400000) + 1;
+                dayLabel = `Day ${dayNum} of ${totalDays}`;
+              }
+              return (
+                <div key={c.id}>
+                  {dayLabel && (
+                    <div style={{ fontSize: 10, color: '#f472b6', fontFamily: "'DM Mono', monospace", marginBottom: 4, paddingLeft: 2 }}>{dayLabel}</div>
+                  )}
+                  <ConcertCard concert={c} onOpen={onOpen} compact={false} />
+                </div>
+              );
+            })}
           </>
         )}
       </div>
@@ -631,7 +665,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
           <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
             {online
               ? <>{formatDate(concert.date)} · {formatOnlineLocation(concert)}</>
-              : <>{formatDate(concert.date)} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}</>}
+              : <>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}</>}
           </div>
           {!showVenue && (
             <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>

@@ -467,6 +467,7 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
 
   const statusOf = (c) => isWish(c) ? 'wish' : isPast(c.date) ? 'went' : 'upcoming';
   const STATUS_COLOR = { wish: '#34d399', upcoming: '#818cf8', went: '#a78bfa' };
+  const isMultiDay = (c) => !!(c.endDate && c.endDate > c.date);
 
   const firstOfMonth = new Date(year, monthIdx, 1);
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
@@ -476,6 +477,52 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
   const cells = [];
   for (let i = 0; i < startWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null); // pad to full weeks for clean bar rendering
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  const dateKeyFor = (d) => `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const monthStartKey = dateKeyFor(1);
+  const monthEndKey = dateKeyFor(daysInMonth);
+
+  // Multi-day festivals (bars), one row per festival that overlaps this month, broken
+  // into per-week segments so each segment can be drawn within a single grid row —
+  // a festival spanning a week boundary gets two segments, one per row.
+  const multiDayFestivals = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    for (const c of concerts) {
+      if (!isMultiDay(c) || seen.has(c.id)) continue;
+      const startKey = c.date.slice(0, 10);
+      const endKey = c.endDate.slice(0, 10);
+      if (endKey < monthStartKey || startKey > monthEndKey) continue; // doesn't overlap this month
+      seen.add(c.id);
+      list.push(c);
+    }
+    return list;
+  }, [concerts, monthStartKey, monthEndKey]);
+
+  const festivalRowSegments = (week, weekIdx) => {
+    // For a given week (array of 7 day-numbers or null), find every festival bar segment
+    // that should render on this row, with its start column and column span clamped to the week.
+    return multiDayFestivals.map((c, fi) => {
+      const startKey = c.date.slice(0, 10);
+      const endKey = c.endDate.slice(0, 10);
+      let firstCol = -1, lastCol = -1;
+      week.forEach((d, col) => {
+        if (d === null) return;
+        const key = dateKeyFor(d);
+        if (key >= startKey && key <= endKey) {
+          if (firstCol === -1) firstCol = col;
+          lastCol = col;
+        }
+      });
+      if (firstCol === -1) return null;
+      return { concert: c, startCol: firstCol, span: lastCol - firstCol + 1, colorIndex: fi };
+    }).filter(Boolean);
+  };
+
+  const FESTIVAL_BAR_COLORS = ['#f472b6', '#fb923c', '#facc15', '#60a5fa', '#34d399'];
 
   const monthLabel = firstOfMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const goPrevMonth = () => onMonthChange(monthIdx === 0 ? { year: year - 1, month: 11 } : { year, month: monthIdx - 1 });
@@ -499,45 +546,71 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
         ))}
       </div>
 
-      {/* Day grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 16 }}>
-        {cells.map((d, i) => {
-          if (d === null) return <div key={i} />;
-          const dateKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-          const shows = byDate[dateKey] || [];
-          const isToday = dateKey === todayKey;
-          const isSelected = dateKey === selectedDate;
-          const statuses = [...new Set(shows.map(statusOf))];
-          const hasOnline = shows.some(isOnline);
-          const hasOffline = shows.some(c => !isOnline(c));
+      {/* Day grid — rendered week by week so multi-day festival bars can span columns within a row */}
+      <div style={{ marginBottom: 16 }}>
+        {weeks.map((week, weekIdx) => {
+          const segments = festivalRowSegments(week, weekIdx);
           return (
-            <button
-              key={i}
-              onClick={() => onSelectDate(shows.length > 0 ? (isSelected ? null : dateKey) : null)}
-              style={{
-                aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                background: isSelected ? '#1a1a30' : 'none',
-                border: isToday ? '1px solid #a78bfa' : isSelected ? '1px solid #2e2e50' : '1px solid transparent',
-                borderRadius: 8, cursor: shows.length > 0 ? 'pointer' : 'default', padding: 0, position: 'relative'
-              }}
-            >
-              <span style={{ fontSize: 12, color: isToday ? '#a78bfa' : shows.length > 0 ? '#e2e0ff' : '#4a4870', fontWeight: isToday ? 700 : 400 }}>{d}</span>
-              {shows.length > 0 && (
-                <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                  {statuses.slice(0, 2).map(s => (
-                    <span key={s} style={{ width: 4, height: 4, borderRadius: 99, background: STATUS_COLOR[s], display: 'inline-block' }} />
-                  ))}
-                  {(hasOnline && hasOffline) ? (
-                    <>
-                      <span style={{ width: 4, height: 4, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />
-                      <span style={{ width: 4, height: 4, borderRadius: 99, background: '#6b6a8f', display: 'inline-block' }} />
-                    </>
-                  ) : hasOnline ? (
-                    <span style={{ width: 4, height: 4, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />
-                  ) : null}
-                </div>
-              )}
-            </button>
+            <div key={weekIdx} style={{ position: 'relative', marginBottom: segments.length > 0 ? 8 + segments.length * 7 : 2 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+                {week.map((d, col) => {
+                  if (d === null) return <div key={col} />;
+                  const dateKey = dateKeyFor(d);
+                  const allShows = byDate[dateKey] || [];
+                  const shows = allShows.filter(c => !isMultiDay(c)); // multi-day festivals get a bar, not a dot
+                  const isToday = dateKey === todayKey;
+                  const isSelected = dateKey === selectedDate;
+                  const statuses = [...new Set(shows.map(statusOf))];
+                  const hasOnline = shows.some(isOnline);
+                  const hasOffline = shows.some(c => !isOnline(c));
+                  return (
+                    <button
+                      key={col}
+                      onClick={() => onSelectDate(allShows.length > 0 ? (isSelected ? null : dateKey) : null)}
+                      style={{
+                        aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        background: isSelected ? '#1a1a30' : 'none',
+                        border: isToday ? '1px solid #a78bfa' : isSelected ? '1px solid #2e2e50' : '1px solid transparent',
+                        borderRadius: 8, cursor: allShows.length > 0 ? 'pointer' : 'default', padding: 0, position: 'relative'
+                      }}
+                    >
+                      <span style={{ fontSize: 12, color: isToday ? '#a78bfa' : allShows.length > 0 ? '#e2e0ff' : '#4a4870', fontWeight: isToday ? 700 : 400 }}>{d}</span>
+                      {shows.length > 0 && (
+                        <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+                          {statuses.slice(0, 2).map(s => (
+                            <span key={s} style={{ width: 4, height: 4, borderRadius: 99, background: STATUS_COLOR[s], display: 'inline-block' }} />
+                          ))}
+                          {(hasOnline && hasOffline) ? (
+                            <>
+                              <span style={{ width: 4, height: 4, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />
+                              <span style={{ width: 4, height: 4, borderRadius: 99, background: '#6b6a8f', display: 'inline-block' }} />
+                            </>
+                          ) : hasOnline ? (
+                            <span style={{ width: 4, height: 4, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />
+                          ) : null}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Festival bars for this week, stacked below the day cells */}
+              {segments.map((seg, si) => (
+                <button
+                  key={seg.concert.id}
+                  onClick={() => { const sk = seg.concert.date.slice(0,10); const ek = seg.concert.endDate.slice(0,10); const within = selectedDate >= sk && selectedDate <= ek; onSelectDate(within ? null : sk); }}
+                  title={seg.concert.artist}
+                  style={{
+                    position: 'absolute', left: `calc(${seg.startCol} * (100% / 7) + 2px)`,
+                    width: `calc(${seg.span} * (100% / 7) - 4px)`,
+                    top: `calc(100% + ${si * 7}px)`, height: 5, borderRadius: 3,
+                    background: FESTIVAL_BAR_COLORS[seg.colorIndex % FESTIVAL_BAR_COLORS.length],
+                    border: 'none', padding: 0, cursor: 'pointer',
+                    opacity: byDate[selectedDate]?.some(c => c.id === seg.concert.id) ? 1 : 0.85
+                  }}
+                />
+              ))}
+            </div>
           );
         })}
       </div>
@@ -552,6 +625,11 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 6, height: 6, borderRadius: 99, background: ONLINE_COLOR, display: 'inline-block' }} />Online
         </span>
+        {multiDayFestivals.length > 0 && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 5, borderRadius: 3, background: FESTIVAL_BAR_COLORS[0], display: 'inline-block' }} />Multi-day festival
+          </span>
+        )}
       </div>
 
       {/* Selected day's shows */}

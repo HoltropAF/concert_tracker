@@ -18,6 +18,7 @@
       --accent:     #7c6fcd;
       --accent-dim: #2e2a5a;
       --green:      #4ade80;
+      --red:        #f472b6;
       --radius:     12px;
     }
 
@@ -63,12 +64,31 @@
       transition: width 0.35s ease;
     }
 
+    /* ── Language toggle ── */
+    .lang-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 2px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lang-sep { font-size: 11px; color: var(--border); }
+    .lang-opt {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      transition: color 0.15s;
+    }
+    .lang-opt.active { color: var(--accent); }
+
     /* ── Steps ── */
     .step { display: none; flex-direction: column; gap: 18px; flex: 1; }
     .step.active { display: flex; }
-
     .step-icon { font-size: 40px; line-height: 1; }
-
     h1 { font-size: 24px; font-weight: 600; line-height: 1.3; }
 
     .why {
@@ -114,11 +134,12 @@
       -webkit-tap-highlight-color: transparent;
     }
     .btn:active { transform: scale(0.97); }
-    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary  { background: var(--accent); color: #fff; }
     .btn-primary:hover { opacity: 0.88; }
     .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
     .btn-secondary:hover { border-color: var(--accent); }
-    .btn-full { width: 100%; }
+    .btn-full   { width: 100%; }
+    .btn-inline { align-self: flex-start; }
     .btn-install { background: var(--green); color: #0a1a0a; font-weight: 600; }
 
     /* ── Inputs ── */
@@ -138,6 +159,9 @@
     }
     .field input:focus { border-color: var(--accent); }
     .field input::placeholder { color: var(--muted); opacity: 0.55; }
+    .field input.error { border-color: var(--red); }
+    .field-hint { font-size: 12px; color: var(--red); display: none; }
+    .field input.error ~ .field-hint { display: block; }
 
     /* ── Code block ── */
     .code-block {
@@ -156,6 +180,7 @@
       overflow-x: auto;
       white-space: pre;
     }
+    .pre-sm { padding: 10px 16px; font-size: 13px; }
     .copy-btn {
       position: absolute;
       top: 8px;
@@ -204,7 +229,7 @@
       padding: 14px 10px;
       text-align: center;
     }
-    .stat-num { font-size: 22px; font-weight: 600; color: var(--accent); }
+    .stat-num   { font-size: 22px; font-weight: 600; color: var(--accent); }
     .stat-label { font-size: 12px; color: var(--muted); margin-top: 3px; }
 
     /* ── iOS walkthrough ── */
@@ -219,9 +244,7 @@
       padding: 12px 14px;
     }
     .ios-num {
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
+      width: 24px; height: 24px; min-width: 24px;
       background: var(--accent-dim);
       border-radius: 50%;
       display: flex;
@@ -235,7 +258,6 @@
     .share-icon {
       display: inline-flex;
       align-items: center;
-      gap: 1px;
       background: var(--accent-dim);
       border-radius: 4px;
       padding: 1px 5px 2px;
@@ -243,181 +265,181 @@
       vertical-align: middle;
       line-height: 1;
     }
-
-    /* ── Done screen ── */
-    .done-hero { text-align: center; padding: 16px 0; }
-    .done-hero .big { font-size: 56px; margin-bottom: 12px; }
-    .done-hero h1 { font-size: 26px; }
   </style>
 </head>
 <body>
 <div class="wizard">
 
   <div class="progress">
-    <span class="progress-label" id="prog-label">Step 1 of 8</span>
+    <span class="progress-label" id="prog-label"></span>
     <div class="progress-track">
-      <div class="progress-fill" id="prog-fill" style="width:12.5%"></div>
+      <div class="progress-fill" id="prog-fill"></div>
     </div>
+    <button type="button" class="lang-toggle" onclick="toggleLang()" id="lang-btn" aria-label="Switch language" title="Switch language">
+      <span class="lang-opt" id="lo-en">EN</span>
+      <span class="lang-sep">|</span>
+      <span class="lang-opt" id="lo-nl">NL</span>
+    </button>
   </div>
 
   <!-- ══ Step 1: Welcome ══════════════════════════════════════════════════ -->
   <section class="step active" id="step-1">
     <div class="hero">
       <div class="hero-logo">🎵</div>
-      <h1>Set up settracker</h1>
+      <h1 data-t="s1_h1"></h1>
     </div>
-    <p>This wizard sets up your own copy of settracker — your own database, your own deployment, installed on your phone. All free, no technical background needed.</p>
+    <p data-t="s1_p"></p>
     <div class="stat-row">
       <div class="stat-card">
         <div class="stat-num">~10</div>
-        <div class="stat-label">minutes</div>
+        <div class="stat-label" data-t="s1_stat_minutes"></div>
       </div>
       <div class="stat-card">
         <div class="stat-num">3</div>
-        <div class="stat-label">free accounts</div>
+        <div class="stat-label" data-t="s1_stat_accounts"></div>
       </div>
       <div class="stat-card">
         <div class="stat-num">€0</div>
-        <div class="stat-label">cost</div>
+        <div class="stat-label" data-t="s1_stat_cost"></div>
       </div>
     </div>
     <div class="callout">
       <span class="callout-icon">📋</span>
-      <div>You'll need accounts on <strong>GitHub</strong>, <strong>Supabase</strong>, and <strong>Vercel</strong>. This wizard links you to each signup as we go — nothing to prepare in advance.</div>
+      <div data-t-html="s1_callout"></div>
     </div>
     <div class="actions">
-      <button class="btn btn-primary btn-full" onclick="goTo(2)">Let's go →</button>
+      <button type="button" class="btn btn-primary btn-full" onclick="goTo(2)" data-t="s1_btn"></button>
     </div>
   </section>
 
   <!-- ══ Step 2: GitHub fork ══════════════════════════════════════════════ -->
   <section class="step" id="step-2">
     <div class="step-icon">🐙</div>
-    <h1>Fork the project on GitHub</h1>
-    <div class="why">GitHub hosts the code. You need your own copy (a "fork") so Vercel can deploy it under your account — and so any changes you make stay yours.</div>
-    <p><strong>1.</strong> No GitHub account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.</p>
-    <p><strong>2.</strong> Click the button below. GitHub will show a confirmation page — just click <strong>Create fork</strong>.</p>
+    <h1 data-t="s2_h1"></h1>
+    <div class="why" data-t-html="s2_why"></div>
+    <p data-t-html="s2_p1"></p>
+    <p data-t-html="s2_p2"></p>
     <div class="actions">
-      <a class="btn btn-primary btn-full" href="https://github.com/HoltropAF/concert_tracker/fork" target="_blank" rel="noopener">Fork on GitHub ↗</a>
-      <button class="btn btn-secondary btn-full" onclick="goTo(3)">I've forked it — next →</button>
+      <a class="btn btn-primary btn-full" href="https://github.com/HoltropAF/concert_tracker/fork" target="_blank" rel="noopener" data-t="s2_btn1"></a>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goTo(3)" data-t="s2_btn2"></button>
     </div>
   </section>
 
   <!-- ══ Step 3: Supabase account & project ═══════════════════════════════ -->
   <section class="step" id="step-3">
     <div class="step-icon">🗄️</div>
-    <h1>Create your Supabase project</h1>
-    <div class="why">Supabase is your database. It stores all your concert data and handles logins. It's free and takes about 2 minutes to set up a new project.</div>
-    <p><strong>1.</strong> No Supabase account? <a href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.</p>
-    <p><strong>2.</strong> In your Supabase dashboard, click <strong>New project</strong>. Give it any name — <code>settracker</code> works fine. Set any password. Click <strong>Create new project</strong>.</p>
-    <p><strong>3.</strong> Wait about 2 minutes. You'll see a green status indicator when it's ready.</p>
+    <h1 data-t="s3_h1"></h1>
+    <div class="why" data-t-html="s3_why"></div>
+    <p data-t-html="s3_p1"></p>
+    <p data-t-html="s3_p2"></p>
+    <p data-t-html="s3_p3"></p>
     <div class="actions">
-      <a class="btn btn-secondary btn-full" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener">Open Supabase dashboard ↗</a>
-      <button class="btn btn-primary btn-full" onclick="goTo(4)">Project is ready — next →</button>
+      <a class="btn btn-secondary btn-full" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener" data-t="s3_btn1"></a>
+      <button type="button" class="btn btn-primary btn-full" onclick="goTo(4)" data-t="s3_btn2"></button>
     </div>
   </section>
 
   <!-- ══ Step 4: Run schema SQL ════════════════════════════════════════════ -->
   <section class="step" id="step-4">
     <div class="step-icon">🛠️</div>
-    <h1>Set up your database tables</h1>
-    <div class="why">The app needs two tables in your Supabase database — one for concerts, one for settings. The SQL below creates them and sets the security rules so only you can access your data.</div>
-    <p><strong>1.</strong> Click below to open your SQL Editor.</p>
-    <a class="btn btn-secondary" href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" rel="noopener" style="align-self:flex-start">Open SQL Editor ↗</a>
-    <p><strong>2.</strong> Copy all the SQL below, paste it into the editor, and click <strong>Run</strong>.</p>
+    <h1 data-t="s4_h1"></h1>
+    <div class="why" data-t-html="s4_why"></div>
+    <p data-t-html="s4_p1"></p>
+    <a class="btn btn-secondary btn-inline" href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" rel="noopener" data-t="s4_btn1"></a>
+    <p data-t-html="s4_p2"></p>
     <div class="code-block">
-      <button class="copy-btn" id="copy-sql-btn" onclick="copySql(this)">Copy</button>
+      <button type="button" class="copy-btn" id="copy-sql-btn" onclick="copySql(this)" data-t="copy" data-t-title="copy"></button>
       <pre id="sql-block"></pre>
     </div>
     <div class="callout">
       <span class="callout-icon">✅</span>
-      <div>After clicking Run you should see <strong>"Success. No rows returned."</strong> — that's correct. It means the tables were created successfully.</div>
+      <div data-t-html="s4_callout"></div>
     </div>
     <div class="actions">
-      <button class="btn btn-primary btn-full" onclick="goTo(5)">Done — next →</button>
+      <button type="button" class="btn btn-primary btn-full" onclick="goTo(5)" data-t="s4_btn2"></button>
     </div>
   </section>
 
   <!-- ══ Step 5: Copy keys ═════════════════════════════════════════════════ -->
   <section class="step" id="step-5">
     <div class="step-icon">🔑</div>
-    <h1>Copy your Supabase credentials</h1>
-    <div class="why">The app needs two values to connect to your database: your project URL and a public API key. Paste them here now — they'll be carried forward to the Vercel step so you don't have to find them again.</div>
-    <p><strong>1.</strong> Click below to open your project's API settings page.</p>
-    <a class="btn btn-secondary" href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener" style="align-self:flex-start">Open API Settings ↗</a>
-    <p><strong>2.</strong> Copy the two values and paste them below.</p>
+    <h1 data-t="s5_h1"></h1>
+    <div class="why" data-t-html="s5_why"></div>
+    <p data-t-html="s5_p1"></p>
+    <a class="btn btn-secondary btn-inline" href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener" data-t="s5_btn1"></a>
+    <p data-t-html="s5_p2"></p>
     <div class="field">
-      <label>Project URL</label>
-      <input type="url" id="inp-url" placeholder="https://xxxxxxxx.supabase.co"
-             oninput="onUrlInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <label data-t="s5_label1"></label>
+      <input type="url" id="inp-url" oninput="clearErr(this); onUrlInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <span class="field-hint" data-t="err_url"></span>
     </div>
     <div class="field">
-      <label>anon public key</label>
-      <input type="text" id="inp-key" placeholder="eyJ..."
-             oninput="onKeyInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <label data-t="s5_label2"></label>
+      <input type="text" id="inp-key" oninput="clearErr(this); onKeyInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <span class="field-hint" data-t="err_key"></span>
     </div>
-    <p class="muted">These values stay in this browser tab only — this wizard never sends them anywhere.</p>
+    <p class="muted" data-t="s5_muted"></p>
     <div class="actions">
-      <button class="btn btn-primary btn-full" onclick="goToVercel()">Next →</button>
+      <button type="button" class="btn btn-primary btn-full" onclick="validate5()" data-t="s5_btn2"></button>
     </div>
   </section>
 
   <!-- ══ Step 6: Vercel deploy ═════════════════════════════════════════════ -->
   <section class="step" id="step-6">
     <div class="step-icon">🚀</div>
-    <h1>Deploy to Vercel</h1>
-    <div class="why">Vercel puts your app online for free. It takes the code from your GitHub fork and builds it into a live website at a <code>*.vercel.app</code> address.</div>
-    <p><strong>1.</strong> Click the button below. Vercel will open its import page, already pointed at your fork.</p>
-    <p class="muted">On that page, Vercel will show a form with two fields — <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>. Paste the values from the previous step into those fields, then click <strong>Deploy</strong>.</p>
-    <a class="btn btn-primary btn-full" id="vercel-btn" href="#" target="_blank" rel="noopener">Deploy on Vercel ↗</a>
+    <h1 data-t="s6_h1"></h1>
+    <div class="why" data-t-html="s6_why"></div>
+    <p data-t-html="s6_p1"></p>
+    <p class="muted" data-t-html="s6_muted"></p>
+    <a class="btn btn-primary btn-full" id="vercel-btn" href="#" target="_blank" rel="noopener" data-t="s6_btn1"></a>
     <div class="callout">
       <span class="callout-icon">⏱️</span>
-      <div>After clicking Deploy on Vercel's page, wait about <strong>60 seconds</strong>. When it finishes, Vercel shows you a URL like <code>your-project.vercel.app</code>. Copy it and paste it below.</div>
+      <div data-t-html="s6_callout"></div>
     </div>
     <div class="field">
-      <label>Your Vercel URL</label>
-      <input type="url" id="inp-vercel" placeholder="https://your-project.vercel.app"
-             oninput="onVercelInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <label data-t="s6_label"></label>
+      <input type="url" id="inp-vercel" oninput="clearErr(this); onVercelInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+      <span class="field-hint" data-t="err_vercel"></span>
     </div>
     <div class="actions">
-      <button class="btn btn-primary btn-full" onclick="goTo(7)">I have my URL — next →</button>
+      <button type="button" class="btn btn-primary btn-full" onclick="validate6()" data-t="s6_btn2"></button>
     </div>
   </section>
 
   <!-- ══ Step 7: Supabase auth link ════════════════════════════════════════ -->
   <section class="step" id="step-7">
     <div class="step-icon">🔗</div>
-    <h1>Link Supabase to your Vercel URL</h1>
-    <div class="why">Supabase sends you a magic-link email when you log in. For that link to redirect back to your app correctly, Supabase needs to know your app's URL.</div>
+    <h1 data-t="s7_h1"></h1>
+    <div class="why" data-t-html="s7_why"></div>
     <div class="callout">
       <span class="callout-icon">↩️</span>
-      <div>This step takes you back to Supabase after just coming from Vercel. That's expected — it's just the order things have to happen: deploy first, then tell Supabase where you landed.</div>
+      <div data-t-html="s7_callout"></div>
     </div>
-    <p><strong>1.</strong> Open Auth URL Configuration in Supabase.</p>
-    <a class="btn btn-secondary" href="https://supabase.com/dashboard/project/_/auth/url-configuration" target="_blank" rel="noopener" style="align-self:flex-start">Open Auth URL Config ↗</a>
-    <p><strong>2.</strong> Set <strong>Site URL</strong> to your Vercel URL:</p>
+    <p data-t-html="s7_p1"></p>
+    <a class="btn btn-secondary btn-inline" href="https://supabase.com/dashboard/project/_/auth/url-configuration" target="_blank" rel="noopener" data-t="s7_btn1"></a>
+    <p data-t-html="s7_p2"></p>
     <div class="code-block">
-      <button class="copy-btn" id="copy-vercel-url-btn" onclick="copyField('vercel-url-display', this)">Copy</button>
-      <pre id="vercel-url-display" style="padding:10px 16px;font-size:13px;"></pre>
+      <button type="button" class="copy-btn" id="copy-vercel-url-btn" onclick="copyField('vercel-url-display', this)" data-t="copy" data-t-title="copy"></button>
+      <pre id="vercel-url-display" class="pre-sm"></pre>
     </div>
-    <p><strong>3.</strong> Under <strong>Redirect URLs</strong>, add the same URL with <code>/**</code> appended:</p>
+    <p data-t-html="s7_p3"></p>
     <div class="code-block">
-      <button class="copy-btn" id="copy-vercel-wild-btn" onclick="copyField('vercel-url-wild-display', this)">Copy</button>
-      <pre id="vercel-url-wild-display" style="padding:10px 16px;font-size:13px;"></pre>
+      <button type="button" class="copy-btn" id="copy-vercel-wild-btn" onclick="copyField('vercel-url-wild-display', this)" data-t="copy" data-t-title="copy"></button>
+      <pre id="vercel-url-wild-display" class="pre-sm"></pre>
     </div>
-    <p><strong>4.</strong> Click <strong>Save</strong> in Supabase.</p>
+    <p data-t-html="s7_p4"></p>
     <div class="actions">
-      <button class="btn btn-primary btn-full" onclick="goTo(8)">Done — final step →</button>
+      <button type="button" class="btn btn-primary btn-full" onclick="goTo(8)" data-t="s7_btn2"></button>
     </div>
   </section>
 
   <!-- ══ Step 8: Install on phone ══════════════════════════════════════════ -->
   <section class="step" id="step-8">
     <div class="step-icon">📱</div>
-    <h1>Install on your phone</h1>
-    <div class="why">The app is a PWA — it can be added to your home screen and opens fullscreen like a native app, with no browser bar.</div>
-    <div id="install-body"><!-- filled by JS --></div>
-    <div class="actions" id="install-actions"><!-- filled by JS --></div>
+    <h1 data-t="s8_h1"></h1>
+    <div class="why" data-t-html="s8_why"></div>
+    <div id="install-body"></div>
+    <div class="actions" id="install-actions"></div>
   </section>
 
 </div><!-- /wizard -->
@@ -425,15 +447,184 @@
 <script>
 'use strict';
 
-// ── State ─────────────────────────────────────────────────────────────────
-let supabaseUrl  = '';
-let supabaseKey  = '';
-let vercelUrl    = '';
-let deferredPWA  = null;
-let currentStep  = 1;
-const TOTAL      = 8;
+// ── Translations ──────────────────────────────────────────────────────────
+const T = {
+  en: {
+    stepOf:          (n, t) => `Step ${n} of ${t}`,
+    s1_h1:           'Set up settracker',
+    s1_p:            'This wizard sets up your own copy of settracker — your own database, your own deployment, installed on your phone. All free, no technical background needed.',
+    s1_stat_minutes: 'minutes',
+    s1_stat_accounts:'free accounts',
+    s1_stat_cost:    'cost',
+    s1_callout:      'You\'ll need accounts on <strong>GitHub</strong>, <strong>Supabase</strong>, and <strong>Vercel</strong>. This wizard links you to each signup as we go — nothing to prepare in advance.',
+    s1_btn:          'Let\'s go →',
+    s2_h1:           'Fork the project on GitHub',
+    s2_why:          'GitHub hosts the code. You need your own copy (a "fork") so Vercel can deploy it under your account — and so any changes you make stay yours.',
+    s2_p1:           '<strong>1.</strong> No GitHub account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.',
+    s2_p2:           '<strong>2.</strong> Click the button below. GitHub will show a confirmation page — just click <strong>Create fork</strong>.',
+    s2_btn1:         'Fork on GitHub ↗',
+    s2_btn2:         'I\'ve forked it — next →',
+    s3_h1:           'Create your Supabase project',
+    s3_why:          'Supabase is your database. It stores all your concert data and handles logins. It\'s free and takes about 2 minutes to set up a new project.',
+    s3_p1:           '<strong>1.</strong> No Supabase account? <a href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.',
+    s3_p2:           '<strong>2.</strong> In your Supabase dashboard, click <strong>New project</strong>. Give it any name — <code>settracker</code> works fine. Set any password. Click <strong>Create new project</strong>.',
+    s3_p3:           '<strong>3.</strong> Wait about 2 minutes. You\'ll see a green status indicator when it\'s ready.',
+    s3_btn1:         'Open Supabase dashboard ↗',
+    s3_btn2:         'Project is ready — next →',
+    s4_h1:           'Set up your database tables',
+    s4_why:          'The app needs two tables in your Supabase database — one for concerts, one for settings. The SQL below creates them and sets the security rules so only you can access your data.',
+    s4_p1:           '<strong>1.</strong> Click below to open your SQL Editor.',
+    s4_btn1:         'Open SQL Editor ↗',
+    s4_p2:           '<strong>2.</strong> Copy all the SQL below, paste it into the editor, and click <strong>Run</strong>.',
+    s4_callout:      'After clicking Run you should see <strong>"Success. No rows returned."</strong> — that\'s correct. It means the tables were created successfully.',
+    s4_btn2:         'Done — next →',
+    s5_h1:           'Copy your Supabase credentials',
+    s5_why:          'The app needs two values to connect to your database: your project URL and a public API key. Paste them here now — they\'ll be carried forward to the Vercel step so you don\'t have to find them again.',
+    s5_p1:           '<strong>1.</strong> Click below to open your project\'s API settings page.',
+    s5_btn1:         'Open API Settings ↗',
+    s5_p2:           '<strong>2.</strong> Copy the two values and paste them below.',
+    s5_label1:       'Project URL',
+    s5_label2:       'anon public key',
+    s5_ph_url:       'https://xxxxxxxx.supabase.co',
+    s5_ph_key:       'eyJ...',
+    s5_muted:        'These values stay in this browser tab only — this wizard never sends them anywhere.',
+    s5_btn2:         'Next →',
+    err_url:         'Please paste your Project URL before continuing.',
+    err_key:         'Please paste your anon public key before continuing.',
+    s6_h1:           'Deploy to Vercel',
+    s6_why:          'Vercel puts your app online for free. It takes the code from your GitHub fork and builds it into a live website at a <code>*.vercel.app</code> address.',
+    s6_p1:           '<strong>1.</strong> Click the button below. Vercel will open its import page, already pointed at your fork.',
+    s6_muted:        'On that page, Vercel will show a form with two fields — <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>. Paste the values from the previous step into those fields, then click <strong>Deploy</strong>.',
+    s6_btn1:         'Deploy on Vercel ↗',
+    s6_callout:      'After clicking Deploy on Vercel\'s page, wait about <strong>60 seconds</strong>. When it finishes, Vercel shows you a URL like <code>your-project.vercel.app</code>. Copy it and paste it below.',
+    s6_label:        'Your Vercel URL',
+    s6_ph_vercel:    'https://your-project.vercel.app',
+    s6_btn2:         'I have my URL — next →',
+    err_vercel:      'Please paste your Vercel URL before continuing.',
+    s7_h1:           'Link Supabase to your Vercel URL',
+    s7_why:          'Supabase sends you a magic-link email when you log in. For that link to redirect back to your app correctly, Supabase needs to know your app\'s URL.',
+    s7_callout:      'This step takes you back to Supabase after just coming from Vercel. That\'s expected — it\'s just the order things have to happen: deploy first, then tell Supabase where you landed.',
+    s7_p1:           '<strong>1.</strong> Open Auth URL Configuration in Supabase.',
+    s7_btn1:         'Open Auth URL Config ↗',
+    s7_p2:           '<strong>2.</strong> Set <strong>Site URL</strong> to your Vercel URL:',
+    s7_p3:           '<strong>3.</strong> Under <strong>Redirect URLs</strong>, add the same URL with <code>/**</code> appended:',
+    s7_p4:           '<strong>4.</strong> Click <strong>Save</strong> in Supabase.',
+    s7_btn2:         'Done — final step →',
+    s8_h1:           'Install on your phone',
+    s8_why:          'The app is a PWA — it can be added to your home screen and opens fullscreen like a native app, with no browser bar.',
+    ios_safari_note: 'On iPhone, use <strong>Safari</strong> to install — it won\'t work from Chrome or Firefox on iOS.',
+    ios_step1:       (url) => `Open <strong>${url}</strong> in <strong>Safari</strong> — the install option doesn\'t appear in other browsers on iPhone.`,
+    ios_step2:       'Tap the <strong>Share</strong> button at the bottom of the screen <span class="share-icon">⎙</span> (a box with an upward arrow).',
+    ios_step3:       'Scroll down in the sheet that appears and tap <strong>Add to Home Screen</strong>.',
+    ios_step4:       'Tap <strong>Add</strong> in the top-right corner to confirm.',
+    ios_done:        'The app will appear on your home screen and open fullscreen with no browser bar.',
+    android_p:       'Open your app in Chrome, Edge, or Brave on this phone — then install using the button below.',
+    android_btn:     '⬇ Install App',
+    android_note:    'Tapping this triggers your browser\'s native install prompt.',
+    android_manual:  'In Chrome, tap <strong>⋮</strong> (three-dot menu, top-right) → <strong>Add to Home screen</strong> or <strong>Install app</strong>.',
+    desktop_p:       'Open your app URL on your phone to install it.',
+    desktop_iphone:  '<strong>iPhone (Safari):</strong>',
+    desktop_android: '<strong>Android (Chrome):</strong> tap <strong>⋮</strong> → <strong>Add to Home screen</strong>.',
+    desktop_done:    'That\'s everything! Your settracker is live. Enjoy tracking your shows.',
+    copy:            'Copy',
+    copied:          'Copied!',
+    copy_failed:     'Failed',
+    installed:       '✓ Installed!',
+  },
+  nl: {
+    stepOf:          (n, t) => `Stap ${n} van ${t}`,
+    s1_h1:           'Settracker instellen',
+    s1_p:            'Deze wizard helpt je bij het opzetten van je eigen kopie van settracker — je eigen database, je eigen deployment, geïnstalleerd op je telefoon. Helemaal gratis, geen technische kennis nodig.',
+    s1_stat_minutes: 'minuten',
+    s1_stat_accounts:'gratis accounts',
+    s1_stat_cost:    'kosten',
+    s1_callout:      'Je hebt accounts nodig op <strong>GitHub</strong>, <strong>Supabase</strong> en <strong>Vercel</strong>. De wizard linkt je naar elke aanmeldpagina — je hoeft niets van tevoren voor te bereiden.',
+    s1_btn:          'Aan de slag →',
+    s2_h1:           'Kopieer het project op GitHub',
+    s2_why:          'GitHub bewaart de code. Je hebt een eigen kopie nodig (een "fork") zodat Vercel het onder jouw account kan deployen — en zodat wijzigingen die jij maakt van jou blijven.',
+    s2_p1:           '<strong>1.</strong> Nog geen GitHub-account? <a href="https://github.com/signup" target="_blank" rel="noopener">Registreer hier ↗</a> — kom dan terug.',
+    s2_p2:           '<strong>2.</strong> Klik op de knop hieronder. GitHub toont een bevestigingspagina — klik gewoon op <strong>Create fork</strong>.',
+    s2_btn1:         'Forken op GitHub ↗',
+    s2_btn2:         'Fork aangemaakt — volgende →',
+    s3_h1:           'Maak een Supabase-project aan',
+    s3_why:          'Supabase is je database. Het slaat al je concertdata op en regelt het inloggen. Het is gratis en duurt ongeveer 2 minuten om een nieuw project aan te maken.',
+    s3_p1:           '<strong>1.</strong> Nog geen Supabase-account? <a href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">Registreer hier ↗</a> — kom dan terug.',
+    s3_p2:           '<strong>2.</strong> Klik in je Supabase-dashboard op <strong>New project</strong>. Geef het een naam — <code>settracker</code> werkt prima. Kies een wachtwoord. Klik op <strong>Create new project</strong>.',
+    s3_p3:           '<strong>3.</strong> Wacht ongeveer 2 minuten. Je ziet een groen statusindicatortje als het klaar is.',
+    s3_btn1:         'Open Supabase-dashboard ↗',
+    s3_btn2:         'Project is klaar — volgende →',
+    s4_h1:           'Databasetabellen aanmaken',
+    s4_why:          'De app heeft twee tabellen nodig in je Supabase-database — één voor concerten, één voor instellingen. De SQL hieronder maakt ze aan en stelt de beveiligingsregels in zodat alleen jij je data kunt zien.',
+    s4_p1:           '<strong>1.</strong> Klik hieronder om je SQL Editor te openen.',
+    s4_btn1:         'Open SQL Editor ↗',
+    s4_p2:           '<strong>2.</strong> Kopieer de SQL hieronder, plak hem in de editor en klik op <strong>Run</strong>.',
+    s4_callout:      'Na het klikken op Run zie je <strong>"Success. No rows returned."</strong> — dat klopt. Het betekent dat de tabellen succesvol zijn aangemaakt.',
+    s4_btn2:         'Klaar — volgende →',
+    s5_h1:           'Kopieer je Supabase-gegevens',
+    s5_why:          'De app heeft twee waarden nodig om verbinding te maken met je database: je project-URL en een publieke API-sleutel. Plak ze hier — ze worden meegenomen naar de Vercel-stap zodat je ze niet opnieuw hoeft op te zoeken.',
+    s5_p1:           '<strong>1.</strong> Klik hieronder om de API-instellingen van je project te openen.',
+    s5_btn1:         'Open API-instellingen ↗',
+    s5_p2:           '<strong>2.</strong> Kopieer de twee waarden en plak ze hieronder.',
+    s5_label1:       'Project URL',
+    s5_label2:       'anon public sleutel',
+    s5_ph_url:       'https://xxxxxxxx.supabase.co',
+    s5_ph_key:       'eyJ...',
+    s5_muted:        'Deze waarden blijven alleen in dit browsertabblad — de wizard stuurt ze nergens naartoe.',
+    s5_btn2:         'Volgende →',
+    err_url:         'Plak eerst je Project URL voordat je verdergaat.',
+    err_key:         'Plak eerst je anon public sleutel voordat je verdergaat.',
+    s6_h1:           'Deployen naar Vercel',
+    s6_why:          'Vercel zet je app gratis online. Het neemt de code van je GitHub-fork en bouwt er een live website van op een <code>*.vercel.app</code>-adres.',
+    s6_p1:           '<strong>1.</strong> Klik op de knop hieronder. Vercel opent zijn importpagina, al ingesteld op jouw fork.',
+    s6_muted:        'Op die pagina toont Vercel een formulier met twee velden — <strong>VITE_SUPABASE_URL</strong> en <strong>VITE_SUPABASE_ANON_KEY</strong>. Plak de waarden uit de vorige stap in die velden en klik op <strong>Deploy</strong>.',
+    s6_btn1:         'Deployen op Vercel ↗',
+    s6_callout:      'Na het klikken op Deploy op de Vercel-pagina, wacht ongeveer <strong>60 seconden</strong>. Als het klaar is toont Vercel een URL zoals <code>your-project.vercel.app</code>. Kopieer die en plak hem hieronder.',
+    s6_label:        'Jouw Vercel URL',
+    s6_ph_vercel:    'https://your-project.vercel.app',
+    s6_btn2:         'Ik heb mijn URL — volgende →',
+    err_vercel:      'Plak eerst je Vercel URL voordat je verdergaat.',
+    s7_h1:           'Koppel Supabase aan je Vercel URL',
+    s7_why:          'Supabase stuurt je een magic-link e-mail wanneer je inlogt. Om die link correct terug te verwijzen naar je app, moet Supabase de URL van je app weten.',
+    s7_callout:      'Deze stap brengt je terug naar Supabase nadat je net van Vercel komt. Dat klopt — het is gewoon de volgorde: eerst deployen, dan Supabase vertellen waar je terecht bent gekomen.',
+    s7_p1:           '<strong>1.</strong> Open de Auth URL-configuratie in Supabase.',
+    s7_btn1:         'Open Auth URL-config ↗',
+    s7_p2:           '<strong>2.</strong> Stel <strong>Site URL</strong> in op je Vercel URL:',
+    s7_p3:           '<strong>3.</strong> Voeg onder <strong>Redirect URLs</strong> dezelfde URL toe met <code>/**</code> erachter:',
+    s7_p4:           '<strong>4.</strong> Klik op <strong>Save</strong> in Supabase.',
+    s7_btn2:         'Klaar — laatste stap →',
+    s8_h1:           'Installeer op je telefoon',
+    s8_why:          'De app is een PWA — je kunt hem aan je beginscherm toevoegen en hij opent volledig scherm zoals een native app, zonder browserbalk.',
+    ios_safari_note: 'Gebruik op iPhone <strong>Safari</strong> om te installeren — in Chrome of Firefox werkt dit niet op iOS.',
+    ios_step1:       (url) => `Open <strong>${url}</strong> in <strong>Safari</strong> — de installatieoptie verschijnt niet in andere browsers op iPhone.`,
+    ios_step2:       'Tik op de <strong>Deel</strong>-knop onderaan het scherm <span class="share-icon">⎙</span> (een vak met een pijl omhoog).',
+    ios_step3:       'Scroll omlaag in het menu dat verschijnt en tik op <strong>Zet op beginscherm</strong>.',
+    ios_step4:       'Tik op <strong>Voeg toe</strong> rechtsboven om te bevestigen.',
+    ios_done:        'De app verschijnt op je beginscherm en opent volledig scherm zonder browserbalk.',
+    android_p:       'Open je app in Chrome, Edge of Brave op deze telefoon — installeer dan via de knop hieronder.',
+    android_btn:     '⬇ App installeren',
+    android_note:    'Hierop tikken toont de installatieprompt van je browser.',
+    android_manual:  'Tik in Chrome op <strong>⋮</strong> (drie puntjes, rechtsboven) → <strong>Toevoegen aan startscherm</strong> of <strong>App installeren</strong>.',
+    desktop_p:       'Open je app URL op je telefoon om hem te installeren.',
+    desktop_iphone:  '<strong>iPhone (Safari):</strong>',
+    desktop_android: '<strong>Android (Chrome):</strong> tik op <strong>⋮</strong> → <strong>Toevoegen aan startscherm</strong>.',
+    desktop_done:    'Dat was alles! Settracker staat live. Veel plezier met het bijhouden van je concerten.',
+    copy:            'Kopieer',
+    copied:          'Gekopieerd!',
+    copy_failed:     'Mislukt',
+    installed:       '✓ Geïnstalleerd!',
+  },
+};
 
-// ── SQL schema ────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────
+let lang        = (navigator.language || '').toLowerCase().startsWith('nl') ? 'nl' : 'en';
+let supabaseUrl = '';
+let supabaseKey = '';
+let vercelUrl   = '';
+let deferredPWA = null;
+let currentStep = 1;
+const TOTAL     = 8;
+
+// ── SQL ───────────────────────────────────────────────────────────────────
 const SQL = `-- Run this in your Supabase project → SQL Editor
 
 -- Enable RLS
@@ -465,22 +656,44 @@ create policy "Users can manage own settings"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);`;
 
-// Render SQL into the pre block on page load
 document.getElementById('sql-block').textContent = SQL;
 
-// Capture PWA install prompt early (fires before step 8 is visible)
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPWA = e;
-});
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPWA = e; });
+
+// ── Language ──────────────────────────────────────────────────────────────
+function setLang(l) {
+  lang = l;
+  document.documentElement.lang = l;
+  document.getElementById('lo-en').classList.toggle('active', l === 'en');
+  document.getElementById('lo-nl').classList.toggle('active', l === 'nl');
+  const t = T[l];
+  document.querySelectorAll('[data-t]').forEach(el => {
+    const k = el.getAttribute('data-t');
+    if (k in t) el.textContent = t[k];
+  });
+  document.querySelectorAll('[data-t-html]').forEach(el => {
+    const k = el.getAttribute('data-t-html');
+    if (k in t) el.innerHTML = t[k];
+  });
+  document.querySelectorAll('[data-t-title]').forEach(el => {
+    const k = el.getAttribute('data-t-title');
+    if (k in t) el.title = t[k];
+  });
+  document.getElementById('inp-url').placeholder    = t.s5_ph_url;
+  document.getElementById('inp-key').placeholder    = t.s5_ph_key;
+  document.getElementById('inp-vercel').placeholder = t.s6_ph_vercel;
+  document.getElementById('prog-label').textContent = t.stepOf(currentStep, TOTAL);
+  if (currentStep === 8) onEnterInstallStep();
+}
+
+function toggleLang() { setLang(lang === 'en' ? 'nl' : 'en'); }
 
 // ── Navigation ────────────────────────────────────────────────────────────
 function goTo(n) {
   document.getElementById('step-' + currentStep).classList.remove('active');
   currentStep = n;
-  const next = document.getElementById('step-' + n);
-  next.classList.add('active');
-  document.getElementById('prog-label').textContent = 'Step ' + n + ' of ' + TOTAL;
+  document.getElementById('step-' + n).classList.add('active');
+  document.getElementById('prog-label').textContent = T[lang].stepOf(n, TOTAL);
   document.getElementById('prog-fill').style.width = (n / TOTAL * 100) + '%';
   window.scrollTo({ top: 0, behavior: 'instant' });
   if (n === 6) onEnterVercelStep();
@@ -492,100 +705,94 @@ function goTo(n) {
 function onUrlInput()    { supabaseUrl = document.getElementById('inp-url').value.trim(); }
 function onKeyInput()    { supabaseKey = document.getElementById('inp-key').value.trim(); }
 function onVercelInput() { vercelUrl   = document.getElementById('inp-vercel').value.trim(); }
+function clearErr(el)    { el.classList.remove('error'); }
+
+// ── Validation ────────────────────────────────────────────────────────────
+function validate5() {
+  onUrlInput(); onKeyInput();
+  const urlEl = document.getElementById('inp-url');
+  const keyEl = document.getElementById('inp-key');
+  let ok = true;
+  if (!supabaseUrl) { urlEl.classList.add('error'); ok = false; }
+  if (!supabaseKey) { keyEl.classList.add('error'); ok = false; }
+  if (!ok) { (supabaseUrl ? keyEl : urlEl).focus(); return; }
+  goToVercel();
+}
+
+function validate6() {
+  onVercelInput();
+  const el = document.getElementById('inp-vercel');
+  if (!vercelUrl) { el.classList.add('error'); el.focus(); return; }
+  goTo(7);
+}
 
 function goToVercel() {
-  // Snapshot state before navigating
-  onUrlInput();
-  onKeyInput();
+  onUrlInput(); onKeyInput();
   goTo(6);
 }
 
-// ── Step 6: Vercel deploy link ────────────────────────────────────────────
+// ── Step 6 ────────────────────────────────────────────────────────────────
 function onEnterVercelStep() {
   const params = new URLSearchParams({
     'repository-url': 'https://github.com/HoltropAF/concert_tracker',
     'env':            'VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY',
     'envDescription': 'Your Supabase Project URL and anon public key from the previous step',
   });
-  document.getElementById('vercel-btn').href =
-    'https://vercel.com/new/clone?' + params.toString();
+  document.getElementById('vercel-btn').href = 'https://vercel.com/new/clone?' + params.toString();
 }
 
-// ── Step 7: Auth URL displays ─────────────────────────────────────────────
+// ── Step 7 ────────────────────────────────────────────────────────────────
 function onEnterAuthStep() {
-  const url  = vercelUrl || 'https://your-project.vercel.app';
+  const url = vercelUrl || 'https://your-project.vercel.app';
   document.getElementById('vercel-url-display').textContent      = url;
   document.getElementById('vercel-url-wild-display').textContent = url + '/**';
 }
 
-// ── Step 8: Install ───────────────────────────────────────────────────────
+// ── Step 8 ────────────────────────────────────────────────────────────────
 function onEnterInstallStep() {
-  const ua       = navigator.userAgent || '';
-  const isIOS    = /iP(hone|ad|od)/i.test(ua);
+  const t         = T[lang];
+  const ua        = navigator.userAgent || '';
+  const isIOS     = /iP(hone|ad|od)/i.test(ua);
   const isAndroid = /Android/i.test(ua);
-  const appUrl   = vercelUrl || '(your Vercel URL from step 6)';
-  const body     = document.getElementById('install-body');
-  const actions  = document.getElementById('install-actions');
+  const appUrl    = vercelUrl || '(your Vercel URL from step 6)';
+  const body      = document.getElementById('install-body');
+  const actions   = document.getElementById('install-actions');
 
   if (isIOS) {
-    body.innerHTML = buildIosContent(appUrl);
-    actions.innerHTML =
-      '<p class="muted">The app will appear on your home screen and open fullscreen with no browser bar.</p>';
+    body.innerHTML    = buildIosSteps(appUrl, t);
+    actions.innerHTML = `<p class="muted">${t.ios_done}</p>`;
 
   } else if (isAndroid) {
     body.innerHTML = `
-      <p>Open your app in Chrome, Edge, or Brave on this phone — then install using the button below.</p>
-      <p class="muted">App URL: <a href="${esc(appUrl)}" target="_blank" rel="noopener">${esc(appUrl)}</a></p>`;
-    if (deferredPWA) {
-      actions.innerHTML = `
-        <button class="btn btn-install btn-full" id="pwa-btn" onclick="doInstall()">⬇ Install App</button>
-        <p class="muted">Tapping this triggers your browser's native install prompt.</p>`;
-    } else {
-      actions.innerHTML = `
-        <div class="callout">
-          <span class="callout-icon">📲</span>
-          <div>In Chrome, tap <strong>⋮</strong> (three-dot menu, top-right) → <strong>Add to Home screen</strong> or <strong>Install app</strong>.</div>
-        </div>`;
-    }
+      <p>${t.android_p}</p>
+      <p class="muted"><a href="${esc(appUrl)}" target="_blank" rel="noopener">${esc(appUrl)}</a></p>`;
+    actions.innerHTML = deferredPWA
+      ? `<button type="button" class="btn btn-install btn-full" id="pwa-btn" onclick="doInstall()">${t.android_btn}</button>
+         <p class="muted">${t.android_note}</p>`
+      : `<div class="callout"><span class="callout-icon">📲</span><div>${t.android_manual}</div></div>`;
 
   } else {
-    // Desktop: show both sets of instructions
     body.innerHTML = `
-      <p>Open your app URL on your phone to install it.</p>
+      <p>${t.desktop_p}</p>
       <div class="code-block">
-        <button class="copy-btn" data-copy="${esc(appUrl)}" onclick="copyFromAttr(this)">Copy</button>
-        <pre style="padding:10px 16px;font-size:13px;">${esc(appUrl)}</pre>
+        <button type="button" class="copy-btn" data-copy="${esc(appUrl)}" onclick="copyFromAttr(this)" title="${esc(t.copy)}">${esc(t.copy)}</button>
+        <pre class="pre-sm">${esc(appUrl)}</pre>
       </div>
-      <p><strong>iPhone (Safari):</strong></p>
-      ${buildIosContent(appUrl)}
-      <p style="margin-top:8px"><strong>Android (Chrome):</strong> tap <strong>⋮</strong> → <strong>Add to Home screen</strong>.</p>`;
+      <p>${t.desktop_iphone}</p>
+      ${buildIosSteps(appUrl, t)}
+      <p>${t.desktop_android}</p>`;
     actions.innerHTML = `
-      <div class="callout">
-        <span class="callout-icon">🎉</span>
-        <div>That's everything! Your settracker is live. Enjoy tracking your shows.</div>
-      </div>`;
+      <div class="callout"><span class="callout-icon">🎉</span><div>${t.desktop_done}</div></div>`;
   }
 }
 
-function buildIosContent(appUrl) {
+function buildIosSteps(appUrl, t) {
   return `
     <div class="ios-steps">
-      <div class="ios-step">
-        <div class="ios-num">1</div>
-        <div class="ios-text">Open <strong>${esc(appUrl)}</strong> in <strong>Safari</strong> — the install option doesn't appear in other browsers on iPhone.</div>
-      </div>
-      <div class="ios-step">
-        <div class="ios-num">2</div>
-        <div class="ios-text">Tap the <strong>Share</strong> button at the bottom of the screen <span class="share-icon">⎙</span> (a box with an upward arrow).</div>
-      </div>
-      <div class="ios-step">
-        <div class="ios-num">3</div>
-        <div class="ios-text">Scroll down in the sheet that appears and tap <strong>Add to Home Screen</strong>.</div>
-      </div>
-      <div class="ios-step">
-        <div class="ios-num">4</div>
-        <div class="ios-text">Tap <strong>Add</strong> in the top-right corner to confirm.</div>
-      </div>
+      <div class="ios-step"><div class="ios-num">1</div><div class="ios-text">${t.ios_step1(esc(appUrl))}</div></div>
+      <div class="ios-step"><div class="ios-num">2</div><div class="ios-text">${t.ios_step2}</div></div>
+      <div class="ios-step"><div class="ios-num">3</div><div class="ios-text">${t.ios_step3}</div></div>
+      <div class="ios-step"><div class="ios-num">4</div><div class="ios-text">${t.ios_step4}</div></div>
     </div>`;
 }
 
@@ -596,34 +803,24 @@ async function doInstall() {
   deferredPWA = null;
   const btn = document.getElementById('pwa-btn');
   if (!btn) return;
-  if (outcome === 'accepted') {
-    btn.textContent = '✓ Installed!';
-    btn.disabled = true;
-  } else {
-    btn.textContent = '⬇ Install App';
-  }
+  btn.textContent = outcome === 'accepted' ? T[lang].installed : T[lang].android_btn;
+  if (outcome === 'accepted') btn.disabled = true;
 }
 
-// ── Clipboard helpers ─────────────────────────────────────────────────────
-function copySql(btn) { copyText(SQL, btn); }
-
-function copyField(preId, btn) {
-  copyText(document.getElementById(preId).textContent, btn);
-}
-
-function copyFromAttr(btn) {
-  copyText(btn.dataset.copy, btn);
-}
+// ── Clipboard ─────────────────────────────────────────────────────────────
+function copySql(btn)          { copyText(SQL, btn); }
+function copyField(preId, btn) { copyText(document.getElementById(preId).textContent, btn); }
+function copyFromAttr(btn)     { copyText(btn.dataset.copy, btn); }
 
 function copyText(text, btn) {
+  const t = T[lang];
   const finish = (ok) => {
     if (!btn) return;
     const orig = btn.textContent;
-    btn.textContent = ok ? 'Copied!' : 'Failed';
+    btn.textContent = ok ? t.copied : t.copy_failed;
     btn.classList.toggle('copied', ok);
     setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
   };
-
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => finish(true), () => legacyCopy(text, finish));
   } else {
@@ -633,28 +830,25 @@ function copyText(text, btn) {
 
 function legacyCopy(text, finish) {
   try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
     ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
     document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
+    ta.focus(); ta.select();
     const ok = document.execCommand('copy');
     document.body.removeChild(ta);
     finish(ok);
-  } catch (e) {
-    finish(false);
-  }
+  } catch { finish(false); }
 }
 
 function esc(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.getElementById('prog-fill').style.width = (1 / TOTAL * 100) + '%';
+setLang(lang);
 </script>
 </body>
 </html>

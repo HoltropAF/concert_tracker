@@ -141,6 +141,7 @@ export default function App() {
   const [showBanner, setShowBanner] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
+  const [setupBannerDismissed, setSetupBannerDismissed] = useState(false)
   const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
 
   useEffect(() => {
@@ -212,6 +213,27 @@ export default function App() {
 
   if (guestMode) return (
     <>
+      {!setupBannerDismissed && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#13121f', borderBottom: '1px solid #2a2550',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '9px 40px 9px 16px',
+          fontFamily: "'DM Sans', sans-serif", fontSize: 13, gap: 6,
+        }}>
+          <span style={{ color: '#6b6890' }}>Exploring as guest —</span>
+          <a href="/setup.html" target="_blank" rel="noopener noreferrer"
+            style={{ color: '#a78bfa', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            want your own copy? →
+          </a>
+          <button onClick={() => setSetupBannerDismissed(true)} style={{
+            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+            background: 'none', border: 'none', color: '#4a4870',
+            cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 6px',
+            fontFamily: 'inherit',
+          }}>×</button>
+        </div>
+      )}
       <AppErrorBoundary>
         <ConcertTracker
           concerts={guest.concerts}

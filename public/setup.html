@@ -346,12 +346,13 @@
     <h1 data-t="s4_h1"></h1>
     <div class="why" data-t-html="s4_why"></div>
     <p data-t-html="s4_p1"></p>
-    <a class="btn btn-secondary btn-inline" href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" rel="noopener" data-t="s4_btn1"></a>
-    <p data-t-html="s4_p2"></p>
     <div class="code-block">
       <button type="button" class="copy-btn" id="copy-sql-btn" onclick="copySql(this)" data-t="copy" data-t-title="copy"></button>
       <pre id="sql-block"></pre>
     </div>
+    <p data-t-html="s4_p2"></p>
+    <a class="btn btn-secondary btn-inline" href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" rel="noopener" data-t="s4_btn1"></a>
+    <p data-t-html="s4_p3"></p>
     <div class="callout">
       <span class="callout-icon">✅</span>
       <div data-t-html="s4_callout"></div>
@@ -475,9 +476,10 @@ const T = {
     s3_btn2:         'Project is ready — next →',
     s4_h1:           'Set up your database tables',
     s4_why:          'The app needs two tables in your Supabase database — one for concerts, one for settings. The SQL below creates them and sets the security rules so only you can access your data.',
-    s4_p1:           '<strong>1.</strong> Click below to open your SQL Editor.',
+    s4_p1:           '<strong>1.</strong> Copy the SQL below using the Copy button in the top-right corner of the block.',
+    s4_p2:           '<strong>2.</strong> Open the SQL Editor — it opens in a new tab so you can come back here.',
     s4_btn1:         'Open SQL Editor ↗',
-    s4_p2:           '<strong>2.</strong> Copy all the SQL below, paste it into the editor, and click <strong>Run</strong>.',
+    s4_p3:           '<strong>3.</strong> Paste it in and click <strong>Run</strong>.',
     s4_callout:      'After clicking Run you should see <strong>"Success. No rows returned."</strong> — that\'s correct. It means the tables were created successfully.',
     s4_btn2:         'Done — next →',
     s5_h1:           'Copy your Supabase credentials',
@@ -558,9 +560,10 @@ const T = {
     s3_btn2:         'Project is klaar — volgende →',
     s4_h1:           'Databasetabellen aanmaken',
     s4_why:          'De app heeft twee tabellen nodig in je Supabase-database — één voor concerten, één voor instellingen. De SQL hieronder maakt ze aan en stelt de beveiligingsregels in zodat alleen jij je data kunt zien.',
-    s4_p1:           '<strong>1.</strong> Klik hieronder om je SQL Editor te openen.',
+    s4_p1:           '<strong>1.</strong> Kopieer de SQL hieronder via de kopieerknop rechtsboven in het blok.',
+    s4_p2:           '<strong>2.</strong> Open de SQL Editor — die opent in een nieuw tabblad zodat je hier terug kunt komen.',
     s4_btn1:         'Open SQL Editor ↗',
-    s4_p2:           '<strong>2.</strong> Kopieer de SQL hieronder, plak hem in de editor en klik op <strong>Run</strong>.',
+    s4_p3:           '<strong>3.</strong> Plak hem erin en klik op <strong>Run</strong>.',
     s4_callout:      'Na het klikken op Run zie je <strong>"Success. No rows returned."</strong> — dat klopt. Het betekent dat de tabellen succesvol zijn aangemaakt.',
     s4_btn2:         'Klaar — volgende →',
     s5_h1:           'Kopieer je Supabase-gegevens',

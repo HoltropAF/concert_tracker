@@ -141,6 +141,20 @@
     .btn-full   { width: 100%; }
     .btn-inline { align-self: flex-start; }
     .btn-install { background: var(--green); color: #0a1a0a; font-weight: 600; }
+    .btn-start-over {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-start-over:hover { color: var(--text); }
 
     /* ── Inputs ── */
     .field { display: flex; flex-direction: column; gap: 6px; }
@@ -323,6 +337,8 @@
     <div class="actions">
       <a class="btn btn-primary btn-full" href="https://github.com/HoltropAF/concert_tracker/fork" target="_blank" rel="noopener" data-t="s2_btn1"></a>
       <button type="button" class="btn btn-secondary btn-full" onclick="goTo(3)" data-t="s2_btn2"></button>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+      <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
     </div>
   </section>
 
@@ -337,6 +353,8 @@
     <div class="actions">
       <a class="btn btn-secondary btn-full" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener" data-t="s3_btn1"></a>
       <button type="button" class="btn btn-primary btn-full" onclick="goTo(4)" data-t="s3_btn2"></button>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+      <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
     </div>
   </section>
 
@@ -359,6 +377,8 @@
     </div>
     <div class="actions">
       <button type="button" class="btn btn-primary btn-full" onclick="goTo(5)" data-t="s4_btn2"></button>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+      <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
     </div>
   </section>
 
@@ -383,6 +403,8 @@
     <p class="muted" data-t="s5_muted"></p>
     <div class="actions">
       <button type="button" class="btn btn-primary btn-full" onclick="validate5()" data-t="s5_btn2"></button>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+      <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
     </div>
   </section>
 
@@ -405,6 +427,8 @@
     </div>
     <div class="actions">
       <button type="button" class="btn btn-primary btn-full" onclick="validate6()" data-t="s6_btn2"></button>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+      <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
     </div>
   </section>
 
@@ -432,6 +456,8 @@
     <p data-t-html="s7_p4"></p>
     <div class="actions">
       <button type="button" class="btn btn-primary btn-full" onclick="goTo(8)" data-t="s7_btn2"></button>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+      <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
     </div>
   </section>
 
@@ -530,6 +556,8 @@ const T = {
     desktop_iphone:  '<strong>iPhone (Safari):</strong>',
     desktop_android: '<strong>Android (Chrome):</strong> tap <strong>⋮</strong> → <strong>Add to Home screen</strong>.',
     desktop_done:    'That\'s everything! Your settracker is live. Enjoy tracking your shows.',
+    back_btn:        '← Back',
+    start_over:      'Start over',
     copy:            'Copy',
     copied:          'Copied!',
     copy_failed:     'Failed',
@@ -614,6 +642,8 @@ const T = {
     desktop_iphone:  '<strong>iPhone (Safari):</strong>',
     desktop_android: '<strong>Android (Chrome):</strong> tik op <strong>⋮</strong> → <strong>Toevoegen aan startscherm</strong>.',
     desktop_done:    'Dat was alles! Settracker staat live. Veel plezier met het bijhouden van je concerten.',
+    back_btn:        '← Terug',
+    start_over:      'Opnieuw beginnen',
     copy:            'Kopieer',
     copied:          'Gekopieerd!',
     copy_failed:     'Mislukt',
@@ -732,6 +762,20 @@ function validate6() {
   goTo(7);
 }
 
+function goBack() {
+  if (currentStep > 1) goTo(currentStep - 1);
+}
+
+function startOver() {
+  supabaseUrl = ''; supabaseKey = ''; vercelUrl = '';
+  ['inp-url', 'inp-key', 'inp-vercel'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    el.classList.remove('error');
+  });
+  goTo(1);
+}
+
 function goToVercel() {
   onUrlInput(); onKeyInput();
   goTo(6);
@@ -764,18 +808,23 @@ function onEnterInstallStep() {
   const body      = document.getElementById('install-body');
   const actions   = document.getElementById('install-actions');
 
+  const navHtml = `
+    <button type="button" class="btn btn-secondary btn-full" onclick="goBack()">${t.back_btn}</button>
+    <button type="button" class="btn-start-over" onclick="startOver()" title="${esc(t.start_over)}">${esc(t.start_over)}</button>`;
+
   if (isIOS) {
     body.innerHTML    = buildIosSteps(appUrl, t);
-    actions.innerHTML = `<p class="muted">${t.ios_done}</p>`;
+    actions.innerHTML = `<p class="muted">${t.ios_done}</p>` + navHtml;
 
   } else if (isAndroid) {
     body.innerHTML = `
       <p>${t.android_p}</p>
       <p class="muted"><a href="${esc(appUrl)}" target="_blank" rel="noopener">${esc(appUrl)}</a></p>`;
-    actions.innerHTML = deferredPWA
+    actions.innerHTML = (deferredPWA
       ? `<button type="button" class="btn btn-install btn-full" id="pwa-btn" onclick="doInstall()">${t.android_btn}</button>
          <p class="muted">${t.android_note}</p>`
-      : `<div class="callout"><span class="callout-icon">📲</span><div>${t.android_manual}</div></div>`;
+      : `<div class="callout"><span class="callout-icon">📲</span><div>${t.android_manual}</div></div>`)
+      + navHtml;
 
   } else {
     body.innerHTML = `
@@ -788,7 +837,7 @@ function onEnterInstallStep() {
       ${buildIosSteps(appUrl, t)}
       <p>${t.desktop_android}</p>`;
     actions.innerHTML = `
-      <div class="callout"><span class="callout-icon">🎉</span><div>${t.desktop_done}</div></div>`;
+      <div class="callout"><span class="callout-icon">🎉</span><div>${t.desktop_done}</div></div>` + navHtml;
   }
 }
 

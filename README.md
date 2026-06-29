@@ -15,7 +15,7 @@ Built by [@annuhfloor](https://www.threads.com/@annuhfloor) — fork it and make
 - [Using the app](#using-the-app)
 - [Something went wrong — how to fix it](#something-went-wrong)
 
-> **Prefer a guided walkthrough?** Open [setup.html](setup.html) in a browser — it's a step-by-step wizard that covers everything in the Setup section below, with copy buttons and direct links to each dashboard page.
+> **Prefer a guided walkthrough?** Open the **[Setup Wizard](https://settracker-theta.vercel.app/setup.html)** — a step-by-step page that covers everything below, with copy buttons and direct links to each dashboard.
 
 ---
 

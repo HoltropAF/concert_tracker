@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>settracker — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0c0c14;
+      --surface:    #151520;
+      --border:     #2a2840;
+      --text:       #e2e0ff;
+      --muted:      #8b87b0;
+      --accent:     #7c6fcd;
+      --accent-dim: #2e2a5a;
+      --green:      #4ade80;
+      --radius:     12px;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wizard {
+      max-width: 540px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Progress ── */
+    .progress {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 36px;
+      flex-shrink: 0;
+    }
+    .progress-label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .progress-track {
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.35s ease;
+    }
+
+    /* ── Steps ── */
+    .step { display: none; flex-direction: column; gap: 18px; flex: 1; }
+    .step.active { display: flex; }
+
+    .step-icon { font-size: 40px; line-height: 1; }
+
+    h1 { font-size: 24px; font-weight: 600; line-height: 1.3; }
+
+    .why {
+      font-size: 14px;
+      color: var(--muted);
+      background: var(--surface);
+      border-left: 3px solid var(--accent-dim);
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+      line-height: 1.55;
+    }
+
+    p { font-size: 15px; }
+    .muted { color: var(--muted); font-size: 13px; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: #1a1826;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: 'Menlo', 'Consolas', monospace;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 20px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); }
+    .btn-full { width: 100%; }
+    .btn-install { background: var(--green); color: #0a1a0a; font-weight: 600; }
+
+    /* ── Inputs ── */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .field input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 11px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--muted); opacity: 0.55; }
+
+    /* ── Code block ── */
+    .code-block {
+      position: relative;
+      background: #09090f;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .code-block pre {
+      padding: 14px 16px;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      color: #c0bcf0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--accent-dim);
+      color: var(--text);
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+      z-index: 1;
+    }
+    .copy-btn:hover { background: var(--accent); }
+    .copy-btn.copied { background: #14532d; color: var(--green); }
+
+    /* ── Callout ── */
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 13px 16px;
+      font-size: 14px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+    .callout-icon { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Actions ── */
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 20px; }
+
+    /* ── Welcome ── */
+    .hero { text-align: center; padding: 16px 0 4px; }
+    .hero-logo { font-size: 52px; margin-bottom: 10px; }
+    .hero h1 { font-size: 28px; }
+
+    .stat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+    .stat-num { font-size: 22px; font-weight: 600; color: var(--accent); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* ── iOS walkthrough ── */
+    .ios-steps { display: flex; flex-direction: column; gap: 10px; }
+    .ios-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .ios-num {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      background: var(--accent-dim);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .ios-text { font-size: 14px; line-height: 1.5; }
+    .share-icon {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      background: var(--accent-dim);
+      border-radius: 4px;
+      padding: 1px 5px 2px;
+      font-size: 14px;
+      vertical-align: middle;
+      line-height: 1;
+    }
+
+    /* ── Done screen ── */
+    .done-hero { text-align: center; padding: 16px 0; }
+    .done-hero .big { font-size: 56px; margin-bottom: 12px; }
+    .done-hero h1 { font-size: 26px; }
+  </style>
+</head>
+<body>
+<div class="wizard">
+
+  <div class="progress">
+    <span class="progress-label" id="prog-label">Step 1 of 8</span>
+    <div class="progress-track">
+      <div class="progress-fill" id="prog-fill" style="width:12.5%"></div>
+    </div>
+  </div>
+
+  <!-- ══ Step 1: Welcome ══════════════════════════════════════════════════ -->
+  <section class="step active" id="step-1">
+    <div class="hero">
+      <div class="hero-logo">🎵</div>
+      <h1>Set up settracker</h1>
+    </div>
+    <p>This wizard sets up your own copy of settracker — your own database, your own deployment, installed on your phone. All free, no technical background needed.</p>
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-num">~10</div>
+        <div class="stat-label">minutes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">3</div>
+        <div class="stat-label">free accounts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">€0</div>
+        <div class="stat-label">cost</div>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="callout-icon">📋</span>
+      <div>You'll need accounts on <strong>GitHub</strong>, <strong>Supabase</strong>, and <strong>Vercel</strong>. This wizard links you to each signup as we go — nothing to prepare in advance.</div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary btn-full" onclick="goTo(2)">Let's go →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 2: GitHub fork ══════════════════════════════════════════════ -->
+  <section class="step" id="step-2">
+    <div class="step-icon">🐙</div>
+    <h1>Fork the project on GitHub</h1>
+    <div class="why">GitHub hosts the code. You need your own copy (a "fork") so Vercel can deploy it under your account — and so any changes you make stay yours.</div>
+    <p><strong>1.</strong> No GitHub account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.</p>
+    <p><strong>2.</strong> Click the button below. GitHub will show a confirmation page — just click <strong>Create fork</strong>.</p>
+    <div class="actions">
+      <a class="btn btn-primary btn-full" href="https://github.com/HoltropAF/concert_tracker/fork" target="_blank" rel="noopener">Fork on GitHub ↗</a>
+      <button class="btn btn-secondary btn-full" onclick="goTo(3)">I've forked it — next →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 3: Supabase account & project ═══════════════════════════════ -->
+  <section class="step" id="step-3">
+    <div class="step-icon">🗄️</div>
+    <h1>Create your Supabase project</h1>
+    <div class="why">Supabase is your database. It stores all your concert data and handles logins. It's free and takes about 2 minutes to set up a new project.</div>
+    <p><strong>1.</strong> No Supabase account? <a href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.</p>
+    <p><strong>2.</strong> In your Supabase dashboard, click <strong>New project</strong>. Give it any name — <code>settracker</code> works fine. Set any password. Click <strong>Create new project</strong>.</p>
+    <p><strong>3.</strong> Wait about 2 minutes. You'll see a green status indicator when it's ready.</p>
+    <div class="actions">
+      <a class="btn btn-secondary btn-full" href="https://supabase.com/dashboard/projects" target="_blank" rel="noopener">Open Supabase dashboard ↗</a>
+      <button class="btn btn-primary btn-full" onclick="goTo(4)">Project is ready — next →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 4: Run schema SQL ════════════════════════════════════════════ -->
+  <section class="step" id="step-4">
+    <div class="step-icon">🛠️</div>
+    <h1>Set up your database tables</h1>
+    <div class="why">The app needs two tables in your Supabase database — one for concerts, one for settings. The SQL below creates them and sets the security rules so only you can access your data.</div>
+    <p><strong>1.</strong> Click below to open your SQL Editor.</p>
+    <a class="btn btn-secondary" href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" rel="noopener" style="align-self:flex-start">Open SQL Editor ↗</a>
+    <p><strong>2.</strong> Copy all the SQL below, paste it into the editor, and click <strong>Run</strong>.</p>
+    <div class="code-block">
+      <button class="copy-btn" id="copy-sql-btn" onclick="copySql(this)">Copy</button>
+      <pre id="sql-block"></pre>
+    </div>
+    <div class="callout">
+      <span class="callout-icon">✅</span>
+      <div>After clicking Run you should see <strong>"Success. No rows returned."</strong> — that's correct. It means the tables were created successfully.</div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary btn-full" onclick="goTo(5)">Done — next →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 5: Copy keys ═════════════════════════════════════════════════ -->
+  <section class="step" id="step-5">
+    <div class="step-icon">🔑</div>
+    <h1>Copy your Supabase credentials</h1>
+    <div class="why">The app needs two values to connect to your database: your project URL and a public API key. Paste them here now — they'll be carried forward to the Vercel step so you don't have to find them again.</div>
+    <p><strong>1.</strong> Click below to open your project's API settings page.</p>
+    <a class="btn btn-secondary" href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener" style="align-self:flex-start">Open API Settings ↗</a>
+    <p><strong>2.</strong> Copy the two values and paste them below.</p>
+    <div class="field">
+      <label>Project URL</label>
+      <input type="url" id="inp-url" placeholder="https://xxxxxxxx.supabase.co"
+             oninput="onUrlInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>anon public key</label>
+      <input type="text" id="inp-key" placeholder="eyJ..."
+             oninput="onKeyInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <p class="muted">These values stay in this browser tab only — this wizard never sends them anywhere.</p>
+    <div class="actions">
+      <button class="btn btn-primary btn-full" onclick="goToVercel()">Next →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 6: Vercel deploy ═════════════════════════════════════════════ -->
+  <section class="step" id="step-6">
+    <div class="step-icon">🚀</div>
+    <h1>Deploy to Vercel</h1>
+    <div class="why">Vercel puts your app online for free. It takes the code from your GitHub fork and builds it into a live website at a <code>*.vercel.app</code> address.</div>
+    <p><strong>1.</strong> Click the button below. Vercel will open its import page, already pointed at your fork.</p>
+    <p class="muted">On that page, Vercel will show a form with two fields — <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>. Paste the values from the previous step into those fields, then click <strong>Deploy</strong>.</p>
+    <a class="btn btn-primary btn-full" id="vercel-btn" href="#" target="_blank" rel="noopener">Deploy on Vercel ↗</a>
+    <div class="callout">
+      <span class="callout-icon">⏱️</span>
+      <div>After clicking Deploy on Vercel's page, wait about <strong>60 seconds</strong>. When it finishes, Vercel shows you a URL like <code>your-project.vercel.app</code>. Copy it and paste it below.</div>
+    </div>
+    <div class="field">
+      <label>Your Vercel URL</label>
+      <input type="url" id="inp-vercel" placeholder="https://your-project.vercel.app"
+             oninput="onVercelInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary btn-full" onclick="goTo(7)">I have my URL — next →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 7: Supabase auth link ════════════════════════════════════════ -->
+  <section class="step" id="step-7">
+    <div class="step-icon">🔗</div>
+    <h1>Link Supabase to your Vercel URL</h1>
+    <div class="why">Supabase sends you a magic-link email when you log in. For that link to redirect back to your app correctly, Supabase needs to know your app's URL.</div>
+    <div class="callout">
+      <span class="callout-icon">↩️</span>
+      <div>This step takes you back to Supabase after just coming from Vercel. That's expected — it's just the order things have to happen: deploy first, then tell Supabase where you landed.</div>
+    </div>
+    <p><strong>1.</strong> Open Auth URL Configuration in Supabase.</p>
+    <a class="btn btn-secondary" href="https://supabase.com/dashboard/project/_/auth/url-configuration" target="_blank" rel="noopener" style="align-self:flex-start">Open Auth URL Config ↗</a>
+    <p><strong>2.</strong> Set <strong>Site URL</strong> to your Vercel URL:</p>
+    <div class="code-block">
+      <button class="copy-btn" id="copy-vercel-url-btn" onclick="copyField('vercel-url-display', this)">Copy</button>
+      <pre id="vercel-url-display" style="padding:10px 16px;font-size:13px;"></pre>
+    </div>
+    <p><strong>3.</strong> Under <strong>Redirect URLs</strong>, add the same URL with <code>/**</code> appended:</p>
+    <div class="code-block">
+      <button class="copy-btn" id="copy-vercel-wild-btn" onclick="copyField('vercel-url-wild-display', this)">Copy</button>
+      <pre id="vercel-url-wild-display" style="padding:10px 16px;font-size:13px;"></pre>
+    </div>
+    <p><strong>4.</strong> Click <strong>Save</strong> in Supabase.</p>
+    <div class="actions">
+      <button class="btn btn-primary btn-full" onclick="goTo(8)">Done — final step →</button>
+    </div>
+  </section>
+
+  <!-- ══ Step 8: Install on phone ══════════════════════════════════════════ -->
+  <section class="step" id="step-8">
+    <div class="step-icon">📱</div>
+    <h1>Install on your phone</h1>
+    <div class="why">The app is a PWA — it can be added to your home screen and opens fullscreen like a native app, with no browser bar.</div>
+    <div id="install-body"><!-- filled by JS --></div>
+    <div class="actions" id="install-actions"><!-- filled by JS --></div>
+  </section>
+
+</div><!-- /wizard -->
+
+<script>
+'use strict';
+
+// ── State ─────────────────────────────────────────────────────────────────
+let supabaseUrl  = '';
+let supabaseKey  = '';
+let vercelUrl    = '';
+let deferredPWA  = null;
+let currentStep  = 1;
+const TOTAL      = 8;
+
+// ── SQL schema ────────────────────────────────────────────────────────────
+const SQL = `-- Run this in your Supabase project → SQL Editor
+
+-- Enable RLS
+create table if not exists public.concerts (
+  id text not null,
+  user_id uuid references auth.users not null,
+  data jsonb not null,
+  updated_at timestamptz default now(),
+  primary key (id, user_id)
+);
+
+create table if not exists public.settings (
+  user_id uuid references auth.users primary key,
+  data jsonb not null default '{}',
+  updated_at timestamptz default now()
+);
+
+-- Row Level Security: users can only see their own data
+alter table public.concerts enable row level security;
+alter table public.settings enable row level security;
+
+create policy "Users can manage own concerts"
+  on public.concerts for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can manage own settings"
+  on public.settings for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);`;
+
+// Render SQL into the pre block on page load
+document.getElementById('sql-block').textContent = SQL;
+
+// Capture PWA install prompt early (fires before step 8 is visible)
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPWA = e;
+});
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function goTo(n) {
+  document.getElementById('step-' + currentStep).classList.remove('active');
+  currentStep = n;
+  const next = document.getElementById('step-' + n);
+  next.classList.add('active');
+  document.getElementById('prog-label').textContent = 'Step ' + n + ' of ' + TOTAL;
+  document.getElementById('prog-fill').style.width = (n / TOTAL * 100) + '%';
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (n === 6) onEnterVercelStep();
+  if (n === 7) onEnterAuthStep();
+  if (n === 8) onEnterInstallStep();
+}
+
+// ── Input handlers ────────────────────────────────────────────────────────
+function onUrlInput()    { supabaseUrl = document.getElementById('inp-url').value.trim(); }
+function onKeyInput()    { supabaseKey = document.getElementById('inp-key').value.trim(); }
+function onVercelInput() { vercelUrl   = document.getElementById('inp-vercel').value.trim(); }
+
+function goToVercel() {
+  // Snapshot state before navigating
+  onUrlInput();
+  onKeyInput();
+  goTo(6);
+}
+
+// ── Step 6: Vercel deploy link ────────────────────────────────────────────
+function onEnterVercelStep() {
+  const params = new URLSearchParams({
+    'repository-url': 'https://github.com/HoltropAF/concert_tracker',
+    'env':            'VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY',
+    'envDescription': 'Your Supabase Project URL and anon public key from the previous step',
+  });
+  document.getElementById('vercel-btn').href =
+    'https://vercel.com/new/clone?' + params.toString();
+}
+
+// ── Step 7: Auth URL displays ─────────────────────────────────────────────
+function onEnterAuthStep() {
+  const url  = vercelUrl || 'https://your-project.vercel.app';
+  document.getElementById('vercel-url-display').textContent      = url;
+  document.getElementById('vercel-url-wild-display').textContent = url + '/**';
+}
+
+// ── Step 8: Install ───────────────────────────────────────────────────────
+function onEnterInstallStep() {
+  const ua       = navigator.userAgent || '';
+  const isIOS    = /iP(hone|ad|od)/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const appUrl   = vercelUrl || '(your Vercel URL from step 6)';
+  const body     = document.getElementById('install-body');
+  const actions  = document.getElementById('install-actions');
+
+  if (isIOS) {
+    body.innerHTML = buildIosContent(appUrl);
+    actions.innerHTML =
+      '<p class="muted">The app will appear on your home screen and open fullscreen with no browser bar.</p>';
+
+  } else if (isAndroid) {
+    body.innerHTML = `
+      <p>Open your app in Chrome, Edge, or Brave on this phone — then install using the button below.</p>
+      <p class="muted">App URL: <a href="${esc(appUrl)}" target="_blank" rel="noopener">${esc(appUrl)}</a></p>`;
+    if (deferredPWA) {
+      actions.innerHTML = `
+        <button class="btn btn-install btn-full" id="pwa-btn" onclick="doInstall()">⬇ Install App</button>
+        <p class="muted">Tapping this triggers your browser's native install prompt.</p>`;
+    } else {
+      actions.innerHTML = `
+        <div class="callout">
+          <span class="callout-icon">📲</span>
+          <div>In Chrome, tap <strong>⋮</strong> (three-dot menu, top-right) → <strong>Add to Home screen</strong> or <strong>Install app</strong>.</div>
+        </div>`;
+    }
+
+  } else {
+    // Desktop: show both sets of instructions
+    body.innerHTML = `
+      <p>Open your app URL on your phone to install it.</p>
+      <div class="code-block">
+        <button class="copy-btn" data-copy="${esc(appUrl)}" onclick="copyFromAttr(this)">Copy</button>
+        <pre style="padding:10px 16px;font-size:13px;">${esc(appUrl)}</pre>
+      </div>
+      <p><strong>iPhone (Safari):</strong></p>
+      ${buildIosContent(appUrl)}
+      <p style="margin-top:8px"><strong>Android (Chrome):</strong> tap <strong>⋮</strong> → <strong>Add to Home screen</strong>.</p>`;
+    actions.innerHTML = `
+      <div class="callout">
+        <span class="callout-icon">🎉</span>
+        <div>That's everything! Your settracker is live. Enjoy tracking your shows.</div>
+      </div>`;
+  }
+}
+
+function buildIosContent(appUrl) {
+  return `
+    <div class="ios-steps">
+      <div class="ios-step">
+        <div class="ios-num">1</div>
+        <div class="ios-text">Open <strong>${esc(appUrl)}</strong> in <strong>Safari</strong> — the install option doesn't appear in other browsers on iPhone.</div>
+      </div>
+      <div class="ios-step">
+        <div class="ios-num">2</div>
+        <div class="ios-text">Tap the <strong>Share</strong> button at the bottom of the screen <span class="share-icon">⎙</span> (a box with an upward arrow).</div>
+      </div>
+      <div class="ios-step">
+        <div class="ios-num">3</div>
+        <div class="ios-text">Scroll down in the sheet that appears and tap <strong>Add to Home Screen</strong>.</div>
+      </div>
+      <div class="ios-step">
+        <div class="ios-num">4</div>
+        <div class="ios-text">Tap <strong>Add</strong> in the top-right corner to confirm.</div>
+      </div>
+    </div>`;
+}
+
+async function doInstall() {
+  if (!deferredPWA) return;
+  deferredPWA.prompt();
+  const { outcome } = await deferredPWA.userChoice;
+  deferredPWA = null;
+  const btn = document.getElementById('pwa-btn');
+  if (!btn) return;
+  if (outcome === 'accepted') {
+    btn.textContent = '✓ Installed!';
+    btn.disabled = true;
+  } else {
+    btn.textContent = '⬇ Install App';
+  }
+}
+
+// ── Clipboard helpers ─────────────────────────────────────────────────────
+function copySql(btn) { copyText(SQL, btn); }
+
+function copyField(preId, btn) {
+  copyText(document.getElementById(preId).textContent, btn);
+}
+
+function copyFromAttr(btn) {
+  copyText(btn.dataset.copy, btn);
+}
+
+function copyText(text, btn) {
+  const finish = (ok) => {
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = ok ? 'Copied!' : 'Failed';
+    btn.classList.toggle('copied', ok);
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => finish(true), () => legacyCopy(text, finish));
+  } else {
+    legacyCopy(text, finish);
+  }
+}
+
+function legacyCopy(text, finish) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    finish(ok);
+  } catch (e) {
+    finish(false);
+  }
+}
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+</script>
+</body>
+</html>

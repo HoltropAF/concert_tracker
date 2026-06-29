@@ -11,8 +11,11 @@ Built by [@annuhfloor](https://www.threads.com/@annuhfloor) — fork it and make
 ## Table of contents
 
 - [Setup — get the app running](#setup)
+- [Local development — fast edit loop without deploying](#local-development)
 - [Using the app](#using-the-app)
 - [Something went wrong — how to fix it](#something-went-wrong)
+
+> **Prefer a guided walkthrough?** Open [setup.html](setup.html) in a browser — it's a step-by-step wizard that covers everything in the Setup section below, with copy buttons and direct links to each dashboard page.
 
 ---
 
@@ -196,6 +199,7 @@ The app opens fullscreen like a regular app — no browser bar.
 Get a native push notification on your phone when a ticket sale starts — even when the app is fully closed. This uses **ntfy**, a free open-source notification service.
 
 **Cost:**
+
 - Android: completely free
 - iPhone: free app + **€1.99 one-time in-app purchase** to unlock push delivery (without it, notifications only work when the app is open)
 
@@ -276,6 +280,65 @@ In the app: **Settings → Data → Export** — downloads a file with all your 
 Keep it somewhere safe (Google Drive, iCloud). Export regularly — especially before trying anything new.
 
 To restore: **Settings → Data → Restore from backup** → select your file.
+
+---
+
+---
+
+## Local development
+
+The default workflow for making changes is: edit → commit → push → wait ~60 seconds for Vercel → check the live site. For anything more than a one-liner, that loop is too slow. This section documents a faster local workflow using a `dev` branch and Vite's built-in dev server, so you can see changes instantly before anything touches main or production.
+
+### 1. Create a dev branch
+
+Branch off main so all work stays isolated until it's ready:
+
+```sh
+git checkout -b dev
+```
+
+### 2. Start the local dev server
+
+```sh
+npm run dev
+```
+
+Vite will print a local URL, typically `http://localhost:5173/`. Open it in the browser. This instance reads from your existing `.env`, so it's connected to the real Supabase project — auth, concert data, and setlist imports all work exactly as in production.
+
+### 3. Edit and hot-reload
+
+Edit any component — for example `src/components/ConcertTracker.jsx` or `src/components/AuthScreen.jsx` — and save. Vite hot-reloads the browser in well under a second, no deploy, no waiting on Vercel.
+
+### 4. Commit on dev as you go
+
+```sh
+git add .
+git commit -m "tweak stats chart layout"
+```
+
+### 5. Optional: push dev for a Vercel preview
+
+Since the repo is linked to Vercel, pushing a non-main branch triggers a separate preview URL — separate from the production URL — which is useful for testing on a phone or sharing a work-in-progress without touching production:
+
+```sh
+git push -u origin dev
+```
+
+### 6. Merge into main to redeploy production
+
+When the work is ready, merge into main — this is the step that actually redeploys the live site:
+
+```sh
+git checkout main
+git merge dev
+git push
+```
+
+---
+
+### A note on the shared database
+
+`npm run dev` points at the same Supabase database as production, because it uses the same `.env`. That's fine for UI and layout work, but riskier for anything touching real data or schema changes. If a true sandbox is needed, spin up a second free Supabase project, run the schema SQL in it, and point a separate `.env.dev` at it.
 
 ---
 

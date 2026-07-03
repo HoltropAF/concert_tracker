@@ -5101,6 +5101,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
   const [selectedSong, setSelectedSong] = useState(null);
   const [songMatcher, setSongMatcher] = useState(null);
   const [filterType, setFilterType] = useState('all');
+  const [filterSpotify, setFilterSpotify] = useState('all'); // 'all' | 'linked' | 'unlinked'
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
 
   const songCount = {};
@@ -5132,7 +5133,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
   const byCount = [...songEntries].sort((a, b) => b.count - a.count);
   const topSet = topN ? new Set(byCount.slice(0, topN)) : null;
   const filtered = songEntries
-    .filter(e => (!topSet || topSet.has(e)) && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase())))
+    .filter(e => (!topSet || topSet.has(e))
+      && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase()))
+      && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
     .sort((a, b) => sortBy === 'count' ? b.count - a.count : (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist)));
 
   if (selectedSong) {
@@ -5259,6 +5262,19 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
             ))}
           </div>
         </div>
+        {linkedCount > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {[['all','All'],['linked','Linked ●'],['unlinked','Unlinked']].map(([id, label]) => (
+              <button key={id} onClick={() => setFilterSpotify(id)}
+                style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify === id ? 700 : 400,
+                  background: filterSpotify === id ? (id === 'linked' ? '#0a2a18' : id === 'unlinked' ? '#1f1f35' : '#a78bfa') : 'none',
+                  color: filterSpotify === id ? (id === 'linked' ? '#1DB954' : id === 'unlinked' ? '#c4c2f0' : '#0c0c14') : '#6b6a8f',
+                  border: `1px solid ${filterSpotify === id ? (id === 'linked' ? '#1DB954' : id === 'unlinked' ? '#3a3858' : '#a78bfa') : '#1f1f35'}` }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ padding: '0 16px' }}>
         {totalUnique === 0 ? (
@@ -7341,6 +7357,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [selectedDate, setSelectedDate] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
+  const [spotifyPrompt, setSpotifyPrompt] = useState(null) // concert awaiting Spotify link prompt
+  const [spotifyMatcherConcert, setSpotifyMatcherConcert] = useState(null) // open SpotifyMatcher for this concert
 
   const notify = useCallback((message, type = 'success') => {
     setToast({ message, type })
@@ -7642,6 +7660,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success');
             if (result?.error) return;
             setShowAdd(null); savedScrollPos.current = 0; setSelected(c);
+            if (settings.spotifyAccessToken && getSongList(c.setlist).length > 0) {
+              setSpotifyPrompt(c);
+            }
           }}
           onClose={() => setShowAdd(null)}
           initialType={showAdd}
@@ -7957,6 +7978,48 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       <ChartGroupNav />
       <ShowsSubNav />
       <BottomNav />
+
+      {/* Spotify link prompt after adding a concert with songs */}
+      {spotifyPrompt && !spotifyMatcherConcert && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 900 }}>
+          <div style={{ background: '#13131f', border: '1px solid #2a2850', borderRadius: '16px 16px 0 0', padding: '24px 18px 36px', width: '100%', maxWidth: 480 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff', marginBottom: 6 }}>
+              Link songs to Spotify?
+            </div>
+            <div style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 22 }}>
+              {spotifyPrompt.artist} · {getSongList(spotifyPrompt.setlist).length} song{getSongList(spotifyPrompt.setlist).length !== 1 ? 's' : ''} added. Want to link them to Spotify now?
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setSpotifyMatcherConcert(spotifyPrompt)}
+                style={{ flex: 1, padding: 12, borderRadius: 9, background: '#1DB954', border: 'none', color: '#000', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                Link now
+              </button>
+              <button onClick={() => setSpotifyPrompt(null)}
+                style={{ padding: '12px 18px', borderRadius: 9, background: 'none', border: '1px solid #2a2850', color: '#6b6a8f', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SpotifyMatcher opened from the add-concert prompt */}
+      {spotifyMatcherConcert && (
+        <SpotifyMatcher
+          artist={spotifyMatcherConcert.artist}
+          songs={getSongList(spotifyMatcherConcert.setlist)}
+          settings={settings}
+          saveSettings={onUpdateSettings || (() => {})}
+          onSave={async updatedSongs => {
+            const updated = { ...spotifyMatcherConcert, setlist: updatedSongs }
+            await onSaveConcert(updated)
+            setSelected(prev => prev?.id === updated.id ? updated : prev)
+            setSpotifyMatcherConcert(null)
+            setSpotifyPrompt(null)
+          }}
+          onClose={() => { setSpotifyMatcherConcert(null); setSpotifyPrompt(null) }}
+        />
+      )}
     </div>
   )
 }

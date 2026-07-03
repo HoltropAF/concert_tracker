@@ -17,5 +17,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <!-- Emergency fallback: if JS fails to load (SW cache miss on a chunk), show a
+         clear-cache button after 6 seconds so the user isn't stuck on a blank screen. -->
+    <script>
+      setTimeout(function () {
+        if (document.getElementById('root').children.length > 0) return
+        var s = document.createElement('style')
+        s.textContent = '#_fb{position:fixed;inset:0;background:#0c0c14;display:flex;align-items:center;justify-content:center;font-family:sans-serif}#_fb div{max-width:320px;width:100%;background:#13131f;border:1px solid #f472b6;border-radius:12px;padding:24px;text-align:center}#_fb h2{color:#e2e0ff;font-size:18px;margin:0 0 10px}#_fb p{color:#6b6a8f;font-size:12px;line-height:1.6;margin:0 0 18px}#_fb button{display:block;width:100%;padding:12px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700;margin-bottom:8px}#_fb .p{background:#a78bfa;border:none;color:#0c0c14}#_fb .s{background:none;border:1px solid #2a2850;color:#6b6a8f}'
+        document.head.appendChild(s)
+        var d = document.createElement('div')
+        d.id = '_fb'
+        d.innerHTML = '<div><h2>Something went wrong</h2><p>The app couldn\'t load — probably a stale browser cache. Clear the cache and reload to fix it.</p><button class="p" onclick="(function(){var r=function(){location.reload()};if(!navigator.serviceWorker){r();return}navigator.serviceWorker.getRegistrations().then(function(a){return Promise.all(a.map(function(x){return x.unregister()}))}).then(function(){return caches.keys()}).then(function(k){return Promise.all(k.map(function(n){return caches.delete(n)}))}).then(r).catch(r)})()">Clear cache &amp; reload</button><button class="s" onclick="location.reload()">Just reload</button></div>'
+        document.body.appendChild(d)
+      }, 6000)
+    </script>
   </body>
 </html>

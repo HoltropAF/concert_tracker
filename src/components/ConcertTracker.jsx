@@ -1317,16 +1317,6 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                       </button>
                       {isOpen && (
                         <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `2px solid ${color}44` }}>
-                          {songs.length > 0 && settings.spotifyAccessToken && (
-                            <button
-                              onClick={() => setSpotifyMatcher({ songs, artist: name, onSave: save })}
-                              style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 8, display: 'block' }}
-                            >
-                              {songs.every(s => s && typeof s === 'object' && s.spotifyId)
-                                ? 'Manage Spotify links →'
-                                : 'Link to Spotify →'}
-                            </button>
-                          )}
                           {songs.length > 0
                             ? <SetlistSection
                                 concert={concert} settings={settings}
@@ -1711,6 +1701,16 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                     </button>
                     {isOpen && (
                       <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `2px solid ${color}44` }}>
+                        {songs.length > 0 && settings.spotifyAccessToken && (
+                          <button
+                            onClick={() => setSpotifyMatcher({ songs, artist: name, onSave: save })}
+                            style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 8, display: 'block' }}
+                          >
+                            {songs.every(s => s && typeof s === 'object' && s.spotifyId)
+                              ? 'Manage Spotify links →'
+                              : 'Link to Spotify →'}
+                          </button>
+                        )}
                         <SetlistSection
                           concert={concert} settings={settings}
                           overrideSongs={songs}
@@ -5093,12 +5093,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
   );
 }
 
-function SongsView({ concerts, onOpen, settings }) {
+function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
   const past = concerts.filter(c => isPast(c.date));
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('count');
   const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [songMatcher, setSongMatcher] = useState(null);
   const [filterType, setFilterType] = useState('all');
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
 
@@ -5109,10 +5110,16 @@ function SongsView({ concerts, onOpen, settings }) {
       const cov = getSongCover(s);
       const a = (typeof cov === 'string' && cov) || performer || '';
       const k = n + '\n' + a;
-      const sid = (s && typeof s === 'object' && s.spotifyId) ? s.spotifyId : null;
-      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, spotifyId: null };
+      const sp = (s && typeof s === 'object') ? s : null;
+      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, spotifyId: null, spotifyName: null, albumName: null, albumId: null, albumArt: null };
       songCount[k].count += 1;
-      if (sid && !songCount[k].spotifyId) songCount[k].spotifyId = sid;
+      if (sp?.spotifyId && !songCount[k].spotifyId) {
+        songCount[k].spotifyId = sp.spotifyId;
+        songCount[k].spotifyName = sp.spotifyName || null;
+        songCount[k].albumName = sp.albumName || null;
+        songCount[k].albumId = sp.albumId || null;
+        songCount[k].albumArt = sp.albumArt || null;
+      }
     };
     getSongList(c.setlist).forEach(s => tally(s, c.artist));
     Object.entries(c.supportSetlists || {}).forEach(([an, songs]) => getSongList(songs).forEach(s => tally(s, an)));
@@ -5156,16 +5163,31 @@ function SongsView({ concerts, onOpen, settings }) {
       <div style={{ padding: '0 0 100px' }}>
         <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
             <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{selectedSong.artist} · {appearances.length}× live</div>
+            {selectedSong.albumName && selectedSong.albumId && (
+              <a href={`https://open.spotify.com/album/${selectedSong.albumId}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'block', fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4, textDecoration: 'none' }}>
+                {selectedSong.albumName} ↗
+              </a>
+            )}
             {selectedSong.spotifyId && (
               <a href={`https://open.spotify.com/track/${selectedSong.spotifyId}`} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5, color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
                 ▶ Listen on Spotify
               </a>
             )}
+            {!selectedSong.spotifyId && settings.spotifyAccessToken && (
+              <button onClick={() => setSongMatcher(selectedSong)}
+                style={{ background: 'none', border: 'none', padding: '4px 0 0', color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, display: 'block' }}>
+                Link to Spotify →
+              </button>
+            )}
           </div>
+          {selectedSong.albumArt && (
+            <img src={selectedSong.albumArt} alt="" style={{ width: 54, height: 54, borderRadius: 6, flexShrink: 0, objectFit: 'cover' }} />
+          )}
         </div>
         <div style={{ padding: '14px 16px' }}>
           {appearances.map(({ concert: c, artist, info, cover, isSupport, occurrenceIndex, occurrenceTotal }) => {
@@ -5250,20 +5272,23 @@ function SongsView({ concerts, onOpen, settings }) {
         ) : filtered.length === 0 ? (
           <EmptyState title="No songs found" detail="Add setlists to shows and songs will collect here." />
         ) : filtered.map((e, i) => (
-          <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist, spotifyId: e.spotifyId || null })} style={{
+          <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist, spotifyId: e.spotifyId || null, spotifyName: e.spotifyName || null, albumName: e.albumName || null, albumId: e.albumId || null, albumArt: e.albumArt || null })} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
             borderLeft: `3px solid ${e.count >= 5 ? '#a78bfa' : e.count >= 3 ? '#6d5fa8' : e.count >= 2 ? '#3d3564' : '#2e2e4a'}`,
             borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 20, textAlign: 'right', flexShrink: 0 }}>
                 {sortBy === 'count' ? (i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`) : null}
               </span>
+              {e.albumArt
+                ? <img src={e.albumArt} alt="" style={{ width: 34, height: 34, borderRadius: 4, flexShrink: 0, objectFit: 'cover' }} />
+                : null}
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ color: '#c4c2f0', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
-                  {e.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, flexShrink: 0, lineHeight: 1 }}>●</span>}
+                  {e.spotifyId && !e.albumArt && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, flexShrink: 0, lineHeight: 1 }}>●</span>}
                 </span>
                 <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>
               </span>
@@ -5272,6 +5297,23 @@ function SongsView({ concerts, onOpen, settings }) {
           </button>
         ))}
       </div>
+      {songMatcher && (
+        <SpotifyMatcher
+          artist={songMatcher.artist}
+          songs={[{ name: songMatcher.name, spotifyId: songMatcher.spotifyId, spotifyName: songMatcher.spotifyName, albumName: songMatcher.albumName, albumId: songMatcher.albumId, albumArt: songMatcher.albumArt }]}
+          settings={settings}
+          saveSettings={saveSettings || (() => {})}
+          onSave={([updated]) => {
+            if (updated?.spotifyId && onLinkSong) {
+              const data = { spotifyId: updated.spotifyId, spotifyName: updated.spotifyName, albumName: updated.albumName, albumId: updated.albumId, albumArt: updated.albumArt }
+              onLinkSong(songMatcher.name, songMatcher.artist, data)
+              setSelectedSong(prev => prev ? { ...prev, ...data } : prev)
+            }
+            setSongMatcher(null)
+          }}
+          onClose={() => setSongMatcher(null)}
+        />
+      )}
     </div>
   );
 }
@@ -7347,6 +7389,29 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     return result
   }
 
+  const handleLinkSongSpotify = async (songName, artistName, spotifyData) => {
+    const matching = concerts.filter(concert => {
+      const inMain = concert.artist === artistName && getSongList(concert.setlist).some(s => getSongName(s) === songName)
+      const inSupport = Object.entries(concert.supportSetlists || {}).some(
+        ([a, sl]) => a === artistName && getSongList(sl).some(s => getSongName(s) === songName)
+      )
+      return inMain || inSupport
+    })
+    const patch = (sl) => getSongList(sl).map(s =>
+      getSongName(s) === songName ? { ...(typeof s === 'string' ? { name: s } : s), ...spotifyData } : s
+    )
+    for (const concert of matching) {
+      const updated = {
+        ...concert,
+        ...(concert.artist === artistName ? { setlist: patch(concert.setlist) } : {}),
+        supportSetlists: Object.fromEntries(
+          Object.entries(concert.supportSetlists || {}).map(([a, sl]) => [a, a === artistName ? patch(sl) : sl])
+        ),
+      }
+      await handleSave(updated)
+    }
+  }
+
   const updateSetting = (key, value) => {
     return onUpdateSetting(key, value)
   }
@@ -7888,7 +7953,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
-        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} />}
+        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}

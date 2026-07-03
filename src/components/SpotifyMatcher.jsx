@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getValidSpotifyToken } from '../lib/spotify'
 
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '')
-const getSongSpotifyId = s => (s && typeof s === 'object') ? (s.spotifyId || null) : null
+const getSongSpotifyId = s => (s && typeof s === 'object' && s.spotifyId) ? s.spotifyId : null
 
 const norm = s => s.toLowerCase()
   .replace(/[''`]/g, "'")
@@ -17,11 +17,73 @@ const isGoodMatch = (a, b) => {
   return longer.startsWith(shorter)
 }
 
+const extractTrack = t => ({
+  id: t.id,
+  name: t.name,
+  artists: t.artists.map(a => a.name).join(', '),
+  albumName: t.album?.name || '',
+  albumId: t.album?.id || '',
+  albumArt: t.album?.images?.at(-1)?.url || '',
+})
+
+function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick, onCancel }) {
+  return (
+    <div style={{ marginTop: 8, background: '#0e0e1a', borderRadius: 8, padding: 10, border: '1px solid #1f1f35' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && onSearch()}
+          placeholder="song title, artist…"
+          autoFocus
+          style={{ flex: 1, background: '#13131f', border: '1px solid #2a2850', borderRadius: 6, color: '#c4c2f0', padding: '6px 10px', fontSize: 12, fontFamily: "'DM Mono', monospace", outline: 'none', boxSizing: 'border-box' }}
+        />
+        <button
+          onClick={onSearch}
+          disabled={loading || !query?.trim()}
+          style={{ background: loading || !query?.trim() ? '#2a2850' : '#a78bfa', border: 'none', borderRadius: 6, color: '#0c0c14', fontSize: 11, fontWeight: 700, padding: '0 14px', cursor: loading || !query?.trim() ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}
+        >
+          {loading ? '…' : 'Search'}
+        </button>
+      </div>
+      {results.length === 0 && !loading && (
+        <div style={{ fontSize: 10, color: '#3a3858', fontFamily: "'DM Mono', monospace", padding: '4px 0' }}>type to search Spotify</div>
+      )}
+      {results.map(track => (
+        <button
+          key={track.id}
+          onClick={() => onPick(track)}
+          style={{ width: '100%', textAlign: 'left', background: 'none', border: '1px solid #1f1f35', borderRadius: 6, padding: '7px 10px', cursor: 'pointer', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+        >
+          {track.albumArt
+            ? <img src={track.albumArt} alt="" style={{ width: 28, height: 28, borderRadius: 3, flexShrink: 0, objectFit: 'cover' }} />
+            : <div style={{ width: 28, height: 28, borderRadius: 3, background: '#1a1a2e', flexShrink: 0 }} />}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: '#c4c2f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</div>
+            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {track.artists}{track.albumName ? ` · ${track.albumName}` : ''}
+            </div>
+          </div>
+        </button>
+      ))}
+      <button onClick={onCancel} style={{ background: 'none', border: 'none', color: '#4a4870', fontSize: 10, cursor: 'pointer', padding: '4px 0 0', fontFamily: "'DM Mono', monospace" }}>
+        Cancel
+      </button>
+    </div>
+  )
+}
+
 export default function SpotifyMatcher({ artist, songs, settings, saveSettings, onSave, onClose }) {
+  // results[i]: null | {id,name,artists,albumName,albumId,albumArt,confidence}
+  //           | {notFound:true} | {alreadyLinked:true, existingId, existingName, existingAlbumName, existingAlbumArt}
   const [results, setResults] = useState(() => new Array(songs.length).fill(null))
+  // choices[i]: confirmed track object {id,name,artists,albumName,albumId,albumArt}
   const [choices, setChoices] = useState({})
-  const [unlinked, setUnlinked] = useState(new Set())
-  const [phase, setPhase] = useState('searching')
+  // indices where manual-search/change panel is open
+  const [panelOpen, setPanelOpen] = useState(new Set())
+  const [manualQuery, setManualQuery] = useState({})
+  const [manualResults, setManualResults] = useState({})
+  const [manualLoading, setManualLoading] = useState(new Set())
   const cancelled = useRef(false)
   const tokenRef = useRef(null)
 
@@ -38,39 +100,31 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
     return t
   }
 
-  async function searchSong(token, name) {
+  async function searchSpotify(query, limit = 5) {
+    const token = await getToken()
+    if (!token) return []
     try {
-      const q = encodeURIComponent(`track:${name} artist:${artist}`)
-      let r = await fetch(
-        `https://api.spotify.com/v1/search?q=${q}&type=track&limit=3`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      const q = encodeURIComponent(query)
+      let r = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=${limit}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       if (r.status === 429) {
         await new Promise(ok => setTimeout(ok, 2000))
-        r = await fetch(
-          `https://api.spotify.com/v1/search?q=${q}&type=track&limit=3`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
+        r = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=${limit}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
       }
-      if (!r.ok) return { notFound: true }
+      if (!r.ok) return []
       const data = await r.json()
-      const items = (data.tracks?.items || []).filter(t => t?.id)
-      if (!items.length) return { notFound: true }
-      const top = items[0]
-      return {
-        id: top.id,
-        name: top.name,
-        artists: top.artists.map(a => a.name).join(', '),
-        confidence: isGoodMatch(name, top.name) ? 'high' : 'low',
-      }
+      return (data.tracks?.items || []).filter(t => t?.id).map(extractTrack)
     } catch {
-      return { notFound: true }
+      return []
     }
   }
 
   async function run() {
     const token = await getToken()
-    if (!token) { setPhase('done'); return }
+    if (!token) return
 
     const res = new Array(songs.length).fill(null)
     const ch = {}
@@ -78,15 +132,31 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
     for (let i = 0; i < songs.length; i++) {
       if (cancelled.current) return
 
-      if (getSongSpotifyId(songs[i])) {
-        res[i] = { alreadyLinked: true, existingId: getSongSpotifyId(songs[i]) }
+      const existingId = getSongSpotifyId(songs[i])
+      if (existingId) {
+        const s = songs[i]
+        res[i] = {
+          alreadyLinked: true,
+          existingId,
+          existingName: s.spotifyName || getSongName(s),
+          existingAlbumName: s.albumName || '',
+          existingAlbumArt: s.albumArt || '',
+        }
         setResults([...res])
         continue
       }
 
-      const result = await searchSong(token, getSongName(songs[i]))
-      res[i] = result
-      if (result.id && result.confidence === 'high') ch[i] = result.id
+      const name = getSongName(songs[i])
+      const items = await searchSpotify(`track:${name} artist:${artist}`, 3)
+
+      if (!items.length) {
+        res[i] = { notFound: true }
+      } else {
+        const top = items[0]
+        const confidence = isGoodMatch(name, top.name) ? 'high' : 'low'
+        res[i] = { ...top, confidence }
+        if (confidence === 'high') ch[i] = top
+      }
 
       setResults([...res])
       setChoices({ ...ch })
@@ -96,66 +166,49 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
     if (!cancelled.current) {
       setResults([...res])
       setChoices({ ...ch })
-      setPhase('done')
     }
   }
 
-  const handleUnlink = async (i) => {
-    setUnlinked(prev => new Set([...prev, i]))
+  const openPanel = (i) => {
+    setPanelOpen(prev => new Set([...prev, i]))
+    setManualQuery(prev => ({ ...prev, [i]: getSongName(songs[i]) }))
+    setManualResults(prev => ({ ...prev, [i]: [] }))
+  }
+
+  const closePanel = (i) => {
+    setPanelOpen(prev => { const n = new Set(prev); n.delete(i); return n })
+  }
+
+  const handleManualSearch = async (i) => {
+    const q = (manualQuery[i] || '').trim()
+    if (!q) return
+    setManualLoading(prev => new Set([...prev, i]))
+    const items = await searchSpotify(q, 5)
+    setManualResults(prev => ({ ...prev, [i]: items }))
+    setManualLoading(prev => { const n = new Set(prev); n.delete(i); return n })
+  }
+
+  const pickTrack = (i, track) => {
+    setChoices(prev => ({ ...prev, [i]: track }))
+    closePanel(i)
+  }
+
+  const unpickTrack = (i) => {
     setChoices(prev => { const n = { ...prev }; delete n[i]; return n })
-    setResults(prev => { const r = [...prev]; r[i] = null; return r })
-
-    const token = await getToken()
-    if (!token) {
-      setResults(prev => { const r = [...prev]; r[i] = { notFound: true }; return r })
-      return
-    }
-    const result = await searchSong(token, getSongName(songs[i]))
-    setResults(prev => { const r = [...prev]; r[i] = result; return r })
-  }
-
-  const handleRelink = (i) => {
-    setUnlinked(prev => { const n = new Set(prev); n.delete(i); return n })
-    const existingId = getSongSpotifyId(songs[i])
-    if (existingId) setChoices(prev => ({ ...prev, [i]: existingId }))
-    setResults(prev => {
-      const r = [...prev]
-      r[i] = { alreadyLinked: true, existingId }
-      return r
-    })
-  }
-
-  const toggle = (i) => {
-    const r = results[i]
-    if (!r?.id) return
-    setChoices(prev => {
-      const next = { ...prev }
-      if (next[i]) delete next[i]; else next[i] = r.id
-      return next
-    })
   }
 
   const handleSave = () => {
     const updated = songs.map((song, i) => {
-      const newId = choices[i]
-      if (newId) {
-        const base = typeof song === 'string' ? { name: song } : { ...song }
-        return { ...base, spotifyId: newId }
-      }
-      if (unlinked.has(i) && !newId) {
-        if (typeof song === 'string') return song
-        const { spotifyId, ...rest } = song
-        return Object.keys(rest).length === 1 && rest.name ? rest.name : rest
-      }
-      return song
+      const choice = choices[i]
+      if (!choice) return song
+      const base = typeof song === 'string' ? { name: song } : { ...song }
+      return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt }
     })
     onSave(updated)
     onClose()
   }
 
-  const newLinkCount = Object.keys(choices).length
-  const unlinkCount = [...unlinked].filter(i => !choices[i]).length
-  const changeCount = newLinkCount + unlinkCount
+  const changeCount = Object.keys(choices).length
   const doneCount = results.filter(r => r !== null).length
   const stillSearching = doneCount < songs.length
 
@@ -164,89 +217,143 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
       <div style={{ background: '#13131f', border: '1px solid #2a2850', borderRadius: '16px 16px 0 0', padding: '20px 18px 32px', width: '100%', maxWidth: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Spotify links</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Link to Spotify</div>
             <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-              {artist} · {songs.length} songs
-              {stillSearching
-                ? ` · searching ${doneCount}/${songs.length}…`
-                : changeCount > 0 ? ` · ${changeCount} change${changeCount !== 1 ? 's' : ''}` : ' · no changes'}
+              {artist} · {songs.length} song{songs.length !== 1 ? 's' : ''}
+              {stillSearching ? ` · searching ${doneCount}/${songs.length}…` : changeCount > 0 ? ` · ${changeCount} ready to save` : ' · no changes'}
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: '0 0 0 12px' }}>×</button>
         </div>
 
-        {/* Song list */}
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          {[
+            { color: '#6ee7b7', label: 'auto-matched' },
+            { color: '#fbbf24', label: 'needs review' },
+            { color: '#4a4870', label: 'not found' },
+            { color: '#1DB954', label: 'linked' },
+          ].map(({ color, label }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+              <span style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Song rows */}
         <div style={{ flex: 1, overflowY: 'auto', marginBottom: 14 }}>
           {songs.map((song, i) => {
-            const name = getSongName(song)
+            const songName = getSongName(song)
             const result = results[i]
-            const confirmed = !!choices[i]
-            const isUnlinked = unlinked.has(i)
+            const choice = choices[i]
+            const hasPanelOpen = panelOpen.has(i)
+            const mResults = manualResults[i] || []
+            const mLoading = manualLoading.has(i)
 
-            if (result?.alreadyLinked) return (
-              <div key={i} style={{ paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #1a1a2e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: '#1DB954', fontSize: 11, flexShrink: 0 }}>●</span>
-                <span style={{ color: '#c4c2f0', fontSize: 13, flex: 1 }}>{name}</span>
-                <button
-                  onClick={() => handleUnlink(i)}
-                  style={{ background: 'none', border: '1px solid #3a1a1a', borderRadius: 6, color: '#6b3a3a', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}
-                >
-                  unlink
-                </button>
+            const Dot = ({ color }) => (
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block', marginTop: 2 }} />
+            )
+            const Art = ({ src }) => src
+              ? <img src={src} alt="" style={{ width: 36, height: 36, borderRadius: 4, flexShrink: 0, objectFit: 'cover' }} />
+              : <div style={{ width: 36, height: 36, borderRadius: 4, background: '#1a1a2e', flexShrink: 0 }} />
+            const TrackMeta = ({ name, sub }) => (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: '#c4c2f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                {sub && <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>}
               </div>
+            )
+            const panel = hasPanelOpen && (
+              <ManualSearchPanel
+                query={manualQuery[i] || ''}
+                setQuery={q => setManualQuery(p => ({ ...p, [i]: q }))}
+                onSearch={() => handleManualSearch(i)}
+                loading={mLoading}
+                results={mResults}
+                onPick={t => pickTrack(i, t)}
+                onCancel={() => closePanel(i)}
+              />
             )
 
             return (
               <div key={i} style={{ paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #1a1a2e' }}>
-                <div style={{ fontSize: 13, color: result === null ? '#5a5878' : '#c4c2f0', marginBottom: result === null ? 0 : 5 }}>
-                  {name}
-                  {isUnlinked && <span style={{ color: '#f472b6', fontSize: 10, fontFamily: "'DM Mono', monospace", marginLeft: 8 }}>unlinked</span>}
-                </div>
-                {result === null && (
-                  <div style={{ fontSize: 10, color: '#3a3858', fontFamily: "'DM Mono', monospace" }}>searching…</div>
-                )}
-                {result?.notFound && !isUnlinked && (
-                  <div style={{ fontSize: 10, color: '#3a3858', fontFamily: "'DM Mono', monospace" }}>not found on Spotify</div>
-                )}
-                {result?.notFound && isUnlinked && (
+
+                {/* ── CONFIRMED CHOICE ── */}
+                {choice && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ fontSize: 10, color: '#3a3858', fontFamily: "'DM Mono', monospace", flex: 1 }}>not found on Spotify</div>
-                    <button onClick={() => handleRelink(i)} style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>keep link</button>
+                    <Dot color="#1DB954" />
+                    <Art src={choice.albumArt} />
+                    <TrackMeta name={choice.name} sub={`${choice.artists}${choice.albumName ? ` · ${choice.albumName}` : ''}`} />
+                    <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                      <button onClick={() => openPanel(i)} style={{ background: 'none', border: '1px solid #2a2850', borderRadius: 6, color: '#6b6a8f', fontSize: 10, padding: '3px 8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Change</button>
+                      <button onClick={() => unpickTrack(i)} title="Remove this link" style={{ background: 'none', border: '1px solid #1DB95466', borderRadius: 6, color: '#1DB954', fontSize: 12, padding: '3px 8px', cursor: 'pointer', lineHeight: 1 }}>✓</button>
+                    </div>
+                  </div>
+                  {choice.name.toLowerCase() !== songName.toLowerCase() && (
+                    <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", paddingLeft: 52, marginTop: 2 }}>logged as: {songName}</div>
+                  )}
+                  {panel}
+                </>}
+
+                {/* ── SEARCHING ── */}
+                {!choice && result === null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Dot color="#2a2850" />
+                    <span style={{ fontSize: 13, color: '#5a5878', flex: 1 }}>{songName}</span>
+                    <span style={{ fontSize: 10, color: '#3a3858', fontFamily: "'DM Mono', monospace" }}>searching…</span>
                   </div>
                 )}
-                {result?.id && (
+
+                {/* ── ALREADY LINKED ── */}
+                {!choice && result?.alreadyLinked && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: result.confidence === 'high' ? '#6ee7b7' : '#fbbf24', fontFamily: "'DM Mono', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {result.name}
-                      </div>
-                      <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 1 }}>
-                        {result.artists}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      {isUnlinked && (
-                        <button onClick={() => handleRelink(i)} style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>keep link</button>
-                      )}
-                      <button
-                        onClick={() => toggle(i)}
-                        style={{
-                          padding: '4px 12px', borderRadius: 6,
-                          background: confirmed ? '#1DB954' : 'none',
-                          border: `1px solid ${confirmed ? '#1DB954' : '#3a3858'}`,
-                          color: confirmed ? '#000' : '#6b6a8f',
-                          fontSize: 11, fontWeight: confirmed ? 700 : 400,
-                          cursor: 'pointer', fontFamily: "'DM Mono', monospace",
-                          transition: 'all 0.1s',
-                        }}
-                      >
-                        {confirmed ? '✓ linked' : 'link'}
+                    <Dot color="#1DB954" />
+                    <Art src={result.existingAlbumArt} />
+                    <TrackMeta
+                      name={result.existingName || songName}
+                      sub={result.existingAlbumName}
+                    />
+                    <button onClick={() => openPanel(i)} style={{ background: 'none', border: '1px solid #2a2850', borderRadius: 6, color: '#6b6a8f', fontSize: 10, padding: '3px 8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Change</button>
+                  </div>
+                  {panel}
+                </>}
+
+                {/* ── NOT FOUND ── */}
+                {!choice && result?.notFound && <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Dot color="#4a4870" />
+                    <span style={{ fontSize: 13, color: '#6b6a8f', flex: 1 }}>{songName}</span>
+                    {!hasPanelOpen && (
+                      <button onClick={() => openPanel(i)} style={{ background: 'none', border: '1px solid #2a2850', borderRadius: 6, color: '#6b6a8f', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
+                        Search manually
                       </button>
-                    </div>
+                    )}
                   </div>
-                )}
+                  {!hasPanelOpen && (
+                    <div style={{ fontSize: 10, color: '#3a3858', fontFamily: "'DM Mono', monospace", paddingLeft: 16, marginTop: 2 }}>not found — try a different title or spelling</div>
+                  )}
+                  {panel}
+                </>}
+
+                {/* ── SUGGESTED (unconfirmed match) ── */}
+                {!choice && result?.id && <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Dot color={result.confidence === 'high' ? '#6ee7b7' : '#fbbf24'} />
+                    <Art src={result.albumArt} />
+                    <TrackMeta name={result.name} sub={`${result.artists}${result.albumName ? ` · ${result.albumName}` : ''}`} />
+                    <button onClick={() => pickTrack(i, result)} style={{ background: 'none', border: '1px solid #3a3858', borderRadius: 6, color: '#6b6a8f', fontSize: 11, padding: '4px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>link</button>
+                  </div>
+                  {result.confidence === 'low' && !hasPanelOpen && (
+                    <div style={{ fontSize: 10, color: '#fbbf24', fontFamily: "'DM Mono', monospace", paddingLeft: 52, marginTop: 2 }}>
+                      low confidence — confirm if correct or{' '}
+                      <button onClick={() => openPanel(i)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 10, cursor: 'pointer', padding: 0, fontFamily: "'DM Mono', monospace", textDecoration: 'underline' }}>search manually</button>
+                    </div>
+                  )}
+                  {panel}
+                </>}
+
               </div>
             )
           })}
@@ -257,22 +364,11 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
           <button
             onClick={handleSave}
             disabled={changeCount === 0}
-            style={{
-              flex: 1, padding: '12px', borderRadius: 9,
-              background: changeCount > 0 ? '#1DB954' : '#1a2e24',
-              border: 'none',
-              color: changeCount > 0 ? '#000' : '#3a5a3a',
-              fontSize: 13, fontWeight: 700,
-              cursor: changeCount > 0 ? 'pointer' : 'default',
-              fontFamily: "'DM Sans', sans-serif",
-            }}
+            style={{ flex: 1, padding: '12px', borderRadius: 9, background: changeCount > 0 ? '#1DB954' : '#1a2e24', border: 'none', color: changeCount > 0 ? '#000' : '#3a5a3a', fontSize: 13, fontWeight: 700, cursor: changeCount > 0 ? 'pointer' : 'default', fontFamily: "'DM Sans', sans-serif" }}
           >
-            {changeCount > 0 ? `Save ${changeCount} change${changeCount !== 1 ? 's' : ''}` : 'No changes'}
+            {changeCount > 0 ? `Save ${changeCount} link${changeCount !== 1 ? 's' : ''}` : 'No changes'}
           </button>
-          <button
-            onClick={onClose}
-            style={{ padding: '12px 18px', borderRadius: 9, background: 'none', border: '1px solid #2a2850', color: '#6b6a8f', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
-          >
+          <button onClick={onClose} style={{ padding: '12px 18px', borderRadius: 9, background: 'none', border: '1px solid #2a2850', color: '#6b6a8f', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
             Close
           </button>
         </div>

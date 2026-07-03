@@ -5109,8 +5109,10 @@ function SongsView({ concerts, onOpen, settings }) {
       const cov = getSongCover(s);
       const a = (typeof cov === 'string' && cov) || performer || '';
       const k = n + '\n' + a;
-      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0 };
+      const sid = (s && typeof s === 'object' && s.spotifyId) ? s.spotifyId : null;
+      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, spotifyId: null };
       songCount[k].count += 1;
+      if (sid && !songCount[k].spotifyId) songCount[k].spotifyId = sid;
     };
     getSongList(c.setlist).forEach(s => tally(s, c.artist));
     Object.entries(c.supportSetlists || {}).forEach(([an, songs]) => getSongList(songs).forEach(s => tally(s, an)));
@@ -5118,6 +5120,7 @@ function SongsView({ concerts, onOpen, settings }) {
   const songEntries = Object.values(songCount);
   const totalUnique = songEntries.length;
   const totalHeard = songEntries.reduce((a, e) => a + e.count, 0);
+  const linkedCount = songEntries.filter(e => e.spotifyId).length;
 
   const byCount = [...songEntries].sort((a, b) => b.count - a.count);
   const topSet = topN ? new Set(byCount.slice(0, topN)) : null;
@@ -5156,6 +5159,12 @@ function SongsView({ concerts, onOpen, settings }) {
           <div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
             <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{selectedSong.artist} · {appearances.length}× live</div>
+            {selectedSong.spotifyId && (
+              <a href={`https://open.spotify.com/track/${selectedSong.spotifyId}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5, color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
+                ▶ Listen on Spotify
+              </a>
+            )}
           </div>
         </div>
         <div style={{ padding: '14px 16px' }}>
@@ -5189,7 +5198,7 @@ function SongsView({ concerts, onOpen, settings }) {
       <div style={{ padding: '14px 16px 10px' }}>
         {/* Stat tiles */}
         {!search && totalUnique > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${linkedCount > 0 ? 5 : 4}, 1fr)`, gap: 6, marginBottom: 12 }}>
             {[
               { value: totalUnique, label: "unique" },
               { value: totalHeard, label: "heard" },
@@ -5201,6 +5210,12 @@ function SongsView({ concerts, onOpen, settings }) {
                 <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
               </div>
             ))}
+            {linkedCount > 0 && (
+              <div style={{ background: "#13131f", border: "1px solid #1DB95433", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#1DB954", lineHeight: 1 }}>{linkedCount}</div>
+                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>linked</div>
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
@@ -5235,7 +5250,7 @@ function SongsView({ concerts, onOpen, settings }) {
         ) : filtered.length === 0 ? (
           <EmptyState title="No songs found" detail="Add setlists to shows and songs will collect here." />
         ) : filtered.map((e, i) => (
-          <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist })} style={{
+          <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist, spotifyId: e.spotifyId || null })} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
             borderLeft: `3px solid ${e.count >= 5 ? '#a78bfa' : e.count >= 3 ? '#6d5fa8' : e.count >= 2 ? '#3d3564' : '#2e2e4a'}`,
             borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6,
@@ -5246,7 +5261,10 @@ function SongsView({ concerts, onOpen, settings }) {
                 {sortBy === 'count' ? (i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`) : null}
               </span>
               <span style={{ minWidth: 0 }}>
-                <span style={{ color: '#c4c2f0', fontSize: 13, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ color: '#c4c2f0', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                  {e.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, flexShrink: 0, lineHeight: 1 }}>●</span>}
+                </span>
                 <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>
               </span>
             </div>

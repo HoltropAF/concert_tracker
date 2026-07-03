@@ -112,8 +112,11 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         }}>
           {!sent ? (
             <>
+              <div style={{ fontSize: 13, color: '#a78bfa', fontFamily: "'Syne', sans-serif", fontWeight: 700, marginBottom: 4 }}>
+                sign in
+              </div>
               <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>
-                max twice an hour
+                new or returning — magic link, max twice an hour
               </div>
               <input
                 className="auth-input"

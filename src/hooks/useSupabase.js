@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
 
+// ============================================================
+// DATA NORMALIZERS
+// * Coerce raw Supabase JSON blobs into consistent shapes.
+// * Always run DB data through these before rendering — the
+// * stored JSON may be from an older version with different fields.
+// ============================================================
+
 const arrayOr = (value, fallback = []) => Array.isArray(value) ? value : fallback
 const stringList = (value, fallback = []) => arrayOr(value, fallback).map(v => String(v || '').trim()).filter(Boolean)
 const supportList = (value) => arrayOr(value).map(v => {
@@ -22,6 +29,10 @@ const setlistMap = (value) => {
   return Object.fromEntries(Object.entries(value).map(([artist, songs]) => [String(artist || '').trim(), arrayOr(songs).filter(Boolean)]).filter(([artist]) => artist))
 }
 
+// * Songs in the setlist can be a plain string OR an object:
+// *   { name: string, info?: string, cover?: string, spotifyId?: string }
+// * Always access them via the getSong* helpers in ConcertTracker — never raw.
+// TODO: add spotifyId to normalizeConcert once Spotify integration is built (docs/spotify-integration-plan.md)
 const normalizeConcert = (value, fallbackId = '') => {
   const concert = value && typeof value === 'object' ? value : {}
   return {
@@ -80,6 +91,10 @@ const normalizeSettings = (value) => {
   }
 }
 
+// ============================================================
+// HOOKS
+// ============================================================
+
 export function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -91,6 +106,8 @@ export function useAuth() {
       return
     }
 
+    // ! 9-second timeout triggers the "database is napping" screen.
+    // ! Supabase free projects pause after ~7 days of inactivity.
     const timeout = setTimeout(() => {
       setDbSleeping(true)
       setLoading(false)
@@ -153,17 +170,17 @@ export function useConcerts(userId) {
     }
 
     if (!data || data.length === 0) {
-      // First login — seed from built-in data if any
+      // * First login — seed from built-in data if any exists in src/lib/data.js
       if (SEED_DATA.length > 0) await seedConcerts(userId)
       setLoaded(true)
       return
     }
 
     if (SEED_DATA.length === 0) {
-      // No hardcoded seed — concerts are self-contained in DB
+      // * No hardcoded seed — concerts are fully self-contained in the DB
       setConcerts(data.map(r => normalizeConcert(r.data, r.id)).sort((a, b) => b.date.localeCompare(a.date)))
     } else {
-      // Merge: seed is source of truth for base fields, DB wins for user edits
+      // * Merge: SEED_DATA is source of truth for base fields; DB wins for user edits
       const userFields = ['rating', 'merch', 'notes', 'friends', 'solo']
       const dbMap = Object.fromEntries(data.map(r => [r.id, r.data]))
       const merged = SEED_DATA.map(seed => {
@@ -181,7 +198,7 @@ export function useConcerts(userId) {
   const seedConcerts = async (uid) => {
     if (!isSupabaseConfigured) return
     const rows = SEED_DATA.map(c => ({ id: c.id, user_id: uid, data: c }))
-    // Insert in batches of 20
+    // * Insert in batches of 20 to stay within Supabase request size limits
     for (let i = 0; i < rows.length; i += 20) {
       await supabase.from('concerts').upsert(rows.slice(i, i + 20))
     }
@@ -191,6 +208,7 @@ export function useConcerts(userId) {
   const saveConcert = useCallback(async (concert) => {
     if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
     let previousConcerts = []
+    // * Optimistic update: apply locally first, roll back on DB error
     setConcerts(prev => {
       previousConcerts = prev
       const exists = prev.some(c => c.id === concert.id)
@@ -210,6 +228,7 @@ export function useConcerts(userId) {
   const deleteConcert = useCallback(async (concertId) => {
     if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
     let previousConcerts = []
+    // * Optimistic update: remove locally first, roll back on DB error
     setConcerts(prev => {
       previousConcerts = prev
       return prev.filter(c => c.id !== concertId)
@@ -228,6 +247,7 @@ export function useConcerts(userId) {
 
 export function useSettings(userId) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  // * settingsRef keeps a sync copy for use inside callbacks without stale-closure issues
   const settingsRef = useRef(DEFAULT_SETTINGS)
 
   useEffect(() => {

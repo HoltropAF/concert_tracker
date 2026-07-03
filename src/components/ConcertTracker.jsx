@@ -47,6 +47,7 @@ function PhotoAdjust({ path, pos, onChange }) {
 // ============================================================
 
 const APP_VERSION = '1.0.1'
+// TODO: bump APP_VERSION in every release and update public/changelog.md before going public
 
 const CHART_GROUP_IDS = [
   { id: "activity",  label: "Activity"  },
@@ -97,6 +98,9 @@ const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'sup
 const getFriends = c => Array.isArray(c?.friends) ? c.friends : [];
 const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.genre ? [c.genre] : []);
 
+// * Songs are stored as a plain string OR { name, info?, cover?, spotifyId? }.
+// * Always use these helpers — never access song fields directly.
+// TODO: add spotifyId support once Spotify matching is built (docs/spotify-integration-plan.md)
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
@@ -6122,6 +6126,17 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   useEffect(() => { if (!touched) setLocal({ ...settings }); }, [settings]);
 
+  // * Picks up the Spotify Client ID written by the setup wizard (setup.html).
+  // * The wizard stores it in localStorage as 'pending_spotify_client_id' so it
+  // * survives the redirect back to the app, then this effect consumes it once.
+  useEffect(() => {
+    const pending = localStorage.getItem('pending_spotify_client_id');
+    if (pending) {
+      localStorage.removeItem('pending_spotify_client_id');
+      if (!settings.spotifyClientId) lUpdate('spotifyClientId', pending);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const hasChanges = JSON.stringify(local) !== JSON.stringify(settings);
   const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
   const defaultViewOptions = [{ id: "stats", label: "Stats" }, { id: "home", label: "Shows" }, { id: "artists", label: "Artists" }, { id: "songs", label: "Songs" }, { id: "venues", label: "Venues" }];
@@ -6977,6 +6992,54 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </SettingsSection>
 
+        {/* Integrations */}
+        <SettingsSection title="Integrations">
+          <div style={{ padding: "14px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: local.spotifyClientId ? 0 : 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0d2b12", border: "1px solid #1a4d22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z"/></svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>Spotify</div>
+                <div style={{ fontSize: 11, color: local.spotifyClientId ? "#4ade80" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>
+                  {local.spotifyClientId ? "client ID configured" : "not configured"}
+                </div>
+              </div>
+              <div style={{ width: 8, height: 8, borderRadius: 99, background: local.spotifyClientId ? "#4ade80" : "#2e2e4a", flexShrink: 0 }} />
+            </div>
+
+            {!local.spotifyClientId && (
+              <button onClick={() => setOpenSection(s => s === 'spotify-guide' ? null : 'spotify-guide')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                {openSection === 'spotify-guide' ? 'hide setup guide ▲' : 'set up Spotify ▾'}
+              </button>
+            )}
+
+            {(openSection === 'spotify-guide' || local.spotifyClientId) && (
+              <div style={{ marginTop: 14 }}>
+                {!local.spotifyClientId && (
+                  <ol style={{ paddingLeft: 16, margin: "0 0 12px", color: "#9d9bc0", fontSize: 12, fontFamily: "'DM Mono', monospace", lineHeight: 2 }}>
+                    <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>developer.spotify.com ↗</a> and create a free app</li>
+                    <li>In the app settings, add <code style={{ background: "#0c0c14", padding: "1px 5px", borderRadius: 4 }}>{window.location.origin}</code> as a <strong>Redirect URI</strong></li>
+                    <li>Copy the <strong>Client ID</strong> and paste it below</li>
+                  </ol>
+                )}
+                <input
+                  value={local.spotifyClientId || ''}
+                  onChange={e => lUpdate('spotifyClientId', e.target.value.trim())}
+                  placeholder="Paste Client ID here"
+                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
+                />
+                {local.spotifyClientId && (
+                  <button onClick={() => lUpdate('spotifyClientId', '')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 8, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                    remove
+                  </button>
+                )}
+                {/* TODO: "Connect Spotify" OAuth PKCE button goes here (docs/spotify-integration-plan.md step 3) */}
+              </div>
+            )}
+          </div>
+        </SettingsSection>
+
         {/* Profile edit bottom sheet */}
         {editingInitials && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
@@ -7129,6 +7192,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
 // ============================================================
 // MAIN APP
+// * Top-level shell: nav bar, view routing, add-concert sheet,
+// * search/filter state, toast host, and back-button wiring.
 // ============================================================
 
 export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail }) {

@@ -4,6 +4,8 @@ import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
+// * Reads cached concert counts from localStorage so the loading splash can show
+// * meaningful stats before the DB responds on subsequent visits.
 function readSplashCounts() {
   try {
     return JSON.parse(localStorage.getItem('splash_counts') || 'null')
@@ -11,6 +13,12 @@ function readSplashCounts() {
     return null
   }
 }
+
+// ============================================================
+// ERROR BOUNDARY
+// * Catches any unhandled render error and shows a friendly recovery screen.
+// * Prevents a single bad concert from crashing the whole app.
+// ============================================================
 
 class AppErrorBoundary extends Component {
   constructor(props) {
@@ -80,6 +88,13 @@ function LoadingSplash({ label, counts = null }) {
   )
 }
 
+// ============================================================
+// GUEST MODE
+// * All state lives in localStorage (guest_concerts / guest_settings).
+// * No Supabase calls are made in guest mode. clearGuest() wipes everything on exit.
+// * SAMPLE_CONCERTS are loaded on first guest visit so there's something to explore.
+// ============================================================
+
 function useGuestMode() {
   const [concerts, setConcerts] = useState(() => {
     try { return JSON.parse(localStorage.getItem('guest_concerts') || '[]') } catch { return [] }
@@ -136,13 +151,33 @@ function useGuestMode() {
   return { concerts, settings, saveConcert, deleteConcert, saveSetting, saveSettings, clearGuest, initWithSamples }
 }
 
+// ============================================================
+// APP
+// ============================================================
+
 export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
   const [updateReady, setUpdateReady] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(false)
+  const [changelogText, setChangelogText] = useState(null)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
   const [setupBannerDismissed, setSetupBannerDismissed] = useState(false)
   const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
+
+  // * changelog.md is lazily fetched only when the user opens "what's changed".
+  // * Cached in state for the page lifetime — re-fetched on next reload.
+  const toggleChangelog = async () => {
+    if (!showChangelog && changelogText === null) {
+      try {
+        const res = await fetch('/changelog.md')
+        setChangelogText(res.ok ? await res.text() : '')
+      } catch {
+        setChangelogText('')
+      }
+    }
+    setShowChangelog(v => !v)
+  }
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }
@@ -151,15 +186,16 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // Detect when a new service worker has taken over → show update banner
+  // * Update detection uses three signals:
+  // * 1. controllerchange — new SW took over after skipWaiting
+  // * 2. reg.waiting — a SW was already waiting when the page loaded
+  // * 3. statechange on the installing worker — catches mid-session updates
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.ready.then(reg => {
-      // fired when a new SW activates after skipWaiting
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         setUpdateReady(true)
       })
-      // also check if there's already a waiting SW on load
       if (reg.waiting) setUpdateReady(true)
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing
@@ -185,6 +221,7 @@ export default function App() {
   const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
   const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
 
+  // * Keep splash counts fresh after every load so the next visit shows current stats
   useEffect(() => {
     if (!loaded) return
     const counts = {
@@ -292,15 +329,32 @@ export default function App() {
           position: 'fixed', bottom: 72, left: '50%', transform: 'translateX(-50%)',
           width: 'calc(100% - 32px)', maxWidth: 448,
           background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 12,
-          padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
           zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.6)'
         }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: '#e2e0ff' }}>Update available</div>
-            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>A new version of settracker is ready</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: '#e2e0ff' }}>Update available</div>
+              <button onClick={toggleChangelog} style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace",
+                marginTop: 3, display: 'block', textDecoration: 'underline', textUnderlineOffset: 2
+              }}>
+                {showChangelog ? 'hide changes ▲' : "what's changed ▾"}
+              </button>
+            </div>
+            <button onClick={() => { setUpdateReady(false); setShowChangelog(false) }} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
+            <button onClick={() => window.location.reload()} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Update</button>
           </div>
-          <button onClick={() => setUpdateReady(false)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
-          <button onClick={() => window.location.reload()} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Update</button>
+          {showChangelog && (
+            <div style={{
+              marginTop: 10, paddingTop: 10, borderTop: '1px solid #2a2850',
+              fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace",
+              lineHeight: 1.7, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap'
+            }}>
+              {changelogText === null ? 'loading...' : changelogText.trim() || 'no release notes yet.'}
+            </div>
+          )}
         </div>
       )}
       <AppErrorBoundary>

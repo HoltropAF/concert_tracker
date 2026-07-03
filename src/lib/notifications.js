@@ -1,4 +1,5 @@
-// Ticket sale notification helpers
+// * Ticket sale notification helpers — schedules browser Notification API alerts
+// * for wishlist concerts that have a ticketSaleAt datetime set.
 
 export async function requestPermission() {
   if (!('Notification' in window)) return 'unsupported'
@@ -12,13 +13,12 @@ export function canNotify() {
   return 'Notification' in window && Notification.permission === 'granted'
 }
 
-// Schedule a notification for a ticket sale.
-// saleAt: ISO datetime string, e.g. "2026-06-15T10:00"
-// label: artist name
-// Fires 30 min before, and at the exact time.
-// Stores scheduled timers in memory (cleared on reload — that's fine, we re-check on open).
+// ! Timers live in memory only — cleared on every page reload.
+// ! reScheduleAll() must be called on app open to restore pending alarms.
 const timers = new Map()
 
+// * Fires two notifications: a 30-min warning and an at-sale-time alert.
+// * If the sale started less than 30 min ago, notifies immediately instead.
 export function scheduleTicketAlarm(concertId, saleAt, artist) {
   clearTicketAlarm(concertId)
   if (!canNotify() || !saleAt) return
@@ -74,7 +74,7 @@ export function clearTicketAlarm(concertId) {
   timers.delete(concertId)
 }
 
-// Call on app load: re-schedule all pending alarms from concert data
+// * Call on every app open to re-schedule alarms lost when the page was closed.
 export function reScheduleAll(concerts) {
   if (!canNotify()) return
   concerts.forEach(c => {

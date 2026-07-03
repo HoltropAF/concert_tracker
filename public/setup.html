@@ -246,6 +246,8 @@
     .stat-num   { font-size: 22px; font-weight: 600; color: var(--accent); }
     .stat-label { font-size: 12px; color: var(--muted); margin-top: 3px; }
 
+    .hidden { display: none; }
+
     /* ── iOS walkthrough ── */
     .ios-steps { display: flex; flex-direction: column; gap: 10px; }
     .ios-step {
@@ -324,6 +326,7 @@
     <p class="muted" data-t-html="s1_note"></p>
     <div class="actions">
       <button type="button" class="btn btn-primary btn-full" onclick="goTo(2)" data-t="s1_btn"></button>
+      <a class="btn btn-secondary btn-full" href="/" data-t="s1_existing_btn" title="I already have an account"></a>
     </div>
   </section>
 
@@ -461,11 +464,64 @@
     </div>
   </section>
 
-  <!-- ══ Step 8: Install on phone ══════════════════════════════════════════ -->
+  <!-- ══ Step 8: Spotify (optional) ════════════════════════════════════════ -->
   <section class="step" id="step-8">
-    <div class="step-icon">📱</div>
+    <div class="step-icon">🎵</div>
     <h1 data-t="s8_h1"></h1>
     <div class="why" data-t-html="s8_why"></div>
+
+    <!-- Choice -->
+    <div id="spotify-choice">
+      <p data-t="s8_choose"></p>
+      <div class="actions">
+        <button type="button" class="btn btn-primary btn-full" onclick="spotifyYes()" data-t="s8_yes_btn"></button>
+        <button type="button" class="btn btn-secondary btn-full" onclick="spotifyNo()" data-t="s8_no_btn"></button>
+        <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
+        <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
+      </div>
+    </div>
+
+    <!-- Yes path -->
+    <div id="spotify-yes" class="hidden">
+      <p data-t-html="s8_yes_p1"></p>
+      <p data-t-html="s8_yes_p2"></p>
+      <div class="code-block">
+        <button type="button" class="copy-btn" id="copy-spotify-redirect-btn" onclick="copyField('spotify-redirect-display', this)" data-t="copy" data-t-title="copy"></button>
+        <pre id="spotify-redirect-display" class="pre-sm"></pre>
+      </div>
+      <p data-t-html="s8_yes_p3"></p>
+      <div class="field">
+        <label data-t="s8_label_cid"></label>
+        <input type="text" id="inp-spotify-cid" oninput="clearErr(this); onSpotifyCidInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+        <span class="field-hint" data-t="err_spotify_cid"></span>
+      </div>
+      <p class="muted" data-t="s8_yes_muted"></p>
+      <div class="actions">
+        <button type="button" class="btn btn-primary btn-full" onclick="validateSpotify()" data-t="s8_next_btn"></button>
+        <button type="button" class="btn btn-secondary btn-full" onclick="spotifyReset()" data-t="back_btn"></button>
+        <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
+      </div>
+    </div>
+
+    <!-- No path -->
+    <div id="spotify-no" class="hidden">
+      <div class="callout">
+        <span class="callout-icon">ℹ️</span>
+        <div data-t-html="s8_no_callout"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-primary btn-full" onclick="goTo(9)" data-t="s8_next_btn"></button>
+        <button type="button" class="btn btn-secondary btn-full" onclick="spotifyReset()" data-t="back_btn"></button>
+        <button type="button" class="btn-start-over" onclick="startOver()" data-t="start_over" data-t-title="start_over" title="Start over"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Step 9: Install on phone ══════════════════════════════════════════ -->
+  <section class="step" id="step-9">
+    <div class="step-icon">📱</div>
+    <h1 data-t="s9_h1"></h1>
+    <div class="why" data-t-html="s9_why"></div>
     <div id="install-body"></div>
     <div class="actions" id="install-actions"></div>
   </section>
@@ -487,6 +543,7 @@ const T = {
     s1_callout:      'You\'ll need accounts on <strong>GitHub</strong>, <strong>Supabase</strong>, and <strong>Vercel</strong>. This wizard links you to each signup as we go — nothing to prepare in advance.',
     s1_note:         'This is a personal hobby project, not an official product. If something doesn\'t work, the easiest way to reach me is to <a href="https://github.com/HoltropAF/concert_tracker/issues/new" target="_blank" rel="noopener">open an issue on GitHub ↗</a> — you\'ll need a GitHub account, which you\'re creating in step 2 anyway. If you\'d rather not, ask the person who shared this with you for my contact info.',
     s1_btn:          'Let\'s go →',
+    s1_existing_btn: 'I already have an account — sign in →',
     s2_h1:           'Fork the project on GitHub',
     s2_why:          'GitHub hosts the code. You need your own copy (a "fork") so Vercel can deploy it under your account — and so any changes you make stay yours.',
     s2_p1:           '<strong>1.</strong> No GitHub account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.',
@@ -539,9 +596,23 @@ const T = {
     s7_p2:           '<strong>2.</strong> Set <strong>Site URL</strong> to your Vercel URL:',
     s7_p3:           '<strong>3.</strong> Under <strong>Redirect URLs</strong>, add the same URL with <code>/**</code> appended:',
     s7_p4:           '<strong>4.</strong> Click <strong>Save</strong> in Supabase.',
-    s7_btn2:         'Done — final step →',
-    s8_h1:           'Install on your phone',
-    s8_why:          'The app is a PWA — it can be added to your home screen and opens fullscreen like a native app, with no browser bar.',
+    s7_btn2:         'Next →',
+    s8_h1:           'Spotify integration',
+    s8_why:          'Connect Spotify to fetch setlists, see which songs were played at each show, and create playlists from your concerts. This is optional — you can skip it now and set it up later in Settings.',
+    s8_choose:       'Do you want to connect Spotify?',
+    s8_yes_btn:      'Yes, set it up →',
+    s8_no_btn:       'No, skip for now',
+    s8_yes_p1:       '<strong>1.</strong> Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard ↗</a>, log in, and click <strong>Create app</strong>. Any name works.',
+    s8_yes_p2:       '<strong>2.</strong> In your new app\'s settings click <strong>Edit settings</strong>. Under <strong>Redirect URIs</strong>, add your Vercel URL:',
+    s8_yes_p3:       '<strong>3.</strong> Back in the app dashboard, copy your <strong>Client ID</strong> and paste it below.',
+    s8_label_cid:    'Spotify Client ID',
+    s8_ph_cid:       'Paste your Client ID here',
+    s8_yes_muted:    'This stays in your browser and will be pre-filled in Settings when you first log in.',
+    s8_next_btn:     'Next →',
+    s8_no_callout:   'No problem. You can connect Spotify at any time via <strong>Settings → Account → Integrations</strong> after logging in.',
+    err_spotify_cid: 'Please paste your Spotify Client ID before continuing.',
+    s9_h1:           'Install on your phone',
+    s9_why:          'The app is a PWA — it can be added to your home screen and opens fullscreen like a native app, with no browser bar.',
     ios_safari_note: 'On iPhone, use <strong>Safari</strong> to install — it won\'t work from Chrome or Firefox on iOS.',
     ios_step1:       (url) => `Open <strong>${url}</strong> in <strong>Safari</strong> — the install option doesn\'t appear in other browsers on iPhone.`,
     ios_step2:       'Tap the <strong>Share</strong> button at the bottom of the screen <span class="share-icon">⎙</span> (a box with an upward arrow).',
@@ -573,6 +644,7 @@ const T = {
     s1_callout:      'Je hebt accounts nodig op <strong>GitHub</strong>, <strong>Supabase</strong> en <strong>Vercel</strong>. De wizard linkt je naar elke aanmeldpagina — je hoeft niets van tevoren voor te bereiden.',
     s1_note:         'Dit is een persoonlijk hobbyproject, geen officieel product. Als er iets niet werkt, kun je dat het makkelijkst melden via <a href="https://github.com/HoltropAF/concert_tracker/issues/new" target="_blank" rel="noopener">een issue op GitHub ↗</a> — daarvoor heb je een GitHub-account nodig, die je toch al aanmaakt in stap 2. Wil je dat liever niet, vraag dan de persoon die dit met je gedeeld heeft om mijn contactgegevens.',
     s1_btn:          'Aan de slag →',
+    s1_existing_btn: 'Ik heb al een account — inloggen →',
     s2_h1:           'Kopieer het project op GitHub',
     s2_why:          'GitHub bewaart de code. Je hebt een eigen kopie nodig (een "fork") zodat Vercel het onder jouw account kan deployen — en zodat wijzigingen die jij maakt van jou blijven.',
     s2_p1:           '<strong>1.</strong> Nog geen GitHub-account? <a href="https://github.com/signup" target="_blank" rel="noopener">Registreer hier ↗</a> — kom dan terug.',
@@ -625,9 +697,23 @@ const T = {
     s7_p2:           '<strong>2.</strong> Stel <strong>Site URL</strong> in op je Vercel URL:',
     s7_p3:           '<strong>3.</strong> Voeg onder <strong>Redirect URLs</strong> dezelfde URL toe met <code>/**</code> erachter:',
     s7_p4:           '<strong>4.</strong> Klik op <strong>Save</strong> in Supabase.',
-    s7_btn2:         'Klaar — laatste stap →',
-    s8_h1:           'Installeer op je telefoon',
-    s8_why:          'De app is een PWA — je kunt hem aan je beginscherm toevoegen en hij opent volledig scherm zoals een native app, zonder browserbalk.',
+    s7_btn2:         'Volgende →',
+    s8_h1:           'Spotify-integratie',
+    s8_why:          'Verbind Spotify om setlists op te halen, te zien welke nummers er gespeeld werden en playlists te maken van je concerten. Dit is optioneel — je kunt het nu overslaan en later instellen via Instellingen.',
+    s8_choose:       'Wil je Spotify koppelen?',
+    s8_yes_btn:      'Ja, instellen →',
+    s8_no_btn:       'Nee, overslaan',
+    s8_yes_p1:       '<strong>1.</strong> Ga naar <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard ↗</a>, log in en klik op <strong>Create app</strong>. Elke naam werkt.',
+    s8_yes_p2:       '<strong>2.</strong> Klik in de instellingen van je nieuwe app op <strong>Edit settings</strong>. Voeg onder <strong>Redirect URIs</strong> je Vercel URL toe:',
+    s8_yes_p3:       '<strong>3.</strong> Kopieer je <strong>Client ID</strong> uit het app-dashboard en plak hem hieronder.',
+    s8_label_cid:    'Spotify Client ID',
+    s8_ph_cid:       'Plak je Client ID hier',
+    s8_yes_muted:    'Dit blijft in je browser en wordt vooringevuld in Instellingen als je voor het eerst inlogt.',
+    s8_next_btn:     'Volgende →',
+    s8_no_callout:   'Geen probleem. Je kunt Spotify op elk moment koppelen via <strong>Instellingen → Account → Integraties</strong> na het inloggen.',
+    err_spotify_cid: 'Plak eerst je Spotify Client ID voordat je verdergaat.',
+    s9_h1:           'Installeer op je telefoon',
+    s9_why:          'De app is een PWA — je kunt hem aan je beginscherm toevoegen en hij opent volledig scherm zoals een native app, zonder browserbalk.',
     ios_safari_note: 'Gebruik op iPhone <strong>Safari</strong> om te installeren — in Chrome of Firefox werkt dit niet op iOS.',
     ios_step1:       (url) => `Open <strong>${url}</strong> in <strong>Safari</strong> — de installatieoptie verschijnt niet in andere browsers op iPhone.`,
     ios_step2:       'Tik op de <strong>Deel</strong>-knop onderaan het scherm <span class="share-icon">⎙</span> (een vak met een pijl omhoog).',
@@ -652,13 +738,14 @@ const T = {
 };
 
 // ── State ─────────────────────────────────────────────────────────────────
-let lang        = (navigator.language || '').toLowerCase().startsWith('nl') ? 'nl' : 'en';
-let supabaseUrl = '';
-let supabaseKey = '';
-let vercelUrl   = '';
-let deferredPWA = null;
-let currentStep = 1;
-const TOTAL     = 8;
+let lang            = (navigator.language || '').toLowerCase().startsWith('nl') ? 'nl' : 'en';
+let supabaseUrl     = '';
+let supabaseKey     = '';
+let vercelUrl       = '';
+let spotifyClientId = '';
+let deferredPWA     = null;
+let currentStep     = 1;
+const TOTAL         = 9;
 
 // ── SQL ───────────────────────────────────────────────────────────────────
 const SQL = `-- Run this in your Supabase project → SQL Editor
@@ -715,11 +802,13 @@ function setLang(l) {
     const k = el.getAttribute('data-t-title');
     if (k in t) el.title = t[k];
   });
-  document.getElementById('inp-url').placeholder    = t.s5_ph_url;
-  document.getElementById('inp-key').placeholder    = t.s5_ph_key;
-  document.getElementById('inp-vercel').placeholder = t.s6_ph_vercel;
-  document.getElementById('prog-label').textContent = t.stepOf(currentStep, TOTAL);
-  if (currentStep === 8) onEnterInstallStep();
+  document.getElementById('inp-url').placeholder         = t.s5_ph_url;
+  document.getElementById('inp-key').placeholder         = t.s5_ph_key;
+  document.getElementById('inp-vercel').placeholder      = t.s6_ph_vercel;
+  document.getElementById('inp-spotify-cid').placeholder = t.s8_ph_cid;
+  document.getElementById('prog-label').textContent      = t.stepOf(currentStep, TOTAL);
+  if (currentStep === 8) onEnterSpotifyStep();
+  if (currentStep === 9) onEnterInstallStep();
 }
 
 function toggleLang() { setLang(lang === 'en' ? 'nl' : 'en'); }
@@ -734,7 +823,8 @@ function goTo(n) {
   window.scrollTo({ top: 0, behavior: 'instant' });
   if (n === 6) onEnterVercelStep();
   if (n === 7) onEnterAuthStep();
-  if (n === 8) onEnterInstallStep();
+  if (n === 8) onEnterSpotifyStep();
+  if (n === 9) onEnterInstallStep();
 }
 
 // ── Input handlers ────────────────────────────────────────────────────────
@@ -767,12 +857,14 @@ function goBack() {
 }
 
 function startOver() {
-  supabaseUrl = ''; supabaseKey = ''; vercelUrl = '';
-  ['inp-url', 'inp-key', 'inp-vercel'].forEach(id => {
+  supabaseUrl = ''; supabaseKey = ''; vercelUrl = ''; spotifyClientId = '';
+  ['inp-url', 'inp-key', 'inp-vercel', 'inp-spotify-cid'].forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     el.value = '';
     el.classList.remove('error');
   });
+  spotifyReset();
   goTo(1);
 }
 
@@ -798,7 +890,45 @@ function onEnterAuthStep() {
   document.getElementById('vercel-url-wild-display').textContent = url + '/**';
 }
 
-// ── Step 8 ────────────────────────────────────────────────────────────────
+// ── Step 8: Spotify ───────────────────────────────────────────────────────
+function onEnterSpotifyStep() {
+  const url = vercelUrl || 'https://your-project.vercel.app';
+  document.getElementById('spotify-redirect-display').textContent = url;
+  spotifyReset();
+}
+
+function spotifyYes() {
+  document.getElementById('spotify-choice').classList.add('hidden');
+  document.getElementById('spotify-yes').classList.remove('hidden');
+}
+
+function spotifyNo() {
+  document.getElementById('spotify-choice').classList.add('hidden');
+  document.getElementById('spotify-no').classList.remove('hidden');
+}
+
+function spotifyReset() {
+  document.getElementById('spotify-choice').classList.remove('hidden');
+  document.getElementById('spotify-yes').classList.add('hidden');
+  document.getElementById('spotify-no').classList.add('hidden');
+  spotifyClientId = '';
+  const inp = document.getElementById('inp-spotify-cid');
+  if (inp) { inp.value = ''; inp.classList.remove('error'); }
+}
+
+function onSpotifyCidInput() {
+  spotifyClientId = document.getElementById('inp-spotify-cid').value.trim();
+}
+
+function validateSpotify() {
+  onSpotifyCidInput();
+  const el = document.getElementById('inp-spotify-cid');
+  if (!spotifyClientId) { el.classList.add('error'); el.focus(); return; }
+  localStorage.setItem('pending_spotify_client_id', spotifyClientId);
+  goTo(9);
+}
+
+// ── Step 9: Install ───────────────────────────────────────────────────────
 function onEnterInstallStep() {
   const t         = T[lang];
   const ua        = navigator.userAgent || '';

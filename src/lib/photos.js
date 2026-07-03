@@ -3,9 +3,9 @@ import { supabase } from './supabase'
 const MAX_DIM = 1280
 const QUALITY = 0.82
 
-// Downscale an image file to max 1280px (long edge) JPEG ~82% quality.
-// Uses a Display P3 canvas where supported so wide-gamut (iPhone) photos
-// keep their saturation instead of being squashed into sRGB.
+// * Resize before upload: caps the long edge at 1280px at ~82% JPEG quality.
+// * Uses Display P3 color space where available so wide-gamut iPhone photos
+// * keep their saturation instead of being crushed into sRGB on the canvas.
 export async function resizeImage(file) {
   const bitmap = await createImageBitmap(file).catch(() => null)
   if (!bitmap) throw new Error('Could not read image')
@@ -24,7 +24,8 @@ export async function resizeImage(file) {
   return blob
 }
 
-// Upload (or replace) the single photo for a concert. Returns the storage path.
+// * Photos are stored at userId/concertId.jpg — each user owns their own folder.
+// * Re-uploading the same concertId replaces the previous photo (upsert: true).
 export async function uploadConcertPhoto(concertId, file) {
   if (!supabase) throw new Error('Not connected')
   const { data: { user } } = await supabase.auth.getUser()
@@ -47,7 +48,8 @@ export async function deleteConcertPhoto(path) {
   urlCache.delete(path)
 }
 
-// Signed URL with in-memory cache (50 min, URLs valid 60 min)
+// * Signed URLs are valid for 60 min but cached for only 50 min to avoid
+// * serving an expired URL in the last window before the signature expires.
 const urlCache = new Map()
 export async function getPhotoUrl(path) {
   if (!supabase || !path) return null

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
 import { startSpotifyAuth } from '../lib/spotify'
+import SpotifyMatcher from './SpotifyMatcher'
 
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
@@ -891,7 +892,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</span>
+                      {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
+                    </div>
                     {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
                     {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {typeof cover === 'string' ? cover : 'cover'}</div>}
                   </div>
@@ -1014,7 +1018,7 @@ function normalizeConcertForm(concert) {
   };
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSetting = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
+function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -1029,6 +1033,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
   const [supportRole, setSupportRole] = useState('support');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [expandedSupportSetlists, setExpandedSupportSetlists] = useState(new Set());
+  const [spotifyMatcher, setSpotifyMatcher] = useState(null);
   const toggleSupportSetlist = (name) => setExpandedSupportSetlists(prev => {
     const next = new Set(prev);
     next.has(name) ? next.delete(name) : next.add(name);
@@ -1312,6 +1317,16 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                       </button>
                       {isOpen && (
                         <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `2px solid ${color}44` }}>
+                          {songs.length > 0 && settings.spotifyAccessToken && (
+                            <button
+                              onClick={() => setSpotifyMatcher({ songs, artist: name, onSave: save })}
+                              style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 8, display: 'block' }}
+                            >
+                              {songs.every(s => s && typeof s === 'object' && s.spotifyId)
+                                ? 'Manage Spotify links →'
+                                : 'Link to Spotify →'}
+                            </button>
+                          )}
                           {songs.length > 0
                             ? <SetlistSection
                                 concert={concert} settings={settings}
@@ -1734,6 +1749,16 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
           </div>
         )}
       </div>
+      {spotifyMatcher && (
+        <SpotifyMatcher
+          artist={spotifyMatcher.artist}
+          songs={spotifyMatcher.songs}
+          settings={settings}
+          saveSettings={onUpdateSettings || (() => {})}
+          onSave={spotifyMatcher.onSave}
+          onClose={() => setSpotifyMatcher(null)}
+        />
+      )}
       {pendingTag && (
         <SaveTagPrompt
           value={pendingTag.value}
@@ -7570,7 +7595,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); } }} allArtists={[...new Set([
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),

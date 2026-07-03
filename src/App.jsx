@@ -170,6 +170,14 @@ export default function App() {
   const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
   const [pendingSpotifyExchange, setPendingSpotifyExchange] = useState(null)
 
+  // * All custom hooks must be declared before any useEffect that references their
+  // * return values in a dependency array — otherwise the dep array is evaluated
+  // * while those const bindings are still in TDZ, causing a runtime crash.
+  const guest = useGuestMode()
+  const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
+  const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
+  const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
+
   // * Detect a Spotify OAuth callback (?code=…) on every fresh page load.
   // * Reads the code verifier + client ID from sessionStorage (written by startSpotifyAuth
   // * before the redirect), validates the state param against CSRF, then stores the
@@ -220,18 +228,12 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-
   const handleInstall = async () => {
     if (!installPrompt) return
     installPrompt.prompt()
     await installPrompt.userChoice
     setInstallPrompt(null); setShowBanner(false)
   }
-
-  const guest = useGuestMode()
-  const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
-  const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
-  const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
 
   // * Keep splash counts fresh after every load so the next visit shows current stats
   useEffect(() => {

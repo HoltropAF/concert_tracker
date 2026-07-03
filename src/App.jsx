@@ -1,10 +1,15 @@
-import { Component, useState, useEffect, useCallback } from 'react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
+import { Component, Suspense, lazy, useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import { exchangeCodeForTokens } from './lib/spotify'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
+
+// * Lazy-loaded so a failure in useRegisterSW (or the workbox-window chunk) cannot
+// * crash the main App component. If the import fails, the banner just doesn't render.
+const SWUpdateBanner = lazy(() =>
+  import('./components/SWUpdateBanner').catch(() => ({ default: () => null }))
+)
 
 // * Reads cached concert counts from localStorage so the loading splash can show
 // * meaningful stats before the DB responds on subsequent visits.
@@ -158,33 +163,12 @@ function useGuestMode() {
 // ============================================================
 
 export default function App() {
-  // * useRegisterSW handles the full SW lifecycle: needRefresh fires when a new SW
-  // * is waiting to activate. updateServiceWorker(true) tells it to skip waiting
-  // * and reloads the page — all in one safe operation.
-  const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW()
-
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
-  const [showChangelog, setShowChangelog] = useState(false)
-  const [changelogText, setChangelogText] = useState(null)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
   const [setupBannerDismissed, setSetupBannerDismissed] = useState(false)
   const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
   const [pendingSpotifyExchange, setPendingSpotifyExchange] = useState(null)
-
-  // * changelog.md is lazily fetched only when the user opens "what's changed".
-  // * Cached in state for the page lifetime — re-fetched on next reload.
-  const toggleChangelog = async () => {
-    if (!showChangelog && changelogText === null) {
-      try {
-        const res = await fetch('/changelog.md')
-        setChangelogText(res.ok ? await res.text() : '')
-      } catch {
-        setChangelogText('')
-      }
-    }
-    setShowChangelog(v => !v)
-  }
 
   // * Detect a Spotify OAuth callback (?code=…) on every fresh page load.
   // * Reads the code verifier + client ID from sessionStorage (written by startSpotifyAuth
@@ -352,39 +336,9 @@ export default function App() {
 
   return (
     <>
-      {needRefresh && (
-        <div style={{
-          position: 'fixed', bottom: 72, left: '50%', transform: 'translateX(-50%)',
-          width: 'calc(100% - 32px)', maxWidth: 448,
-          background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 12,
-          padding: '12px 16px',
-          zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.6)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: '#e2e0ff' }}>Update available</div>
-              <button onClick={toggleChangelog} style={{
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace",
-                marginTop: 3, display: 'block', textDecoration: 'underline', textUnderlineOffset: 2
-              }}>
-                {showChangelog ? 'hide changes ▲' : "what's changed ▾"}
-              </button>
-            </div>
-            <button onClick={() => { setNeedRefresh(false); setShowChangelog(false) }} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
-            <button onClick={() => updateServiceWorker(true)} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Update</button>
-          </div>
-          {showChangelog && (
-            <div style={{
-              marginTop: 10, paddingTop: 10, borderTop: '1px solid #2a2850',
-              fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace",
-              lineHeight: 1.7, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap'
-            }}>
-              {changelogText === null ? 'loading...' : changelogText.trim() || 'no release notes yet.'}
-            </div>
-          )}
-        </div>
-      )}
+      <Suspense fallback={null}>
+        <SWUpdateBanner />
+      </Suspense>
       <AppErrorBoundary>
         <ConcertTracker
           concerts={concerts}

@@ -12,15 +12,16 @@ import './index.css'
 class RootErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { crashed: false }
+    this.state = { crashed: false, errorMessage: null }
   }
 
-  static getDerivedStateFromError() {
-    return { crashed: true }
+  static getDerivedStateFromError(error) {
+    return { crashed: true, errorMessage: error?.message || String(error) }
   }
 
   componentDidCatch(error, info) {
     console.error('[RootErrorBoundary] App crashed:', error, info)
+    this.setState({ errorMessage: error?.message || String(error) })
   }
 
   clearCacheAndReload() {
@@ -40,9 +41,14 @@ class RootErrorBoundary extends Component {
       <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'DM Sans', sans-serif" }}>
         <div style={{ maxWidth: 360, width: '100%', background: '#13131f', border: '1px solid #f472b6', borderRadius: 12, padding: 24, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff', marginBottom: 10 }}>Something went wrong</div>
-          <div style={{ color: '#6b6a8f', fontSize: 12, lineHeight: 1.7, fontFamily: "'DM Mono', monospace", marginBottom: 20 }}>
-            The app failed to start. This can happen when your browser has a stale cached version after an update. Reloading usually fixes it — or clear the cache for a guaranteed fresh start.
+          <div style={{ color: '#6b6a8f', fontSize: 12, lineHeight: 1.7, fontFamily: "'DM Mono', monospace", marginBottom: this.state.errorMessage ? 10 : 20 }}>
+            The app failed to start. Reloading usually fixes it — or clear the cache for a guaranteed fresh start.
           </div>
+          {this.state.errorMessage && (
+            <div style={{ color: '#f472b6', fontSize: 11, lineHeight: 1.5, fontFamily: "'DM Mono', monospace", marginBottom: 16, wordBreak: 'break-word', textAlign: 'left', background: '#0c0c14', borderRadius: 6, padding: '8px 10px' }}>
+              {this.state.errorMessage}
+            </div>
+          )}
           <button
             onClick={() => window.location.reload()}
             style={{ display: 'block', width: '100%', minHeight: 44, borderRadius: 8, border: 'none', background: '#a78bfa', color: '#0c0c14', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}

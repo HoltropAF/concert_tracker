@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
+import { startSpotifyAuth } from '../lib/spotify'
 
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
@@ -6995,18 +6996,24 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         {/* Integrations */}
         <SettingsSection title="Integrations">
           <div style={{ padding: "14px 16px" }}>
+            {(() => {
+              const spotifyConnected = Boolean(settings.spotifyAccessToken)
+              const dotColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#2e2e4a"
+              const statusColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#4a4870"
+              const statusLabel = spotifyConnected ? "connected" : local.spotifyClientId ? "client ID set — not connected" : "not configured"
+              return (
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: local.spotifyClientId ? 0 : 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0d2b12", border: "1px solid #1a4d22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z"/></svg>
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>Spotify</div>
-                <div style={{ fontSize: 11, color: local.spotifyClientId ? "#4ade80" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>
-                  {local.spotifyClientId ? "client ID configured" : "not configured"}
-                </div>
+                <div style={{ fontSize: 11, color: statusColor, fontFamily: "'DM Mono', monospace" }}>{statusLabel}</div>
               </div>
-              <div style={{ width: 8, height: 8, borderRadius: 99, background: local.spotifyClientId ? "#4ade80" : "#2e2e4a", flexShrink: 0 }} />
+              <div style={{ width: 8, height: 8, borderRadius: 99, background: dotColor, flexShrink: 0 }} />
             </div>
+              )
+            })()}
 
             {!local.spotifyClientId && (
               <button onClick={() => setOpenSection(s => s === 'spotify-guide' ? null : 'spotify-guide')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
@@ -7029,12 +7036,36 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                   placeholder="Paste Client ID here"
                   style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
                 />
-                {local.spotifyClientId && (
+                {local.spotifyClientId && !settings.spotifyAccessToken && (
                   <button onClick={() => lUpdate('spotifyClientId', '')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 8, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
                     remove
                   </button>
                 )}
-                {/* TODO: "Connect Spotify" OAuth PKCE button goes here (docs/spotify-integration-plan.md step 3) */}
+                {/* Connect / disconnect */}
+                {local.spotifyClientId && !settings.spotifyAccessToken && (
+                  <button
+                    onClick={() => startSpotifyAuth(local.spotifyClientId)}
+                    style={{ display: "block", marginTop: 14, width: "100%", padding: "11px", borderRadius: 9, background: "#1DB954", border: "none", color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em" }}
+                  >
+                    Connect Spotify →
+                  </button>
+                )}
+                {settings.spotifyAccessToken && (
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#4ade80", fontFamily: "'DM Mono', monospace" }}>✓ connected</span>
+                    <button
+                      onClick={() => {
+                        const next = { ...local, spotifyAccessToken: '', spotifyRefreshToken: '', spotifyTokenExpiry: null }
+                        setLocal(next)
+                        setSaved(false)
+                        if (onUpdateAll) onUpdateAll(next)
+                      }}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}
+                    >
+                      disconnect
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

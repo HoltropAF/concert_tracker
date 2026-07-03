@@ -1,6 +1,7 @@
 import { Component, useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
+import { exchangeCodeForTokens } from './lib/spotify'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
@@ -164,6 +165,7 @@ export default function App() {
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
   const [setupBannerDismissed, setSetupBannerDismissed] = useState(false)
   const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
+  const [pendingSpotifyExchange, setPendingSpotifyExchange] = useState(null)
 
   // * changelog.md is lazily fetched only when the user opens "what's changed".
   // * Cached in state for the page lifetime — re-fetched on next reload.
@@ -178,6 +180,49 @@ export default function App() {
     }
     setShowChangelog(v => !v)
   }
+
+  // * Detect a Spotify OAuth callback (?code=…) on every fresh page load.
+  // * Reads the code verifier + client ID from sessionStorage (written by startSpotifyAuth
+  // * before the redirect), validates the state param against CSRF, then stores the
+  // * exchange payload so the next effect can complete it once auth+settings are ready.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    const error = params.get('error')
+
+    if (code || error) history.replaceState({}, '', window.location.pathname)
+    if (error || !code || !state) return
+
+    const savedState = sessionStorage.getItem('spotify_oauth_state')
+    const verifier = sessionStorage.getItem('spotify_code_verifier')
+    const clientId = sessionStorage.getItem('spotify_oauth_client_id')
+
+    sessionStorage.removeItem('spotify_oauth_state')
+    sessionStorage.removeItem('spotify_code_verifier')
+    sessionStorage.removeItem('spotify_oauth_client_id')
+
+    if (state !== savedState || !verifier || !clientId) return
+    setPendingSpotifyExchange({ code, verifier, clientId })
+  }, [])
+
+  // * Exchange the Spotify code for tokens once the user is authenticated and
+  // * settings are loaded. Saves clientId + tokens together so they're always
+  // * in sync (handles the case where the user hadn't saved Settings manually).
+  useEffect(() => {
+    if (!pendingSpotifyExchange || !user || !loaded) return
+    const { code, verifier, clientId } = pendingSpotifyExchange
+    setPendingSpotifyExchange(null)
+    exchangeCodeForTokens(code, verifier, clientId)
+      .then(data => saveSettings({
+        ...settings,
+        spotifyClientId: clientId,
+        spotifyAccessToken: data.access_token,
+        spotifyRefreshToken: data.refresh_token,
+        spotifyTokenExpiry: Date.now() + data.expires_in * 1000,
+      }))
+      .catch(err => console.error('Spotify token exchange failed:', err))
+  }, [pendingSpotifyExchange, user, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }

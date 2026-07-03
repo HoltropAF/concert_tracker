@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'settracker',
@@ -24,7 +24,6 @@ export default defineConfig({
         ]
       },
       workbox: {
-        skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [

@@ -1,4 +1,5 @@
 import { Component, useState, useEffect, useCallback } from 'react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import { exchangeCodeForTokens } from './lib/spotify'
@@ -157,9 +158,13 @@ function useGuestMode() {
 // ============================================================
 
 export default function App() {
+  // * useRegisterSW handles the full SW lifecycle: needRefresh fires when a new SW
+  // * is waiting to activate. updateServiceWorker(true) tells it to skip waiting
+  // * and reloads the page — all in one safe operation.
+  const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW()
+
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
-  const [updateReady, setUpdateReady] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
   const [changelogText, setChangelogText] = useState(null)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
@@ -231,28 +236,6 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // * Update detection uses three signals:
-  // * 1. controllerchange — new SW took over after skipWaiting
-  // * 2. reg.waiting — a SW was already waiting when the page loaded
-  // * 3. statechange on the installing worker — catches mid-session updates
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return
-    navigator.serviceWorker.ready.then(reg => {
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        setUpdateReady(true)
-      })
-      if (reg.waiting) setUpdateReady(true)
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing
-        if (!newWorker) return
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            setUpdateReady(true)
-          }
-        })
-      })
-    })
-  }, [])
 
   const handleInstall = async () => {
     if (!installPrompt) return
@@ -369,7 +352,7 @@ export default function App() {
 
   return (
     <>
-      {updateReady && (
+      {needRefresh && (
         <div style={{
           position: 'fixed', bottom: 72, left: '50%', transform: 'translateX(-50%)',
           width: 'calc(100% - 32px)', maxWidth: 448,
@@ -388,8 +371,8 @@ export default function App() {
                 {showChangelog ? 'hide changes ▲' : "what's changed ▾"}
               </button>
             </div>
-            <button onClick={() => { setUpdateReady(false); setShowChangelog(false) }} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
-            <button onClick={() => window.location.reload()} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Update</button>
+            <button onClick={() => { setNeedRefresh(false); setShowChangelog(false) }} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
+            <button onClick={() => updateServiceWorker(true)} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Update</button>
           </div>
           {showChangelog && (
             <div style={{

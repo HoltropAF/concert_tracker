@@ -5220,24 +5220,18 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
       <div style={{ padding: '14px 16px 10px' }}>
         {/* Stat tiles */}
         {!search && totalUnique > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${linkedCount > 0 ? 5 : 4}, 1fr)`, gap: 6, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${linkedCount > 0 ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 12 }}>
             {[
               { value: totalUnique, label: "unique" },
-              { value: totalHeard, label: "heard" },
               { value: byCount[0]?.count ?? "—", label: byCount[0] ? byCount[0].name.slice(0, 8) : "top" },
               { value: [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length, label: "artists" },
+              ...(linkedCount > 0 ? [{ value: linkedCount, label: "linked" }] : []),
             ].map(({ value, label }) => (
-              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
+              <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
               </div>
             ))}
-            {linkedCount > 0 && (
-              <div style={{ background: "#13131f", border: "1px solid #1DB95433", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#1DB954", lineHeight: 1 }}>{linkedCount}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>linked</div>
-              </div>
-            )}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>

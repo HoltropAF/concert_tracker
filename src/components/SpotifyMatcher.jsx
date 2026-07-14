@@ -24,6 +24,8 @@ const extractTrack = t => ({
   albumName: t.album?.name || '',
   albumId: t.album?.id || '',
   albumArt: t.album?.images?.at(-1)?.url || '',
+  durationMs: t.duration_ms || null,
+  popularity: typeof t.popularity === 'number' ? t.popularity : null,
 })
 
 function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick, onCancel }) {
@@ -184,11 +186,11 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
       const choice = choices[i]
       if (choice) {
         const base = typeof song === 'string' ? { name: song } : { ...song }
-        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt }
+        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt, durationMs: choice.durationMs, popularity: choice.popularity }
       }
       if (removals.has(i)) {
         if (typeof song === 'string') return song
-        const { spotifyId, spotifyName, albumName, albumId, albumArt, ...rest } = song
+        const { spotifyId, spotifyName, albumName, albumId, albumArt, durationMs, popularity, ...rest } = song
         return Object.keys(rest).length === 1 && rest.name ? rest.name : rest
       }
       return song

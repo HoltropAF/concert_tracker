@@ -7322,6 +7322,22 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 // * search/filter state, toast host, and back-button wiring.
 // ============================================================
 
+function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
+  const open = openId === id;
+  return (
+    <div style={{ marginBottom: 8, borderBottom: '1px solid #1f1f35', paddingBottom: open ? 10 : 8 }}>
+      <button onClick={() => onToggle(open ? null : id)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: activeLabel ? '#a78bfa' : '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: activeLabel ? 700 : 400 }}>{label}</span>
+          {activeLabel && <span style={{ fontSize: 10, color: '#0c0c14', fontFamily: "'DM Mono', monospace", background: '#a78bfa', borderRadius: 99, padding: '1px 7px' }}>{activeLabel}</span>}
+        </div>
+        <span style={{ fontSize: 11, color: '#4a4870', transform: open ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+      </button>
+      {open && <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 5 }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail }) {
   const today = new Date()
   const isPastDate = (dateStr) => new Date(dateStr + 'T00:00:00') <= today
@@ -7339,6 +7355,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [filterType, setFilterType] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [showSort, setShowSort] = useState(false)
+  const [openFilterSection, setOpenFilterSection] = useState(null) // accordion: only one filter category open at a time
   const [filterFriend, setFilterFriend] = useState('all')
   const [filterVenue, setFilterVenue] = useState('all')
   const [filterRating, setFilterRating] = useState(0)
@@ -7450,6 +7467,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (filterYear !== 'all' && c.date.slice(0,4) !== filterYear) return false
     if (filterType === 'concerts' && c.type !== 'concert') return false
     if (filterType === 'festivals' && c.type !== 'festival') return false
+    if (filterType === 'online' && !isOnline(c)) return false
     if (filterFriend !== 'all' && !getFriends(c).includes(filterFriend)) return false
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
@@ -7766,12 +7784,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {/* Type dropdown */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <button onClick={() => { setShowYearDropdown(false); document.getElementById('type-dd') && (document.getElementById('type-dd').style.display = document.getElementById('type-dd').style.display === 'block' ? 'none' : 'block') }} style={{ minHeight: 36, padding: '7px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterType !== 'all' ? '#a78bfa' : '#13131f', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-                {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : 'Festivals'}
+                {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : filterType === 'festivals' ? 'Festivals' : 'Online'}
                 <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
               </button>
               <div id="type-dd" style={{ display: 'none', position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 110 }}>
-                {[{id:'all',label:'All'},{id:'concerts',label:'Shows'},{id:'festivals',label:'Festivals'}].map((t,i) => (
-                  <button key={t.id} onClick={() => { setFilterType(t.id); document.getElementById('type-dd').style.display='none' }} style={{ width: '100%', background: filterType === t.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < 2 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: filterType === t.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{t.label}</button>
+                {[{id:'all',label:'All'},{id:'concerts',label:'Shows'},{id:'festivals',label:'Festivals'},{id:'online',label:'Online'}].map((t,i) => (
+                  <button key={t.id} onClick={() => { setFilterType(t.id); document.getElementById('type-dd').style.display='none' }} style={{ width: '100%', background: filterType === t.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < 3 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: filterType === t.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{t.label}</button>
                 ))}
               </div>
             </div>
@@ -7825,89 +7843,73 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {view === 'home' && showFilters && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-            <button onClick={resetFilters} style={{ marginBottom: 12, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Type</div>
-              <div style={{ display: 'flex', gap: 5 }}>
-                {[['all','All'],['concerts','Concerts'],['festivals','Festivals']].map(([id, label]) => (
-                  <button key={id} onClick={() => setFilterType(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterType === id ? '#a78bfa' : '#0c0c14', color: filterType === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Friend</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                <button onClick={() => setFilterFriend('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterFriend === 'all' ? '#f472b6' : '#0c0c14', color: filterFriend === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterFriend === 'all' ? '#f472b6' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
-                {activeFriends.map(f => (
-                  <button key={f} onClick={() => setFilterFriend(filterFriend === f ? 'all' : f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterFriend === f ? '#f472b6' : '#0c0c14', color: filterFriend === f ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterFriend === f ? '#f472b6' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{f}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Venue</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                <button onClick={() => setFilterVenue('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterVenue === 'all' ? '#38bdf8' : '#0c0c14', color: filterVenue === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterVenue === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
-                {allVenues.map(v => (
-                  <button key={v} onClick={() => setFilterVenue(filterVenue === v ? 'all' : v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterVenue === v ? '#38bdf8' : '#0c0c14', color: filterVenue === v ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterVenue === v ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{v}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Rating</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                <button onClick={() => setFilterRating(0)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === 0 ? '#a78bfa' : '#0c0c14', color: filterRating === 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === 0 ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Any</button>
-                {Array.from({ length: settings.ratingSystem || 5 }, (_, i) => i + 1).map(n => (
-                  <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n}★</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Photos</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                <button onClick={() => onUpdateSetting('showListPhotos', settings.showListPhotos === false)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: settings.showListPhotos !== false ? '#a78bfa' : '#0c0c14', color: settings.showListPhotos !== false ? '#0c0c14' : '#6b6a8f', border: `1px solid ${settings.showListPhotos !== false ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>📷 Show in list</button>
-                <button onClick={() => setFilterHasPhoto(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterHasPhoto ? '#a78bfa' : '#0c0c14', color: filterHasPhoto ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterHasPhoto ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Only with photo</button>
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Solo only</div>
+            <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
+
+            <FilterGroup id="type" label="Type" activeLabel={filterType !== 'all' ? {concerts:'Concerts',festivals:'Festivals',online:'Online'}[filterType] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              {[['all','All'],['concerts','Concerts'],['festivals','Festivals'],['online','Online']].map(([id, label]) => (
+                <button key={id} onClick={() => setFilterType(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterType === id ? '#a78bfa' : '#0c0c14', color: filterType === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+              ))}
+            </FilterGroup>
+
+            <FilterGroup id="friend" label="Friend" activeLabel={filterFriend !== 'all' ? filterFriend : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              <button onClick={() => setFilterFriend('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterFriend === 'all' ? '#f472b6' : '#0c0c14', color: filterFriend === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterFriend === 'all' ? '#f472b6' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+              {activeFriends.map(f => (
+                <button key={f} onClick={() => setFilterFriend(filterFriend === f ? 'all' : f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterFriend === f ? '#f472b6' : '#0c0c14', color: filterFriend === f ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterFriend === f ? '#f472b6' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{f}</button>
+              ))}
+            </FilterGroup>
+
+            <FilterGroup id="venue" label="Venue" activeLabel={filterVenue !== 'all' ? filterVenue : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              <button onClick={() => setFilterVenue('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterVenue === 'all' ? '#38bdf8' : '#0c0c14', color: filterVenue === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterVenue === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+              {allVenues.map(v => (
+                <button key={v} onClick={() => setFilterVenue(filterVenue === v ? 'all' : v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterVenue === v ? '#38bdf8' : '#0c0c14', color: filterVenue === v ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterVenue === v ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{v}</button>
+              ))}
+            </FilterGroup>
+
+            <FilterGroup id="rating" label="Rating" activeLabel={filterRating !== 0 ? `${filterRating}★` : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              <button onClick={() => setFilterRating(0)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === 0 ? '#a78bfa' : '#0c0c14', color: filterRating === 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === 0 ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Any</button>
+              {Array.from({ length: settings.ratingSystem || 5 }, (_, i) => i + 1).map(n => (
+                <button key={n} onClick={() => setFilterRating(filterRating === n ? 0 : n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterRating === n ? '#a78bfa' : '#0c0c14', color: filterRating === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterRating === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n}★</button>
+              ))}
+            </FilterGroup>
+
+            <FilterGroup id="photos" label="Photos" activeLabel={filterHasPhoto ? 'Only with photo' : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              <button onClick={() => onUpdateSetting('showListPhotos', settings.showListPhotos === false)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: settings.showListPhotos !== false ? '#a78bfa' : '#0c0c14', color: settings.showListPhotos !== false ? '#0c0c14' : '#6b6a8f', border: `1px solid ${settings.showListPhotos !== false ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>📷 Show in list</button>
+              <button onClick={() => setFilterHasPhoto(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterHasPhoto ? '#a78bfa' : '#0c0c14', color: filterHasPhoto ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterHasPhoto ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Only with photo</button>
+            </FilterGroup>
+
+            <FilterGroup id="solo" label="Solo only" activeLabel={filterSolo ? 'Solo' : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
               <button onClick={() => setFilterSolo(s => !s)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSolo ? '#a78bfa' : '#0c0c14', color: filterSolo ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSolo ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Solo</button>
-            </div>
+            </FilterGroup>
+
             {(settings.genres||[]).length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Genre</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {(() => {
-                    const _g = settings.genres||[]; const _top = _g.slice(0,3); const _rest = _g.slice(3);
-                    return (<>
-                      <button onClick={() => setFilterGenre('all')} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre==='all'?'#a78bfa':'#0c0c14', color:filterGenre==='all'?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre==='all'?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>All</button>
-                      {_top.map(g => <button key={g} onClick={() => setFilterGenre(filterGenre===g?'all':g)} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre===g?'#a78bfa':'#0c0c14', color:filterGenre===g?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre===g?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>{g}</button>)}
-                      {_rest.length > 0 && <select value={_rest.includes(filterGenre)?filterGenre:''} onChange={e => e.target.value && setFilterGenre(e.target.value)} style={{ background:_rest.includes(filterGenre)?'#a78bfa':'#0c0c14', border:`1px solid ${_rest.includes(filterGenre)?'#a78bfa':'#1f1f35'}`, borderRadius:99, color:_rest.includes(filterGenre)?'#0c0c14':'#6b6a8f', fontFamily:"'DM Mono', monospace", fontSize:11, padding:'4px 8px', cursor:'pointer', WebkitAppearance:'none', appearance:'none' }}><option value=''>more ▾</option>{_rest.map(g => <option key={g} value={g}>{g}</option>)}</select>}
-                    </>);
-                  })()}
-                </div>
-              </div>
+              <FilterGroup id="genre" label="Genre" activeLabel={filterGenre !== 'all' ? filterGenre : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+                {(() => {
+                  const _g = settings.genres||[]; const _top = _g.slice(0,3); const _rest = _g.slice(3);
+                  return (<>
+                    <button onClick={() => setFilterGenre('all')} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre==='all'?'#a78bfa':'#0c0c14', color:filterGenre==='all'?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre==='all'?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>All</button>
+                    {_top.map(g => <button key={g} onClick={() => setFilterGenre(filterGenre===g?'all':g)} style={{ padding:'4px 10px', borderRadius:99, fontSize:11, cursor:'pointer', background:filterGenre===g?'#a78bfa':'#0c0c14', color:filterGenre===g?'#0c0c14':'#6b6a8f', border:`1px solid ${filterGenre===g?'#a78bfa':'#1f1f35'}`, fontFamily:"'DM Mono', monospace" }}>{g}</button>)}
+                    {_rest.length > 0 && <select value={_rest.includes(filterGenre)?filterGenre:''} onChange={e => e.target.value && setFilterGenre(e.target.value)} style={{ background:_rest.includes(filterGenre)?'#a78bfa':'#0c0c14', border:`1px solid ${_rest.includes(filterGenre)?'#a78bfa':'#1f1f35'}`, borderRadius:99, color:_rest.includes(filterGenre)?'#0c0c14':'#6b6a8f', fontFamily:"'DM Mono', monospace", fontSize:11, padding:'4px 8px', cursor:'pointer', WebkitAppearance:'none', appearance:'none' }}><option value=''>more ▾</option>{_rest.map(g => <option key={g} value={g}>{g}</option>)}</select>}
+                  </>);
+                })()}
+              </FilterGroup>
             )}
+
             {(settings.subgenres||[]).length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Subgenre</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  <button onClick={() => setFilterSubgenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === 'all' ? '#38bdf8' : '#0c0c14', color: filterSubgenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
-                  {(settings.subgenres||[]).map(g => (
-                    <button key={g} onClick={() => setFilterSubgenre(filterSubgenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === g ? '#38bdf8' : '#0c0c14', color: filterSubgenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === g ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
-                  ))}
-                </div>
-              </div>
+              <FilterGroup id="subgenre" label="Subgenre" activeLabel={filterSubgenre !== 'all' ? filterSubgenre : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+                <button onClick={() => setFilterSubgenre('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === 'all' ? '#38bdf8' : '#0c0c14', color: filterSubgenre === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === 'all' ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                {(settings.subgenres||[]).map(g => (
+                  <button key={g} onClick={() => setFilterSubgenre(filterSubgenre === g ? 'all' : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSubgenre === g ? '#38bdf8' : '#0c0c14', color: filterSubgenre === g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSubgenre === g ? '#38bdf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{g}</button>
+                ))}
+              </FilterGroup>
             )}
+
             {allCountries.length > 1 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Country</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  <button onClick={() => setFilterCountry('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === 'all' ? '#a78bfa' : '#0c0c14', color: filterCountry === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
-                  {allCountries.map(c => (
-                    <button key={c} onClick={() => setFilterCountry(filterCountry === c ? 'all' : c)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === c ? '#a78bfa' : '#0c0c14', color: filterCountry === c ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === c ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{c}</button>
-                  ))}
-                </div>
-              </div>
+              <FilterGroup id="country" label="Country" activeLabel={filterCountry !== 'all' ? filterCountry : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+                <button onClick={() => setFilterCountry('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === 'all' ? '#a78bfa' : '#0c0c14', color: filterCountry === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                {allCountries.map(c => (
+                  <button key={c} onClick={() => setFilterCountry(filterCountry === c ? 'all' : c)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === c ? '#a78bfa' : '#0c0c14', color: filterCountry === c ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === c ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{c}</button>
+                ))}
+              </FilterGroup>
             )}
           </div>
         )}

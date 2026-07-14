@@ -26,6 +26,7 @@ const extractTrack = t => ({
   albumArt: t.album?.images?.at(-1)?.url || '',
   durationMs: t.duration_ms || null,
   popularity: typeof t.popularity === 'number' ? t.popularity : null,
+  trackNumber: t.track_number || null,
 })
 
 function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick, onCancel }) {
@@ -186,11 +187,11 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
       const choice = choices[i]
       if (choice) {
         const base = typeof song === 'string' ? { name: song } : { ...song }
-        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt, durationMs: choice.durationMs, popularity: choice.popularity }
+        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt, durationMs: choice.durationMs, popularity: choice.popularity, trackNumber: choice.trackNumber }
       }
       if (removals.has(i)) {
         if (typeof song === 'string') return song
-        const { spotifyId, spotifyName, albumName, albumId, albumArt, durationMs, popularity, ...rest } = song
+        const { spotifyId, spotifyName, albumName, albumId, albumArt, durationMs, popularity, trackNumber, ...rest } = song
         return Object.keys(rest).length === 1 && rest.name ? rest.name : rest
       }
       return song

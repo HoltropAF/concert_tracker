@@ -6393,32 +6393,14 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
   const defaultViewOptions = [{ id: "stats", label: "Stats" }, { id: "home", label: "Shows" }, { id: "artists", label: "Artists" }, { id: "songs", label: "Songs" }, { id: "venues", label: "Venues" }];
   const defaultSortOptions = [{ id: "newest", label: "Date" }, { id: "oldest", label: "Oldest" }, { id: "alpha", label: "A-Z" }, { id: "price", label: "Price" }, { id: "rating", label: "Rating" }];
+  // Icons are auto-fetched from each site's favicon — no need to hand-draw a
+  // logo SVG whenever a new platform is added, just add href/label/domain.
   const socialLinks = [
-    {
-      href: "https://github.com/HoltropAF/concert_tracker",
-      label: "GitHub",
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#9d9bc0"><path d="M12 2a10 10 0 0 0-3.162 19.49c.5.092.68-.216.68-.48 0-.236-.008-.86-.014-1.69-2.77.602-3.356-1.335-3.356-1.335-.454-1.154-1.108-1.462-1.108-1.462-.906-.62.068-.608.068-.608 1 .07 1.526 1.027 1.526 1.027.89 1.526 2.336 1.085 2.904.83.09-.644.35-1.085.636-1.334-2.212-.252-4.54-1.106-4.54-4.924 0-1.088.39-1.978 1.028-2.675-.104-.252-.446-1.268.098-2.644 0 0 .838-.268 2.746 1.022A9.55 9.55 0 0 1 12 6.84c.85.004 1.706.114 2.504.336 1.906-1.29 2.742-1.022 2.742-1.022.546 1.376.204 2.392.1 2.644.64.697 1.026 1.587 1.026 2.675 0 3.828-2.332 4.668-4.552 4.916.358.308.678.916.678 1.846 0 1.334-.012 2.41-.012 2.738 0 .266.18.576.688.478A10 10 0 0 0 12 2Z"/></svg>
-    },
-    {
-      href: "https://www.threads.com/@annuhfloor",
-      label: "Threads",
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#9d9bc0"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.028-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.594 12c.022 3.086.713 5.496 2.051 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.689-2.044 1.616-1.707 1.594-3.957 1.332-5.005-.274-1.386-.995-2.367-2.181-2.973-.321 1.798-.908 3.192-1.763 4.134-.99 1.092-2.298 1.617-3.89 1.56-1.354-.046-2.553-.54-3.37-1.388-.95-.984-1.404-2.383-1.277-3.848.235-2.65 2.168-4.356 5.089-4.424.952-.022 1.929.099 2.898.361-.094-.499-.195-.967-.305-1.394-.348-1.358-.854-2.365-1.506-2.994-.705-.677-1.645-1.014-2.866-.997-1.53.024-2.717.533-3.529 1.512-.74.889-1.154 2.154-1.22 3.758l-2.1-.078c.083-2.076.614-3.757 1.58-4.997 1.14-1.44 2.817-2.185 4.982-2.216 1.79-.025 3.235.444 4.3 1.397.872.784 1.537 1.95 1.976 3.467.12.413.236.883.346 1.405a11.3 11.3 0 0 1 1.133.508c1.821.982 2.95 2.478 3.317 4.329.407 2.056.214 5.273-2.202 7.851C17.056 23.22 14.908 24 12.186 24z"/></svg>
-    },
-    {
-      href: "https://www.tiktok.com/@annuhfloor98",
-      label: "TikTok",
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="#9d9bc0"><path d="M15.86 3c.2 1.695 1.154 3.466 3.14 4.434v2.305a8.11 8.11 0 0 1-3.14-.797v6.493A5.451 5.451 0 1 1 10.41 10c.234 0 .462.014.69.044v2.355a3.11 3.11 0 1 0 2.42 3.036V3h2.34Z"/></svg>
-    },
-    {
-      href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm",
-      label: "Spotify",
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z" fill="#9d9bc0"/></svg>
-    },
-    {
-      href: "https://www.vinted.nl/member/50873825",
-      label: "Vinted",
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6.5 5.5h3.4v6.3c0 2.4.2 4.1.7 5 .5 1 1.3 1.5 2.4 1.5.8 0 1.6-.3 2.2-1 .6-.7 1.1-1.8 1.5-3.3l2.4-8.5c.1-.4.4-.7.8-.7h2.6l-3.2 11.4c-.7 2.4-1.7 4.2-2.9 5.4-1.2 1.2-2.7 1.8-4.4 1.8-2.1 0-3.8-.8-5-2.5-1.1-1.7-1.8-4.4-2-8.1L6.5 5.5Z" fill="#9d9bc0"/></svg>
-    },
+    { href: "https://github.com/HoltropAF/concert_tracker", label: "GitHub", domain: "github.com" },
+    { href: "https://www.threads.com/@annuhfloor", label: "Threads", domain: "threads.com" },
+    { href: "https://www.tiktok.com/@annuhfloor98", label: "TikTok", domain: "tiktok.com" },
+    { href: "https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm", label: "Spotify", domain: "spotify.com" },
+    { href: "https://www.vinted.nl/member/50873825", label: "Vinted", domain: "vinted.nl" },
   ];
   const cycleOption = (options, current) => {
     const idx = Math.max(0, options.findIndex(o => o.id === current));
@@ -6873,12 +6855,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         }}>{saved ? "Saved ✓" : "Save"}</button>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
           { id: null, label: 'General' },
           { id: 'preferences', label: 'Display' },
           { id: 'tags', label: 'Tags' },
-          { id: 'data', label: 'Account' },
+          { id: 'account', label: 'Account' },
+          { id: 'integrations', label: 'Integrations' },
         ].map(tab => (
           <button key={String(tab.id)} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
             minHeight: 34, borderRadius: 7, cursor: "pointer", fontSize: 10,
@@ -6921,16 +6904,17 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
             {/* Social links */}
             <SettingsSection title="Find me online">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, padding: "14px" }}>
-                {socialLinks.map(({ href, label, icon }) => (
-                  <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
-                    <span style={{ width: 44, height: 44, borderRadius: 12, background: "#1a1929", border: "1px solid #2a2840", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                      {icon}
+              {socialLinks.map(({ href, label, domain }, i, arr) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a28" : "none" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0, overflow: "hidden" }}>
+                      <img src={`https://www.google.com/s2/favicons?sz=64&domain=${domain}`} alt="" width={16} height={16} />
                     </span>
-                    <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: "#4a4870", textAlign: "center", letterSpacing: "0.03em" }}>{label}</span>
-                  </a>
-                ))}
-              </div>
+                    <span>{label}</span>
+                  </span>
+                  <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
+                </a>
+              ))}
             </SettingsSection>
           </div>
         );
@@ -7208,7 +7192,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
       )}
 
-      {activeSettingsTab === 'data' && <>
+      {activeSettingsTab === 'account' && <>
         {/* Profile */}
         <SettingsSection title="Profile">
           <div style={{ padding: "14px 16px" }}>
@@ -7232,84 +7216,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 {userEmail === 'guest' ? 'exit' : 'sign out'}
               </button>
             </div>
-          </div>
-        </SettingsSection>
-
-        {/* Integrations */}
-        <SettingsSection title="Integrations">
-          <div style={{ padding: "14px 16px" }}>
-            {(() => {
-              const spotifyConnected = Boolean(settings.spotifyAccessToken)
-              const dotColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#2e2e4a"
-              const statusColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#4a4870"
-              const statusLabel = spotifyConnected ? "connected" : local.spotifyClientId ? "client ID set — not connected" : "not configured"
-              return (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: local.spotifyClientId ? 0 : 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0d2b12", border: "1px solid #1a4d22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z"/></svg>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>Spotify</div>
-                <div style={{ fontSize: 11, color: statusColor, fontFamily: "'DM Mono', monospace" }}>{statusLabel}</div>
-              </div>
-              <div style={{ width: 8, height: 8, borderRadius: 99, background: dotColor, flexShrink: 0 }} />
-            </div>
-              )
-            })()}
-
-            {!local.spotifyClientId && (
-              <button onClick={() => setOpenSection(s => s === 'spotify-guide' ? null : 'spotify-guide')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
-                {openSection === 'spotify-guide' ? 'hide setup guide ▲' : 'set up Spotify ▾'}
-              </button>
-            )}
-
-            {(openSection === 'spotify-guide' || local.spotifyClientId) && (
-              <div style={{ marginTop: 14 }}>
-                {!local.spotifyClientId && (
-                  <ol style={{ paddingLeft: 16, margin: "0 0 12px", color: "#9d9bc0", fontSize: 12, fontFamily: "'DM Mono', monospace", lineHeight: 2 }}>
-                    <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>developer.spotify.com ↗</a> and create a free app</li>
-                    <li>In the app settings, add <code style={{ background: "#0c0c14", padding: "1px 5px", borderRadius: 4 }}>{window.location.origin}</code> as a <strong>Redirect URI</strong></li>
-                    <li>Copy the <strong>Client ID</strong> and paste it below</li>
-                  </ol>
-                )}
-                <input
-                  value={local.spotifyClientId || ''}
-                  onChange={e => lUpdate('spotifyClientId', e.target.value.trim())}
-                  placeholder="Paste Client ID here"
-                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
-                />
-                {local.spotifyClientId && !settings.spotifyAccessToken && (
-                  <button onClick={() => lUpdate('spotifyClientId', '')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 8, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
-                    remove
-                  </button>
-                )}
-                {/* Connect / disconnect */}
-                {local.spotifyClientId && !settings.spotifyAccessToken && (
-                  <button
-                    onClick={() => startSpotifyAuth(local.spotifyClientId)}
-                    style={{ display: "block", marginTop: 14, width: "100%", padding: "11px", borderRadius: 9, background: "#1DB954", border: "none", color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em" }}
-                  >
-                    Connect Spotify →
-                  </button>
-                )}
-                {settings.spotifyAccessToken && (
-                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 12, color: "#4ade80", fontFamily: "'DM Mono', monospace" }}>✓ connected</span>
-                    <button
-                      onClick={() => {
-                        const next = { ...local, spotifyAccessToken: '', spotifyRefreshToken: '', spotifyTokenExpiry: null }
-                        setLocal(next)
-                        setSaved(false)
-                        if (onUpdateAll) onUpdateAll(next)
-                      }}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}
-                    >
-                      disconnect
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </SettingsSection>
 
@@ -7448,17 +7354,86 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
       </>}
 
-      {/* Follow me on */}
-      <div style={{ display: "none", marginTop: 24, paddingBottom: 8, textAlign: "center" }}>
-        <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em", marginBottom: 10 }}>follow me on</div>
-        <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-          {socialLinks.map(({ href, label, icon }) => (
-            <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, background: "#13131f", border: "1px solid #1f1f35", color: "#4a4870", textDecoration: "none" }}>
-              {icon}
-            </a>
-          ))}
-        </div>
-      </div>
+      {activeSettingsTab === 'integrations' && <>
+        {/* Integrations */}
+        <SettingsSection title="Integrations">
+          <div style={{ padding: "14px 16px" }}>
+            {(() => {
+              const spotifyConnected = Boolean(settings.spotifyAccessToken)
+              const dotColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#2e2e4a"
+              const statusColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#4a4870"
+              const statusLabel = spotifyConnected ? "connected" : local.spotifyClientId ? "client ID set — not connected" : "not configured"
+              return (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: local.spotifyClientId ? 0 : 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0d2b12", border: "1px solid #1a4d22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z"/></svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>Spotify</div>
+                <div style={{ fontSize: 11, color: statusColor, fontFamily: "'DM Mono', monospace" }}>{statusLabel}</div>
+              </div>
+              <div style={{ width: 8, height: 8, borderRadius: 99, background: dotColor, flexShrink: 0 }} />
+            </div>
+              )
+            })()}
+
+            {!local.spotifyClientId && (
+              <button onClick={() => setOpenSection(s => s === 'spotify-guide' ? null : 'spotify-guide')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                {openSection === 'spotify-guide' ? 'hide setup guide ▲' : 'set up Spotify ▾'}
+              </button>
+            )}
+
+            {(openSection === 'spotify-guide' || local.spotifyClientId) && (
+              <div style={{ marginTop: 14 }}>
+                {!local.spotifyClientId && (
+                  <ol style={{ paddingLeft: 16, margin: "0 0 12px", color: "#9d9bc0", fontSize: 12, fontFamily: "'DM Mono', monospace", lineHeight: 2 }}>
+                    <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>developer.spotify.com ↗</a> and create a free app</li>
+                    <li>In the app settings, add <code style={{ background: "#0c0c14", padding: "1px 5px", borderRadius: 4 }}>{window.location.origin}</code> as a <strong>Redirect URI</strong></li>
+                    <li>Copy the <strong>Client ID</strong> and paste it below</li>
+                  </ol>
+                )}
+                <input
+                  value={local.spotifyClientId || ''}
+                  onChange={e => lUpdate('spotifyClientId', e.target.value.trim())}
+                  placeholder="Paste Client ID here"
+                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
+                />
+                {local.spotifyClientId && !settings.spotifyAccessToken && (
+                  <button onClick={() => lUpdate('spotifyClientId', '')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 8, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                    remove
+                  </button>
+                )}
+                {/* Connect / disconnect */}
+                {local.spotifyClientId && !settings.spotifyAccessToken && (
+                  <button
+                    onClick={() => startSpotifyAuth(local.spotifyClientId)}
+                    style={{ display: "block", marginTop: 14, width: "100%", padding: "11px", borderRadius: 9, background: "#1DB954", border: "none", color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em" }}
+                  >
+                    Connect Spotify →
+                  </button>
+                )}
+                {settings.spotifyAccessToken && (
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#4ade80", fontFamily: "'DM Mono', monospace" }}>✓ connected</span>
+                    <button
+                      onClick={() => {
+                        const next = { ...local, spotifyAccessToken: '', spotifyRefreshToken: '', spotifyTokenExpiry: null }
+                        setLocal(next)
+                        setSaved(false)
+                        if (onUpdateAll) onUpdateAll(next)
+                      }}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}
+                    >
+                      disconnect
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </SettingsSection>
+
+      </>}
     </div>
   );
 }

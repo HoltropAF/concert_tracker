@@ -2206,6 +2206,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       charts: [
         { id: "artists",    label: "Artist overview" },
         { id: "shows",      label: "Shows over time" },
+        { id: "day-pixels", label: "Year in pixels" },
         { id: "genres-pie", label: "Genres" },
         { id: "language",   label: "Language" },
         { id: "ratings",    label: "Ratings" },
@@ -2653,6 +2654,99 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               {sView === "line"       && <LineChart        w={showsChartDims.w} h={showsChartDims.h} />}
               {sView === "heatmap"    && <Heatmap          w={showsChartDims.w} h={showsChartDims.h} />}
               {sView === "cumulative" && <CumulativeChart  w={showsChartDims.w} h={showsChartDims.h} />}
+            </div>
+          </div>
+        );
+      }
+      case "day-pixels": {
+        const pyKey = "day-pixels-year";
+        const allDatedYears = [...new Set(concerts.filter(c => !isWish(c) && c.date && c.date.length === 10).map(c => c.date.slice(0, 4)))].sort();
+        const todayYearStr = String(new Date().getFullYear());
+        const defaultPixelYear = allDatedYears.includes(todayYearStr) ? todayYearStr : (allDatedYears[allDatedYears.length - 1] || todayYearStr);
+        const pixelYear = chartOpt(pyKey, defaultPixelYear);
+        const yIdx = allDatedYears.indexOf(pixelYear);
+
+        // Map every date in the year to the shows that happened on it
+        const dayMap = {};
+        concerts.filter(c => !isWish(c) && c.date && c.date.slice(0, 4) === pixelYear).forEach(c => {
+          const key = c.date;
+          if (!dayMap[key]) dayMap[key] = [];
+          dayMap[key].push(c);
+        });
+        const maxDayCount = Math.max(...Object.values(dayMap).map(l => l.length), 1);
+
+        const jan1 = new Date(`${pixelYear}-01-01T00:00:00`);
+        const dec31 = new Date(`${pixelYear}-12-31T00:00:00`);
+        const gridStart = new Date(jan1); gridStart.setDate(gridStart.getDate() - gridStart.getDay()); // back up to Sunday
+        const totalDays = Math.round((dec31 - gridStart) / 86400000) + 1;
+        const totalWeeks = Math.ceil(totalDays / 7);
+        const CELL = 11, GAP = 3;
+
+        const monthLabels = [];
+        for (let m = 0; m < 12; m++) {
+          const first = new Date(pixelYear, m, 1);
+          const dayIdx = Math.round((first - gridStart) / 86400000);
+          monthLabels.push({ label: monthNames[m], col: Math.floor(dayIdx / 7) });
+        }
+
+        const cellsByWeek = Array.from({ length: totalWeeks }, (_, w) => Array.from({ length: 7 }, (_, d) => {
+          const date = new Date(gridStart); date.setDate(date.getDate() + w * 7 + d);
+          if (date.getFullYear().toString() !== pixelYear) return null;
+          const key = date.toISOString().slice(0, 10);
+          const shows = dayMap[key] || [];
+          return { date: key, shows };
+        }));
+
+        const totalShowsThisYear = Object.values(dayMap).reduce((s, l) => s + l.length, 0);
+        const daysWithShows = Object.keys(dayMap).length;
+
+        return (
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <button onClick={() => yIdx > 0 && setChartOptions(o => ({ ...o, [pyKey]: allDatedYears[yIdx - 1] }))} disabled={yIdx <= 0} style={{ background: "none", border: "none", color: yIdx > 0 ? "#a78bfa" : "#2e2e4a", fontSize: 16, cursor: yIdx > 0 ? "pointer" : "default", padding: "0 6px" }}>‹</button>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff" }}>{pixelYear}</div>
+              <button onClick={() => yIdx < allDatedYears.length - 1 && setChartOptions(o => ({ ...o, [pyKey]: allDatedYears[yIdx + 1] }))} disabled={yIdx >= allDatedYears.length - 1 || yIdx < 0} style={{ background: "none", border: "none", color: (yIdx >= 0 && yIdx < allDatedYears.length - 1) ? "#a78bfa" : "#2e2e4a", fontSize: 16, cursor: (yIdx >= 0 && yIdx < allDatedYears.length - 1) ? "pointer" : "default", padding: "0 6px" }}>›</button>
+            </div>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>
+              {totalShowsThisYear} show{totalShowsThisYear !== 1 ? "s" : ""} · {daysWithShows} day{daysWithShows !== 1 ? "s" : ""} out {pixelYear === todayYearStr ? "so far" : "that year"}
+            </div>
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <div style={{ position: "relative", width: totalWeeks * (CELL + GAP), paddingLeft: 20 }}>
+                {monthLabels.map(({ label, col }) => (
+                  <div key={label} style={{ position: "absolute", left: 20 + col * (CELL + GAP), top: 0, fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{label[0]}</div>
+                ))}
+                <div style={{ display: "flex", gap: GAP, marginTop: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: GAP, marginRight: 2, flexShrink: 0, marginLeft: -20 }}>
+                    {["", "M", "", "W", "", "F", ""].map((d, i) => (
+                      <div key={i} style={{ width: 16, height: CELL, fontSize: 7, color: "#4a4870", fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 4 }}>{d}</div>
+                    ))}
+                  </div>
+                  {cellsByWeek.map((week, wi) => (
+                    <div key={wi} style={{ display: "flex", flexDirection: "column", gap: GAP }}>
+                      {week.map((cell, di) => {
+                        if (!cell) return <div key={di} style={{ width: CELL, height: CELL }} />;
+                        const count = cell.shows.length;
+                        const hasFest = cell.shows.some(c => c.type === "festival");
+                        const intensity = count > 0 ? 0.25 + (count / maxDayCount) * 0.75 : 0;
+                        const color = count === 0 ? "#0e0e1a" : hasFest ? `rgba(244,114,182,${intensity})` : `rgba(167,139,250,${intensity})`;
+                        return (
+                          <button key={di} onClick={() => count > 0 && onOpen(cell.shows[0])} title={count > 0 ? `${formatDate(cell.date)} — ${cell.shows.map(c => c.artist).join(', ')}` : formatDate(cell.date)}
+                            style={{ width: CELL, height: CELL, borderRadius: 2, background: color, border: "none", padding: 0, cursor: count > 0 ? "pointer" : "default" }} />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12 }}>
+              <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>less</span>
+              {[0, 0.3, 0.55, 0.8, 1].map(v => (
+                <div key={v} style={{ width: CELL, height: CELL, borderRadius: 2, background: v === 0 ? "#0e0e1a" : `rgba(167,139,250,${v})` }} />
+              ))}
+              <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>more</span>
+              <span style={{ width: CELL, height: CELL, borderRadius: 2, background: "rgba(244,114,182,0.85)", marginLeft: 10 }} />
+              <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>festival</span>
             </div>
           </div>
         );

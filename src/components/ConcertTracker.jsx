@@ -5508,7 +5508,7 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
-function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
+function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {} }) {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
@@ -5516,7 +5516,9 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
   const [filterType, setFilterType] = useState('all');
   const [showVenuePast, setShowVenuePast] = useState(false);
   const [showVenueUpcoming, setShowVenueUpcoming] = useState(false);
-  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); }, [selectedVenue]);
+  const [editingVenueUrl, setEditingVenueUrl] = useState(false);
+  const [venueUrlInput, setVenueUrlInput] = useState('');
+  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueUrl(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
@@ -5572,10 +5574,41 @@ function VenuesView({ concerts, onOpen, settings, onNavigate = () => {} }) {
             <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
               {v.city && `${v.city}${v.country ? `, ${v.country}` : ''} · `}{v.pastCount}× visited{v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}
             </div>
-            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
-              📍 Open in Maps ↗
-            </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
+                📍 Open in Maps ↗
+              </a>
+              {(() => {
+                const venueUrl = (settings.venueUrls || {})[selectedVenue] || '';
+                return !editingVenueUrl ? (
+                  <>
+                    {venueUrl && (
+                      <a href={venueUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
+                        🔗 Website ↗
+                      </a>
+                    )}
+                    <button onClick={() => { setVenueUrlInput(venueUrl); setEditingVenueUrl(true); }} style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                      {venueUrl ? 'edit' : '+ add website'}
+                    </button>
+                  </>
+                ) : null;
+              })()}
+            </div>
+            {editingVenueUrl && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <input value={venueUrlInput} onChange={e => setVenueUrlInput(e.target.value)} placeholder="https://venue-website.com" autoFocus
+                  style={{ flex: 1, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 11, boxSizing: 'border-box' }} />
+                <button onClick={() => {
+                  const next = { ...(settings.venueUrls || {}) };
+                  const trimmed = venueUrlInput.trim();
+                  if (trimmed) next[selectedVenue] = trimmed; else delete next[selectedVenue];
+                  onUpdateSetting('venueUrls', next);
+                  setEditingVenueUrl(false);
+                }} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 11, fontWeight: 700, padding: '0 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+                <button onClick={() => setEditingVenueUrl(false)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Cancel</button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -8149,7 +8182,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>
 

@@ -117,15 +117,18 @@ const friendColor = name => {
   return FRIEND_HUES[hash % FRIEND_HUES.length];
 };
 const friendInitials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
-// Detail-page header subtitle: one fact per line instead of a dot-separated
-// string. Used on Venue/Artist/Song/Friend detail headers for consistency.
-function DetailSubtitle({ items }) {
-  const shown = items.filter(Boolean);
+// Detail-page header subtitle: each entry in `lines` is its own row; an entry
+// that is itself an array gets its parts joined with " · " on that one row.
+// Used on Venue/Artist/Song/Friend detail headers for consistency.
+function DetailSubtitle({ lines }) {
+  const shown = lines.map(l => Array.isArray(l) ? l.filter(Boolean) : (l ? [l] : [])).filter(l => l.length > 0);
   if (shown.length === 0) return null;
   return (
     <div style={{ marginTop: 3 }}>
-      {shown.map((line, i) => (
-        <div key={i} style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>{line}</div>
+      {shown.map((parts, i) => (
+        <div key={i} style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+          {parts.map((p, j) => <span key={j}>{j > 0 && ' · '}{p}</span>)}
+        </div>
       ))}
     </div>
   );
@@ -4498,15 +4501,15 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           </div>
         )}
 
-        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px" }}>←</button>
           <FriendAvatar name={displayName(f.name)} size={44} />
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
             </div>
-            <DetailSubtitle items={[
+            <DetailSubtitle lines={[
               `${f.shows.length} show${f.shows.length !== 1 ? 's' : ''} together`,
               yearSpan,
               profile.contact,
@@ -4532,7 +4535,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
             distinctCountries > 1 && { value: distinctCountries, label: "countries" },
           ].filter(Boolean);
           return (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 20px 0" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 16px 0" }}>
               {tiles.map(({ value, label }) => (
                 <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
@@ -4543,7 +4546,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           );
         })()}
 
-        <div style={{ padding: "16px 20px" }}>
+        <div style={{ padding: "16px 16px" }}>
           {/* Details */}
           {(() => {
             const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
@@ -4577,16 +4580,13 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
             return (
               <div style={card}>
                 <div style={sectionLabel}>Photos together</div>
-                <div style={{ position: "relative" }}>
-                  <div style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                    {photos.map(c => (
-                      <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                        <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
-                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.artist} · {c.date.slice(0, 4)}</div>
-                      </button>
-                    ))}
-                  </div>
-                  {photos.length > 2 && <div style={{ position: "absolute", top: 0, right: 0, bottom: 20, width: 28, background: "linear-gradient(to right, transparent, #13131f)", pointerEvents: "none" }} />}
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  {photos.map(c => (
+                    <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.artist} · {c.date.slice(0, 4)}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
             );
@@ -4925,15 +4925,14 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
     });
     return (
       <div style={{ padding: "0 0 100px" }}>
-        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <button onClick={() => setSelectedArtist(null)} style={{
-            background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1
+            background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px"
           }}>←</button>
           <div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedArtist}</div>
-            <DetailSubtitle items={[
-              `${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`,
-              ...(roleParts.length > 0 && pastShows.length !== totalAppearances ? roleParts : []),
+            <DetailSubtitle lines={[
+              [`${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`, ...(roleParts.length > 0 && pastShows.length !== totalAppearances ? roleParts : [])],
               allUpcoming.length > 0 ? `${allUpcoming.length} upcoming` : null,
             ]} />
           </div>
@@ -4955,7 +4954,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
               </div>
               <div style={{ padding: "0 16px" }}>
-                <DetailSubtitle items={[
+                <DetailSubtitle lines={[
                   avgTicket !== null ? <>avg ticket <span style={{ color: "#c4c2f0" }}>€{avgTicket.toFixed(0)}</span></> : null,
                   merchItems.length > 0 ? `${merchItems.length} merch item${merchItems.length !== 1 ? 's' : ''} bought · €${merchSpend.toFixed(0)}` : null,
                   totalSongsHeard > 0 ? `${totalSongsHeard} songs heard live` : null,
@@ -4963,16 +4962,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
                 ]} />
               </div>
               {photos.length > 0 && (
-                <div style={{ position: "relative" }}>
-                  <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
-                    {photos.map(c => (
-                      <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                        <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
-                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
-                      </button>
-                    ))}
-                  </div>
-                  {photos.length > 2 && <div style={{ position: "absolute", top: 12, right: 16, bottom: 20, width: 28, background: "linear-gradient(to right, transparent, #0c0c14)", pointerEvents: "none" }} />}
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
+                  {photos.map(c => (
+                    <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
+                    </button>
+                  ))}
                 </div>
               )}
             </>
@@ -5352,11 +5348,11 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
     const duration = formatDuration(selectedSong.durationMs);
     return (
       <div style={{ padding: '0 0 100px' }}>
-        <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
-            <DetailSubtitle items={[selectedSong.artist, duration]} />
+            <DetailSubtitle lines={[[selectedSong.artist, duration]]} />
             {selectedSong.albumName && selectedSong.albumId && (
               <a href={`https://open.spotify.com/album/${selectedSong.albumId}`} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'block', fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4, textDecoration: 'none' }}>
@@ -5637,15 +5633,13 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const rooms = [...new Set(v.past.filter(c => c.room).map(c => c.room))];
     return (
       <div style={{ padding: '0 0 100px' }}>
-        <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => setSelectedVenue(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <button onClick={() => setSelectedVenue(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedVenue}</div>
-            <DetailSubtitle items={[
-              v.city,
-              v.country,
-              `${v.pastCount}× visited`,
-              v.upcoming.length > 0 ? `${v.upcoming.length} upcoming` : null,
+            <DetailSubtitle lines={[
+              [v.city, v.country],
+              [`${v.pastCount}× visited`, v.upcoming.length > 0 ? `${v.upcoming.length} upcoming` : null],
             ]} />
             {(() => {
               const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
@@ -5737,16 +5731,13 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 
         {/* Photos */}
         {v.photos.length > 0 && (
-          <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px', WebkitOverflowScrolling: 'touch' }}>
-              {v.photos.map(c => (
-                <button key={c.id} onClick={() => onOpen(c)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
-                  <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: '16 / 10', borderRadius: 10 }} />
-                  <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.date.slice(0,4)} · {c.artist}</div>
-                </button>
-              ))}
-            </div>
-            {v.photos.length > 2 && <div style={{ position: 'absolute', top: 12, right: 16, bottom: 20, width: 28, background: 'linear-gradient(to right, transparent, #0c0c14)', pointerEvents: 'none' }} />}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px', WebkitOverflowScrolling: 'touch' }}>
+            {v.photos.map(c => (
+              <button key={c.id} onClick={() => onOpen(c)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
+                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: '16 / 10', borderRadius: 10 }} />
+                <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.date.slice(0,4)} · {c.artist}</div>
+              </button>
+            ))}
           </div>
         )}
 

@@ -5115,58 +5115,35 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
     <div style={{ padding: "0 0 100px" }}>
       {/* Artist overview header */}
       {!search && activeFilterCount === 0 && (
-        <div style={{ padding: "12px 16px 0" }}>
-          {/* Headline stat, matching Venues/Songs */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalArtists}</span>
-              <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
-            </div>
-            <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
-              {uniqueGenres} genre{uniqueGenres !== 1 ? 's' : ''}{newThisYear > 0 ? ` · ${newThisYear} new this year` : ''}{avgShowsPerArtist ? ` · ${avgShowsPerArtist} avg shows` : ''}
-            </div>
+        <div style={{ padding: "14px 16px 0" }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalArtists}</span>
+            <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
           </div>
+          {(uniqueGenres > 0 || avgShowsPerArtist) && (
+            <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+              {uniqueGenres} genre{uniqueGenres !== 1 ? 's' : ''}{avgShowsPerArtist ? `, ${avgShowsPerArtist} avg shows` : ''}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Search + controls */}
-      <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
-        <div style={{ position: "relative", marginBottom: 8 }}>
-          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
+      {/* Type pills */}
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6 }}>
+        {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
+          <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Search + sort + filters */}
+      <div style={{ padding: "8px 16px 0", position: "relative", zIndex: 10 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search artist..."
-            style={{
-              width: "100%", background: "#13131f", border: `1px solid ${search ? "#a78bfa" : "#1f1f35"}`,
-              borderRadius: 10, color: "#c4c2f0", padding: "9px 32px 9px 32px",
-              fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box"
-            }}
+            style={{ flex: 1, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
           />
-          {search && (
-            <button onClick={() => setSearch("")} style={{
-              position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-              background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 14, padding: 0
-            }}>×</button>
-          )}
-        </div>
-
-        {/* Sort + Filter pill row */}
-        <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button onClick={() => setShowTypeDropdown(d => !d)} style={{ minHeight: 30, background: filterType !== 'all' ? '#a78bfa' : 'none', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterType !== 'all' ? 700 : 400, display: 'flex', alignItems: 'center', gap: 4 }}>
-              {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : 'Fest'}
-              <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
-            </button>
-            {showTypeDropdown && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 100 }}>
-                {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label], i) => (
-                  <button key={id} onClick={() => { setFilterType(id); setShowTypeDropdown(false); }} style={{ width: '100%', background: filterType === id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < 2 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: filterType === id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{label}</button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div style={{ flex: 1 }} />
           <button onClick={() => { setShowSort(s => !s); setShowFilters(false); }} style={{ background: showSort || sortBy !== 'most-seen' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortBy !== 'most-seen' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-seen' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-seen' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-seen' ? ' ↕' : ''}
           </button>
@@ -5451,91 +5428,72 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
 
   return (
     <div style={{ padding: '0 0 100px' }}>
-      <div style={{ padding: '14px 16px 10px' }}>
-        {/* Overview: headline stat + subtitle, matching Venues */}
-        {!search && totalUnique > 0 && (() => {
-          const totalArtists = [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length;
-          return (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalUnique}</span>
-                <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
-              </div>
-              <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
-                across {past.length} show{past.length !== 1 ? 's' : ''}{totalArtists > 0 ? ` · ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}{linkedCount > 0 ? ` · ${linkedCount} linked` : ''}
-              </div>
+      {/* Overview: headline stat + subtitle, matching Venues */}
+      {!search && totalUnique > 0 && (() => {
+        const totalArtists = [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length;
+        return (
+          <div style={{ padding: '14px 16px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalUnique}</span>
+              <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
             </div>
-          );
-        })()}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff' }}>Songs</div>
-        </div>
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search songs…"
-            style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`, borderRadius: 10, color: '#c4c2f0', padding: '9px 32px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
-          {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>}
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {/* Type dropdown */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button onClick={() => setShowTypeDropdown(d => !d)} style={{ minHeight: 30, padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterType !== 'all' ? '#a78bfa' : '#13131f', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-              {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : 'Fest'}
-              <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
-            </button>
-            {showTypeDropdown && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 100 }}>
-                {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label], i) => (
-                  <button key={id} onClick={() => { setFilterType(id); setShowTypeDropdown(false); }} style={{ width: '100%', background: filterType === id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < 2 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: filterType === id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{label}</button>
-                ))}
+            {(past.length > 0 || totalArtists > 0) && (
+              <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+                across {past.length} show{past.length !== 1 ? 's' : ''}{totalArtists > 0 ? `, ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}
               </div>
             )}
           </div>
-          {/* Sort toggle */}
-          <button onClick={() => { setShowSongSort(s => !s); setShowSongFilters(false); }} style={{ minHeight: 30, background: showSongSort || sortBy !== 'count' || topN !== null ? '#1a1a30' : 'none', border: `1px solid ${showSongSort || sortBy !== 'count' || topN !== null ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'count' || topN !== null ? '#a78bfa' : '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'count' || topN !== null ? 700 : 400, flexShrink: 0 }}>
-            Sort{sortBy !== 'count' || topN !== null ? ' ↕' : ''}
+        );
+      })()}
+      {/* Type pills */}
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6 }}>
+        {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
+          <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
+        ))}
+      </div>
+      {/* Search + sort + spotify */}
+      <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search songs..."
+          style={{ flex: 1, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+        />
+        <button onClick={() => { setShowSongSort(s => !s); setShowSongFilters(false); }} style={{ background: showSongSort || sortBy !== 'count' || topN !== null ? '#1a1a30' : 'none', border: `1px solid ${showSongSort || sortBy !== 'count' || topN !== null ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'count' || topN !== null ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'count' || topN !== null ? 700 : 400, flexShrink: 0 }}>
+          Sort{sortBy !== 'count' || topN !== null ? ' ↕' : ''}
+        </button>
+        {linkedCount > 0 && (
+          <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
+            {filterSpotify === 'all' ? 'Spotify' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
           </button>
-          {/* Linked/unlinked filter toggle */}
-          {linkedCount > 0 && (
-            <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ minHeight: 30, background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
-              {filterSpotify === 'all' ? 'Spotify' : filterSpotify === 'linked' ? 'Linked ●' : 'Unlinked'}
-            </button>
-          )}
-        </div>
-        {showSongSort && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '12px', marginTop: 8 }}>
-            {(sortBy !== 'count' || topN !== null) && <button onClick={() => { setSortBy('count'); setTopN(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
-            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Sort by</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-              {[{id:'count',label:'Most heard'},{id:'alpha',label:'A–Z'}].map(o => (
-                <button key={o.id} onClick={() => setSortBy(o.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy===o.id ? '#a78bfa' : '#0c0c14', color: sortBy===o.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy===o.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: sortBy===o.id ? 700 : 400 }}>{o.label}</button>
-              ))}
-            </div>
-            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Show</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {[{v:null,label:'All'},{v:5,label:'Top 5'},{v:10,label:'Top 10'},{v:20,label:'Top 20'}].map(o => (
-                <button key={o.label} onClick={() => setTopN(o.v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: topN===o.v ? '#3d3564' : '#0c0c14', color: topN===o.v ? '#c4c2f0' : '#6b6a8f', border: `1px solid ${topN===o.v ? '#6d5fa8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: topN===o.v ? 700 : 400 }}>{o.label}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {showSongFilters && linkedCount > 0 && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '12px', marginTop: 8 }}>
-            {filterSpotify !== 'all' && <button onClick={() => setFilterSpotify('all')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {[['all','All'],['linked','Linked ●'],['unlinked','Unlinked']].map(([id, label]) => (
-                <button key={id} onClick={() => setFilterSpotify(id)}
-                  style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify === id ? 700 : 400,
-                    background: filterSpotify === id ? (id === 'linked' ? '#0a2a18' : id === 'unlinked' ? '#1f1f35' : '#a78bfa') : '#0c0c14',
-                    color: filterSpotify === id ? (id === 'linked' ? '#1DB954' : id === 'unlinked' ? '#c4c2f0' : '#0c0c14') : '#6b6a8f',
-                    border: `1px solid ${filterSpotify === id ? (id === 'linked' ? '#1DB954' : id === 'unlinked' ? '#3a3858' : '#a78bfa') : '#1f1f35'}` }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
         )}
       </div>
+      {showSongSort && (
+        <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
+          {(sortBy !== 'count' || topN !== null) && <button onClick={() => { setSortBy('count'); setTopN(null); }} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Sort by</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+            {[{id:'count',label:'Most heard'},{id:'alpha',label:'A–Z'}].map(o => (
+              <button key={o.id} onClick={() => setSortBy(o.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy===o.id ? '#a78bfa' : '#0c0c14', color: sortBy===o.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy===o.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: sortBy===o.id ? 700 : 400 }}>{o.label}</button>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Show</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {[{v:null,label:'All'},{v:5,label:'Top 5'},{v:10,label:'Top 10'},{v:20,label:'Top 20'}].map(o => (
+              <button key={o.label} onClick={() => setTopN(o.v)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: topN===o.v ? '#3d3564' : '#0c0c14', color: topN===o.v ? '#c4c2f0' : '#6b6a8f', border: `1px solid ${topN===o.v ? '#6d5fa8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: topN===o.v ? 700 : 400 }}>{o.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {showSongFilters && linkedCount > 0 && (
+        <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
+          {filterSpotify !== 'all' && <button onClick={() => setFilterSpotify('all')} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {[['all','All'],['linked','Linked'],['unlinked','Unlinked']].map(([id, label]) => (
+              <button key={id} onClick={() => setFilterSpotify(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSpotify===id ? '#a78bfa' : '#0c0c14', color: filterSpotify===id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSpotify===id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify===id ? 700 : 400 }}>{label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ padding: '0 16px' }}>
         {totalUnique === 0 ? (
           <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>log setlists on your shows to see songs here</div>

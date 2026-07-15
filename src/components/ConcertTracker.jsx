@@ -6427,10 +6427,88 @@ function SettingsOptionPills({ value, options, onChange }) {
   );
 }
 
-function SettingsSection({ title, children }) {
+// Full-width choice block: bold label + sub caption, then pills that fill the
+// row and wrap — matches the "Property Type" pattern from the reference
+// (as opposed to SettingsRow+SettingsOptionPills, which crams small pills
+// right-aligned next to a label — fine for a quick binary choice, wrong for
+// a primary preference with several options).
+function PreferenceBlock({ label, sub, value, options, onChange, isLast = false }) {
+  return (
+    <div style={{ padding: "14px 2px", borderBottom: isLast ? "none" : "1px solid #1a1a24" }}>
+      <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: sub ? 2 : 10 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>{sub}</div>}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {options.map(o => (
+          <button key={o.id} onClick={() => onChange(o.id)} style={{
+            padding: "9px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer",
+            background: value === o.id ? "#a78bfa" : "transparent",
+            color: value === o.id ? "#0c0c14" : "#c4c2f0",
+            border: `1.5px solid ${value === o.id ? "#a78bfa" : "#2e2e48"}`,
+            fontWeight: value === o.id ? 700 : 500, fontFamily: "'DM Sans', sans-serif",
+          }}>{o.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Real slider for wide-range numeric settings (native <input type=range> —
+// cheap, accessible, accent-color themes it automatically). Reserved for
+// ranges wide enough that a stepper would mean many taps; narrow ranges
+// (e.g. 3–6) stay as SettingsStepper, where a slider would be fiddly.
+function SettingsSliderRow({ label, sub, value, min, max, onChange, isLast = false }) {
+  return (
+    <div style={{ padding: "14px 2px", borderBottom: isLast ? "none" : "1px solid #1a1a24" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <span style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 13, color: "#a78bfa", fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{value}</span>
+      </div>
+      {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
+      <input type="range" min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))}
+        style={{ width: "100%", accentColor: "#a78bfa", marginTop: 10, height: 4 }} />
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+        <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{min}</span>
+        <span style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{max}</span>
+      </div>
+    </div>
+  );
+}
+
+// Minimal monoline section icons — same stroke language already used in the
+// Help section (stroke="#a78bfa" strokeWidth=1.8, no fill). One per section
+// header rather than one per row: a full per-row icon set (~25 distinct,
+// recognizable glyphs) isn't realistic to hand-draw well without an icon
+// library, and mediocre icons read worse than none. Section-level anchoring
+// gets most of the visual benefit from the reference for a fraction of the cost.
+const SETTINGS_ICONS = {
+  help: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>,
+  online: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  eye: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>,
+  card: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>,
+  list: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>,
+  chart: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>,
+  sliders: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21V14M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 12h6"/></svg>,
+  layout: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>,
+  person: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>,
+  bell: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  plug: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2v6M15 2v6M6 8h12l-1 6a5 5 0 0 1-5 4 5 5 0 0 1-5-4L6 8z"/><path d="M12 18v4"/></svg>,
+  data: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>,
+  tag: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 12.6 12 21.2 2.8 12 2.8 2.8 12 2.8l8.6 8.6a2 2 0 0 1 0 2.9z"/><circle cx="7.3" cy="7.3" r="1"/></svg>,
+};
+
+function SettingsSectionIcon({ id }) {
+  const svg = SETTINGS_ICONS[id];
+  if (!svg) return null;
+  return <span style={{ width: 14, height: 14, display: "inline-flex", flexShrink: 0 }}>{svg}</span>;
+}
+
+function SettingsSection({ title, icon, children }) {
   return (
     <div style={{ marginBottom: 22 }}>
-      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 8px 4px" }}>{title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 8px 4px" }}>
+        {icon && <SettingsSectionIcon id={icon} />}
+        {title}
+      </div>
       <div style={{ background: "#111119", borderRadius: 14, padding: "2px 12px", overflow: "hidden" }}>{children}</div>
     </div>
   );
@@ -7074,7 +7152,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </div>
 
             {/* Help links */}
-            <SettingsSection title="Help">
+            <SettingsSection title="Help" icon="help">
               {[
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
@@ -7093,7 +7171,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </SettingsSection>
 
             {/* Social links */}
-            <SettingsSection title="Find me online">
+            <SettingsSection title="Find me online" icon="online">
               <div style={{ display: "flex", gap: 10, padding: "10px 2px", overflowX: "auto" }}>
                 {socialLinks.map(({ href, label, icon }) => (
                   <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none", flexShrink: 0 }}>
@@ -7110,7 +7188,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       })()}
 
       {activeSettingsTab === 'preferences' && <>
-        <SettingsSection title="Opening defaults">
+        <SettingsSection title="Opening defaults" icon="eye">
           <SettingsRow label="Show past concerts" sub="On by default when opening app">
             <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
           </SettingsRow>
@@ -7120,12 +7198,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Show upcoming" sub="On by default when opening app">
             <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); onUpdate("defaultShowUpcoming", v); }} />
           </SettingsRow>
-          <SettingsRow label="Default view" sub="What shows first on open">
-            <SettingsOptionPills value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} />
-          </SettingsRow>
+          <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast />
         </SettingsSection>
 
-        <SettingsSection title="Concert cards">
+        <SettingsSection title="Concert cards" icon="card">
           <SettingsRow label="Show venue" sub="Display venue name on cards">
             <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); onUpdate("showVenueOnCards", checked); }} />
           </SettingsRow>
@@ -7134,51 +7210,37 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Concert list">
+        <SettingsSection title="Concert list" icon="list">
           <SettingsRow label="Group by month" sub="Month headers in concert list">
             <SettingsToggle checked={!!local.groupByMonth} onChange={checked => { lUpdate("groupByMonth", checked); onUpdate("groupByMonth", checked); }} />
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Summary & stats">
-          <SettingsRow label="Stats tab" sub="Which stats view opens first">
-            <SettingsOptionPills value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => lUpdate("defaultStatsTab", v)} />
-          </SettingsRow>
-          <SettingsRow label="Summary scope" sub="Default time range on summary page">
-            <SettingsOptionPills
-              value={local.summaryYear || 'all'}
-              options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
-              onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
-            />
-          </SettingsRow>
+        <SettingsSection title="Summary & stats" icon="chart">
+          <PreferenceBlock label="Stats tab" sub="Which stats view opens first" value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => { lUpdate("defaultStatsTab", v); onUpdate("defaultStatsTab", v); }} />
+          <PreferenceBlock
+            label="Summary scope" sub="Default time range on summary page"
+            value={local.summaryYear || 'all'}
+            options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
+            onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
+          />
           <SettingsRow label="Top artists" sub="Rows shown in charts">
             <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); onUpdate("topArtistsRows", v); }} max={6} />
           </SettingsRow>
-          <SettingsRow label="Top friends" sub="Rows shown in charts">
-            <SettingsStepper value={local.topFriendsRows} onChange={v => lUpdate("topFriendsRows", v)} />
-          </SettingsRow>
-          <SettingsRow label="Top venues" sub="Rows shown in charts">
-            <SettingsStepper value={local.topVenuesRows} onChange={v => lUpdate("topVenuesRows", v)} />
-          </SettingsRow>
-          <SettingsRow label="Most expensive" sub="Rows shown in list">
-            <SettingsStepper value={local.topExpensiveRows} onChange={v => lUpdate("topExpensiveRows", v)} min={3} max={20} />
-          </SettingsRow>
-          <SettingsRow label="Songs shown" sub="Default rows in Songs tab">
-            <SettingsStepper value={local.topSongsRows} onChange={v => lUpdate("topSongsRows", v)} min={3} max={50} />
-          </SettingsRow>
+          <SettingsSliderRow label="Top friends" sub="Rows shown in charts" value={local.topFriendsRows} min={3} max={20} onChange={v => { lUpdate("topFriendsRows", v); onUpdate("topFriendsRows", v); }} />
+          <SettingsSliderRow label="Top venues" sub="Rows shown in charts" value={local.topVenuesRows} min={3} max={20} onChange={v => { lUpdate("topVenuesRows", v); onUpdate("topVenuesRows", v); }} />
+          <SettingsSliderRow label="Most expensive" sub="Rows shown in list" value={local.topExpensiveRows} min={3} max={20} onChange={v => { lUpdate("topExpensiveRows", v); onUpdate("topExpensiveRows", v); }} />
+          <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); onUpdate("topSongsRows", v); }} isLast />
         </SettingsSection>
 
-        <SettingsSection title="App">
-          <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
-            <SettingsOptionPills
-              value={local.colorTheme || 'purple'}
-              options={[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}]}
-              onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
-            />
-          </SettingsRow>
-          <SettingsRow label="Rating system" sub="Stars used when rating shows">
-            <SettingsOptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />
-          </SettingsRow>
+        <SettingsSection title="App" icon="sliders">
+          <PreferenceBlock
+            label="Color theme" sub="Changes instantly, no save needed"
+            value={local.colorTheme || 'purple'}
+            options={[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}]}
+            onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
+          />
+          <PreferenceBlock label="Rating system" sub="Stars used when rating shows" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => { lUpdate("ratingSystem", Number(v)); onUpdate("ratingSystem", Number(v)); }} />
           <SettingsRow label="Default country" sub="Pre-filled when adding a show">
             <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
           </SettingsRow>
@@ -7317,7 +7379,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {false && activeSettingsTab === 'preferences' && (
-        <SettingsSection title="Visible sections">
+        <SettingsSection title="Visible sections" icon="layout">
           <SettingsRow label="Summary scope" sub="Default time range on summary page">
             <SettingsOptionPills
               value={local.summaryYear || 'all'}
@@ -7374,7 +7436,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {activeSettingsTab === 'account' && <>
         {/* Profile */}
-        <SettingsSection title="Profile">
+        <SettingsSection title="Profile" icon="person">
           <div style={{ padding: "14px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
@@ -7444,7 +7506,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
 
         {/* Notifications */}
-        <SettingsSection title="Notifications">
+        <SettingsSection title="Notifications" icon="bell">
           <div style={{ padding: '14px 16px' }}>
             <div style={{ fontSize: 12, color: '#9d9bc0', marginBottom: 12, lineHeight: 1.5 }}>
               Ticket sale reminders (30 min before + when sales open) come in two layers: instant alerts while the app is open, and a daily background check for when it's closed.
@@ -7492,7 +7554,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         {/* Integrations */}
-        <SettingsSection title="Integrations">
+        <SettingsSection title="Integrations" icon="plug">
           <div style={{ padding: "14px 16px" }}>
             {(() => {
               const spotifyConnected = Boolean(settings.spotifyAccessToken)
@@ -7570,7 +7632,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         {/* Your data */}
-        <SettingsSection title="Your data">
+        <SettingsSection title="Your data" icon="data">
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
 
             {/* Export */}

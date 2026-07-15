@@ -1,68 +1,67 @@
 // api/cron-notify.js
-// Vercel cron job — runs every 15 minutes.
-// Checks all concerts in Supabase for wishlist entries with upcoming ticket sales
-// and sends ntfy notifications 30 min before and at sale time.
-// Configure in vercel.json: { "crons": [{ "path": "/api/cron-notify", "schedule": "*/15 * * * *" }] }
+// Vercel cron job — runs once daily (Vercel's Hobby plan does not allow more
+// frequent cron schedules; see vercel.json).
+//
+// Because this only runs once a day, it can't hit the precise "30 minutes
+// before" / "at sale time" moments — that precision only happens client-side
+// (see src/lib/notifications.js) while the app is open. This job is the
+// fallback for when the app is closed: a "heads up, a sale is coming up
+// within the next day or so" digest, sent once per show via ntfy.
 
 import { createClient } from '@supabase/supabase-js'
 
-const WINDOW_MIN = 15   // how often the cron runs (minutes)
-const WARN_MIN   = 30   // how early to send the warning notification
+const LOOKAHEAD_HOURS = 30 // catches any sale landing before the next run, with slack for Vercel's "sometime in the hour" timing
 
 export default async function handler(req, res) {
-  // Vercel cron requests have an Authorization header
+  // Vercel cron requests carry this header automatically
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY  // service role — bypasses RLS
+    process.env.SUPABASE_SERVICE_ROLE_KEY // service role — bypasses RLS
   )
 
-  const now = new Date()
-  const windowEnd = new Date(now.getTime() + WINDOW_MIN * 60 * 1000)
+  const now = Date.now()
+  const lookaheadMs = now + LOOKAHEAD_HOURS * 60 * 60 * 1000
 
-  // Fetch all concert rows that have wishlist entries with a ticketSaleAt
-  const { data: rows, error } = await supabase
-    .from('concerts')
-    .select('data, user_id')
+  const { data: concertRows, error: concertsErr } = await supabase.from('concerts').select('id, data, user_id')
+  if (concertsErr) return res.status(500).json({ error: concertsErr.message })
 
-  if (error) return res.status(500).json({ error: error.message })
+  // Group upcoming sales by user so we only fetch each user's settings once
+  const byUser = new Map()
+  for (const row of concertRows) {
+    const c = row.data
+    if (!c?.wishlist || !c?.ticketSaleAt) continue
+    const saleMs = new Date(c.ticketSaleAt).getTime()
+    if (!(saleMs > now && saleMs <= lookaheadMs)) continue
+    if (!byUser.has(row.user_id)) byUser.set(row.user_id, [])
+    byUser.get(row.user_id).push({ id: row.id, ...c })
+  }
 
   const fired = []
 
-  for (const row of rows) {
-    const concert = row.data
-    if (!concert.wishlist || !concert.ticketSaleAt) continue
+  for (const [userId, shows] of byUser) {
+    const { data: settingsRow } = await supabase.from('settings').select('data').eq('user_id', userId).single()
+    const topic = settingsRow?.data?.ntfyTopic
+    if (!topic) continue
 
-    // Find the ntfy topic stored in this user's settings
-    const { data: settingsRow } = await supabase
-      .from('settings')
-      .select('data')
-      .eq('user_id', row.user_id)
-      .single()
+    const alreadyNotified = new Set(settingsRow.data.notifiedSaleDigestIds || [])
+    const toNotify = shows.filter(s => !alreadyNotified.has(s.id))
+    if (toNotify.length === 0) continue
 
-    const ntfyTopic = settingsRow?.data?.ntfyTopic
-    if (!ntfyTopic) continue
-
-    const saleMs  = new Date(concert.ticketSaleAt).getTime()
-    const nowMs   = now.getTime()
-    const endMs   = windowEnd.getTime()
-
-    // 30-min warning: sale is between (now + WARN_MIN - WINDOW) and (now + WARN_MIN)
-    const warnWindowStart = nowMs + (WARN_MIN - WINDOW_MIN) * 60 * 1000
-    const warnWindowEnd   = nowMs + WARN_MIN * 60 * 1000
-    if (saleMs > warnWindowStart && saleMs <= warnWindowEnd) {
-      await sendNtfy(ntfyTopic, '🎫 Tickets in 30 minutes', `${concert.artist} — sale starts soon!`, 4, 'rotating_light')
-      fired.push({ concert: concert.artist, type: 'warning' })
+    for (const show of toNotify) {
+      const saleDate = new Date(show.ticketSaleAt)
+      const when = saleDate.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      await sendNtfy(topic, '🎫 Tickets going on sale soon', `${show.artist} — ${when}`, 4, 'ticket')
+      fired.push({ user: userId, concert: show.artist })
+      alreadyNotified.add(show.id)
     }
 
-    // At sale time: sale is within this cron window
-    if (saleMs > nowMs && saleMs <= endMs) {
-      await sendNtfy(ntfyTopic, '🎫 Tickets on sale NOW', `${concert.artist} — go get your tickets!`, 5, 'fire')
-      fired.push({ concert: concert.artist, type: 'sale' })
-    }
+    await supabase.from('settings').update({
+      data: { ...settingsRow.data, notifiedSaleDigestIds: [...alreadyNotified] },
+    }).eq('user_id', userId)
   }
 
   return res.status(200).json({ ok: true, fired })

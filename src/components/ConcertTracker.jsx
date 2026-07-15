@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
+import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
 import SpotifyMatcher from './SpotifyMatcher'
 
 function PhotoImg({ path, style, pos }) {
@@ -6509,6 +6510,30 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [newGroupFriends, setNewGroupFriends] = useState([]);
   const [importQueue, setImportQueue] = useState(null); // [{friends, suggested},...] | null
   const [importNameInput, setImportNameInput] = useState('');
+  const [notifyPermState, setNotifyPermState] = useState(() => (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'));
+  const [ntfyTestStatus, setNtfyTestStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
+  const handleEnableBrowserNotifications = async () => {
+    const result = await requestNotifyPermission();
+    setNotifyPermState(result);
+  };
+  const handleSetupNtfyTopic = () => {
+    const topic = `settracker-${crypto.randomUUID().slice(0, 8)}`;
+    onUpdate('ntfyTopic', topic);
+  };
+  const handleSendNtfyTest = async () => {
+    if (!settings.ntfyTopic) return;
+    setNtfyTestStatus('sending');
+    try {
+      const r = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: settings.ntfyTopic, title: '🔔 Test notification', body: 'If you see this, background notifications are working!', tags: ['bell'] }),
+      });
+      setNtfyTestStatus(r.ok ? 'sent' : 'error');
+    } catch {
+      setNtfyTestStatus('error');
+    }
+  };
   const [local, setLocal] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -7427,6 +7452,132 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         )}
 
+        {/* Notifications */}
+        <SettingsSection title="Notifications">
+          <div style={{ padding: '14px 16px' }}>
+            <div style={{ fontSize: 12, color: '#9d9bc0', marginBottom: 12, lineHeight: 1.5 }}>
+              Ticket sale reminders (30 min before + when sales open) come in two layers: instant alerts while the app is open, and a daily background check for when it's closed.
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1a1a2e' }}>
+              <div>
+                <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 600 }}>While the app is open</div>
+                <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>
+                  {notifyPermState === 'granted' ? 'Enabled ✓' : notifyPermState === 'denied' ? 'Blocked — allow notifications for this site in your browser settings' : notifyPermState === 'unsupported' ? 'Not supported in this browser' : 'Not enabled yet'}
+                </div>
+              </div>
+              {notifyPermState !== 'granted' && notifyPermState !== 'unsupported' && (
+                <button onClick={handleEnableBrowserNotifications} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Enable</button>
+              )}
+            </div>
+
+            <div style={{ padding: '12px 0 4px' }}>
+              <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 600, marginBottom: 4 }}>While the app is closed</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 10, lineHeight: 1.5 }}>
+                Uses <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>ntfy.sh</a> — a free push service. Runs once a day, so this is a "sale's coming up soon" heads-up rather than a precise 30-minute warning.
+              </div>
+              {!settings.ntfyTopic ? (
+                <button onClick={handleSetupNtfyTopic} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '9px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Set up background notifications</button>
+              ) : (
+                <div style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 10, padding: '12px' }}>
+                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Your topic</div>
+                  <div style={{ fontSize: 13, color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontWeight: 700, marginBottom: 10, wordBreak: 'break-all' }}>{settings.ntfyTopic}</div>
+                  <ol style={{ fontSize: 11, color: '#9d9bc0', lineHeight: 1.7, margin: 0, paddingLeft: 18 }}>
+                    <li>Install the <b>ntfy</b> app (iOS / Android), or just keep <a href={`https://ntfy.sh/${settings.ntfyTopic}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>this page</a> bookmarked</li>
+                    <li>Subscribe to topic <b>{settings.ntfyTopic}</b></li>
+                  </ol>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <button onClick={handleSendNtfyTest} disabled={ntfyTestStatus === 'sending'} style={{ background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', fontSize: 11, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                      {ntfyTestStatus === 'sending' ? 'Sending…' : 'Send test'}
+                    </button>
+                    <button onClick={handleSetupNtfyTopic} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>New topic</button>
+                  </div>
+                  {ntfyTestStatus === 'sent' && <div style={{ fontSize: 10, color: '#34d399', marginTop: 8 }}>Sent — check your device</div>}
+                  {ntfyTestStatus === 'error' && <div style={{ fontSize: 10, color: '#f87171', marginTop: 8 }}>Couldn't send — is the topic subscribed?</div>}
+                </div>
+              )}
+            </div>
+          </div>
+        </SettingsSection>
+
+        {/* Integrations */}
+        <SettingsSection title="Integrations">
+          <div style={{ padding: "14px 16px" }}>
+            {(() => {
+              const spotifyConnected = Boolean(settings.spotifyAccessToken)
+              const dotColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#2e2e4a"
+              const statusColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#4a4870"
+              const statusLabel = spotifyConnected ? "connected" : local.spotifyClientId ? "client ID set — not connected" : "not configured"
+              return (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: local.spotifyClientId ? 0 : 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0d2b12", border: "1px solid #1a4d22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z"/></svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>Spotify</div>
+                <div style={{ fontSize: 11, color: statusColor, fontFamily: "'DM Mono', monospace" }}>{statusLabel}</div>
+              </div>
+              <div style={{ width: 8, height: 8, borderRadius: 99, background: dotColor, flexShrink: 0 }} />
+            </div>
+              )
+            })()}
+
+            {!local.spotifyClientId && (
+              <button onClick={() => setOpenSection(s => s === 'spotify-guide' ? null : 'spotify-guide')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                {openSection === 'spotify-guide' ? 'hide setup guide ▲' : 'set up Spotify ▾'}
+              </button>
+            )}
+
+            {(openSection === 'spotify-guide' || local.spotifyClientId) && (
+              <div style={{ marginTop: 14 }}>
+                {!local.spotifyClientId && (
+                  <ol style={{ paddingLeft: 16, margin: "0 0 12px", color: "#9d9bc0", fontSize: 12, fontFamily: "'DM Mono', monospace", lineHeight: 2 }}>
+                    <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>developer.spotify.com ↗</a> and create a free app</li>
+                    <li>In the app settings, add <code style={{ background: "#0c0c14", padding: "1px 5px", borderRadius: 4 }}>{window.location.origin}</code> as a <strong>Redirect URI</strong></li>
+                    <li>Copy the <strong>Client ID</strong> and paste it below</li>
+                  </ol>
+                )}
+                <input
+                  value={local.spotifyClientId || ''}
+                  onChange={e => lUpdate('spotifyClientId', e.target.value.trim())}
+                  placeholder="Paste Client ID here"
+                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
+                />
+                {local.spotifyClientId && !settings.spotifyAccessToken && (
+                  <button onClick={() => lUpdate('spotifyClientId', '')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 8, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                    remove
+                  </button>
+                )}
+                {/* Connect / disconnect */}
+                {local.spotifyClientId && !settings.spotifyAccessToken && (
+                  <button
+                    onClick={() => startSpotifyAuth(local.spotifyClientId)}
+                    style={{ display: "block", marginTop: 14, width: "100%", padding: "11px", borderRadius: 9, background: "#1DB954", border: "none", color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em" }}
+                  >
+                    Connect Spotify →
+                  </button>
+                )}
+                {settings.spotifyAccessToken && (
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#4ade80", fontFamily: "'DM Mono', monospace" }}>✓ connected</span>
+                    <button
+                      onClick={() => {
+                        const next = { ...local, spotifyAccessToken: '', spotifyRefreshToken: '', spotifyTokenExpiry: null }
+                        setLocal(next)
+                        setSaved(false)
+                        if (onUpdateAll) onUpdateAll(next)
+                      }}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}
+                    >
+                      disconnect
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </SettingsSection>
+
         {/* Your data */}
         <SettingsSection title="Your data">
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
@@ -7516,84 +7667,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             )}
           </div>
         </SettingsSection>
-        {/* Integrations */}
-        <SettingsSection title="Integrations">
-          <div style={{ padding: "14px 16px" }}>
-            {(() => {
-              const spotifyConnected = Boolean(settings.spotifyAccessToken)
-              const dotColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#2e2e4a"
-              const statusColor = spotifyConnected ? "#4ade80" : local.spotifyClientId ? "#fbbf24" : "#4a4870"
-              const statusLabel = spotifyConnected ? "connected" : local.spotifyClientId ? "client ID set — not connected" : "not configured"
-              return (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: local.spotifyClientId ? 0 : 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#0d2b12", border: "1px solid #1a4d22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.966-.519.781.781 0 0 1 .52-.966c3.632-1.102 8.147-.568 11.226 1.322a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.539-1.073 9.425-.866 13.146 1.385a.937.937 0 0 1-.986 1.565z"/></svg>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif" }}>Spotify</div>
-                <div style={{ fontSize: 11, color: statusColor, fontFamily: "'DM Mono', monospace" }}>{statusLabel}</div>
-              </div>
-              <div style={{ width: 8, height: 8, borderRadius: 99, background: dotColor, flexShrink: 0 }} />
-            </div>
-              )
-            })()}
-
-            {!local.spotifyClientId && (
-              <button onClick={() => setOpenSection(s => s === 'spotify-guide' ? null : 'spotify-guide')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#a78bfa", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
-                {openSection === 'spotify-guide' ? 'hide setup guide ▲' : 'set up Spotify ▾'}
-              </button>
-            )}
-
-            {(openSection === 'spotify-guide' || local.spotifyClientId) && (
-              <div style={{ marginTop: 14 }}>
-                {!local.spotifyClientId && (
-                  <ol style={{ paddingLeft: 16, margin: "0 0 12px", color: "#9d9bc0", fontSize: 12, fontFamily: "'DM Mono', monospace", lineHeight: 2 }}>
-                    <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>developer.spotify.com ↗</a> and create a free app</li>
-                    <li>In the app settings, add <code style={{ background: "#0c0c14", padding: "1px 5px", borderRadius: 4 }}>{window.location.origin}</code> as a <strong>Redirect URI</strong></li>
-                    <li>Copy the <strong>Client ID</strong> and paste it below</li>
-                  </ol>
-                )}
-                <input
-                  value={local.spotifyClientId || ''}
-                  onChange={e => lUpdate('spotifyClientId', e.target.value.trim())}
-                  placeholder="Paste Client ID here"
-                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 12 }}
-                />
-                {local.spotifyClientId && !settings.spotifyAccessToken && (
-                  <button onClick={() => lUpdate('spotifyClientId', '')} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", marginTop: 8, fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}>
-                    remove
-                  </button>
-                )}
-                {/* Connect / disconnect */}
-                {local.spotifyClientId && !settings.spotifyAccessToken && (
-                  <button
-                    onClick={() => startSpotifyAuth(local.spotifyClientId)}
-                    style={{ display: "block", marginTop: 14, width: "100%", padding: "11px", borderRadius: 9, background: "#1DB954", border: "none", color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "-0.01em" }}
-                  >
-                    Connect Spotify →
-                  </button>
-                )}
-                {settings.spotifyAccessToken && (
-                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 12, color: "#4ade80", fontFamily: "'DM Mono', monospace" }}>✓ connected</span>
-                    <button
-                      onClick={() => {
-                        const next = { ...local, spotifyAccessToken: '', spotifyRefreshToken: '', spotifyTokenExpiry: null }
-                        setLocal(next)
-                        setSaved(false)
-                        if (onUpdateAll) onUpdateAll(next)
-                      }}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2 }}
-                    >
-                      disconnect
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </SettingsSection>
-
       </>}
 
     </div>
@@ -7675,6 +7748,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   useEffect(() => { if (showsGroup.includes(view)) setShowsTab(view); }, [view])
   useEffect(() => { setSortOrder(settings.defaultSort || 'newest'); }, [settings.defaultSort])
   useEffect(() => { setCompact(!!settings.compactView); }, [settings.compactView])
+
+  // Re-arm in-app ticket-sale alarms (30-min-before + at-sale-time) whenever the
+  // concert list changes. These only fire while this tab is open — see the
+  // Notifications section in Settings for the background/app-closed fallback.
+  useEffect(() => { reScheduleAll(concerts) }, [concerts])
 
   const allFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
 

@@ -269,6 +269,58 @@ function CostBreakdownFields({ value, onChange, labelStyle, inputStyle }) {
 // Small confirmation popup: "Add 'X' to your saved [tags]?" — used when someone types
 // a brand-new custom value (merch category, genre, etc.) directly on a show, so they
 // can optionally promote it to a permanent, reusable option without going to Settings.
+function Donut({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined, labelPad = 0.18 }) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  if (total === 0) return null;
+  const cx = size/2, cy = size/2, r = size*0.36, stroke = size*0.15;
+  const labelR = r + stroke + size*labelPad;
+  const GAP = segments.length > 1 ? 3 : 0;
+  let angle = -90;
+  const arcs = segments.map((seg, idx) => {
+    const pct = seg.value / total;
+    const segDeg = pct * 360 - GAP;
+    const midDeg = angle + GAP/2 + Math.max(0.1, segDeg)/2;
+    const s = ((angle + GAP/2) * Math.PI) / 180;
+    const e = ((angle + GAP/2 + Math.max(0.1, segDeg)) * Math.PI) / 180;
+    const midRad = (midDeg * Math.PI) / 180;
+    angle += pct * 360;
+    const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
+    const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
+    const lx = cx + labelR * Math.cos(midRad), ly = cy + labelR * Math.sin(midRad);
+    const rawLabel = labelTexts ? labelTexts[idx] : `${Math.round(pct*100)}%`;
+    const arcLabel = (!labelTexts && rawLabel && rawLabel.length > 7) ? rawLabel.slice(0, 6) + '…' : rawLabel;
+    return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
+  });
+  const pad = showLabels ? Math.max(size*0.1, labelR - size/2 + size*0.14) : 0;
+  const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
+  return (
+    <svg overflow="visible" width={size + pad*2} height={size + pad*2} viewBox={vb} style={{ overflow: "visible", display: "block" }}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0d0d1a" strokeWidth={stroke} />
+      {arcs.map((a, i) => a.d && (
+        <path key={i} d={a.d} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="butt" />
+      ))}
+      {showLabels && arcs.map((a, i) => a.pct > 0.05 && a.d && a.arcLabel && (
+        <text key={`l${i}`} x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="middle" fill={a.color} fontSize={size*0.09} fontFamily="'DM Mono',monospace" fontWeight="600">{a.arcLabel}</text>
+      ))}
+      {centerText === undefined ? (
+        <>
+          <text x={cx} y={cy - size*0.08} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.16} fontFamily="'Syne',sans-serif" fontWeight="800">{label.split(' ')[0]}</text>
+          {label.split(' ').length > 1 && <text x={cx} y={cy + size*0.11} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.10} fontFamily="'DM Mono',monospace">{label.split(' ').slice(1).join(' ')}</text>}
+        </>
+      ) : centerText !== null ? (
+        Array.isArray(centerText) ? (
+          centerText.map((line, li) => (
+            <text key={li} x={cx} y={cy + (li - (centerText.length - 1) / 2) * size * 0.13 + 2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{line}</text>
+          ))
+        ) : (
+          <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{centerText}</text>
+        )
+      ) : null}
+    </svg>
+  );
+};
+
+
 function SaveTagPrompt({ value, label, onConfirm, onDismiss }) {
   if (!value || !value.trim()) return null;
   return (
@@ -2158,57 +2210,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Donut chart (SVG)
   // labelTexts: array of strings to show on arcs instead of %; null = show %
   // centerText: string to show in center; null = hide center; undefined = show total count
-  const Donut = ({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined, labelPad = 0.18 }) => {
-    const total = segments.reduce((s, x) => s + x.value, 0);
-    if (total === 0) return null;
-    const cx = size/2, cy = size/2, r = size*0.36, stroke = size*0.15;
-    const labelR = r + stroke + size*labelPad;
-    const GAP = segments.length > 1 ? 3 : 0;
-    let angle = -90;
-    const arcs = segments.map((seg, idx) => {
-      const pct = seg.value / total;
-      const segDeg = pct * 360 - GAP;
-      const midDeg = angle + GAP/2 + Math.max(0.1, segDeg)/2;
-      const s = ((angle + GAP/2) * Math.PI) / 180;
-      const e = ((angle + GAP/2 + Math.max(0.1, segDeg)) * Math.PI) / 180;
-      const midRad = (midDeg * Math.PI) / 180;
-      angle += pct * 360;
-      const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
-      const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
-      const lx = cx + labelR * Math.cos(midRad), ly = cy + labelR * Math.sin(midRad);
-      const rawLabel = labelTexts ? labelTexts[idx] : `${Math.round(pct*100)}%`;
-      const arcLabel = (!labelTexts && rawLabel && rawLabel.length > 7) ? rawLabel.slice(0, 6) + '…' : rawLabel;
-      return { ...seg, pct, lx, ly, arcLabel, d: segDeg <= 0 ? null : `M ${x1} ${y1} A ${r} ${r} 0 ${segDeg > 180 ? 1 : 0} 1 ${x2} ${y2}` };
-    });
-    const pad = showLabels ? Math.max(size*0.1, labelR - size/2 + size*0.14) : 0;
-    const vb = `${-pad} ${-pad} ${size + pad*2} ${size + pad*2}`;
-    return (
-      <svg overflow="visible" width={size + pad*2} height={size + pad*2} viewBox={vb} style={{ overflow: "visible", display: "block" }}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#0d0d1a" strokeWidth={stroke} />
-        {arcs.map((a, i) => a.d && (
-          <path key={i} d={a.d} fill="none" stroke={a.color} strokeWidth={stroke} strokeLinecap="butt" />
-        ))}
-        {showLabels && arcs.map((a, i) => a.pct > 0.05 && a.d && a.arcLabel && (
-          <text key={`l${i}`} x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="middle" fill={a.color} fontSize={size*0.09} fontFamily="'DM Mono',monospace" fontWeight="600">{a.arcLabel}</text>
-        ))}
-        {centerText === undefined ? (
-          <>
-            <text x={cx} y={cy - size*0.08} textAnchor="middle" dominantBaseline="middle" fill="#e2e0ff" fontSize={size*0.16} fontFamily="'Syne',sans-serif" fontWeight="800">{label.split(' ')[0]}</text>
-            {label.split(' ').length > 1 && <text x={cx} y={cy + size*0.11} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.10} fontFamily="'DM Mono',monospace">{label.split(' ').slice(1).join(' ')}</text>}
-          </>
-        ) : centerText !== null ? (
-          Array.isArray(centerText) ? (
-            centerText.map((line, li) => (
-              <text key={li} x={cx} y={cy + (li - (centerText.length - 1) / 2) * size * 0.13 + 2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{line}</text>
-            ))
-          ) : (
-            <text x={cx} y={cy+2} textAnchor="middle" dominantBaseline="middle" fill="#6b6a8f" fontSize={size*0.11} fontFamily="'DM Mono',monospace">{centerText}</text>
-          )
-        ) : null}
-      </svg>
-    );
-  };
-
   const ChartToggle = ({ options, value, onChange, color = "#a78bfa" }) => (
     <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
       {options.map(o => (
@@ -4416,6 +4417,15 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   const past = concerts.filter(c => isPast(c.date));
   const allFriends = [...new Set(past.flatMap(c => getFriends(c)))].sort();
 
+  const solo = past.filter(c => getFriends(c).length === 0);
+  const withFriends = past.filter(c => getFriends(c).length > 0);
+  const groupSizeDist = {};
+  past.forEach(c => {
+    const n = getFriends(c).length;
+    const key = n >= 6 ? '6+' : String(n);
+    groupSizeDist[key] = (groupSizeDist[key] || 0) + 1;
+  });
+
   const friendEntries = allFriends.map(name => {
     const shows = past.filter(c => getFriends(c).includes(name));
     const sortedShows = [...shows].sort((a, b) => a.date.localeCompare(b.date));
@@ -4666,6 +4676,44 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           </div>
         </div>
       )}
+      {/* Solo vs with friends, group size breakdown */}
+      {!search && past.length > 0 && (() => {
+        const groupSizeLabels = ["0","1","2","3","4","5","6+"];
+        const groupSizeColors = ["#6b6a8f","#a78bfa","#818cf8","#60a5fa","#34d399","#fbbf24","#f472b6"];
+        const gsLegendLabels = groupSizeLabels.map(k => k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`);
+        const allGs = groupSizeLabels.map((k, i) => ({ label: gsLegendLabels[i], count: groupSizeDist[k] || 0, color: groupSizeColors[i] })).filter(x => x.count > 0).sort((a,b) => b.count - a.count);
+        const top4Gs = allGs.slice(0, 4);
+        const othersGs = allGs.slice(4).reduce((s, x) => s + x.count, 0);
+        return (
+          <div style={{ padding: "0 16px 12px", display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 12px" }}>
+              <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={64} centerText={[String(past.length), "shows"]} />
+              <div style={{ marginTop: 8 }}>
+                {[{ label: "With friends", value: withFriends.length, color: "#a78bfa" }, { label: "Solo", value: solo.length, color: "#6b6a8f" }].map(s => (
+                  <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: 1, background: s.color, flexShrink: 0 }} />
+                    <span style={{ color: "#9d9bc0", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{s.label} · {s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ flex: 1, background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 12px" }}>
+              <Donut size={64} centerText={["Group", "size"]} segments={[
+                ...top4Gs.map(x => ({ value: x.count, color: x.color })),
+                ...(othersGs > 0 ? [{ value: othersGs, color: "#4a4870" }] : [])
+              ]} />
+              <div style={{ marginTop: 8 }}>
+                {[...top4Gs, ...(othersGs > 0 ? [{ label: "Others", color: "#4a4870", count: othersGs }] : [])].slice(0, 3).map(x => (
+                  <div key={x.label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
+                    <span style={{ color: "#9d9bc0", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{x.label} · {x.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Search + sort */}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
         <div style={{ position: "relative", marginBottom: 8 }}>
@@ -5780,26 +5828,34 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const totalVenues = venueEntries.filter(v => v.pastCount > 0).length;
   const uniqueCountries = [...new Set(venueEntries.flatMap(v => v.shows.map(c => c.country)).filter(Boolean))].length;
   const uniqueCities = [...new Set(venueEntries.flatMap(v => v.shows.map(c => c.city)).filter(Boolean))].length;
-  const mostVisited = venueEntries.sort((a,b) => b.pastCount - a.pastCount)[0];
+  const top3Venues = [...venueEntries].filter(v => v.pastCount > 0).sort((a,b) => b.pastCount - a.pastCount).slice(0, 3);
 
   return (
     <div style={{ padding: '0 0 100px' }}>
-      {/* Stat tiles */}
-      {!search && (
-        <div style={{ padding: '10px 12px 0', marginBottom: 2 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
-            {[
-              { value: totalVenues, label: "venues" },
-              { value: uniqueCities, label: "cities" },
-              { value: uniqueCountries, label: "countries" },
-              { value: mostVisited?.pastCount ?? "—", label: mostVisited ? mostVisited.name.slice(0, 8) : "top" },
-            ].map(({ value, label }) => (
-              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
-              </div>
-            ))}
+      {/* Overview: one headline stat, location breakdown, top 3 */}
+      {!search && totalVenues > 0 && (
+        <div style={{ padding: '14px 16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalVenues}</span>
+            <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>venues visited</span>
           </div>
+          {(uniqueCities > 0 || uniqueCountries > 0) && (
+            <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+              across {uniqueCities} cit{uniqueCities !== 1 ? 'ies' : 'y'}{uniqueCountries > 0 ? `, ${uniqueCountries} countr${uniqueCountries !== 1 ? 'ies' : 'y'}` : ''}
+            </div>
+          )}
+          {top3Venues.length > 0 && (
+            <div style={{ marginTop: 12, marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Top 3</div>
+              {top3Venues.map((v, i) => (
+                <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 10, color: '#2e2e50', fontFamily: "'DM Mono', monospace", width: 16, flexShrink: 0 }}>#{i + 1}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: '#c4c2f0', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
+                  <span style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{v.pastCount}×</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {/* Type pills */}
@@ -8027,10 +8083,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const BottomNav = () => (
     <div data-bottom-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
-      {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'charts', () => { setView('stats'); setStatsTab('charts'); })}
-      {navBtn('summary', '▤', 'Summary', view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
+      {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
       {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
-      {navBtn('settings', '⚙', 'Settings', view === 'settings',                    () => setView('settings'))}
     </div>
   )
 
@@ -8111,8 +8165,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
       {/* Header */}
       <div style={{ flexShrink: 0, padding: '36px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
-        <div style={{ marginBottom: 20, textAlign: 'center' }}>
+        <div style={{ marginBottom: 20, textAlign: 'center', position: 'relative' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
+          <button onClick={() => setView('settings')} aria-label="Settings" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: view === 'settings' ? '#a78bfa' : '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: '6px 4px', lineHeight: 1, letterSpacing: '1px' }}>⋯</button>
           {isSummaryHeader && (
             <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
             {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isPastDate(c.date)).length} upcoming

@@ -5139,7 +5139,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search artist..."
-            style={{ flex: 1, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+            style={{ flex: 1, minWidth: 0, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }}
           />
           <button onClick={() => { setShowSort(s => !s); setShowFilters(false); }} style={{ background: showSort || sortBy !== 'most-seen' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortBy !== 'most-seen' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-seen' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-seen' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-seen' ? ' ↕' : ''}
@@ -5446,19 +5446,19 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
       </div>
-      {/* Search + sort + spotify */}
+      {/* Search + sort + filters */}
       <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search songs..."
-          style={{ flex: 1, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+          style={{ flex: 1, minWidth: 0, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }}
         />
         <button onClick={() => { setShowSongSort(s => !s); setShowSongFilters(false); }} style={{ background: showSongSort || sortBy !== 'count' || topN !== null ? '#1a1a30' : 'none', border: `1px solid ${showSongSort || sortBy !== 'count' || topN !== null ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'count' || topN !== null ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'count' || topN !== null ? 700 : 400, flexShrink: 0 }}>
           Sort{sortBy !== 'count' || topN !== null ? ' ↕' : ''}
         </button>
         {linkedCount > 0 && (
           <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
-            {filterSpotify === 'all' ? 'Spotify' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
+            {filterSpotify === 'all' ? 'Filters' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
           </button>
         )}
       </div>
@@ -5818,7 +5818,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search venues..."
-          style={{ flex: 1, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+          style={{ flex: 1, minWidth: 0, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }}
         />
         <button onClick={() => setShowSort(s => !s)} style={{ background: showSort || sortBy !== 'most-visited' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortBy !== 'most-visited' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-visited' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-visited' ? 700 : 400, flexShrink: 0 }}>
           Sort{sortBy !== 'most-visited' ? ' ↕' : ''}

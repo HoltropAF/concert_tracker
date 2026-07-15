@@ -1823,21 +1823,24 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
   );
 }
 
-function Collapsible({ title, defaultOpen = true, children, open: controlledOpen, onToggle }) {
+function Collapsible({ title, icon, defaultOpen = true, children, open: controlledOpen, onToggle }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const toggle = onToggle || (() => setInternalOpen(o => !o));
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: 8 }}>
       <button onClick={toggle} style={{
-        width: "100%", background: "none", border: "none", cursor: "pointer",
+        width: "100%", background: "#111119", border: "none", borderRadius: 12, cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 0 8px", borderBottom: `1px solid ${open ? "#2e2e50" : "#1f1f35"}`
+        padding: "12px 12px",
       }}>
-        <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: open ? "#c4c2f0" : "#6b6a8f" }}>{title}</span>
-        <span style={{ color: "#6b6a8f", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▾</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {icon && <SettingsSectionIcon id={icon} />}
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: open ? "#e2e0ff" : "#c4c2f0" }}>{title}</span>
+        </span>
+        <span style={{ color: "#4a4870", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▾</span>
       </button>
-      {open && <div style={{ paddingTop: 10 }}>{children}</div>}
+      {open && <div style={{ paddingTop: 6 }}>{children}</div>}
     </div>
   );
 }
@@ -6432,19 +6435,20 @@ function SettingsOptionPills({ value, options, onChange }) {
 // (as opposed to SettingsRow+SettingsOptionPills, which crams small pills
 // right-aligned next to a label — fine for a quick binary choice, wrong for
 // a primary preference with several options).
-function PreferenceBlock({ label, sub, value, options, onChange, isLast = false }) {
+function PreferenceBlock({ label, sub, value, options, onChange, isLast = false, compact = false }) {
   return (
     <div style={{ padding: "14px 2px", borderBottom: isLast ? "none" : "1px solid #1a1a24" }}>
       <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: sub ? 2 : 10 }}>{label}</div>
       {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>{sub}</div>}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ display: "flex", flexWrap: compact ? "nowrap" : "wrap", gap: compact ? 4 : 8 }}>
         {options.map(o => (
           <button key={o.id} onClick={() => onChange(o.id)} style={{
-            padding: "9px 16px", borderRadius: 99, fontSize: 13, cursor: "pointer",
+            padding: compact ? "6px 4px" : "9px 16px", borderRadius: compact ? 8 : 99, fontSize: compact ? 11 : 13, cursor: "pointer",
             background: value === o.id ? "#a78bfa" : "transparent",
             color: value === o.id ? "#0c0c14" : "#c4c2f0",
             border: `1.5px solid ${value === o.id ? "#a78bfa" : "#2e2e48"}`,
             fontWeight: value === o.id ? 700 : 500, fontFamily: "'DM Sans', sans-serif",
+            flex: compact ? "1 1 0" : "0 0 auto", minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>{o.label}</button>
         ))}
       </div>
@@ -6586,8 +6590,36 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [newVenue, setNewVenue] = useState({ name: '', city: '', country: '', room: '' });
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupFriends, setNewGroupFriends] = useState([]);
-  const [importQueue, setImportQueue] = useState(null); // [{friends, suggested},...] | null
-  const [importNameInput, setImportNameInput] = useState('');
+  const handleRatingSystemChange = async (newScaleStr) => {
+    const newScale = Number(newScaleStr);
+    const oldScale = Number(local.ratingSystem || 5);
+    if (newScale === oldScale) return;
+
+    // Remember exactly what ratings looked like on the scale we're leaving,
+    // so switching back later restores the originals instead of re-deriving
+    // them (which would compound rounding loss on a 10→5→10 round trip).
+    const snapshots = { ...(settings.ratingSnapshots || {}) };
+    const leavingSnapshot = {};
+    concerts.forEach(c => { if (c.rating) leavingSnapshot[c.id] = c.rating; });
+    snapshots[String(oldScale)] = leavingSnapshot;
+
+    const arrivingSnapshot = snapshots[String(newScale)] || {};
+    const ratio = newScale / oldScale;
+    const updates = [];
+    concerts.forEach(c => {
+      if (!c.rating) return;
+      const remembered = arrivingSnapshot[c.id];
+      const converted = remembered != null ? remembered : (ratio > 1 ? Math.round(c.rating * ratio) : Math.floor(c.rating * ratio));
+      if (converted !== c.rating) updates.push({ ...c, rating: converted });
+    });
+
+    lUpdate("ratingSystem", newScale);
+    onUpdate("ratingSystem", newScale);
+    lUpdate("ratingSnapshots", snapshots);
+    onUpdate("ratingSnapshots", snapshots);
+    if (onSaveConcert) await Promise.all(updates.map(c => onSaveConcert(c)));
+  };
+
   const [notifyPermState, setNotifyPermState] = useState(() => (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'));
   const [ntfyTestStatus, setNtfyTestStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
   const handleEnableBrowserNotifications = async () => {
@@ -7146,9 +7178,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         return (
           <div>
             {/* App identity */}
-            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 14, padding: "16px", marginBottom: 12, textAlign: "center" }}>
-              <div style={{ color: "#e2e0ff", fontSize: 15, fontFamily: "'Syne', sans-serif", fontWeight: 800, letterSpacing: "0.04em", marginBottom: 3 }}>settracker</div>
-              <div style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>your personal concert diary</div>
+            <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 14, padding: "14px", marginBottom: 12, textAlign: "center" }}>
+              <div style={{ color: "#e2e0ff", fontSize: 15, fontFamily: "'Syne', sans-serif", fontWeight: 800, letterSpacing: "0.04em" }}>settracker</div>
             </div>
 
             {/* Help links */}
@@ -7198,7 +7229,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Show upcoming" sub="On by default when opening app">
             <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); onUpdate("defaultShowUpcoming", v); }} />
           </SettingsRow>
-          <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast />
+          <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast compact />
         </SettingsSection>
 
         <SettingsSection title="Concert cards" icon="card">
@@ -7211,8 +7242,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         <SettingsSection title="Concert list" icon="list">
-          <SettingsRow label="Group by month" sub="Month headers in concert list">
-            <SettingsToggle checked={!!local.groupByMonth} onChange={checked => { lUpdate("groupByMonth", checked); onUpdate("groupByMonth", checked); }} />
+          <SettingsRow label="Group by year" sub="Year headers in concert list">
+            <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); onUpdate("groupByYear", checked); }} />
           </SettingsRow>
         </SettingsSection>
 
@@ -7240,7 +7271,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             options={[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}]}
             onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
           />
-          <PreferenceBlock label="Rating system" sub="Stars used when rating shows" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => { lUpdate("ratingSystem", Number(v)); onUpdate("ratingSystem", Number(v)); }} />
+          <PreferenceBlock label="Rating system" sub="Existing ratings are converted automatically" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={handleRatingSystemChange} />
           <SettingsRow label="Default country" sub="Pre-filled when adding a show">
             <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
           </SettingsRow>
@@ -7249,16 +7280,16 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
       {activeSettingsTab === 'tags' && <>
       {[
-        { label: "Genres", id: "genres", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
-        { label: "Subgenres", id: "subgenres", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
-        { label: "Languages", id: "languages", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
-        { label: "Venue sizes", id: "venueSizes", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
-        { label: "Merch items", id: "merch", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
-        { label: "Ticket types", id: "ticketTypes", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
-        { label: "Ticket add-ons", id: "ticketAddons", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
-      ].map(({ label, id, items, ...props }) => (
-        <Collapsible key={id} title={`${label} (${items.length})`} defaultOpen={false} {...sec(id)}>
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+        { label: "Genres", id: "genres", icon: "tag", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
+        { label: "Subgenres", id: "subgenres", icon: "tag", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
+        { label: "Languages", id: "languages", icon: "online", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
+        { label: "Venue sizes", id: "venueSizes", icon: "layout", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
+        { label: "Merch items", id: "merch", icon: "card", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        { label: "Ticket types", id: "ticketTypes", icon: "list", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
+        { label: "Ticket add-ons", id: "ticketAddons", icon: "list", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
+      ].map(({ label, id, icon, items, ...props }) => (
+        <Collapsible key={id} title={`${label} (${items.length})`} icon={icon} defaultOpen={false} {...sec(id)}>
+          <div style={{ background: "#0c0c14", borderRadius: 10, padding: "12px" }}>
             <TagManager items={items} {...props} />
           </div>
         </Collapsible>
@@ -7266,8 +7297,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </>}
 
       {activeSettingsTab === 'tags' && <>
-      <Collapsible title={`Saved venues (${savedVenues.length})`} {...sec("venues")}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
+      <Collapsible title={`Saved venues (${savedVenues.length})`} icon="layout" {...sec("venues")}>
+        <div style={{ background: "#0c0c14", borderRadius: 10, padding: "12px" }}>
           <button onClick={importVenuesFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>⤓ Import venues from my shows</button>
           {savedVenues.length > 0 && (
             <div style={{ marginBottom: 14 }}>
@@ -7530,7 +7561,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 Uses <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>ntfy.sh</a> — a free push service. Runs once a day, so this is a "sale's coming up soon" heads-up rather than a precise 30-minute warning.
               </div>
               {!settings.ntfyTopic ? (
-                <button onClick={handleSetupNtfyTopic} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '9px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Set up background notifications</button>
+                <div style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 10, padding: '12px' }}>
+                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>How it works</div>
+                  <ol style={{ fontSize: 11, color: '#9d9bc0', lineHeight: 1.7, margin: 0, paddingLeft: 18, marginBottom: 12 }}>
+                    <li>Tap "Set up" below — you'll get a private, random topic name (like a channel just for you)</li>
+                    <li>Install the free <b>ntfy</b> app: <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>iOS</a> / <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>Android</a></li>
+                    <li>In the app, subscribe to your topic — that's it, no account or login needed</li>
+                  </ol>
+                  <button onClick={handleSetupNtfyTopic} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '9px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", width: '100%' }}>Set up background notifications</button>
+                </div>
               ) : (
                 <div style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 10, padding: '12px' }}>
                   <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Your topic</div>
@@ -7950,7 +7989,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 ? 'Friends'
                 : 'Stats'
   const renderConcertList = (list, showPhoto) => {
-    if (!settings.groupByMonth) {
+    if (!settings.groupByYear) {
       return list.map(c => (
         <ConcertCard
           key={c.id}
@@ -7965,12 +8004,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     }
     const groups = []
     list.forEach(c => {
-      const key = (c.date || '').slice(0, 7)
+      const key = (c.date || '').slice(0, 4)
       const last = groups[groups.length - 1]
       if (!last || last.key !== key) {
         groups.push({
           key,
-          label: c.date ? new Date(c.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'Unknown',
+          label: key || 'Unknown',
           items: [c],
         })
       } else {

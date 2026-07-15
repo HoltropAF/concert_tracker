@@ -109,6 +109,25 @@ const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
 const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 const formatDuration = ms => { if (!ms) return null; const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+// Deterministic colored-initials avatar for friends — same name always gets the same hue.
+const FRIEND_HUES = [265, 210, 340, 25, 165, 45, 190, 300];
+const friendColor = name => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return FRIEND_HUES[hash % FRIEND_HUES.length];
+};
+const friendInitials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+function FriendAvatar({ name, size = 36 }) {
+  const hue = friendColor(name);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: `hsl(${hue}, 55%, 22%)`, border: `1px solid hsl(${hue}, 55%, 40%)`,
+      color: `hsl(${hue}, 70%, 78%)`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: size * 0.36,
+    }}>{friendInitials(name)}</div>
+  );
+}
 // Extra costs beyond ticket price: travel, stay (accommodation), food, other misc.
 // Falls back to the legacy single `otherCost` number for shows saved before this breakdown existed.
 const extraCostTotal = c => {
@@ -4378,7 +4397,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
 function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   const [selectedFriend, setSelectedFriend] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [showSortPanel, setShowSortPanel] = useState(false);
@@ -4395,13 +4413,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
 
   const past = concerts.filter(c => isPast(c.date));
   const allFriends = [...new Set(past.flatMap(c => getFriends(c)))].sort();
-
-  const friendGroups = settings.friendGroups || [];
-  const groupEntries = friendGroups.map(g => {
-    const shows = past.filter(c => g.friends.length > 0 && g.friends.every(f => getFriends(c).includes(f)));
-    const sorted = [...shows].sort((a, b) => a.date.localeCompare(b.date));
-    return { ...g, shows, sorted, lastShow: sorted[sorted.length - 1] || null };
-  });
 
   const friendEntries = allFriends.map(name => {
     const shows = past.filter(c => getFriends(c).includes(name));
@@ -4430,37 +4441,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
       return 0;
     });
 
-  useBackButton(() => { if (selectedFriend) setSelectedFriend(null); else if (selectedGroup) setSelectedGroup(null); }, selectedFriend !== null || selectedGroup !== null);
-
-  if (selectedGroup !== null) {
-    const g = groupEntries[selectedGroup];
-    if (!g) return null;
-    const sectionLabel = { fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
-    return (
-      <div style={{ padding: "0 0 100px" }}>
-        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setSelectedGroup(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{g.name}</div>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{g.friends.join(', ')}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#6b6a8f" }}>{g.shows.length}</div>
-            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>show{g.shows.length !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
-        <div style={{ padding: "16px 20px" }}>
-          {g.shows.length === 0
-            ? <div style={{ textAlign: "center", color: "#2e2e4a", padding: "40px 0", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>no shows found where all members attended</div>
-            : <>
-                <div style={sectionLabel}>Shows together</div>
-                {[...g.sorted].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
-              </>
-          }
-        </div>
-      </div>
-    );
-  }
+  useBackButton(() => { if (selectedFriend) setSelectedFriend(null); }, selectedFriend !== null);
 
   if (selectedFriend) {
     const f = friendEntries.find(fd => fd.name === selectedFriend);
@@ -4507,6 +4488,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
 
         <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+          <FriendAvatar name={displayName(f.name)} size={44} />
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>
               {displayName(f.name)}
@@ -4577,11 +4559,22 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
             const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
             const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
             const topV = Object.entries(vCount).sort((a, b) => b[1] - a[1])[0];
-            if (!avgR && !topA && !topV) return null;
+            const distinctVenues = Object.keys(vCount).length;
+            const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
+            const totalSpent = f.shows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + extraCostTotal(c), 0);
+            const rows = [
+              avgR && ["avg rating", `★ ${avgR}`],
+              topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`],
+              topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`],
+              distinctVenues > 0 && ["venues together", distinctVenues],
+              distinctCountries > 1 && ["countries together", distinctCountries],
+              totalSpent > 0 && ["spent together", `€${totalSpent.toFixed(0)}`],
+            ].filter(Boolean);
+            if (rows.length === 0) return null;
             return (
               <div style={card}>
                 <div style={sectionLabel}>Together</div>
-                {[avgR && ["avg rating", `★ ${avgR}`], topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`], topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`]].filter(Boolean).map(([l, v]) => (
+                {rows.map(([l, v]) => (
                   <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
                     <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{l}</span>
                     <span style={{ color: "#c4c2f0", fontSize: 12 }}>{v}</span>
@@ -4654,17 +4647,35 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
     );
   }
 
+  const topFriend = [...friendEntries].sort((a,b) => b.shows.length - a.shows.length)[0] || null;
+
   return (
     <div style={{ padding: "0 0 100px" }}>
+      {/* Hero: top concert buddy */}
+      {!search && topFriend && topFriend.shows.length > 1 && (
+        <div style={{ padding: "12px 16px 0" }}>
+          <button onClick={() => setSelectedFriend(topFriend.name)} style={{
+            width: "100%", textAlign: "left", cursor: "pointer", border: "none",
+            background: `linear-gradient(135deg, hsl(${friendColor(displayName(topFriend.name))}, 45%, 16%), #13131f)`,
+            borderRadius: 14, padding: "16px", display: "flex", alignItems: "center", gap: 14,
+          }}>
+            <FriendAvatar name={displayName(topFriend.name)} size={52} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, color: "#9d9bc0", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Top concert buddy</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1.1 }}>{displayName(topFriend.name)}</div>
+              <div style={{ fontSize: 11, color: "#6b6a8f", marginTop: 3 }}>{topFriend.shows.length} shows together{topFriend.lastShow ? ` · last: ${topFriend.lastShow.artist}` : ''}</div>
+            </div>
+          </button>
+        </div>
+      )}
       {/* Stat tiles */}
       {!search && (
         <div style={{ padding: "12px 16px 0" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
             {[
               { value: allFriends.length, label: "friends" },
               { value: friendEntries.filter(f => f.shows.length > 1).length, label: "regulars" },
               { value: past.filter(c => getFriends(c).length === 0).length, label: "solo" },
-              { value: friendEntries.sort((a,b) => b.shows.length - a.shows.length)[0]?.shows.length ?? "—", label: friendEntries.sort((a,b) => b.shows.length - a.shows.length)[0] ? `w. ${(friendEntries.sort((a,b) => b.shows.length - a.shows.length)[0]?.name || '').split(' ')[0]}` : "top" },
             ].map(({ value, label }) => (
               <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
@@ -4703,30 +4714,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
         )}
       </div>
 
-      {/* Groups */}
-      {groupEntries.length > 0 && (
-        <div style={{ padding: "0 16px", marginBottom: 4 }}>
-          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingLeft: 2 }}>Groups</div>
-          {groupEntries.map((g, i) => (
-            <button key={g.name} onClick={() => setSelectedGroup(i)} style={{
-              width: "100%", textAlign: "left", background: "#13131f",
-              border: "1px solid #1f1f35", borderLeft: "3px solid #3d3564",
-              borderRadius: 10, padding: "10px 14px", cursor: "pointer", marginBottom: 8,
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 2 }}>{g.name}</div>
-                <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.friends.join(', ')}</div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#6b6a8f" }}>{g.shows.length}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>show{g.shows.length !== 1 ? 's' : ''}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Friend list */}
       <div style={{ padding: "0 16px" }}>
         {filtered.map(({ name, shows, lastShow, topGenres, upcoming }) => (
@@ -4734,8 +4721,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
             width: "100%", textAlign: "left", background: "#13131f",
             border: "1px solid #1f1f35", borderLeft: "3px solid #2e2e4a",
             borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
-            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+            display: "flex", alignItems: "center", gap: 12
           }}>
+            <FriendAvatar name={displayName(name)} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{displayName(name)}</div>
               {lastShow && (() => {
@@ -7337,75 +7325,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       </Collapsible>
 
-      {false && <Collapsible title={`Friend groups (${friendGroups.length})`} {...sec("friendGroups")}>
-        <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px 16px", marginBottom: 4 }}>
-          {friendGroups.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <button onClick={() => setShowFriendGroups(o => !o)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono', monospace", padding: 0, marginBottom: showFriendGroups ? 10 : 0 }}>
-                {showFriendGroups ? '▾' : '▸'} already added ({friendGroups.length})
-              </button>
-              {showFriendGroups && friendGroups.map((g, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid #1a1a2e' }}>
-                  <div>
-                    <div style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 600 }}>{g.name}</div>
-                    <div style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{g.friends.join(', ')}</div>
-                  </div>
-                  <button onClick={() => removeFriendGroup(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}>×</button>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Import review flow */}
-          {importQueue && importQueue.length > 0 ? (() => {
-            const current = importQueue[0];
-            const remaining = importQueue.length;
-            const dismiss = () => {
-              const next = importQueue.slice(1);
-              setImportQueue(next.length > 0 ? next : null);
-              setImportNameInput(next[0]?.suggested || '');
-            };
-            const save = () => {
-              const name = importNameInput.trim() || current.suggested;
-              const next2 = [...friendGroups, { name, friends: current.friends }];
-              lUpdate('friendGroups', next2); onUpdate('friendGroups', next2);
-              const q = importQueue.slice(1);
-              setImportQueue(q.length > 0 ? q : null);
-              setImportNameInput(q[0]?.suggested || '');
-            };
-            return (
-              <div style={{ background: '#0c0c14', border: '1px solid #a78bfa55', borderRadius: 12, padding: '14px', marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
-                  Suggested group {importQueue.length > 1 ? `(${remaining} left)` : '(last one)'}
-                </div>
-                <div style={{ fontSize: 13, color: '#c4c2f0', marginBottom: 4 }}>{current.friends.join(', ')}</div>
-                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>{current.count} shows together</div>
-                <input
-                  value={importNameInput}
-                  onChange={e => setImportNameInput(e.target.value)}
-                  placeholder="Group name…"
-                  style={{ width: '100%', background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 10 }}
-                />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={save} style={{ flex: 1, background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>Save group</button>
-                  <button onClick={dismiss} style={{ flex: 1, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Skip</button>
-                </div>
-              </div>
-            );
-          })() : (
-            <button onClick={importFriendGroupsFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 14 }}>⤓ Suggest groups from my shows (3+ together)</button>
-          )}
-          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Add group</div>
-          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Group name (e.g. Festival crew)" style={{ width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 8 }} />
-          {allFriendsFromConcerts.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-              {allFriendsFromConcerts.map(f => (
-                <button key={f} onClick={() => toggleGroupFriend(f)} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: newGroupFriends.includes(f) ? '#a78bfa' : '#0c0c14', color: newGroupFriends.includes(f) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${newGroupFriends.includes(f) ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{f}</button>
-              ))}
-            </div>
-          )}
-          <button onClick={addFriendGroup} disabled={!newGroupName.trim() || newGroupFriends.length === 0} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", opacity: !newGroupName.trim() || newGroupFriends.length === 0 ? 0.4 : 1 }}>Add group</button>
-        </div>
-      </Collapsible>}
 
       </>}
 

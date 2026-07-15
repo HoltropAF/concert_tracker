@@ -4402,6 +4402,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null); // { name, nickname, contact, note }
   const [filterType, setFilterType] = useState('all');
+  const [showAllTogether, setShowAllTogether] = useState(false);
+  useEffect(() => { setShowAllTogether(false); }, [selectedFriend]);
 
   const friendProfiles = settings.friendProfiles || {};
   const getProfile = name => friendProfiles[name] || {};
@@ -4503,34 +4505,59 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
-        <div style={{ padding: "16px 20px" }}>
-          {/* Timeline */}
-          <div style={card}>
-            <div style={sectionLabel}>Timeline</div>
-            <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
-              {f.firstShow && (
-                <div>
-                  <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: 3 }}>First together</div>
-                  <div style={{ fontSize: 12, color: "#c4c2f0" }}>{formatDate(f.firstShow.date)}</div>
-                  <div style={{ fontSize: 11, color: "#6b6a8f" }}>{f.firstShow.artist}</div>
+        {/* Stat tiles */}
+        {(() => {
+          const rated = f.shows.filter(c => c.rating);
+          const avgR = rated.length ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : null;
+          const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
+          const distinctVenues = Object.keys(vCount).length;
+          const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
+          const totalSpent = f.shows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + extraCostTotal(c), 0);
+          const tiles = [
+            { value: `${f.shows.length}×`, label: "together" },
+            avgR && { value: `★ ${avgR}`, label: "avg rating" },
+            distinctVenues > 0 && { value: distinctVenues, label: "venues" },
+            totalSpent > 0 && { value: `€${totalSpent.toFixed(0)}`, label: "spent" },
+            distinctCountries > 1 && { value: distinctCountries, label: "countries" },
+          ].filter(Boolean);
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 20px 0" }}>
+              {tiles.map(({ value, label }) => (
+                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
                 </div>
-              )}
-              {f.lastShow && f.firstShow && f.lastShow.id !== f.firstShow.id && (
-                <div>
-                  <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: 3 }}>Most recent</div>
-                  <div style={{ fontSize: 12, color: "#c4c2f0" }}>{formatDate(f.lastShow.date)}</div>
-                  <div style={{ fontSize: 11, color: "#6b6a8f" }}>{f.lastShow.artist}</div>
-                </div>
-              )}
+              ))}
             </div>
-            {(f.concertCount > 0 || f.festivalCount > 0) && (
-              <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>
-                {f.concertCount > 0 && `${f.concertCount} concert${f.concertCount !== 1 ? 's' : ''}`}
-                {f.concertCount > 0 && f.festivalCount > 0 && ' · '}
-                {f.festivalCount > 0 && `${f.festivalCount} festival${f.festivalCount !== 1 ? 's' : ''}`}
+          );
+        })()}
+
+        <div style={{ padding: "16px 20px" }}>
+          {/* Details */}
+          {(() => {
+            const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
+            const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
+            const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
+            const topV = Object.entries(vCount).sort((a, b) => b[1] - a[1])[0];
+            const rows = [
+              f.firstShow && ["first together", `${formatDate(f.firstShow.date)} · ${f.firstShow.artist}`],
+              f.lastShow && f.firstShow && f.lastShow.id !== f.firstShow.id && ["most recent", `${formatDate(f.lastShow.date)} · ${f.lastShow.artist}`],
+              topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`],
+              topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`],
+            ].filter(Boolean);
+            if (rows.length === 0) return null;
+            return (
+              <div style={card}>
+                <div style={sectionLabel}>Details</div>
+                {rows.map(([l, v]) => (
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{l}</span>
+                    <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>{v}</span>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Photos together */}
           {(() => {
@@ -4547,39 +4574,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
                     </button>
                   ))}
                 </div>
-              </div>
-            );
-          })()}
-
-          {/* Together stats */}
-          {(() => {
-            const rated = f.shows.filter(c => c.rating);
-            const avgR = rated.length ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : null;
-            const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
-            const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
-            const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
-            const topV = Object.entries(vCount).sort((a, b) => b[1] - a[1])[0];
-            const distinctVenues = Object.keys(vCount).length;
-            const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
-            const totalSpent = f.shows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + extraCostTotal(c), 0);
-            const rows = [
-              avgR && ["avg rating", `★ ${avgR}`],
-              topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`],
-              topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`],
-              distinctVenues > 0 && ["venues together", distinctVenues],
-              distinctCountries > 1 && ["countries together", distinctCountries],
-              totalSpent > 0 && ["spent together", `€${totalSpent.toFixed(0)}`],
-            ].filter(Boolean);
-            if (rows.length === 0) return null;
-            return (
-              <div style={card}>
-                <div style={sectionLabel}>Together</div>
-                {rows.map(([l, v]) => (
-                  <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
-                    <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{l}</span>
-                    <span style={{ color: "#c4c2f0", fontSize: 12 }}>{v}</span>
-                  </div>
-                ))}
               </div>
             );
           })()}
@@ -4639,35 +4633,22 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
 
           {/* All shows */}
           <div>
-            <div style={{ ...sectionLabel, marginBottom: 8 }}>All shows together</div>
-            {[...f.sortedShows].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+            <button onClick={() => setShowAllTogether(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0 8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={sectionLabel.marginBottom !== undefined ? { ...sectionLabel, marginBottom: 0 } : sectionLabel}>All shows together</span>
+                <span style={{ fontSize: 10, color: '#2e2e50', fontFamily: "'DM Mono', monospace", background: '#13131f', border: '1px solid #1f1f35', borderRadius: 99, padding: '1px 7px' }}>{f.sortedShows.length}</span>
+              </div>
+              <span style={{ fontSize: 11, color: '#4a4870', transform: showAllTogether ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+            </button>
+            {showAllTogether && [...f.sortedShows].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
           </div>
         </div>
       </div>
     );
   }
 
-  const topFriend = [...friendEntries].sort((a,b) => b.shows.length - a.shows.length)[0] || null;
-
   return (
     <div style={{ padding: "0 0 100px" }}>
-      {/* Hero: top concert buddy */}
-      {!search && topFriend && topFriend.shows.length > 1 && (
-        <div style={{ padding: "12px 16px 0" }}>
-          <button onClick={() => setSelectedFriend(topFriend.name)} style={{
-            width: "100%", textAlign: "left", cursor: "pointer", border: "none",
-            background: `linear-gradient(135deg, hsl(${friendColor(displayName(topFriend.name))}, 45%, 16%), #13131f)`,
-            borderRadius: 14, padding: "16px", display: "flex", alignItems: "center", gap: 14,
-          }}>
-            <FriendAvatar name={displayName(topFriend.name)} size={52} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, color: "#9d9bc0", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Top concert buddy</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1.1 }}>{displayName(topFriend.name)}</div>
-              <div style={{ fontSize: 11, color: "#6b6a8f", marginTop: 3 }}>{topFriend.shows.length} shows together{topFriend.lastShow ? ` · last: ${topFriend.lastShow.artist}` : ''}</div>
-            </div>
-          </button>
-        </div>
-      )}
       {/* Stat tiles */}
       {!search && (
         <div style={{ padding: "12px 16px 0" }}>

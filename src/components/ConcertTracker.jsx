@@ -2224,29 +2224,16 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     </div>
   );
 
+  // Most charts have been relocated directly into their relevant tab (shows-over-time,
+  // genres/ratings/language -> Shows; artist overview -> Artists; top songs/covers -> Songs;
+  // top venues/venue loyalty -> Venues; friends & group size -> Friends). What's left here
+  // has no single natural home: Year in pixels is too rich to rebuild as an inline widget,
+  // and Financial doesn't belong to any one category page.
   const CHART_GROUPS = [
     {
       id: "activity", label: "Activity",
       charts: [
-        { id: "artists",    label: "Artist overview" },
-        { id: "shows",      label: "Shows over time" },
         { id: "day-pixels", label: "Year in pixels" },
-        { id: "genres-pie", label: "Genres" },
-        { id: "language",   label: "Language" },
-        { id: "ratings",    label: "Ratings" },
-      ]
-    },
-    {
-      id: "friends", label: "Friends",
-      charts: [
-        { id: "solo", label: "Friends & group size" },
-      ]
-    },
-    {
-      id: "places", label: "Places",
-      charts: [
-        { id: "venues",        label: "Top venues" },
-        { id: "venue-loyalty", label: "Venue loyalty" },
       ]
     },
     {
@@ -2257,13 +2244,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         { id: "expensive",  label: "Most expensive shows" },
         { id: "merch-overview", label: "Merch" },
       ]
-    },
-    {
-      id: "music", label: "Music",
-      charts: [
-        ...(topSongs.length > 0 ? [{ id: "songs", label: "Top songs" }] : []),
-        ...(coversList.length > 0 ? [{ id: "covers", label: "Covers" }] : []),
-      ].filter(Boolean)
     },
   ].filter(g => g.charts.length > 0);
 
@@ -3927,6 +3907,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {/* ── SUMMARY ── */}
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0", flex: fillHeight ? 1 : undefined, overflowY: fillHeight ? "auto" : undefined, minHeight: 0 }}>
+
+          {/* Entry points to what doesn't live on a single tab */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button onClick={() => { setChartGroup('financial'); setStatsTab('charts'); }} style={{ flex: 1, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 10px", cursor: "pointer", color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>💰 Financial</button>
+            <button onClick={() => { setChartGroup('activity'); setStatsTab('charts'); }} style={{ flex: 1, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 10px", cursor: "pointer", color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>▦ Year in pixels</button>
+          </div>
 
           {/* Year scope toggle */}
           {(() => {
@@ -7273,7 +7259,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         <SettingsSection title="Summary & stats" icon="chart">
-          <PreferenceBlock label="Stats tab" sub="Which stats view opens first" value={local.defaultStatsTab} options={[{id:"summary",label:"Summary"},{id:"charts",label:"Charts"}]} onChange={v => { lUpdate("defaultStatsTab", v); onUpdate("defaultStatsTab", v); }} />
           <PreferenceBlock
             label="Summary scope" sub="Default time range on summary page"
             value={local.summaryYear || 'all'}

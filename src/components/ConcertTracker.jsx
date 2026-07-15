@@ -5583,7 +5583,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [showVenuePast, setShowVenuePast] = useState(false);
   const [showVenueUpcoming, setShowVenueUpcoming] = useState(false);
   const [editingVenueInfo, setEditingVenueInfo] = useState(false);
-  const [venueEditInput, setVenueEditInput] = useState({ url: '', parking: '', transit: '' });
+  const [venueEditInput, setVenueEditInput] = useState({ url: '', parking: '', transit: '', rooms: [], tags: [] });
+  const [newRoomInput, setNewRoomInput] = useState('');
+  const [newTagInput, setNewTagInput] = useState('');
   useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
@@ -5652,7 +5654,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                   {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
                   {vInfo.parking && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🅿️ Parking ↗</a>}
                   {vInfo.transit && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚇 Transit ↗</a>}
-                  <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '' }); setEditingVenueInfo(true); }}
+                  <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] }); setEditingVenueInfo(true); }}
                     style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
                     edit
                   </button>
@@ -5665,7 +5667,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         {/* Edit venue modal */}
         {editingVenueInfo && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }}>
-            <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px' }}>
+            <div style={{ width: '100%', maxHeight: '85vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Edit venue</div>
                 <button onClick={() => setEditingVenueInfo(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
@@ -5685,11 +5687,33 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                   />
                 </div>
               ))}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Rooms / stages</div>
+                <TagManager
+                  items={venueEditInput.rooms || []}
+                  onRemove={room => setVenueEditInput(p => ({ ...p, rooms: p.rooms.filter(r => r !== room) }))}
+                  input={newRoomInput}
+                  onInput={setNewRoomInput}
+                  onAdd={() => { const v2 = newRoomInput.trim(); if (!v2) return; setVenueEditInput(p => ({ ...p, rooms: [...new Set([...(p.rooms || []), v2])] })); setNewRoomInput(''); }}
+                  placeholder="Add room / stage..."
+                />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Tags</div>
+                <TagManager
+                  items={venueEditInput.tags || []}
+                  onRemove={tag => setVenueEditInput(p => ({ ...p, tags: p.tags.filter(t => t !== tag) }))}
+                  input={newTagInput}
+                  onInput={setNewTagInput}
+                  onAdd={() => { const v2 = newTagInput.trim(); if (!v2) return; setVenueEditInput(p => ({ ...p, tags: [...new Set([...(p.tags || []), v2])] })); setNewTagInput(''); }}
+                  placeholder="e.g. big venue, great sound..."
+                />
+              </div>
               <button onClick={() => {
                 const next = { ...(settings.venueInfo || {}) };
-                const { url, parking, transit } = venueEditInput;
-                const cleaned = { url: url.trim(), parking: parking.trim(), transit: transit.trim() };
-                if (cleaned.url || cleaned.parking || cleaned.transit) next[selectedVenue] = cleaned;
+                const { url, parking, transit, rooms: editedRooms, tags: editedTags } = venueEditInput;
+                const cleaned = { url: url.trim(), parking: parking.trim(), transit: transit.trim(), rooms: editedRooms || [], tags: editedTags || [] };
+                if (cleaned.url || cleaned.parking || cleaned.transit || cleaned.rooms.length || cleaned.tags.length) next[selectedVenue] = cleaned;
                 else delete next[selectedVenue];
                 onUpdateSetting('venueInfo', next);
                 setEditingVenueInfo(false);
@@ -5727,7 +5751,24 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           )}
         </div>
-        {rooms.length > 0 && <div style={{ padding: '10px 16px 0', fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>Rooms/stages: {rooms.join(', ')}</div>}
+        {(() => {
+          const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
+          const displayRooms = vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms;
+          const displayTags = vInfo.tags || [];
+          if (displayRooms.length === 0 && displayTags.length === 0) return null;
+          return (
+            <div style={{ padding: '10px 16px 0' }}>
+              {displayRooms.length > 0 && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: displayTags.length > 0 ? 6 : 0 }}>Rooms/stages: {displayRooms.join(', ')}</div>}
+              {displayTags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {displayTags.map(t => (
+                    <span key={t} style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", padding: '3px 8px', borderRadius: 99, background: '#1a1a30', color: '#9d9bc0' }}>{t}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Photos */}
         {v.photos.length > 0 && (
@@ -7267,50 +7308,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </Collapsible>
       ))}
-      </>}
-
-      {activeSettingsTab === 'tags' && <>
-      <Collapsible title={`Saved venues (${savedVenues.length})`} icon="layout" {...sec("venues")}>
-        <div style={{ background: "#0c0c14", borderRadius: 10, padding: "12px" }}>
-          <button onClick={importVenuesFromHistory} style={{ width: '100%', background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>⤓ Import venues from my shows</button>
-          {savedVenues.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <button onClick={() => setShowSavedVenues(o => !o)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono', monospace", padding: 0, marginBottom: showSavedVenues ? 10 : 0 }}>
-                {showSavedVenues ? '▾' : '▸'} already added ({savedVenues.length})
-              </button>
-              {showSavedVenues && savedVenues.map((v, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid #1a1a2e' }}>
-                  <div>
-                    <div style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 600 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</div>
-                    <div style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{v.city}</div>
-                    <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>{v.country}</div>
-                  </div>
-                  <button onClick={() => removeSavedVenue(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}>×</button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Add venue</div>
-          {[
-            { key: 'name', placeholder: 'Venue name *' },
-            { key: 'room', placeholder: 'Room / stage (optional)' },
-            { key: 'city', placeholder: 'City *' },
-            { key: 'country', placeholder: 'Country *' },
-          ].map(({ key, placeholder }) => (
-            <input key={key} value={newVenue[key]} onChange={e => setNewVenue(v => ({ ...v, [key]: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && addSavedVenue()}
-              placeholder={placeholder}
-              style={{ width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} />
-          ))}
-          <button onClick={addSavedVenue} disabled={!newVenue.name.trim() || !newVenue.city.trim() || !newVenue.country.trim()} style={{
-            background: 'none', border: '1px solid #2a4a3a', borderRadius: 8, color: '#a78bfa',
-            fontSize: 12, padding: '6px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace",
-            opacity: !newVenue.name.trim() || !newVenue.city.trim() || !newVenue.country.trim() ? 0.4 : 1
-          }}>Add venue</button>
-        </div>
-      </Collapsible>
-
-
       </>}
 
       {false && activeSettingsTab === 'preferences' && (

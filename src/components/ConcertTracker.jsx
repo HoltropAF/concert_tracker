@@ -5610,9 +5610,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [filterType, setFilterType] = useState('all');
   const [showVenuePast, setShowVenuePast] = useState(false);
   const [showVenueUpcoming, setShowVenueUpcoming] = useState(false);
-  const [editingVenueUrl, setEditingVenueUrl] = useState(false);
-  const [venueUrlInput, setVenueUrlInput] = useState('');
-  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueUrl(false); }, [selectedVenue]);
+  const [editingVenueInfo, setEditingVenueInfo] = useState(false);
+  const [venueEditInput, setVenueEditInput] = useState({ url: '', parking: '', transit: '' });
+  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
@@ -5668,78 +5668,89 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
               {v.city && `${v.city}${v.country ? `, ${v.country}` : ''} · `}{v.pastCount}× visited{v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
-                📍 Open in Maps ↗
-              </a>
-              {(() => {
-                const venueUrl = (settings.venueUrls || {})[selectedVenue] || '';
-                return !editingVenueUrl ? (
-                  <>
-                    {venueUrl && (
-                      <a href={venueUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
-                        🔗 Website ↗
-                      </a>
-                    )}
-                    <button onClick={() => { setVenueUrlInput(venueUrl); setEditingVenueUrl(true); }} style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
-                      {venueUrl ? 'edit' : '+ add website'}
-                    </button>
-                  </>
-                ) : null;
-              })()}
-            </div>
-            {editingVenueUrl && (
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <input value={venueUrlInput} onChange={e => setVenueUrlInput(e.target.value)} placeholder="https://venue-website.com" autoFocus
-                  style={{ flex: 1, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 11, boxSizing: 'border-box' }} />
-                <button onClick={() => {
-                  const next = { ...(settings.venueUrls || {}) };
-                  const trimmed = venueUrlInput.trim();
-                  if (trimmed) next[selectedVenue] = trimmed; else delete next[selectedVenue];
-                  onUpdateSetting('venueUrls', next);
-                  setEditingVenueUrl(false);
-                }} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 11, fontWeight: 700, padding: '0 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
-                <button onClick={() => setEditingVenueUrl(false)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Cancel</button>
-              </div>
-            )}
+            {(() => {
+              const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
+              const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
+              const mapsQuery = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, q, v.city, v.country].filter(Boolean).join(' '))}`;
+              const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' };
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
+                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
+                  {vInfo.parking && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🅿️ Parking ↗</a>}
+                  {vInfo.transit && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚇 Transit ↗</a>}
+                  <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '' }); setEditingVenueInfo(true); }}
+                    style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                    edit
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
-        {/* Stat tiles */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '14px 16px 0' }}>
-          <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
-            <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>visited</div>
+        {/* Edit venue modal */}
+        {editingVenueInfo && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Edit venue</div>
+                <button onClick={() => setEditingVenueInfo(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              {[
+                { key: 'url', label: 'Website', placeholder: 'https://venue-website.com' },
+                { key: 'parking', label: 'Parking', placeholder: 'e.g. P+R De Uithof, or a street name' },
+                { key: 'transit', label: 'Public transport', placeholder: 'e.g. Amsterdam Centraal, tram 5' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{label}</div>
+                  <input
+                    value={venueEditInput[key] || ''}
+                    onChange={e => setVenueEditInput(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    style={{ width: '100%', boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+                  />
+                </div>
+              ))}
+              <button onClick={() => {
+                const next = { ...(settings.venueInfo || {}) };
+                const { url, parking, transit } = venueEditInput;
+                const cleaned = { url: url.trim(), parking: parking.trim(), transit: transit.trim() };
+                if (cleaned.url || cleaned.parking || cleaned.transit) next[selectedVenue] = cleaned;
+                else delete next[selectedVenue];
+                onUpdateSetting('venueInfo', next);
+                setEditingVenueInfo(false);
+              }} style={{ width: '100%', background: '#a78bfa', border: 'none', borderRadius: 10, color: '#0c0c14', fontSize: 14, fontWeight: 700, padding: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Save</button>
+            </div>
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, padding: '14px 16px 0' }}>
+          <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
+            <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>visited</div>
           </div>
           {v.avgTicket && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{v.avgTicket.toFixed(0)}</div>
-              <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>avg ticket</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{v.avgTicket.toFixed(0)}</div>
+              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>avg ticket</div>
             </div>
           )}
           {totalSpent > 0 && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{totalSpent.toFixed(0)}</div>
-              <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>total spent</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{totalSpent.toFixed(0)}</div>
+              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>total spent</div>
             </div>
           )}
           {v.avgRating && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>★ {v.avgRating.toFixed(1)}</div>
-              <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>avg rating</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>★{v.avgRating.toFixed(1)}</div>
+              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>avg rating</div>
             </div>
           )}
           {artists.length > 0 && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{artists.length}</div>
-              <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>artists seen</div>
-            </div>
-          )}
-          {topFriend && (
-            <div onClick={() => onNavigate({ view: 'friends' })} style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center', cursor: 'pointer' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topFriend[0]} ›</div>
-              <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>top friend · {topFriend[1]}×</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{artists.length}</div>
+              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>artists</div>
             </div>
           )}
         </div>

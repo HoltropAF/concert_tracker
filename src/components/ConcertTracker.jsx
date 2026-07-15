@@ -5097,21 +5097,16 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
       {/* Artist overview header */}
       {!search && activeFilterCount === 0 && (
         <div style={{ padding: "12px 16px 0" }}>
-          {/* Primary tiles */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 8 }}>
-            {[
-              { value: totalArtists, label: "artists" },
-              { value: uniqueGenres, label: "genres" },
-              { value: newThisYear, label: `new in ${thisYear.slice(2)}` },
-              { value: avgShowsPerArtist ?? "—", label: "avg shows" },
-            ].map(({ value, label }) => (
-              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
-              </div>
-            ))}
+          {/* Headline stat, matching Venues/Songs */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalArtists}</span>
+              <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+              {uniqueGenres} genre{uniqueGenres !== 1 ? 's' : ''}{newThisYear > 0 ? ` · ${newThisYear} new this year` : ''}{avgShowsPerArtist ? ` · ${avgShowsPerArtist} avg shows` : ''}
+            </div>
           </div>
-
         </div>
       )}
 
@@ -5438,25 +5433,23 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
   return (
     <div style={{ padding: '0 0 100px' }}>
       <div style={{ padding: '14px 16px 10px' }}>
-        {/* Stat tiles */}
-        {!search && totalUnique > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${linkedCount > 0 ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 12 }}>
-            {[
-              { value: totalUnique, label: "unique" },
-              { value: byCount[0]?.count ?? "—", label: byCount[0] ? byCount[0].name.slice(0, 8) : "top" },
-              { value: [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length, label: "artists" },
-              ...(linkedCount > 0 ? [{ value: linkedCount, label: "linked" }] : []),
-            ].map(({ value, label }) => (
-              <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
+        {/* Overview: headline stat + subtitle, matching Venues */}
+        {!search && totalUnique > 0 && (() => {
+          const totalArtists = [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length;
+          return (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalUnique}</span>
+                <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
               </div>
-            ))}
-          </div>
-        )}
+              <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+                across {past.length} show{past.length !== 1 ? 's' : ''}{totalArtists > 0 ? ` · ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}{linkedCount > 0 ? ` · ${linkedCount} linked` : ''}
+              </div>
+            </div>
+          );
+        })()}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff' }}>Songs</div>
-          {totalUnique > 0 && <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{totalUnique} unique · {totalHeard} total</div>}
         </div>
         <div style={{ position: 'relative', marginBottom: 8 }}>
           <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
@@ -5814,8 +5807,6 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const totalVenues = venueEntries.filter(v => v.pastCount > 0).length;
   const uniqueCountries = [...new Set(venueEntries.flatMap(v => v.shows.map(c => c.country)).filter(Boolean))].length;
   const uniqueCities = [...new Set(venueEntries.flatMap(v => v.shows.map(c => c.city)).filter(Boolean))].length;
-  const top3Venues = [...venueEntries].filter(v => v.pastCount > 0).sort((a,b) => b.pastCount - a.pastCount).slice(0, 3);
-
   return (
     <div style={{ padding: '0 0 100px' }}>
       {/* Overview: one headline stat, location breakdown, top 3 */}
@@ -5828,18 +5819,6 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           {(uniqueCities > 0 || uniqueCountries > 0) && (
             <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
               across {uniqueCities} cit{uniqueCities !== 1 ? 'ies' : 'y'}{uniqueCountries > 0 ? `, ${uniqueCountries} countr${uniqueCountries !== 1 ? 'ies' : 'y'}` : ''}
-            </div>
-          )}
-          {top3Venues.length > 0 && (
-            <div style={{ marginTop: 12, marginBottom: 4 }}>
-              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Top 3</div>
-              {top3Venues.map((v, i) => (
-                <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 10, color: '#2e2e50', fontFamily: "'DM Mono', monospace", width: 16, flexShrink: 0 }}>#{i + 1}</span>
-                  <span style={{ flex: 1, fontSize: 13, color: '#c4c2f0', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
-                  <span style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{v.pastCount}×</span>
-                </button>
-              ))}
             </div>
           )}
         </div>

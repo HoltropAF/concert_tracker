@@ -7778,6 +7778,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
+  const [showActivity, setShowActivity] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
   const [showCalendar, setShowCalendar] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })
@@ -8344,6 +8345,80 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {concerts.length === 0 && (
               <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
             )}
+            {concerts.length > 0 && !showCalendar && (() => {
+              const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
+              const yearCounts = {};
+              pastAll.forEach(c => { const y = c.date.slice(0, 4); yearCounts[y] = (yearCounts[y] || 0) + 1; });
+              const years = Object.keys(yearCounts).sort();
+              const maxYearCount = Math.max(...Object.values(yearCounts), 1);
+              const genreCounts = {}; pastAll.forEach(c => (c.genres || (c.genre ? [c.genre] : [])).forEach(g => { genreCounts[g] = (genreCounts[g] || 0) + 1; }));
+              const topGenres = Object.entries(genreCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+              const ratingScale = settings.ratingSystem || 5;
+              const ratingCounts = {}; pastAll.forEach(c => { if (c.rating) ratingCounts[c.rating] = (ratingCounts[c.rating] || 0) + 1; });
+              const languageCounts = {}; pastAll.forEach(c => { if (c.language) languageCounts[c.language] = (languageCounts[c.language] || 0) + 1; });
+              const topLanguages = Object.entries(languageCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+              if (years.length === 0) return null;
+              return (
+                <div style={{ marginBottom: 10 }}>
+                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '4px 4px 10px' : '4px 4px 6px' }}>
+                    <span style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Activity</span>
+                    <span style={{ fontSize: 11, color: '#4a4870', transform: showActivity ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+                  </button>
+                  {showActivity && (
+                    <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px' }}>
+                      {/* Shows per year */}
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 70, marginBottom: 6 }}>
+                        {years.map(y => (
+                          <button key={y} onClick={() => setFilterYears(f => f.includes(y) ? f.filter(x => x !== y) : [...f, y])} title={`${y}: ${yearCounts[y]} shows`}
+                            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            <div style={{ width: '100%', maxWidth: 22, borderRadius: '3px 3px 0 0', background: filterYears.includes(y) ? '#a78bfa' : '#3d3564', height: `${(yearCounts[y] / maxYearCount) * 100}%`, minHeight: 3 }} />
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                        {years.map(y => (
+                          <div key={y} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{y.slice(2)}</div>
+                        ))}
+                      </div>
+                      {topGenres.length > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 6 }}>Genres</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {topGenres.map(([g, n]) => (
+                              <span key={g} style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", padding: '3px 8px', borderRadius: 99, background: '#1a1a30', color: '#9d9bc0' }}>{g} · {n}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {Object.keys(ratingCounts).length > 0 && (
+                        <div style={{ marginBottom: topLanguages.length ? 10 : 0 }}>
+                          <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 6 }}>Ratings</div>
+                          {Array.from({ length: ratingScale }, (_, i) => ratingScale - i).map(n => (ratingCounts[n] || 0) > 0 && (
+                            <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                              <span style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", width: 24 }}>★{n}</span>
+                              <div style={{ flex: 1, height: 5, background: '#0c0c14', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', borderRadius: 3, background: '#a78bfa', width: `${(ratingCounts[n] / Math.max(...Object.values(ratingCounts))) * 100}%` }} />
+                              </div>
+                              <span style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", width: 14, textAlign: 'right' }}>{ratingCounts[n]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {topLanguages.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 6 }}>Languages</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                            {topLanguages.map(([l, n]) => (
+                              <span key={l} style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", padding: '3px 8px', borderRadius: 99, background: '#1a1a30', color: '#9d9bc0' }}>{l} · {n}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {concerts.length > 0 && showCalendar && (
               <CalendarMode
                 concerts={concerts}

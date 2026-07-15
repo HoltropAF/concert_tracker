@@ -6391,10 +6391,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
 
 function SettingsRow({ label, sub, children }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid #232239", gap: 12 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 2px", borderBottom: "1px solid #1a1a24", gap: 12 }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "#7d7aa5", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
       </div>
       {children}
     </div>
@@ -6429,9 +6429,9 @@ function SettingsOptionPills({ value, options, onChange }) {
 
 function SettingsSection({ title, children }) {
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 6px 2px" }}>{title}</div>
-      <div style={{ background: "#13131f", border: "1px solid #25243a", borderRadius: 12, overflow: "hidden" }}>{children}</div>
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 8px 4px" }}>{title}</div>
+      <div style={{ background: "#111119", borderRadius: 14, padding: "2px 12px", overflow: "hidden" }}>{children}</div>
     </div>
   );
 }
@@ -6441,13 +6441,13 @@ function SettingsToggle({ checked, onChange }) {
     <button
       onClick={() => onChange(!checked)}
       style={{
-        width: 44, height: 26, borderRadius: 99, border: `1px solid ${checked ? "#a78bfa" : "#3a3855"}`,
-        background: checked ? "#3b2a68" : "#202033", padding: 2, cursor: "pointer", flexShrink: 0,
+        width: 44, height: 26, borderRadius: 99, border: "none",
+        background: checked ? "#a78bfa" : "#2a2940", padding: 2, cursor: "pointer", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: checked ? "flex-end" : "flex-start",
-        boxShadow: checked ? "0 0 0 1px rgba(167,139,250,0.18) inset" : "none"
+        transition: "background 0.15s",
       }}
     >
-      <span style={{ width: 20, height: 20, borderRadius: 99, background: checked ? "#b69cff" : "#77739b", display: "block" }} />
+      <span style={{ width: 22, height: 22, borderRadius: 99, background: "#fff", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
     </button>
   );
 }
@@ -7080,7 +7080,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
               ].map(({ svg, label, url }, i, arr) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a28" : "none" }}>
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
                       <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
@@ -7094,7 +7094,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
             {/* Social links */}
             <SettingsSection title="Find me online">
-              <div style={{ display: "flex", gap: 10, padding: "14px", overflowX: "auto" }}>
+              <div style={{ display: "flex", gap: 10, padding: "10px 2px", overflowX: "auto" }}>
                 {socialLinks.map(({ href, label, icon }) => (
                   <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none", flexShrink: 0 }}>
                     <span style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -7121,10 +7121,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); onUpdate("defaultShowUpcoming", v); }} />
           </SettingsRow>
           <SettingsRow label="Default view" sub="What shows first on open">
-            <button onClick={() => lUpdate("defaultTab", cycleOption(defaultViewOptions, local.defaultTab))} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, padding: 0 }}>
-              <span>{optionLabel(defaultViewOptions, local.defaultTab)}</span>
-              <span style={{ color: "#7d7aa5", fontSize: 16, lineHeight: 1 }}>›</span>
-            </button>
+            <SettingsOptionPills value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} />
           </SettingsRow>
         </SettingsSection>
 
@@ -7173,17 +7170,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
         <SettingsSection title="App">
           <SettingsRow label="Color theme" sub="Changes instantly, no save needed">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}].map(o => (
-                <button key={o.id} onClick={() => { onUpdate('colorTheme', o.id); lUpdate('colorTheme', o.id); }} style={{
-                  padding: "4px 10px", borderRadius: 99, fontSize: 11, cursor: "pointer",
-                  background: (local.colorTheme||'purple') === o.id ? "#a78bfa" : "#13131f",
-                  color: (local.colorTheme||'purple') === o.id ? "#0c0c14" : "#6b6a8f",
-                  border: `1px solid ${(local.colorTheme||'purple') === o.id ? "#a78bfa" : "#1f1f35"}`,
-                  fontWeight: (local.colorTheme||'purple') === o.id ? 700 : 400, fontFamily: "'DM Mono', monospace"
-                }}>{o.label}</button>
-              ))}
-            </div>
+            <SettingsOptionPills
+              value={local.colorTheme || 'purple'}
+              options={[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}]}
+              onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
+            />
           </SettingsRow>
           <SettingsRow label="Rating system" sub="Stars used when rating shows">
             <SettingsOptionPills value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={v => lUpdate("ratingSystem", Number(v))} />

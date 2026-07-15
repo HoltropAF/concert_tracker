@@ -7793,6 +7793,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const showsGroup = ['home', 'artists', 'songs', 'venues']
   const [showStartupScreen, setShowStartupScreen] = useState(true)
+  useEffect(() => {
+    const t = setTimeout(() => setShowStartupScreen(false), 2000)
+    return () => clearTimeout(t)
+  }, [])
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
   const [selected, setSelected] = useState(null)
@@ -7892,7 +7896,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           Object.entries(concert.supportSetlists || {}).map(([a, sl]) => [a, a === artistName ? patch(sl) : sl])
         ),
       }
-      await handleSave(updated)
+      // Save directly — not via handleSave, which navigates to the concert and
+      // shows a toast. That's right for the edit form, wrong here: this runs
+      // from the Songs page and should leave the user exactly where they were.
+      await onSaveConcert(updated)
     }
   }
 
@@ -7966,11 +7973,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     concerts: allPast.filter(c => c.type !== 'festival').length,
     festivals: allPast.filter(c => c.type === 'festival').length,
     upcoming: concerts.filter(c => !isWish(c) && !isPastDate(c.date)).length,
-  }
-  const openSummaryFromStartup = () => {
-    setView('stats')
-    setStatsTab('summary')
-    setShowStartupScreen(false)
   }
   const isSummaryHeader = view === 'stats' && statsTab === 'summary'
   const shellTitle = isSummaryHeader
@@ -8195,12 +8197,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <img src="/icon-192.png" alt="" style={{ width: 92, height: 92, borderRadius: 23, display: 'block' }} />
           </div>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 29, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
-          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>
+          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace" }}>
             {headerCounts.concerts} concerts · {headerCounts.festivals} festivals · {headerCounts.upcoming} upcoming
           </div>
-          <button onClick={openSummaryFromStartup} style={{ minWidth: 172, minHeight: 44, borderRadius: 11, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '10px 18px', fontFamily: "'DM Mono', monospace", boxShadow: '0 12px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-            Open summary
-          </button>
         </div>
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />

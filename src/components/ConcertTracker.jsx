@@ -4506,11 +4506,12 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
             </div>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-              {f.shows.length} show{f.shows.length !== 1 ? 's' : ''} together{yearSpan ? ` · ${yearSpan}` : ''}
-            </div>
-            {profile.contact && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{profile.contact}</div>}
-            {profile.note && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Sans', sans-serif", fontStyle: "italic", marginTop: 2 }}>{profile.note}</div>}
+            <DetailSubtitle items={[
+              `${f.shows.length} show${f.shows.length !== 1 ? 's' : ''} together`,
+              yearSpan,
+              profile.contact,
+              profile.note,
+            ]} />
           </div>
           <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
@@ -4533,9 +4534,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           return (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 20px 0" }}>
               {tiles.map(({ value, label }) => (
-                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
+                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -5355,9 +5356,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
           <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
-            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-              {selectedSong.artist}{duration ? ` · ${duration}` : ''}
-            </div>
+            <DetailSubtitle items={[selectedSong.artist, duration]} />
             {selectedSong.albumName && selectedSong.albumId && (
               <a href={`https://open.spotify.com/album/${selectedSong.albumId}`} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'block', fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4, textDecoration: 'none' }}>
@@ -5389,14 +5388,14 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
         </div>
         {/* Stat tiles: times live, popularity */}
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${1 + (typeof selectedSong.popularity === 'number' ? 1 : 0)}, 1fr)`, gap: 6, padding: '12px 16px 0' }}>
-          <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{appearances.length}×</div>
-            <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>live</div>
+          <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{appearances.length}×</div>
+            <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>live</div>
           </div>
           {typeof selectedSong.popularity === 'number' && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#1DB954', lineHeight: 1 }}>{selectedSong.popularity}</div>
-              <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>popularity</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#1DB954', lineHeight: 1 }}>{selectedSong.popularity}</div>
+              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>popularity</div>
             </div>
           )}
         </div>

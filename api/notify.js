@@ -11,12 +11,9 @@ export default async function handler(req, res) {
   if (!topic || !title) return res.status(400).json({ error: 'topic and title required' })
 
   try {
-    const r = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+    const r = await fetch(`https://ntfy.sh`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(tags ? { Tags: tags } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, title, message: body || '', priority, ...(tags ? { tags: Array.isArray(tags) ? tags : [tags] } : {}) }),
     })
     if (!r.ok) return res.status(r.status).json({ error: `ntfy returned ${r.status}` })

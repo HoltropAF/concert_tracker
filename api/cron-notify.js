@@ -68,7 +68,7 @@ export default async function handler(req, res) {
 }
 
 async function sendNtfy(topic, title, body, priority, tag) {
-  await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+  await fetch(`https://ntfy.sh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ topic, title, message: body, priority, tags: [tag] }),

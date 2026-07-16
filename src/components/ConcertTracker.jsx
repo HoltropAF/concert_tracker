@@ -4805,8 +4805,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   );
 }
 
-function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {} }) {
+function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onDetailChange = () => {} }) {
   const [selectedArtist, setSelectedArtist] = useState(null);
+  useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
   const [filterGenre, setFilterGenre] = useState("all");
@@ -5322,12 +5323,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   );
 }
 
-function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
+function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDetailChange = () => {} }) {
   const past = concerts.filter(c => isPast(c.date));
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('count');
   const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
+  useEffect(() => { onDetailChange(selectedSong !== null); return () => onDetailChange(false); }, [selectedSong]);
   const [songMatcher, setSongMatcher] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [filterSpotify, setFilterSpotify] = useState('all'); // 'all' | 'linked' | 'unlinked'
@@ -5573,11 +5575,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
         <button onClick={() => { setShowSongSort(s => !s); setShowSongFilters(false); }} style={{ background: showSongSort || sortBy !== 'count' || topN !== null ? '#1a1a30' : 'none', border: `1px solid ${showSongSort || sortBy !== 'count' || topN !== null ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'count' || topN !== null ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'count' || topN !== null ? 700 : 400, flexShrink: 0 }}>
           Sort{sortBy !== 'count' || topN !== null ? ' ↕' : ''}
         </button>
-        {linkedCount > 0 && (
-          <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
-            {filterSpotify === 'all' ? 'Filters' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
-          </button>
-        )}
+        <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
+          {filterSpotify === 'all' ? 'Filters' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
+        </button>
       </div>
       {showSongSort && (
         <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
@@ -5596,7 +5596,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
           </div>
         </div>
       )}
-      {showSongFilters && linkedCount > 0 && (
+      {showSongFilters && (
         <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
           {filterSpotify !== 'all' && <button onClick={() => setFilterSpotify('all')} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -5619,9 +5619,16 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 20, textAlign: 'right', flexShrink: 0 }}>
-                {sortBy === 'count' ? (i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`) : null}
-              </span>
+              {sortBy === 'count' && i < 3 ? (
+                <span style={{
+                  width: 18, height: 18, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: ['#facc15', '#cbd5e1', '#d97706'][i], color: '#0c0c14', fontSize: 10, fontWeight: 800, fontFamily: "'DM Mono', monospace",
+                }}>{i + 1}</span>
+              ) : (
+                <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 20, textAlign: 'right', flexShrink: 0 }}>
+                  {sortBy === 'count' ? `#${i+1}` : null}
+                </span>
+              )}
               {e.albumArt
                 ? <img src={e.albumArt} alt="" style={{ width: 34, height: 34, borderRadius: 4, flexShrink: 0, objectFit: 'cover' }} />
                 : null}
@@ -5696,6 +5703,10 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
   const [showSort, setShowSort] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCountry, setFilterCountry] = useState('all');
+  const [filterWantToGo, setFilterWantToGo] = useState(false);
+  const [filterMinVisited, setFilterMinVisited] = useState(0);
   const [filterType, setFilterType] = useState('all');
   const [showVenuePast, setShowVenuePast] = useState(false);
   const [showVenueUpcoming, setShowVenueUpcoming] = useState(false);
@@ -5750,9 +5761,14 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     });
   });
 
+  const allVenueCountries = [...new Set(venueEntries.map(v => v.country).filter(Boolean))].sort();
+  const activeFilterCount = [filterCountry !== 'all', filterWantToGo, filterMinVisited > 0].filter(Boolean).length;
   const sorted = venueEntries
     .filter(v => !search || v.name.toLowerCase().includes(search.toLowerCase()))
     .filter(v => filterType === 'all' || (filterType === 'concerts' ? v.past.some(c => c.type !== 'festival') : v.past.some(c => c.type === 'festival')))
+    .filter(v => filterCountry === 'all' || v.country === filterCountry)
+    .filter(v => !filterWantToGo || v.wantToVisit)
+    .filter(v => filterMinVisited === 0 || v.pastCount >= filterMinVisited)
     .sort((a, b) => {
       if (sortBy === 'most-visited') return b.pastCount - a.pastCount || a.name.localeCompare(b.name);
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
@@ -6045,10 +6061,10 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
-        <button onClick={() => { setAddVenueInput({ name: '', city: '', country: '' }); setAddVenueError(null); setShowAddVenueForm(true); }} aria-label="Add a venue you want to visit" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         <button onClick={() => setShowVenuesMap(m => !m)} style={{ background: showVenuesMap ? '#a78bfa' : 'none', border: `1px solid ${showVenuesMap ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showVenuesMap ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: showVenuesMap ? 700 : 400, flexShrink: 0 }}>
           Map
         </button>
+        <button onClick={() => { setAddVenueInput({ name: '', city: '', country: '' }); setAddVenueError(null); setShowAddVenueForm(true); }} aria-label="Add a venue you want to visit" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
       </div>
 
       {/* Add a "want to visit" venue */}
@@ -6125,6 +6141,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         <button onClick={() => setShowSort(s => !s)} style={{ background: showSort || sortBy !== 'most-visited' ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortBy !== 'most-visited' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-visited' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-visited' ? 700 : 400, flexShrink: 0 }}>
           Sort{sortBy !== 'most-visited' ? ' ↕' : ''}
         </button>
+        <button onClick={() => { setShowFilters(f => !f); setShowSort(false); }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+          {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
+        </button>
       </div>
       {showSort && (
         <div style={{ margin: '0 12px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
@@ -6133,6 +6152,34 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             {[{id:'most-visited',label:'Most visited'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Recently visited'},{id:'rating',label:'Best rated'}].map(s => (
               <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
             ))}
+          </div>
+        </div>
+      )}
+      {showFilters && (
+        <div style={{ margin: '0 12px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
+          {activeFilterCount > 0 && <button onClick={() => { setFilterCountry('all'); setFilterWantToGo(false); setFilterMinVisited(0); }} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+          {allVenueCountries.length > 1 && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Country</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <button onClick={() => setFilterCountry('all')} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === 'all' ? '#a78bfa' : '#0c0c14', color: filterCountry === 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === 'all' ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All</button>
+                {allVenueCountries.map(c => (
+                  <button key={c} onClick={() => setFilterCountry(filterCountry === c ? 'all' : c)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterCountry === c ? '#a78bfa' : '#0c0c14', color: filterCountry === c ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterCountry === c ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{c}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Min. times visited</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[0, 2, 3, 5].map(n => (
+                <button key={n} onClick={() => setFilterMinVisited(n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterMinVisited === n ? '#a78bfa' : '#0c0c14', color: filterMinVisited === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterMinVisited === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n === 0 ? 'Any' : `${n}+`}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Want to go</div>
+            <button onClick={() => setFilterWantToGo(w => !w)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterWantToGo ? '#34d399' : '#0c0c14', color: filterWantToGo ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterWantToGo ? '#34d399' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Only want-to-go</button>
           </div>
         </div>
       )}
@@ -8042,6 +8089,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [activityChartMode, setActivityChartMode] = useState('bar')
   const [showAddTypeMenu, setShowAddTypeMenu] = useState(false)
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
+  const [artistDetailOpen, setArtistDetailOpen] = useState(false)
+  const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
   const [showCalendar, setShowCalendar] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })
@@ -8468,6 +8517,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <div data-theme-shell="" style={appShell}>
 
       {/* Header */}
+      {!((view === 'venues' && venueDetailOpen) || (view === 'artists' && artistDetailOpen) || (view === 'songs' && songDetailOpen)) && (
       <div style={{ flexShrink: 0, padding: '36px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
         <div style={{ marginBottom: 20, textAlign: 'center', position: 'relative' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
@@ -8480,6 +8530,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         </div>
 
       </div>
+      )}
 
       {/* Content */}
       <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -8798,8 +8849,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
-        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

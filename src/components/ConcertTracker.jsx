@@ -5603,6 +5603,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [showAddVenueForm, setShowAddVenueForm] = useState(false);
   const [addVenueInput, setAddVenueInput] = useState({ name: '', city: '', country: '' });
   const [addVenueSaving, setAddVenueSaving] = useState(false);
+  const [addVenueError, setAddVenueError] = useState(null);
   useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setOpenVenueInfoPopup(null); }, [selectedVenue]);
   useEffect(() => { onDetailChange(selectedVenue !== null); return () => onDetailChange(false); }, [selectedVenue]);
 
@@ -5939,7 +5940,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
-        <button onClick={() => { setAddVenueInput({ name: '', city: '', country: '' }); setShowAddVenueForm(true); }} aria-label="Add a venue you want to visit" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
+        <button onClick={() => { setAddVenueInput({ name: '', city: '', country: '' }); setAddVenueError(null); setShowAddVenueForm(true); }} aria-label="Add a venue you want to visit" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         <button onClick={() => setShowVenuesMap(m => !m)} style={{ background: showVenuesMap ? '#a78bfa' : 'none', border: `1px solid ${showVenuesMap ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showVenuesMap ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: showVenuesMap ? 700 : 400, flexShrink: 0 }}>
           Map
         </button>
@@ -5949,43 +5950,63 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {showAddVenueForm && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowAddVenueForm(false)}>
           <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Venue you want to visit</div>
               <button onClick={() => setShowAddVenueForm(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
             </div>
+            <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 16, lineHeight: 1.5 }}>
+              Name and city are needed to place it correctly on the map — a venue name alone is often ambiguous. Everything else (website, parking, transit, tags) can be added later from its own page.
+            </div>
             {[
-              { key: 'name', label: 'Venue name', placeholder: 'e.g. Wembley Arena' },
-              { key: 'city', label: 'City', placeholder: 'e.g. London' },
-              { key: 'country', label: 'Country', placeholder: 'e.g. United Kingdom' },
-            ].map(({ key, label, placeholder }) => (
+              { key: 'name', label: 'Venue name', placeholder: 'e.g. Wembley Arena', required: true },
+              { key: 'city', label: 'City', placeholder: 'e.g. London', required: true },
+              { key: 'country', label: 'Country (optional)', placeholder: 'e.g. United Kingdom', required: false },
+            ].map(({ key, label, placeholder, required }) => (
               <div key={key} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{label}</div>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{label}{required && <span style={{ color: '#a78bfa' }}> *</span>}</div>
                 <input
                   value={addVenueInput[key]}
-                  onChange={e => setAddVenueInput(p => ({ ...p, [key]: e.target.value }))}
+                  onChange={e => { setAddVenueInput(p => ({ ...p, [key]: e.target.value })); setAddVenueError(null); }}
                   placeholder={placeholder}
                   style={{ width: '100%', boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
                 />
               </div>
             ))}
-            <button disabled={!addVenueInput.name.trim() || addVenueSaving} onClick={async () => {
+            {addVenueError && (
+              <div style={{ fontSize: 11, color: '#f87171', marginBottom: 12, lineHeight: 1.5 }}>{addVenueError}</div>
+            )}
+            <button disabled={!addVenueInput.name.trim() || !addVenueInput.city.trim() || addVenueSaving} onClick={async () => {
               const entry = { name: addVenueInput.name.trim(), city: addVenueInput.city.trim(), country: addVenueInput.country.trim() };
-              if (!entry.name) return;
+              if (!entry.name || !entry.city) return;
               setAddVenueSaving(true);
+              setAddVenueError(null);
+              const coords = await geocodeVenue(entry.name, entry.city, entry.country);
+              setAddVenueSaving(false);
+              if (!coords) {
+                setAddVenueError("Couldn't find that on the map — check the spelling, or save it anyway without a map pin.");
+                return;
+              }
               const next = [...(settings.wantToVisitVenues || []), entry];
               onUpdateSetting('wantToVisitVenues', next);
-              const coords = await geocodeVenue(entry.name, entry.city, entry.country);
-              if (coords) {
-                const info = { ...(settings.venueInfo || {}) };
-                info[entry.name] = { ...(info[entry.name] || {}), ...coords };
-                onUpdateSetting('venueInfo', info);
-              }
-              setAddVenueSaving(false);
+              const info = { ...(settings.venueInfo || {}) };
+              info[entry.name] = { ...(info[entry.name] || {}), ...coords };
+              onUpdateSetting('venueInfo', info);
               setShowAddVenueForm(false);
               setSelectedVenue(entry.name);
-            }} style={{ width: '100%', background: '#a78bfa', border: 'none', borderRadius: 10, color: '#0c0c14', fontSize: 14, fontWeight: 700, padding: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", opacity: !addVenueInput.name.trim() || addVenueSaving ? 0.5 : 1 }}>
-              {addVenueSaving ? 'Saving…' : 'Add'}
+            }} style={{ width: '100%', background: '#a78bfa', border: 'none', borderRadius: 10, color: '#0c0c14', fontSize: 14, fontWeight: 700, padding: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", opacity: !addVenueInput.name.trim() || !addVenueInput.city.trim() || addVenueSaving ? 0.5 : 1 }}>
+              {addVenueSaving ? 'Finding it on the map…' : 'Add'}
             </button>
+            {addVenueError && (
+              <button onClick={() => {
+                const entry = { name: addVenueInput.name.trim(), city: addVenueInput.city.trim(), country: addVenueInput.country.trim() };
+                const next = [...(settings.wantToVisitVenues || []), entry];
+                onUpdateSetting('wantToVisitVenues', next);
+                setShowAddVenueForm(false);
+                setSelectedVenue(entry.name);
+              }} style={{ width: '100%', background: 'none', border: '1px solid #2e2e50', borderRadius: 10, color: '#6b6a8f', fontSize: 12, padding: '10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginTop: 8 }}>
+                Save without a map pin
+              </button>
+            )}
           </div>
         </div>
       )}

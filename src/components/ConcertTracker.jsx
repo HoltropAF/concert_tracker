@@ -5771,11 +5771,17 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '14px 16px 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '14px 16px 0' }}>
           <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
             <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>visited</div>
           </div>
+          {totalSpent > 0 && (
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{totalSpent.toFixed(0)}</div>
+              <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>total spent</div>
+            </div>
+          )}
           {v.avgRating && (
             <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>★{v.avgRating.toFixed(1)}</div>

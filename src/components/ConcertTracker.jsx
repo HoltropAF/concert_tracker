@@ -8435,6 +8435,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           )}
         </div>
 
+      </div>
+      )}
+
+      {/* Content */}
+      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {view === 'home' && (
+          <>
+            {concerts.length === 0 && (
+              <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
+            )}
         {view === 'home' && concerts.length > 0 && (() => {
           const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
           const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
@@ -8614,16 +8624,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             )}
           </div>
         )}
-      </div>
-      )}
 
-      {/* Content */}
-      <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {view === 'home' && (
-          <>
-            {concerts.length === 0 && (
-              <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
-            )}
             {concerts.length > 0 && !showCalendar && (() => {
               const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
               const yearCounts = {};

@@ -5586,7 +5586,7 @@ function ArtistShowRow({ concert, onOpen }) {
   );
 }
 
-function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {} }) {
+function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {} }) {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
@@ -5602,6 +5602,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [showVenueMapModal, setShowVenueMapModal] = useState(false);
   const [openVenueInfoPopup, setOpenVenueInfoPopup] = useState(null);
   useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setShowVenueMapModal(false); setOpenVenueInfoPopup(null); }, [selectedVenue]);
+  useEffect(() => { onDetailChange(selectedVenue !== null); return () => onDetailChange(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
@@ -5667,7 +5668,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
             setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
             setEditingVenueInfo(true);
-          }} style={{ background: '#1a1a30', border: '1px solid #2e2e50', color: '#a78bfa', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Edit</button>
+          }} style={{ background: 'none', border: 'none', color: '#6b6a8f', padding: '6px 4px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Edit</button>
         </div>
 
         {/* Hero: maps / website / parking / transit */}
@@ -5676,31 +5677,37 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
             const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
             const mapsQuery = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, q, v.city, v.country].filter(Boolean).join(' '))}`;
-            const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' };
-            const infoBtnStyle = { background: 'none', border: '1px solid #3a3858', borderRadius: '50%', width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#6b6a8f', fontSize: 9, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 };
-            const pinBtnStyle = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', fontSize: 11, textDecoration: 'none', flexShrink: 0 };
+            const iconStroke = { stroke: '#9d9bc0', strokeWidth: 1.6, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' };
+            const ICONS = {
+              pin: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>,
+              link: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><path d="M9 17H7a5 5 0 0 1 0-10h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8"/></svg>,
+              car: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><path d="M5 17h14M5 17a1.5 1.5 0 0 1-1.5-1.5V13l1.7-4.5A2 2 0 0 1 7.1 7h9.8a2 2 0 0 1 1.9 1.5L20.5 13v2.5A1.5 1.5 0 0 1 19 17"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>,
+              transit: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><rect x="4" y="4" width="16" height="13" rx="2"/><path d="M4 12h16M8 17v2M16 17v2"/><circle cx="8" cy="8.5" r="0.5"/><circle cx="16" cy="8.5" r="0.5"/></svg>,
+              info: <svg width="11" height="11" viewBox="0 0 24 24" {...iconStroke}><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 8v.01"/></svg>,
+            };
+            const chipStyle = { display: 'inline-flex', alignItems: 'center', gap: 5, background: '#13131f', border: '1px solid #1f1f35', borderRadius: 99, padding: '5px 10px', color: '#9d9bc0', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none', cursor: 'pointer' };
             // A chip for an optional field: icon + label, an (i) that reveals the raw
             // text you typed, and a separate pin that opens Maps for that spot.
             const InfoChip = ({ id, icon, label, text }) => (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ ...linkStyle, color: '#9d9bc0' }}>{icon} {label}</span>
-                <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={infoBtnStyle} aria-label={`${label} info`}>i</button>
-                <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={pinBtnStyle} aria-label={`${label} on Maps`}>📍</a>
+              <span style={{ ...chipStyle, paddingRight: 6 }}>
+                {icon} {label}
+                <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', padding: 0, display: 'inline-flex' }} aria-label={`${label} info`}>{ICONS.info}</button>
+                <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', color: '#6b6a8f' }} aria-label={`${label} on Maps`}>{ICONS.pin}</a>
               </span>
             );
             return (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
-                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
-                  {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon="🚗" label="Parking" text={vInfo.parking} />}
-                  {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={transitEmoji(vInfo.transit)} label="Transit" text={vInfo.transit} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={chipStyle}>{ICONS.pin} Maps</a>
+                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={chipStyle}>{ICONS.link} Website</a>}
+                  {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon={ICONS.car} label="Parking" text={vInfo.parking} />}
+                  {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={ICONS.transit} label="Transit" text={vInfo.transit} />}
                 </div>
                 {openVenueInfoPopup === 'parking' && vInfo.parking && (
-                  <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>🚗 {vInfo.parking}</div>
+                  <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{vInfo.parking}</div>
                 )}
                 {openVenueInfoPopup === 'transit' && vInfo.transit && (
-                  <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{transitEmoji(vInfo.transit)} {vInfo.transit}</div>
+                  <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{vInfo.transit}</div>
                 )}
               </>
             );
@@ -7868,6 +7875,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
   const [showActivity, setShowActivity] = useState(false)
+  const [venueDetailOpen, setVenueDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
   const [showCalendar, setShowCalendar] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })
@@ -8282,6 +8290,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <div data-theme-shell="" style={appShell}>
 
       {/* Header */}
+      {!(view === 'venues' && venueDetailOpen) && (
       <div style={{ flexShrink: 0, padding: '36px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
         <div style={{ marginBottom: 20, textAlign: 'center', position: 'relative' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
@@ -8454,6 +8463,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </div>
         )}
       </div>
+      )}
 
       {/* Content */}
       <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -8592,7 +8602,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>
 

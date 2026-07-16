@@ -23,7 +23,7 @@ const extractTrack = t => ({
   artists: t.artists.map(a => a.name).join(', '),
   albumName: t.album?.name || '',
   albumId: t.album?.id || '',
-  albumArt: t.album?.images?.at(-1)?.url || '',
+  albumArt: t.album?.images?.[0]?.url || '',
   durationMs: t.duration_ms || null,
   popularity: typeof t.popularity === 'number' ? t.popularity : null,
   trackNumber: t.track_number || null,

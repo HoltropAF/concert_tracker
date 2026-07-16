@@ -5350,13 +5350,46 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
           trackNumber: t.track_number || null,
           albumName: t.album?.name || selectedSong.albumName,
           albumId: t.album?.id || selectedSong.albumId,
-          albumArt: t.album?.images?.at(-1)?.url || selectedSong.albumArt,
+          albumArt: t.album?.images?.[0]?.url || selectedSong.albumArt,
         };
         onLinkSong && onLinkSong(selectedSong.name, selectedSong.artist, data);
         setSelectedSong(prev => prev ? { ...prev, ...data } : prev);
       }
     } finally {
       setRefreshingInfo(false);
+    }
+  };
+  const [fixingAllArt, setFixingAllArt] = useState(false);
+  const [fixAllArtProgress, setFixAllArtProgress] = useState(null); // { done, total } | null
+  const handleFixAllAlbumArt = async () => {
+    if (fixingAllArt) return;
+    const linked = songEntries.filter(e => e.spotifyId);
+    if (linked.length === 0) return;
+    setFixingAllArt(true);
+    setFixAllArtProgress({ done: 0, total: linked.length });
+    try {
+      const token = await getValidSpotifyToken(settings, saveSettings);
+      if (!token) return;
+      for (let i = 0; i < linked.length; i++) {
+        const e = linked[i];
+        try {
+          const r = await fetch(`https://api.spotify.com/v1/tracks/${e.spotifyId}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (r.ok) {
+            const t = await r.json();
+            onLinkSong && onLinkSong(e.name, e.artist, {
+              durationMs: t.duration_ms || e.durationMs,
+              popularity: typeof t.popularity === 'number' ? t.popularity : e.popularity,
+              trackNumber: t.track_number || e.trackNumber,
+              albumName: t.album?.name || e.albumName,
+              albumId: t.album?.id || e.albumId,
+              albumArt: t.album?.images?.[0]?.url || e.albumArt,
+            });
+          }
+        } catch {}
+        setFixAllArtProgress({ done: i + 1, total: linked.length });
+      }
+    } finally {
+      setFixingAllArt(false);
     }
   };
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
@@ -5427,6 +5460,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
       <div style={{ padding: '0 0 100px' }}>
         <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
             <DetailSubtitle lines={[[selectedSong.artist, duration]]} />
@@ -5458,6 +5492,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
           {selectedSong.albumArt && (
             <img src={selectedSong.albumArt} alt="" style={{ width: 130, height: 130, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
           )}
+          </div>
         </div>
         {/* Stat tiles: times live, popularity */}
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${1 + (typeof selectedSong.popularity === 'number' ? 1 : 0)}, 1fr)`, gap: 6, padding: '12px 16px 0' }}>
@@ -5513,6 +5548,11 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
               <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
                 across {past.length} show{past.length !== 1 ? 's' : ''}{totalArtists > 0 ? `, ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}
               </div>
+            )}
+            {songEntries.some(e => e.spotifyId) && (
+              <button onClick={handleFixAllAlbumArt} disabled={fixingAllArt} style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: fixingAllArt ? 'default' : 'pointer', textDecoration: fixingAllArt ? 'none' : 'underline', textUnderlineOffset: 2 }}>
+                {fixingAllArt ? `improving album art quality… ${fixAllArtProgress ? `${fixAllArtProgress.done}/${fixAllArtProgress.total}` : ''}` : 'improve album art quality for all linked songs'}
+              </button>
             )}
           </div>
         );
@@ -8428,7 +8468,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <div data-theme-shell="" style={appShell}>
 
       {/* Header */}
-      {!(view === 'venues' && venueDetailOpen) && (
       <div style={{ flexShrink: 0, padding: '36px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
         <div style={{ marginBottom: 20, textAlign: 'center', position: 'relative' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
@@ -8441,7 +8480,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         </div>
 
       </div>
-      )}
 
       {/* Content */}
       <div id="content-scroll" style={{ flex: 1, overflowY: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? 'hidden' : 'auto', overflowX: 'hidden', padding: view === 'stats' && (statsTab === 'charts' || statsTab === 'summary') ? '0' : '0 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -8500,7 +8538,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Artist, venue, friend, tour..."
+              placeholder="Search shows..."
               style={{ flex: 1, minWidth: 0, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }}
             />
             <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>

@@ -5600,7 +5600,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [newTagInput, setNewTagInput] = useState('');
   const [showVenuesMap, setShowVenuesMap] = useState(false);
   const [showVenueMapModal, setShowVenueMapModal] = useState(false);
-  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setShowVenueMapModal(false); }, [selectedVenue]);
+  const [openVenueInfoPopup, setOpenVenueInfoPopup] = useState(null);
+  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setShowVenueMapModal(false); setOpenVenueInfoPopup(null); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
@@ -5665,17 +5666,36 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
               const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
               const mapsQuery = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, q, v.city, v.country].filter(Boolean).join(' '))}`;
               const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' };
+              const infoBtnStyle = { background: 'none', border: '1px solid #3a3858', borderRadius: '50%', width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#6b6a8f', fontSize: 9, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 };
+              const pinBtnStyle = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', fontSize: 11, textDecoration: 'none', flexShrink: 0 };
+              // A chip for an optional field: icon + label, an (i) that reveals the raw
+              // text you typed, and a separate pin that opens Maps for that spot.
+              const InfoChip = ({ id, icon, label, text }) => (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ ...linkStyle, color: '#9d9bc0' }}>{icon} {label}</span>
+                  <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={infoBtnStyle} aria-label={`${label} info`}>i</button>
+                  <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={pinBtnStyle} aria-label={`${label} on Maps`}>📍</a>
+                </span>
+              );
               return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
-                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
-                  {vInfo.parking && settings.showVenueParking !== false && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚗 Parking ↗</a>}
-                  {vInfo.transit && settings.showVenueTransit !== false && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{transitEmoji(vInfo.transit)} Transit ↗</a>}
-                  <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] }); setEditingVenueInfo(true); }}
-                    style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
-                    edit
-                  </button>
-                </div>
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+                    <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
+                    {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
+                    {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon="🚗" label="Parking" text={vInfo.parking} />}
+                    {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={transitEmoji(vInfo.transit)} label="Transit" text={vInfo.transit} />}
+                    <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] }); setEditingVenueInfo(true); }}
+                      style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                      edit
+                    </button>
+                  </div>
+                  {openVenueInfoPopup === 'parking' && vInfo.parking && (
+                    <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>🚗 {vInfo.parking}</div>
+                  )}
+                  {openVenueInfoPopup === 'transit' && vInfo.transit && (
+                    <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{transitEmoji(vInfo.transit)} {vInfo.transit}</div>
+                  )}
+                </>
               );
             })()}
           </div>
@@ -5683,7 +5703,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 
         {/* Edit venue modal */}
         {editingVenueInfo && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }}>
             <div style={{ width: '100%', maxHeight: '85vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Edit venue</div>
@@ -5807,7 +5827,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 
         {/* Full map popup */}
         {showVenueMapModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowVenueMapModal(false)}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowVenueMapModal(false)}>
             <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '16px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>{selectedVenue}</div>
@@ -5911,7 +5931,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         ))}
         <div style={{ flex: 1 }} />
         <button onClick={() => setShowVenuesMap(m => !m)} style={{ background: showVenuesMap ? '#a78bfa' : 'none', border: `1px solid ${showVenuesMap ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showVenuesMap ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: showVenuesMap ? 700 : 400, flexShrink: 0 }}>
-          🗺 Map
+          Map
         </button>
       </div>
       {/* Search + sort */}

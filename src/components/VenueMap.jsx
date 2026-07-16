@@ -19,13 +19,25 @@ const VISITED_ICON = dotIcon('#a78bfa')
 const UPCOMING_ONLY_ICON = dotIcon('#34d399')
 
 // points: [{ name, lat, lng, pastCount, upcomingCount }]
-export default function VenueMap({ points, onSelect, height = 360 }) {
+// focus: optional { lat, lng, zoom } — if set, centers there instead of
+// fitting bounds to all points (used for the single-venue mini preview).
+export default function VenueMap({ points, onSelect, height = 360, focus = null, interactive = true, autoOpenName = null }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    const map = L.map(containerRef.current, { zoomControl: true, attributionControl: true })
+    const map = L.map(containerRef.current, {
+      zoomControl: interactive,
+      attributionControl: interactive,
+      dragging: interactive,
+      scrollWheelZoom: interactive,
+      doubleClickZoom: interactive,
+      touchZoom: interactive,
+      boxZoom: interactive,
+      keyboard: interactive,
+      tap: interactive,
+    })
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors',
@@ -52,16 +64,19 @@ export default function VenueMap({ points, onSelect, height = 360 }) {
         `</div>`
       )
       if (onSelect) marker.on('click', () => onSelect(p.name))
+      if (autoOpenName && p.name === autoOpenName) marker.openPopup()
       markers.push(marker)
     })
-    if (markers.length > 0) {
+    if (focus) {
+      map.setView([focus.lat, focus.lng], focus.zoom ?? 14)
+    } else if (markers.length > 0) {
       const group = L.featureGroup(markers)
       map.fitBounds(group.getBounds().pad(0.2), { maxZoom: 13 })
     } else {
       map.setView([20, 0], 2)
     }
     return () => { markers.forEach(m => m.remove()) }
-  }, [points, onSelect])
+  }, [points, onSelect, focus, autoOpenName])
 
   return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden' }} />
 }

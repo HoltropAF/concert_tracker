@@ -5599,7 +5599,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [newRoomInput, setNewRoomInput] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
   const [showVenuesMap, setShowVenuesMap] = useState(false);
-  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); }, [selectedVenue]);
+  const [showVenueMapModal, setShowVenueMapModal] = useState(false);
+  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setShowVenueMapModal(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
@@ -5784,6 +5785,43 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           );
         })()}
+
+        {/* Mini map */}
+        {(() => {
+          const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
+          if (typeof vInfo.lat !== 'number') return null;
+          return (
+            <div style={{ padding: '12px 16px 0' }}>
+              <button onClick={() => setShowVenueMapModal(true)} style={{ position: 'relative', width: '100%', padding: 0, border: 'none', cursor: 'pointer', display: 'block', borderRadius: 12, overflow: 'hidden' }}>
+                <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} height={130} />
+                <div style={{ position: 'absolute', top: 8, right: 8, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ⤢ expand
+                </div>
+              </button>
+            </div>
+          );
+        })()}
+
+        {/* Full map popup */}
+        {showVenueMapModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowVenueMapModal(false)}>
+            <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '16px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>{selectedVenue}</div>
+                <button onClick={() => setShowVenueMapModal(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <VenueMap
+                points={venueEntries.map(ve => {
+                  const info = (settings.venueInfo || {})[ve.name] || {};
+                  return { name: ve.name, lat: info.lat, lng: info.lng, pastCount: ve.pastCount, upcomingCount: ve.upcoming.length };
+                }).filter(p => typeof p.lat === 'number')}
+                autoOpenName={selectedVenue}
+                onSelect={name => { setShowVenueMapModal(false); setSelectedVenue(name); }}
+                height={420}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Photos */}
         {v.photos.length > 0 && (

@@ -8370,22 +8370,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const isShowsActive = showsGroup.includes(view)
 
-  const ShowsSubNav = () => isShowsActive ? (
-    <div style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
-      {[{ id: 'home', label: 'Shows' }, { id: 'artists', label: 'Artists' }, { id: 'songs', label: 'Songs' }, { id: 'venues', label: 'Venues' }].map(t => (
-        <button key={t.id} onClick={() => setView(t.id)} style={{
-          flex: 1, background: view === t.id ? '#1a1a30' : 'none',
-          border: `1px solid ${view === t.id ? '#a78bfa' : '#1f1f35'}`,
-          borderRadius: 6, padding: '5px 2px', cursor: 'pointer',
-          fontFamily: "'DM Mono', monospace", fontSize: 11,
-          fontWeight: view === t.id ? 700 : 400,
-          color: view === t.id ? '#a78bfa' : '#5a5880',
-          textAlign: 'center'
-        }}>{t.label}</button>
-      ))}
-    </div>
-  ) : null
-
   const navBtn = (id, icon, label, active, onClick) => (
     <button key={id} onClick={onClick} style={{
       flex: 1, background: 'none', border: 'none', cursor: 'pointer',
@@ -8398,10 +8382,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </button>
   )
 
+  const ICON_ARTISTS = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+  const ICON_SONGS = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  const ICON_VENUES = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+
   const BottomNav = () => (
     <div data-bottom-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
-      {navBtn('stats', <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="15" width="3.5" height="6" rx="1" fill="currentColor"/><rect x="8" y="9" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="14" y="12" width="3.5" height="9" rx="1" fill="currentColor"/><rect x="20" y="5" width="3.5" height="16" rx="1" fill="currentColor"/><path d="M3.75 11L9.75 6L15.75 9.5L21.75 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/><circle cx="3.75" cy="11" r="2" fill="currentColor"/><circle cx="9.75" cy="6" r="2" fill="currentColor"/><circle cx="15.75" cy="9.5" r="2" fill="currentColor"/><circle cx="21.75" cy="2.5" r="2" fill="currentColor"/></svg>, 'Stats',    view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
+      {navBtn('shows', '♪', 'Shows', view === 'home', () => setView('home'))}
+      {navBtn('artists', ICON_ARTISTS, 'Artists', view === 'artists', () => setView('artists'))}
+      {navBtn('songs', ICON_SONGS, 'Songs', view === 'songs', () => setView('songs'))}
+      {navBtn('venues', ICON_VENUES, 'Venues', view === 'venues', () => setView('venues'))}
       {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
     </div>
   )
@@ -8441,7 +8431,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />
-      <ShowsSubNav />
       <BottomNav />
     </div>
   )
@@ -8457,7 +8446,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />
-      <ShowsSubNav />
       <BottomNav />
     </div>
   )
@@ -8487,6 +8475,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       <div style={{ flexShrink: 0, padding: '36px 16px 0', background: '#0c0c14', borderBottom: '1px solid #0d1a14' }}>
         <div style={{ marginBottom: 20, textAlign: 'center', position: 'relative' }}>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{shellTitle}</div>
+          <button onClick={() => { setView('stats'); setStatsTab('summary'); }} aria-label="Stats" style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: view === 'stats' && statsTab === 'summary' ? '#a78bfa' : '#6b6a8f', cursor: 'pointer', padding: '6px 4px', lineHeight: 1, display: 'inline-flex', alignItems: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="15" width="3.5" height="6" rx="1" fill="currentColor"/><rect x="8" y="9" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="14" y="12" width="3.5" height="9" rx="1" fill="currentColor"/><rect x="20" y="5" width="3.5" height="16" rx="1" fill="currentColor"/><path d="M3.75 11L9.75 6L15.75 9.5L21.75 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/><circle cx="3.75" cy="11" r="2" fill="currentColor"/><circle cx="9.75" cy="6" r="2" fill="currentColor"/><circle cx="15.75" cy="9.5" r="2" fill="currentColor"/><circle cx="21.75" cy="2.5" r="2" fill="currentColor"/></svg>
+          </button>
           <button onClick={() => setView('settings')} aria-label="Settings" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: view === 'settings' ? '#a78bfa' : '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: '6px 4px', lineHeight: 1, letterSpacing: '1px' }}>⋯</button>
           {isSummaryHeader && (
             <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
@@ -8796,7 +8787,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <ChartGroupNav />
-      <ShowsSubNav />
       <BottomNav />
 
       {/* Spotify link prompt after adding a concert with songs */}

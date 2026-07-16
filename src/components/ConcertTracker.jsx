@@ -5659,19 +5659,14 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <button onClick={() => setSelectedVenue(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVenue}</div>
-            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
-              {[v.city, v.country].filter(Boolean).join(', ')}{v.city || v.country ? ' · ' : ''}{v.pastCount}× visited{v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}
-            </div>
+            <DetailSubtitle lines={[
+              [v.city, v.country],
+              [`${v.pastCount}× visited`, v.upcoming.length > 0 ? `${v.upcoming.length} upcoming` : null],
+            ]} />
           </div>
-          <button onClick={() => {
-            const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
-            const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
-            setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
-            setEditingVenueInfo(true);
-          }} style={{ background: 'none', border: 'none', color: '#6b6a8f', padding: '6px 4px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Edit</button>
         </div>
 
-        {/* Hero: maps / website / parking / transit */}
+        {/* Hero: maps / website / parking / transit / edit */}
         <div style={{ padding: '14px 16px 0' }}>
           {(() => {
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
@@ -5684,6 +5679,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
               car: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><path d="M5 17h14M5 17a1.5 1.5 0 0 1-1.5-1.5V13l1.7-4.5A2 2 0 0 1 7.1 7h9.8a2 2 0 0 1 1.9 1.5L20.5 13v2.5A1.5 1.5 0 0 1 19 17"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>,
               transit: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><rect x="4" y="4" width="16" height="13" rx="2"/><path d="M4 12h16M8 17v2M16 17v2"/><circle cx="8" cy="8.5" r="0.5"/><circle cx="16" cy="8.5" r="0.5"/></svg>,
               info: <svg width="11" height="11" viewBox="0 0 24 24" {...iconStroke}><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 8v.01"/></svg>,
+              edit: <svg width="12" height="12" viewBox="0 0 24 24" {...iconStroke}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>,
             };
             const chipStyle = { display: 'inline-flex', alignItems: 'center', gap: 5, background: '#13131f', border: '1px solid #1f1f35', borderRadius: 99, padding: '5px 10px', color: '#9d9bc0', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none', cursor: 'pointer' };
             // A chip for an optional field: icon + label, an (i) that reveals the raw
@@ -5702,6 +5698,10 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                   {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={chipStyle}>{ICONS.link} Website</a>}
                   {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon={ICONS.car} label="Parking" text={vInfo.parking} />}
                   {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={ICONS.transit} label="Transit" text={vInfo.transit} />}
+                  <button onClick={() => {
+                    setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
+                    setEditingVenueInfo(true);
+                  }} style={chipStyle}>{ICONS.edit} Edit</button>
                 </div>
                 {openVenueInfoPopup === 'parking' && vInfo.parking && (
                   <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{vInfo.parking}</div>

@@ -3,6 +3,7 @@ import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/phot
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
 import SpotifyMatcher from './SpotifyMatcher'
+import VenueMap from './VenueMap'
 
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
@@ -5586,6 +5587,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [venueEditInput, setVenueEditInput] = useState({ url: '', parking: '', transit: '', rooms: [], tags: [] });
   const [newRoomInput, setNewRoomInput] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
+  const [showVenuesMap, setShowVenuesMap] = useState(false);
   useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
@@ -5848,12 +5850,31 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           )}
         </div>
       )}
-      {/* Type pills */}
-      <div style={{ padding: '10px 12px 0', display: 'flex', gap: 6 }}>
+      {/* Type pills + map toggle */}
+      <div style={{ padding: '10px 12px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setShowVenuesMap(m => !m)} style={{ background: showVenuesMap ? '#a78bfa' : 'none', border: `1px solid ${showVenuesMap ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showVenuesMap ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: showVenuesMap ? 700 : 400, flexShrink: 0 }}>
+          🗺 Map
+        </button>
       </div>
+      {showVenuesMap && (
+        <div style={{ padding: '10px 12px 0' }}>
+          <VenueMap
+            points={venueEntries.map(v => {
+              const info = (settings.venueInfo || {})[v.name] || {};
+              return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length };
+            }).filter(p => typeof p.lat === 'number')}
+            onSelect={name => setSelectedVenue(name)}
+          />
+          <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', marginRight: 4 }} />visited</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#34d399', marginRight: 4 }} />upcoming only</span>
+          </div>
+        </div>
+      )}
       {/* Search + sort */}
       <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
@@ -5877,6 +5898,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       )}
 
       {/* Venue list */}
+      {!showVenuesMap && (
       <div style={{ padding: '0 12px' }}>
         {sorted.map(v => (
           <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -5894,6 +5916,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         ))}
         {sorted.length === 0 && <div style={{ textAlign: 'center', color: '#2e2e4a', fontSize: 13, fontFamily: "'DM Mono', monospace", marginTop: 40 }}>No venues found</div>}
       </div>
+      )}
     </div>
   );
 }

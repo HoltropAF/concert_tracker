@@ -5970,7 +5970,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       )}
 
       {showVenuesMap && (() => {
-        const mapPoints = venueEntries.map(v => {
+        const mapPoints = sorted.map(v => {
           const info = (settings.venueInfo || {})[v.name] || {};
           return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, country: v.country };
         }).filter(p => typeof p.lat === 'number');
@@ -8145,7 +8145,19 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     // each step inverted. LIGHT_FILTER is self-inverse so it's the same token.
     const themeInv = inverse[themeFilter] || ''
     const imgFilter = [themeInv, lightMode ? LIGHT_FILTER : ''].filter(Boolean).join(' ')
-    el.textContent = imgFilter ? `[data-theme-shell] img { filter: ${imgFilter} !important; }` : ''
+    const rules = []
+    if (imgFilter) {
+      rules.push(`[data-theme-shell] img { filter: ${imgFilter} !important; }`)
+      // Leaflet's own UI chrome (attribution strip, zoom buttons) isn't an
+      // <img>, but reads just as wrong once the whole page is hue-rotated —
+      // exclude it from the theme filter too so it stays legible.
+      rules.push(`[data-theme-shell] .leaflet-control-attribution, [data-theme-shell] .leaflet-control-zoom { filter: ${imgFilter} !important; }`)
+    }
+    // The default Leaflet attribution bar is a small dark strip that clashes
+    // with the light basemap — restyle it to sit quietly in the corner.
+    rules.push(`.leaflet-control-attribution { background: rgba(255,255,255,0.75) !important; color: #555 !important; font-size: 9px !important; padding: 1px 4px !important; }`)
+    rules.push(`.leaflet-control-attribution a { color: #555 !important; }`)
+    el.textContent = rules.join('\n')
     return () => { const e = document.getElementById(id); if (e) e.textContent = '' }
   }, [themeFilter, lightMode])
 

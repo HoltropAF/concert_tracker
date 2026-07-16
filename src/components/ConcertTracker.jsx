@@ -5599,9 +5599,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [newRoomInput, setNewRoomInput] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
   const [showVenuesMap, setShowVenuesMap] = useState(false);
-  const [showVenueMapModal, setShowVenueMapModal] = useState(false);
   const [openVenueInfoPopup, setOpenVenueInfoPopup] = useState(null);
-  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setShowVenueMapModal(false); setOpenVenueInfoPopup(null); }, [selectedVenue]);
+  useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setOpenVenueInfoPopup(null); }, [selectedVenue]);
   useEffect(() => { onDetailChange(selectedVenue !== null); return () => onDetailChange(false); }, [selectedVenue]);
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
@@ -5818,46 +5817,16 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         {(() => {
           const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
           if (typeof vInfo.lat !== 'number') return null;
+          const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`;
           return (
-            <div style={{ padding: '12px 16px 0' }}>
-              <button onClick={() => setShowVenueMapModal(true)} style={{ position: 'relative', width: '100%', padding: 0, border: 'none', cursor: 'pointer', display: 'block', borderRadius: 12, overflow: 'hidden' }}>
-                <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, parking: settings.showVenueParking !== false ? vInfo.parking : null, transit: settings.showVenueTransit !== false ? vInfo.transit : null }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} height={130} />
-                <div style={{ position: 'absolute', top: 8, right: 8, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-                  ⤢ expand
-                </div>
-              </button>
+            <div style={{ padding: '12px 16px 0', position: 'relative' }}>
+              <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} showZoomControl clickOpensMaps height={130} />
+              <a href={mapsHref} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', top: 20, right: 24, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                Open in Maps ↗
+              </a>
             </div>
           );
         })()}
-
-        {/* Full map popup */}
-        {showVenueMapModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowVenueMapModal(false)}>
-            <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '16px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>{selectedVenue}</div>
-                <button onClick={() => setShowVenueMapModal(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
-              </div>
-              <VenueMap
-                points={venueEntries.map(ve => {
-                  const info = (settings.venueInfo || {})[ve.name] || {};
-                  // Parking/transit only surface on the pin for the venue you came
-                  // from — every other pin on this "zoomed out" map stays a plain
-                  // preview, same as the main overview map.
-                  const isCurrent = ve.name === selectedVenue;
-                  return {
-                    name: ve.name, lat: info.lat, lng: info.lng, pastCount: ve.pastCount, upcomingCount: ve.upcoming.length, shape: ve.mapShape,
-                    parking: isCurrent && settings.showVenueParking !== false ? info.parking : null,
-                    transit: isCurrent && settings.showVenueTransit !== false ? info.transit : null,
-                  };
-                }).filter(p => typeof p.lat === 'number')}
-                autoOpenName={selectedVenue}
-                onSelect={name => { setShowVenueMapModal(false); setSelectedVenue(name); }}
-                height={420}
-              />
-            </div>
-          </div>
-        )}
 
         {/* Photos */}
         {v.photos.length > 0 && (

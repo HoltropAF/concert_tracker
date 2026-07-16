@@ -38,14 +38,17 @@ const ICONS = {
 // points: [{ name, lat, lng, pastCount, upcomingCount, shape: 'pin' | 'diamond' }]
 // focus: optional { lat, lng, zoom } — if set, centers there instead of
 // fitting bounds to all points (used for the single-venue mini preview).
-export default function VenueMap({ points, onSelect, height = 360, focus = null, interactive = true, autoOpenName = null, fitPoints = null }) {
+// showZoomControl: show +/- buttons even when the map is otherwise static.
+// clickOpensMaps: tapping a pin opens Google Maps for that point instead of
+// showing an in-app popup (used for the single-venue preview/expanded view).
+export default function VenueMap({ points, onSelect, height = 360, focus = null, interactive = true, autoOpenName = null, fitPoints = null, showZoomControl = false, clickOpensMaps = false }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
-      zoomControl: interactive,
+      zoomControl: interactive || showZoomControl,
       attributionControl: interactive,
       dragging: interactive,
       scrollWheelZoom: interactive,
@@ -53,7 +56,7 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
       touchZoom: interactive,
       boxZoom: interactive,
       keyboard: interactive,
-      tap: interactive,
+      tap: true,
     })
     // CartoDB Positron — free, no API key, a clean light basemap (closer to
     // the reference style than the standard OSM tiles, and easier to read
@@ -75,22 +78,28 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
       const shapeKey = p.shape === 'diamond' ? 'diamond' : 'pin'
       const iconKey = `${shapeKey}-${p.pastCount > 0 ? 'visited' : 'upcoming'}`
       const marker = L.marker([p.lat, p.lng], { icon: ICONS[iconKey] }).addTo(map)
-      const label = p.pastCount > 0
-        ? `${p.pastCount}× visited`
-        : `${p.upcomingCount} upcoming`
-      const extraLines = [
-        p.parking ? `🚗 ${escapeHtml(p.parking)}` : null,
-        p.transit ? `🚌 ${escapeHtml(p.transit)}` : null,
-      ].filter(Boolean).map(l => `<div style="font-size:11px;color:#666;margin-top:3px">${l}</div>`).join('')
-      marker.bindPopup(
-        `<div style="font-family:'DM Sans',sans-serif;min-width:120px">` +
-        `<div style="font-weight:700;margin-bottom:2px">${escapeHtml(p.name)}</div>` +
-        `<div style="font-size:11px;color:#666">${label}${p.shape === 'diamond' ? ' · festival' : ''}</div>` +
-        extraLines +
-        `</div>`
-      )
-      if (onSelect) marker.on('click', () => onSelect(p.name))
-      if (autoOpenName && p.name === autoOpenName) marker.openPopup()
+      if (clickOpensMaps) {
+        marker.on('click', () => {
+          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query_place_id=`, '_blank', 'noopener')
+        })
+      } else {
+        const label = p.pastCount > 0
+          ? `${p.pastCount}× visited`
+          : `${p.upcomingCount} upcoming`
+        const extraLines = [
+          p.parking ? `🚗 ${escapeHtml(p.parking)}` : null,
+          p.transit ? `🚌 ${escapeHtml(p.transit)}` : null,
+        ].filter(Boolean).map(l => `<div style="font-size:11px;color:#666;margin-top:3px">${l}</div>`).join('')
+        marker.bindPopup(
+          `<div style="font-family:'DM Sans',sans-serif;min-width:120px">` +
+          `<div style="font-weight:700;margin-bottom:2px">${escapeHtml(p.name)}</div>` +
+          `<div style="font-size:11px;color:#666">${label}${p.shape === 'diamond' ? ' · festival' : ''}</div>` +
+          extraLines +
+          `</div>`
+        )
+        if (onSelect) marker.on('click', () => onSelect(p.name))
+        if (autoOpenName && p.name === autoOpenName) marker.openPopup()
+      }
       markers.push(marker)
     })
     if (focus) {
@@ -108,7 +117,7 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
       }
     }
     return () => { markers.forEach(m => m.remove()) }
-  }, [points, onSelect, focus, autoOpenName, fitPoints])
+  }, [points, onSelect, focus, autoOpenName, fitPoints, clickOpensMaps])
 
   return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden' }} />
 }

@@ -7996,6 +7996,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
   const [showActivity, setShowActivity] = useState(false)
+  const [showAddTypeMenu, setShowAddTypeMenu] = useState(false)
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
   const [showCalendar, setShowCalendar] = useState(false)
@@ -8450,7 +8451,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           return (
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ padding: '14px 16px 0', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{pastAll.length}</span>
                 <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
@@ -8464,9 +8465,35 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           );
         })()}
 
+        {/* Type pills + compact/calendar/add */}
         {view === 'home' && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1 }}>
+          <div style={{ display: 'flex', gap: 6, padding: '10px 16px 0', alignItems: 'center' }}>
+            {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
+              <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
+            ))}
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+              {compact ? '▤' : '☰'}
+            </button>
+            <button onClick={() => setShowCalendar(c => !c)} style={{ background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
+              📅
+            </button>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button onClick={() => setShowAddTypeMenu(m => !m)} aria-label="Add a show" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700 }}>+</button>
+              {showAddTypeMenu && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 130 }}>
+                  <button onClick={() => { setShowAddTypeMenu(false); setShowAdd('concert'); }} style={{ width: '100%', background: 'none', border: 'none', borderBottom: '1px solid #0c0c14', padding: '10px 14px', cursor: 'pointer', textAlign: 'left', color: '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>Concert</button>
+                  <button onClick={() => { setShowAddTypeMenu(false); setShowAdd('festival'); }} style={{ width: '100%', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', textAlign: 'left', color: '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>Festival</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Search + sort + filters */}
+        {view === 'home' && (
+          <div style={{ display: 'flex', gap: 8, padding: '8px 16px 10px', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
               <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Artist, venue, friend, tour..."
@@ -8477,66 +8504,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
               )}
             </div>
-            <button onClick={() => setShowAdd('concert')} style={{ minHeight: 38, background: '#1a1a30', border: '1px solid #a78bfa', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ Show</button>
-            <button onClick={() => setShowAdd('festival')} style={{ minHeight: 38, background: '#1a1030', border: '1px solid #f472b6', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: '#f472b6', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0 }}>+ Fest</button>
-            <button onClick={() => setShowCalendar(c => !c)} style={{ minHeight: 38, background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', fontSize: 14, flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
-              📅
-            </button>
-          </div>
-        )}
-
-        {view === 'home' && !showCalendar && (
-          <div style={{ display: 'flex', gap: 6, paddingBottom: 10, alignItems: 'center' }}>
-            {/* Type dropdown */}
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button onClick={() => { setShowYearDropdown(false); document.getElementById('type-dd') && (document.getElementById('type-dd').style.display = document.getElementById('type-dd').style.display === 'block' ? 'none' : 'block') }} style={{ minHeight: 36, padding: '7px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterType !== 'all' ? '#a78bfa' : '#13131f', color: filterType !== 'all' ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType !== 'all' ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterType !== 'all' ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-                {filterType === 'all' ? 'All' : filterType === 'concerts' ? 'Shows' : filterType === 'festivals' ? 'Festivals' : 'Online'}
-                <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
-              </button>
-              <div id="type-dd" style={{ display: 'none', position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 110 }}>
-                {[{id:'all',label:'All'},{id:'concerts',label:'Shows'},{id:'festivals',label:'Festivals'},{id:'online',label:'Online'}].map((t,i) => (
-                  <button key={t.id} onClick={() => { setFilterType(t.id); document.getElementById('type-dd').style.display='none' }} style={{ width: '100%', background: filterType === t.id ? '#1a1a30' : 'none', border: 'none', borderBottom: i < 3 ? '1px solid #0c0c14' : 'none', padding: '9px 14px', cursor: 'pointer', textAlign: 'left', color: filterType === t.id ? '#a78bfa' : '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{t.label}</button>
-                ))}
-              </div>
-            </div>
-            {/* Year dropdown (multi-select) */}
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button onClick={() => setShowYearDropdown(d => !d)} style={{ minHeight: 36, padding: '7px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: filterYears.length > 0 ? '#a78bfa' : '#13131f', color: filterYears.length > 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterYears.length > 0 ? '#a78bfa' : '#1f1f35'}`, fontWeight: filterYears.length > 0 ? 700 : 400, fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-                {filterYears.length === 0 ? 'Year' : filterYears.length === 1 ? filterYears[0] : `${filterYears.length} years`}
-                <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
-              </button>
-              {showYearDropdown && (() => {
-                const _curYr = String(new Date().getFullYear());
-                const _recentYrs = [_curYr, String(_curYr-1), String(_curYr-2)].filter(y => years.includes(y));
-                const _olderYrs = years.filter(y => !_recentYrs.includes(y));
-                const _opts = [..._recentYrs, ..._olderYrs];
-                const toggleYear = y => setFilterYears(f => f.includes(y) ? f.filter(x => x !== y) : [...f, y]);
-                return (
-                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 110 }}>
-                    <button onClick={() => { setFilterYears([]); setShowYearDropdown(false); }} style={{ width: '100%', background: filterYears.length===0?'#1a1a30':'none', border:'none', borderBottom: '1px solid #0c0c14', padding: '9px 14px', cursor:'pointer', textAlign:'left', color: filterYears.length===0?'#a78bfa':'#c4c2f0', fontFamily:"'DM Mono', monospace", fontSize:12 }}>
-                      All years
-                    </button>
-                    {_opts.map((y, i) => (
-                      <button key={y} onClick={() => toggleYear(y)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: filterYears.includes(y)?'#1a1a30':'none', border:'none', borderBottom: i < _opts.length-1 ? '1px solid #0c0c14' : 'none', padding: _olderYrs.includes(y)?'7px 14px':'9px 14px', paddingLeft: _olderYrs.includes(y)?'22px':'14px', cursor:'pointer', textAlign:'left', color: filterYears.includes(y)?'#a78bfa':_olderYrs.includes(y)?'#4a4870':'#c4c2f0', fontFamily:"'DM Mono', monospace", fontSize:12 }}>
-                        <span style={{ width: 12, height: 12, borderRadius: 3, border: `1px solid ${filterYears.includes(y) ? '#a78bfa' : '#3a3858'}`, background: filterYears.includes(y) ? '#a78bfa' : 'none', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#0c0c14' }}>{filterYears.includes(y) ? '✓' : ''}</span>
-                        {y}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-            {/* Sort button */}
-            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ minHeight: 36, background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>
+            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>
               Sort{sortOrder !== defaultSortId ? ` ↕` : ''}
             </button>
-            {/* Filters button */}
-            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ minHeight: 36, background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
               {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
-            </button>
-            {/* Compact / figures toggle */}
-            <button onClick={() => setCompact(c => !c)} style={{ marginLeft: 'auto', background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
-              {compact ? '▤' : '☰'}
             </button>
           </div>
         )}
@@ -8559,6 +8531,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <FilterGroup id="type" label="Type" activeLabel={filterType !== 'all' ? {concerts:'Concerts',festivals:'Festivals',online:'Online'}[filterType] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
               {[['all','All'],['concerts','Concerts'],['festivals','Festivals'],['online','Online']].map(([id, label]) => (
                 <button key={id} onClick={() => setFilterType(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterType === id ? '#a78bfa' : '#0c0c14', color: filterType === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+              ))}
+            </FilterGroup>
+
+            <FilterGroup id="year" label="Year" activeLabel={filterYears.length === 0 ? null : filterYears.length === 1 ? filterYears[0] : `${filterYears.length} years`} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              <button onClick={() => setFilterYears([])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterYears.length === 0 ? '#a78bfa' : '#0c0c14', color: filterYears.length === 0 ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterYears.length === 0 ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>All years</button>
+              {years.map(y => (
+                <button key={y} onClick={() => setFilterYears(f => f.includes(y) ? f.filter(x => x !== y) : [...f, y])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterYears.includes(y) ? '#a78bfa' : '#0c0c14', color: filterYears.includes(y) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterYears.includes(y) ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{y}</button>
               ))}
             </FilterGroup>
 

@@ -7371,6 +7371,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
         <SettingsSection title="App" icon="sliders">
           <PreferenceBlock
+            label="Appearance" sub="Same color theme, flipped background/text"
+            value={local.lightMode ? 'light' : 'dark'}
+            options={[{id:'dark',label:'Dark'},{id:'light',label:'Light'}]}
+            onChange={v => { const val = v === 'light'; onUpdate('lightMode', val); lUpdate('lightMode', val); }}
+          />
+          <PreferenceBlock
             label="Color theme" sub="Changes instantly, no save needed"
             value={local.colorTheme || 'purple'}
             options={[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}]}
@@ -7861,6 +7867,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const THEME_FILTER = { purple:'', blue:'hue-rotate(-50deg)', green:'hue-rotate(-145deg)', red:'hue-rotate(90deg)', orange:'hue-rotate(130deg)', mono:'grayscale(1)' };
   const themeFilter = THEME_FILTER[settings.colorTheme] ?? '';
+  // Light mode reuses the same filter trick as color themes, rather than a
+  // ground-up light palette: invert(1) + hue-rotate(180deg) flips dark<->light
+  // while roughly preserving hue (the same technique "force dark mode" browser
+  // extensions use in reverse). It's self-inverse, so combining it with a
+  // color theme is just a matter of chaining the two filters.
+  const LIGHT_FILTER = 'invert(1) hue-rotate(180deg)';
+  const lightMode = !!settings.lightMode;
+  const combinedFilter = [lightMode ? LIGHT_FILTER : '', themeFilter].filter(Boolean).join(' ');
 
   // Best-effort: if this concert's venue doesn't have map coordinates yet,
   // fetch them in the background (Nominatim, free, no key) and save. Never
@@ -8068,7 +8082,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     }}>{children}</button>
   )
 
-  const appShell = { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0c0c14', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: themeFilter || undefined, overflow: 'hidden' }
+  const appShell = { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0c0c14', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: combinedFilter || undefined, overflow: 'hidden' }
   useEffect(() => {
     const id = 'theme-img-counter'
     let el = document.getElementById(id)
@@ -8080,10 +8094,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       'hue-rotate(130deg)': 'hue-rotate(-130deg)',
       'grayscale(1)': 'grayscale(1) invert(1) grayscale(1) invert(1)',
     }
-    const inv = inverse[themeFilter] || ''
-    el.textContent = themeFilter && inv ? `[data-theme-shell] img { filter: ${inv} !important; }` : ''
+    // Cancel the parent filter chain for images/map-tiles: reverse order,
+    // each step inverted. LIGHT_FILTER is self-inverse so it's the same token.
+    const themeInv = inverse[themeFilter] || ''
+    const imgFilter = [themeInv, lightMode ? LIGHT_FILTER : ''].filter(Boolean).join(' ')
+    el.textContent = imgFilter ? `[data-theme-shell] img { filter: ${imgFilter} !important; }` : ''
     return () => { const e = document.getElementById(id); if (e) e.textContent = '' }
-  }, [themeFilter])
+  }, [themeFilter, lightMode])
 
   const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
 

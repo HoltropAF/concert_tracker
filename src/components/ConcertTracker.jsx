@@ -5771,33 +5771,21 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, padding: '14px 16px 0' }}>
-          <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
-            <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>visited</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '14px 16px 0' }}>
+          <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
+            <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>visited</div>
           </div>
-          {v.avgTicket && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{v.avgTicket.toFixed(0)}</div>
-              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>avg ticket</div>
-            </div>
-          )}
-          {totalSpent > 0 && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>€{totalSpent.toFixed(0)}</div>
-              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>total spent</div>
-            </div>
-          )}
           {v.avgRating && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>★{v.avgRating.toFixed(1)}</div>
-              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>avg rating</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>★{v.avgRating.toFixed(1)}</div>
+              <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>avg rating</div>
             </div>
           )}
           {artists.length > 0 && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{artists.length}</div>
-              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>artists</div>
+            <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{artists.length}</div>
+              <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>artists</div>
             </div>
           )}
         </div>
@@ -5872,7 +5860,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px', WebkitOverflowScrolling: 'touch' }}>
             {v.photos.map(c => (
               <button key={c.id} onClick={() => onOpen(c)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
-                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: '16 / 10', borderRadius: 10 }} />
+                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: '16 / 10', borderRadius: 10 }} />
                 <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.date.slice(0,4)} · {c.artist}</div>
               </button>
             ))}

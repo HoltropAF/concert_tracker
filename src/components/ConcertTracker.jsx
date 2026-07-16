@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
+import { geocodeVenue } from '../lib/geocode'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
 
@@ -7794,11 +7795,27 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const THEME_FILTER = { purple:'', blue:'hue-rotate(-50deg)', green:'hue-rotate(-145deg)', red:'hue-rotate(90deg)', orange:'hue-rotate(130deg)', mono:'grayscale(1)' };
   const themeFilter = THEME_FILTER[settings.colorTheme] ?? '';
 
+  // Best-effort: if this concert's venue doesn't have map coordinates yet,
+  // fetch them in the background (Nominatim, free, no key) and save. Never
+  // blocks or fails the actual concert save.
+  const maybeGeocodeVenue = (concert) => {
+    if (!concert?.venue) return
+    const venueInfo = settings.venueInfo || {}
+    if (venueInfo[concert.venue]?.lat != null) return
+    geocodeVenue(concert.venue, concert.city, concert.country).then(coords => {
+      if (!coords) return
+      const next = { ...(settings.venueInfo || {}) }
+      next[concert.venue] = { ...(next[concert.venue] || {}), ...coords }
+      onUpdateSetting('venueInfo', next)
+    })
+  }
+
   const handleSave = async (updated) => {
     const result = await onSaveConcert(updated)
     notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success')
     if (result?.error) return result
     setSelected(updated)
+    maybeGeocodeVenue(updated)
     return result
   }
 
@@ -8066,6 +8083,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success');
             if (result?.error) return;
             setShowAdd(null); savedScrollPos.current = 0; setSelected(c);
+            maybeGeocodeVenue(c);
             if (settings.spotifyAccessToken && getSongList(c.setlist).length > 0) {
               setSpotifyPrompt(c);
             }

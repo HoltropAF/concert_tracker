@@ -119,6 +119,16 @@ const friendColor = name => {
   return FRIEND_HUES[hash % FRIEND_HUES.length];
 };
 const friendInitials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+// Picks a transit emoji based on the words actually used, so "tram 5" and
+// "Amsterdam Centraal" don't both get the same generic subway icon.
+const transitEmoji = text => {
+  const t = (text || '').toLowerCase();
+  if (/\bbus\b/.test(t)) return '🚌';
+  if (/\btram\b/.test(t)) return '🚊';
+  if (/\b(metro|subway|underground)\b/.test(t)) return '🚇';
+  if (/\b(train|station|centraal|central|gare|bahnhof|trein)\b/.test(t)) return '🚆';
+  return '🚏';
+};
 // Detail-page header subtitle: each entry in `lines` is its own row; an entry
 // that is itself an array gets its parts joined with " · " on that one row.
 // Used on Venue/Artist/Song/Friend detail headers for consistency.
@@ -5655,8 +5665,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
                   <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
                   {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
-                  {vInfo.parking && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🅿️ Parking ↗</a>}
-                  {vInfo.transit && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚇 Transit ↗</a>}
+                  {vInfo.parking && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚗 Parking ↗</a>}
+                  {vInfo.transit && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{transitEmoji(vInfo.transit)} Transit ↗</a>}
                   <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] }); setEditingVenueInfo(true); }}
                     style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
                     edit

@@ -5686,8 +5686,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             // text you typed, and a separate pin that opens Maps for that spot.
             const InfoChip = ({ id, icon, label, text }) => (
               <span style={{ ...chipStyle, paddingRight: 6, flexShrink: 0 }}>
-                {icon} {label}
-                <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', padding: 0, display: 'inline-flex' }} aria-label={`${label} info`}>{ICONS.info}</button>
+                <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: 5, font: 'inherit' }} aria-label={`${label} info`}>
+                  {icon} {label}
+                </button>
                 <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', color: '#6b6a8f' }} aria-label={`${label} on Maps`}>{ICONS.pin}</a>
               </span>
             );

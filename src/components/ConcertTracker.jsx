@@ -5701,7 +5701,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                   <button onClick={() => {
                     setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
                     setEditingVenueInfo(true);
-                  }} style={{ ...chipStyle, flexShrink: 0 }}>{ICONS.edit} Edit</button>
+                  }} aria-label="Edit venue" style={{ ...chipStyle, flexShrink: 0, width: 26, height: 26, padding: 0, justifyContent: 'center' }}>{ICONS.edit}</button>
                 </div>
                 {openVenueInfoPopup === 'parking' && vInfo.parking && (
                   <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{vInfo.parking}</div>

@@ -8035,6 +8035,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showSort, setShowSort] = useState(false)
   const [openFilterSection, setOpenFilterSection] = useState(null) // accordion: only one filter category open at a time
   const [filterFriend, setFilterFriend] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all') // 'all' | 'want' | 'upcoming' | 'past'
   const [filterVenue, setFilterVenue] = useState('all')
   const [filterRating, setFilterRating] = useState(0)
   const [filterSolo, setFilterSolo] = useState(false)
@@ -8174,9 +8175,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
     filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto,
-    filterType !== 'all'
+    filterType !== 'all', filterStatus !== 'all'
   ].filter(Boolean).length
-  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); }
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus('all'); }
   const resetSort = () => setSortOrder(settings.defaultSort || 'newest')
 
   // Shared with both the past/upcoming list and the wishlist, so picking "Online"
@@ -8223,6 +8224,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const wishlist = concerts.filter(c => isWish(c) && matchesType(c))
   const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
   const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
+  const combinedShows = filterStatus === 'want' ? wishlist
+    : filterStatus === 'upcoming' ? upcoming
+    : filterStatus === 'past' ? past
+    : [...wishlist, ...upcoming, ...past]
   const allPast = concerts.filter(c => !isWish(c) && isPastDate(c.date))
   const headerCounts = {
     concerts: allPast.filter(c => c.type !== 'festival').length,
@@ -8578,6 +8583,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
             <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
 
+            <FilterGroup id="status" label="Status" activeLabel={filterStatus !== 'all' ? { want: 'Want to go', upcoming: 'Upcoming', past: 'Past' }[filterStatus] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
+              {[['all','All'],['want','Want to go'],['upcoming','Upcoming'],['past','Past']].map(([id, label]) => (
+                <button key={id} onClick={() => setFilterStatus(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterStatus === id ? '#a78bfa' : '#0c0c14', color: filterStatus === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterStatus === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+              ))}
+            </FilterGroup>
+
             <FilterGroup id="type" label="Type" activeLabel={filterType !== 'all' ? {concerts:'Concerts',festivals:'Festivals',online:'Online'}[filterType] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
               {[['all','All'],['concerts','Concerts'],['festivals','Festivals'],['online','Online']].map(([id, label]) => (
                 <button key={id} onClick={() => setFilterType(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterType === id ? '#a78bfa' : '#0c0c14', color: filterType === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterType === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
@@ -8770,44 +8781,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {concerts.length > 0 && !showCalendar && filtered.length === 0 && (
               <EmptyState title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
-            {!showCalendar && filtered.length > 0 && <>
-            {wishlist.length > 0 && (
+            {!showCalendar && filtered.length > 0 && (
               <div style={{ marginTop: 10 }}>
-                <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showWishlist ? '4px 4px 10px' : '4px 4px 6px', marginBottom: showWishlist ? 4 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Want to go</span>
-                    <span style={{ fontSize: 10, color: '#2e4a3a', fontFamily: "'DM Mono', monospace", background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 99, padding: '1px 7px' }}>{wishlist.length}</span>
-                  </div>
-                  <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
-                </button>
-                {showWishlist && renderConcertList(wishlist, false)}
-                <div style={{ height: 1, background: '#0e0e1a', margin: showWishlist ? '4px 0 16px' : '0 0 12px' }} />
+                {renderConcertList(combinedShows, settings.showListPhotos !== false)}
               </div>
             )}
-            {upcoming.length > 0 && (
-              <div style={{ marginTop: 10 }}>
-                <button onClick={() => setShowUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showUpcoming ? '4px 4px 10px' : '4px 4px 6px', marginBottom: showUpcoming ? 4 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: '#818cf8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upcoming</span>
-                    <span style={{ fontSize: 10, color: '#4a4a8f', fontFamily: "'DM Mono', monospace", background: '#12122a', border: '1px solid #2e2e5a', borderRadius: 99, padding: '1px 7px' }}>{upcoming.length}</span>
-                  </div>
-                  <span style={{ fontSize: 11, color: '#818cf8', transform: showUpcoming ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
-                </button>
-                {(showUpcoming || !!search) && renderConcertList(upcoming, settings.showListPhotos !== false)}
-                <div style={{ height: 1, background: '#0e0e1a', margin: showUpcoming ? '12px 0 16px' : '0 0 12px' }} />
-              </div>
-            )}
-            <div style={{ marginTop: upcoming.length > 0 ? 0 : 10 }}>
-              <button onClick={() => setShowPast(p => !p)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showPast ? '4px 4px 10px' : '4px 4px 6px', marginBottom: showPast ? 4 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 10, color: '#a78bfa', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Past</span>
-                  <span style={{ fontSize: 10, color: '#4a3d70', fontFamily: "'DM Mono', monospace", background: '#181229', border: '1px solid #2e2350', borderRadius: 99, padding: '1px 7px' }}>{past.length}</span>
-                </div>
-                <span style={{ fontSize: 11, color: '#a78bfa', transform: showPast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
-              </button>
-              {(showPast || !!search) && renderConcertList(past, settings.showListPhotos !== false)}
-            </div>
-            </>}
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}

@@ -4802,7 +4802,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   );
 }
 
-function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
+function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {} }) {
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
@@ -4813,6 +4813,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
   const [showSort, setShowSort] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [filterType, setFilterType] = useState('all');
+  const [showAddArtistForm, setShowAddArtistForm] = useState(false);
+  const [addArtistInput, setAddArtistInput] = useState('');
 
   // Group headliner shows by artist (festivals excluded — their name is not an artist)
   const artistMap = {};
@@ -4863,6 +4865,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
     const guestCount = supportApps.filter(a => a.role === 'guest').length;
     const festivalCount = supportApps.filter(a => a.role === 'festival').length;
     return { name, shows, pastShows, upcomingShows, upcomingSupportApps, pastCount: pastShows.length, avgRating, firstShow, lastShow, topGenre, supportApps, supportCount, guestCount, festivalCount };
+  });
+
+  // Artists you haven't seen yet, but want to — kept separate so they never
+  // count toward "seen" stats.
+  const existingArtistNames = new Set(artistEntries.map(a => a.name.toLowerCase()));
+  const wantToSeeArtists = (settings.wantToSeeArtists || []).filter(w => !existingArtistNames.has(w.toLowerCase()));
+  wantToSeeArtists.forEach(name => {
+    artistEntries.push({
+      name, shows: [], pastShows: [], upcomingShows: [], upcomingSupportApps: [], pastCount: 0, avgRating: null,
+      firstShow: null, lastShow: null, topGenre: null, supportApps: [], supportCount: 0, guestCount: 0, festivalCount: 0,
+      wantToSee: true,
+    });
   });
 
   const activeFilterCount = [filterGenre !== 'all', filterMinSeen > 0, filterUpcoming].filter(Boolean).length;
@@ -4950,7 +4964,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
           </div>
         </div>
         {/* Hero count + money stats */}
-        {(() => {
+        {totalAppearances === 0 ? (
+          <div style={{ padding: "14px 16px 0" }}>
+            <div style={{ fontSize: 13, color: "#6b6a8f", marginBottom: 10 }}>Haven't seen them live yet.</div>
+            <button onClick={() => {
+              const next = (settings.wantToSeeArtists || []).filter(w => w.toLowerCase() !== selectedArtist.toLowerCase());
+              onUpdateSetting('wantToSeeArtists', next);
+              setSelectedArtist(null);
+            }} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+              Remove from want-to-see list
+            </button>
+          </div>
+        ) : (() => {
           const priced = pastShows.filter(c => c.ticketPrice > 0);
           const avgTicket = priced.length ? priced.reduce((a, c) => a + c.ticketPrice, 0) / priced.length : null;
           const totalSpentOnArtist = pastShows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
@@ -5102,7 +5127,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
   }
 
   // ── Artist overview stats ───────────────────────────────────────────────────
-  const totalArtists = artistEntries.length;
+  const totalArtists = artistEntries.filter(a => !a.wantToSee).length;
   const uniqueGenres = new Set(artistEntries.flatMap(a => a.shows.flatMap(c => getGenres(c)))).size;
   const pastArtists = artistEntries.filter(a => a.pastCount > 0);
   const avgShowsPerArtist = pastArtists.length ? (pastArtists.reduce((s, a) => s + a.pastCount, 0) / pastArtists.length).toFixed(1) : null;
@@ -5138,11 +5163,45 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
       )}
 
       {/* Type pills */}
-      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6 }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => { setAddArtistInput(''); setShowAddArtistForm(true); }} aria-label="Add an artist you want to see" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
       </div>
+
+      {/* Add an artist you want to see */}
+      {showAddArtistForm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowAddArtistForm(false)}>
+          <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Artist you want to see</div>
+              <button onClick={() => setShowAddArtistForm(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Artist name</div>
+              <input
+                value={addArtistInput}
+                onChange={e => setAddArtistInput(e.target.value)}
+                placeholder="e.g. Fontaines D.C."
+                autoFocus
+                style={{ width: '100%', boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+              />
+            </div>
+            <button disabled={!addArtistInput.trim()} onClick={() => {
+              const name = addArtistInput.trim();
+              if (!name) return;
+              const next = [...(settings.wantToSeeArtists || []), name];
+              onUpdateSetting('wantToSeeArtists', next);
+              setShowAddArtistForm(false);
+              setSelectedArtist(name);
+            }} style={{ width: '100%', background: '#a78bfa', border: 'none', borderRadius: 10, color: '#0c0c14', fontSize: 14, fontWeight: 700, padding: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", opacity: !addArtistInput.trim() ? 0.5 : 1 }}>
+              Add
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Search + sort + filters */}
       <div style={{ padding: "8px 16px 0", position: "relative", zIndex: 10 }}>
@@ -5208,7 +5267,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
 
       {/* Artist list */}
       <div style={{ padding: "0 16px" }}>
-        {sorted.map(({ name, pastCount, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps }) => {
+        {sorted.map(({ name, pastCount, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps, wantToSee }) => {
           const total = pastCount + supportCount + guestCount + festivalCount;
           const latestSupportDate = supportApps.length > 0 ? supportApps.slice().sort((a,b) => b.concert.date.localeCompare(a.concert.date))[0].concert.date : null;
           const displayDate = lastShow ? lastShow.date : latestSupportDate;
@@ -5216,28 +5275,31 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {} }) {
           return (
           <button key={name} onClick={() => setSelectedArtist(name)} style={{
             width: "100%", textAlign: "left", background: "#13131f",
-            border: "1px solid #1f1f35", borderLeft: `3px solid ${getBorderColor(total)}`,
+            border: "1px solid #1f1f35", borderLeft: `3px solid ${wantToSee ? '#34d399' : getBorderColor(total)}`,
             borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
+                {wantToSee && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to see</span>}
                 {topGenre && (
                   <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 99, background: '#1a1a30', color: '#6b6a8f', flexShrink: 0 }}>{topGenre}</span>
                 )}
               </div>
               <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-                {firstShow && lastShow && firstShow.date !== lastShow.date
+                {wantToSee ? 'not seen yet' : firstShow && lastShow && firstShow.date !== lastShow.date
                   ? `${firstShow.date.slice(0,4)} – ${lastShow.date.slice(0,4)} · last ${formatDate(lastShow.date)}`
                   : displayDate ? formatDate(displayDate) : ''}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+              {!wantToSee && (
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#6b6a8f', lineHeight: 1 }}>{total}</span>
                 <span style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>time{total !== 1 ? 's' : ''}</span>
               </div>
+              )}
               {(supportCount > 0 || guestCount > 0 || festivalCount > 0) && (
                 <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right' }}>
                   {[pastCount > 0 && `${pastCount}h`, supportCount > 0 && `${supportCount}s`, guestCount > 0 && `${guestCount}g`, festivalCount > 0 && `${festivalCount}f`].filter(Boolean).join('·')}
@@ -8672,7 +8734,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

@@ -5600,6 +5600,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [newTagInput, setNewTagInput] = useState('');
   const [showVenuesMap, setShowVenuesMap] = useState(false);
   const [openVenueInfoPopup, setOpenVenueInfoPopup] = useState(null);
+  const [showAddVenueForm, setShowAddVenueForm] = useState(false);
+  const [addVenueInput, setAddVenueInput] = useState({ name: '', city: '', country: '' });
+  const [addVenueSaving, setAddVenueSaving] = useState(false);
   useEffect(() => { setShowVenuePast(false); setShowVenueUpcoming(false); setEditingVenueInfo(false); setOpenVenueInfoPopup(null); }, [selectedVenue]);
   useEffect(() => { onDetailChange(selectedVenue !== null); return () => onDetailChange(false); }, [selectedVenue]);
 
@@ -5628,6 +5631,17 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const photos = past.filter(c => c.photo);
     const mapShape = shows.length > 0 && shows.every(c => c.type === 'festival') ? 'diamond' : 'pin';
     return { name, shows, past, upcoming, pastCount: past.length, avgRating, avgTicket, city, country, lastVisit, photos, mapShape };
+  });
+
+  // Venues you haven't logged a show at yet, but want to — kept separate from
+  // real (attended) venues so they never get counted in stats/spend.
+  const existingNames = new Set(venueEntries.map(v => v.name.toLowerCase()));
+  const wantToVisitVenues = (settings.wantToVisitVenues || []).filter(w => !existingNames.has(w.name.toLowerCase()));
+  wantToVisitVenues.forEach(w => {
+    venueEntries.push({
+      name: w.name, shows: [], past: [], upcoming: [], pastCount: 0, avgRating: null, avgTicket: null,
+      city: w.city || null, country: w.country || null, lastVisit: null, photos: [], mapShape: 'pin', wantToVisit: true,
+    });
   });
 
   const sorted = venueEntries
@@ -5768,6 +5782,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           </div>
         )}
+        {!v.wantToVisit && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '14px 16px 0' }}>
           <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
@@ -5792,6 +5807,18 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           )}
         </div>
+        )}
+        {v.wantToVisit && (
+          <div style={{ padding: '14px 16px 0' }}>
+            <button onClick={() => {
+              const next = (settings.wantToVisitVenues || []).filter(w => w.name.toLowerCase() !== selectedVenue.toLowerCase());
+              onUpdateSetting('wantToVisitVenues', next);
+              setSelectedVenue(null);
+            }} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+              Remove from want-to-go list
+            </button>
+          </div>
+        )}
         {(() => {
           const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
           const showRooms = settings.showVenueRooms !== false;
@@ -5912,10 +5939,56 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
+        <button onClick={() => { setAddVenueInput({ name: '', city: '', country: '' }); setShowAddVenueForm(true); }} aria-label="Add a venue you want to visit" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         <button onClick={() => setShowVenuesMap(m => !m)} style={{ background: showVenuesMap ? '#a78bfa' : 'none', border: `1px solid ${showVenuesMap ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showVenuesMap ? '#0c0c14' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: showVenuesMap ? 700 : 400, flexShrink: 0 }}>
           Map
         </button>
       </div>
+
+      {/* Add a "want to visit" venue */}
+      {showAddVenueForm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowAddVenueForm(false)}>
+          <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Venue you want to visit</div>
+              <button onClick={() => setShowAddVenueForm(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+            </div>
+            {[
+              { key: 'name', label: 'Venue name', placeholder: 'e.g. Wembley Arena' },
+              { key: 'city', label: 'City', placeholder: 'e.g. London' },
+              { key: 'country', label: 'Country', placeholder: 'e.g. United Kingdom' },
+            ].map(({ key, label, placeholder }) => (
+              <div key={key} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>{label}</div>
+                <input
+                  value={addVenueInput[key]}
+                  onChange={e => setAddVenueInput(p => ({ ...p, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  style={{ width: '100%', boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+                />
+              </div>
+            ))}
+            <button disabled={!addVenueInput.name.trim() || addVenueSaving} onClick={async () => {
+              const entry = { name: addVenueInput.name.trim(), city: addVenueInput.city.trim(), country: addVenueInput.country.trim() };
+              if (!entry.name) return;
+              setAddVenueSaving(true);
+              const next = [...(settings.wantToVisitVenues || []), entry];
+              onUpdateSetting('wantToVisitVenues', next);
+              const coords = await geocodeVenue(entry.name, entry.city, entry.country);
+              if (coords) {
+                const info = { ...(settings.venueInfo || {}) };
+                info[entry.name] = { ...(info[entry.name] || {}), ...coords };
+                onUpdateSetting('venueInfo', info);
+              }
+              setAddVenueSaving(false);
+              setShowAddVenueForm(false);
+              setSelectedVenue(entry.name);
+            }} style={{ width: '100%', background: '#a78bfa', border: 'none', borderRadius: 10, color: '#0c0c14', fontSize: 14, fontWeight: 700, padding: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", opacity: !addVenueInput.name.trim() || addVenueSaving ? 0.5 : 1 }}>
+              {addVenueSaving ? 'Saving…' : 'Add'}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Search + sort */}
       <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
@@ -5962,11 +6035,14 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {!showVenuesMap && (
       <div style={{ padding: '0 12px' }}>
         {sorted.map(v => (
-          <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.wantToVisit ? '#34d399' : v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
+                {v.wantToVisit && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to go</span>}
+              </div>
               <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                {v.city ? `${v.city} · ` : ''}{v.pastCount}× past{v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}
+                {v.wantToVisit ? (v.city || v.country || 'no shows logged yet') : `${v.city ? `${v.city} · ` : ''}${v.pastCount}× past${v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}`}
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>

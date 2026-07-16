@@ -5848,7 +5848,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`;
           return (
             <div style={{ padding: '12px 16px 0', position: 'relative' }}>
-              <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} showZoomControl clickOpensMaps height={130} />
+              <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, wantToVisit: v.wantToVisit }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} showZoomControl clickOpensMaps height={130} />
               <a href={mapsHref} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', top: 20, right: 24, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
                 Open in Maps ↗
               </a>
@@ -6035,18 +6035,19 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {showVenuesMap && (() => {
         const mapPoints = sorted.map(v => {
           const info = (settings.venueInfo || {})[v.name] || {};
-          return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, country: v.country };
+          return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, country: v.country, wantToVisit: v.wantToVisit };
         }).filter(p => typeof p.lat === 'number');
         const useCountryDefault = settings.mapDefaultRegion === 'country' && settings.defaultCountry;
         const fitPoints = useCountryDefault ? mapPoints.filter(p => p.country === settings.defaultCountry) : null;
         return (
           <div style={{ padding: '0 12px' }}>
             <VenueMap points={mapPoints} fitPoints={fitPoints && fitPoints.length > 0 ? fitPoints : null} onSelect={name => setSelectedVenue(name)} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap', overflowX: 'auto' }}>
-              <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', marginRight: 3 }} />visited</span>
-              <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#34d399', marginRight: 3 }} />upcoming</span>
-              <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#6b6a8f', marginRight: 3 }} />concert</span>
-              <span><span style={{ display: 'inline-block', width: 7, height: 7, background: '#6b6a8f', marginRight: 3, transform: 'rotate(45deg)' }} />festival</span>
+            <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap', overflowX: 'auto' }}>
+              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', marginRight: 3 }} />visited</span>
+              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#34d399', marginRight: 3 }} />upcoming</span>
+              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', marginRight: 3 }} />want to go</span>
+              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#6b6a8f', marginRight: 3 }} />concert</span>
+              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, background: '#6b6a8f', marginRight: 3, transform: 'rotate(45deg)' }} />festival</span>
             </div>
           </div>
         );

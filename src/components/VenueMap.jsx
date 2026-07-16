@@ -31,8 +31,10 @@ function pinIcon(color, shape) {
 const ICONS = {
   'pin-visited': pinIcon('#a78bfa', 'pin'),
   'pin-upcoming': pinIcon('#34d399', 'pin'),
+  'pin-want': pinIcon('#fbbf24', 'pin'),
   'diamond-visited': pinIcon('#a78bfa', 'diamond'),
   'diamond-upcoming': pinIcon('#34d399', 'diamond'),
+  'diamond-want': pinIcon('#fbbf24', 'diamond'),
 }
 
 // points: [{ name, lat, lng, pastCount, upcomingCount, shape: 'pin' | 'diamond' }]
@@ -76,16 +78,18 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
     points.forEach(p => {
       if (typeof p.lat !== 'number' || typeof p.lng !== 'number') return
       const shapeKey = p.shape === 'diamond' ? 'diamond' : 'pin'
-      const iconKey = `${shapeKey}-${p.pastCount > 0 ? 'visited' : 'upcoming'}`
+      const iconKey = `${shapeKey}-${p.wantToVisit ? 'want' : p.pastCount > 0 ? 'visited' : 'upcoming'}`
       const marker = L.marker([p.lat, p.lng], { icon: ICONS[iconKey] }).addTo(map)
       if (clickOpensMaps) {
         marker.on('click', () => {
           window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query_place_id=`, '_blank', 'noopener')
         })
       } else {
-        const label = p.pastCount > 0
-          ? `${p.pastCount}× visited`
-          : `${p.upcomingCount} upcoming`
+        const label = p.wantToVisit
+          ? 'want to go'
+          : p.pastCount > 0
+            ? `${p.pastCount}× visited`
+            : `${p.upcomingCount} upcoming`
         const extraLines = [
           p.parking ? `🚗 ${escapeHtml(p.parking)}` : null,
           p.transit ? `🚌 ${escapeHtml(p.transit)}` : null,

@@ -5625,7 +5625,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const country = shows[0]?.country || null;
     const lastVisit = past.sort((a,b) => b.date.localeCompare(a.date))[0] || null;
     const photos = past.filter(c => c.photo);
-    return { name, shows, past, upcoming, pastCount: past.length, avgRating, avgTicket, city, country, lastVisit, photos };
+    const mapShape = shows.length > 0 && shows.every(c => c.type === 'festival') ? 'diamond' : 'pin';
+    return { name, shows, past, upcoming, pastCount: past.length, avgRating, avgTicket, city, country, lastVisit, photos, mapShape };
   });
 
   const sorted = venueEntries
@@ -5795,7 +5796,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           return (
             <div style={{ padding: '12px 16px 0' }}>
               <button onClick={() => setShowVenueMapModal(true)} style={{ position: 'relative', width: '100%', padding: 0, border: 'none', cursor: 'pointer', display: 'block', borderRadius: 12, overflow: 'hidden' }}>
-                <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} height={130} />
+                <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} height={130} />
                 <div style={{ position: 'absolute', top: 8, right: 8, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
                   ⤢ expand
                 </div>
@@ -5815,7 +5816,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
               <VenueMap
                 points={venueEntries.map(ve => {
                   const info = (settings.venueInfo || {})[ve.name] || {};
-                  return { name: ve.name, lat: info.lat, lng: info.lng, pastCount: ve.pastCount, upcomingCount: ve.upcoming.length };
+                  return { name: ve.name, lat: info.lat, lng: info.lng, pastCount: ve.pastCount, upcomingCount: ve.upcoming.length, shape: ve.mapShape };
                 }).filter(p => typeof p.lat === 'number')}
                 autoOpenName={selectedVenue}
                 onSelect={name => { setShowVenueMapModal(false); setSelectedVenue(name); }}
@@ -5918,13 +5919,15 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <VenueMap
             points={venueEntries.map(v => {
               const info = (settings.venueInfo || {})[v.name] || {};
-              return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length };
+              return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape };
             }).filter(p => typeof p.lat === 'number')}
             onSelect={name => setSelectedVenue(name)}
           />
-          <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 8, fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', marginRight: 4 }} />visited</span>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#34d399', marginRight: 4 }} />upcoming only</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#6b6a8f', marginRight: 4 }} />pin = concerts</span>
+            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#6b6a8f', marginRight: 4, transform: 'rotate(45deg)' }} />diamond = festival</span>
           </div>
         </div>
       )}

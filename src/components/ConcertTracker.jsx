@@ -5361,39 +5361,6 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       setRefreshingInfo(false);
     }
   };
-  const [fixingAllArt, setFixingAllArt] = useState(false);
-  const [fixAllArtProgress, setFixAllArtProgress] = useState(null); // { done, total } | null
-  const handleFixAllAlbumArt = async () => {
-    if (fixingAllArt) return;
-    const linked = songEntries.filter(e => e.spotifyId);
-    if (linked.length === 0) return;
-    setFixingAllArt(true);
-    setFixAllArtProgress({ done: 0, total: linked.length });
-    try {
-      const token = await getValidSpotifyToken(settings, saveSettings);
-      if (!token) return;
-      for (let i = 0; i < linked.length; i++) {
-        const e = linked[i];
-        try {
-          const r = await fetch(`https://api.spotify.com/v1/tracks/${e.spotifyId}`, { headers: { Authorization: `Bearer ${token}` } });
-          if (r.ok) {
-            const t = await r.json();
-            onLinkSong && onLinkSong(e.name, e.artist, {
-              durationMs: t.duration_ms || e.durationMs,
-              popularity: typeof t.popularity === 'number' ? t.popularity : e.popularity,
-              trackNumber: t.track_number || e.trackNumber,
-              albumName: t.album?.name || e.albumName,
-              albumId: t.album?.id || e.albumId,
-              albumArt: t.album?.images?.[0]?.url || e.albumArt,
-            });
-          }
-        } catch {}
-        setFixAllArtProgress({ done: i + 1, total: linked.length });
-      }
-    } finally {
-      setFixingAllArt(false);
-    }
-  };
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
 
   const songCount = {};
@@ -5550,11 +5517,6 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
               <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
                 across {past.length} show{past.length !== 1 ? 's' : ''}{totalArtists > 0 ? `, ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}
               </div>
-            )}
-            {songEntries.some(e => e.spotifyId) && (
-              <button onClick={handleFixAllAlbumArt} disabled={fixingAllArt} style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: fixingAllArt ? 'default' : 'pointer', textDecoration: fixingAllArt ? 'none' : 'underline', textUnderlineOffset: 2 }}>
-                {fixingAllArt ? `improving album art quality… ${fixAllArtProgress ? `${fixAllArtProgress.done}/${fixAllArtProgress.total}` : ''}` : 'improve album art quality for all linked songs'}
-              </button>
             )}
           </div>
         );
@@ -6056,7 +6018,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
       )}
       {/* Type pills + map toggle */}
-      <div style={{ padding: '10px 12px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
@@ -6132,7 +6094,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
       )}
       {/* Search + sort */}
-      <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search venues..."
@@ -6146,7 +6108,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </button>
       </div>
       {showSort && (
-        <div style={{ margin: '0 12px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
+        <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
           {sortBy !== 'most-visited' && <button onClick={() => setSortBy('most-visited')} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {[{id:'most-visited',label:'Most visited'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Recently visited'},{id:'rating',label:'Best rated'}].map(s => (
@@ -6156,7 +6118,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
       )}
       {showFilters && (
-        <div style={{ margin: '0 12px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
+        <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
           {activeFilterCount > 0 && <button onClick={() => { setFilterCountry('all'); setFilterWantToGo(false); setFilterMinVisited(0); }} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
           {allVenueCountries.length > 1 && (
             <div style={{ marginBottom: 10 }}>
@@ -6192,7 +6154,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         const useCountryDefault = settings.mapDefaultRegion === 'country' && settings.defaultCountry;
         const fitPoints = useCountryDefault ? mapPoints.filter(p => p.country === settings.defaultCountry) : null;
         return (
-          <div style={{ padding: '0 12px' }}>
+          <div style={{ padding: '0 16px' }}>
             <VenueMap points={mapPoints} fitPoints={fitPoints && fitPoints.length > 0 ? fitPoints : null} onSelect={name => setSelectedVenue(name)} />
             <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap', overflowX: 'auto' }}>
               <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', marginRight: 3 }} />visited</span>
@@ -6207,7 +6169,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 
       {/* Venue list */}
       {!showVenuesMap && (
-      <div style={{ padding: '0 12px' }}>
+      <div style={{ padding: '0 16px' }}>
         {sorted.map(v => (
           <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.wantToVisit ? '#34d399' : v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>

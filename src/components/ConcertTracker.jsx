@@ -5604,9 +5604,11 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
 
-  // Build venue map
+  // Build venue map — online/streamed shows are excluded: the "venue" field on
+  // those just describes where the artist performed from, not anywhere you
+  // actually went, so they shouldn't count as a visited (or upcoming) place.
   const venueMap = {};
-  concerts.filter(c => !isWish(c) && c.venue).forEach(c => {
+  concerts.filter(c => !isWish(c) && c.venue && !isOnline(c)).forEach(c => {
     const key = c.venue.trim();
     if (!venueMap[key]) venueMap[key] = [];
     venueMap[key].push(c);

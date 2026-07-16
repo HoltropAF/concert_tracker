@@ -4578,12 +4578,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
           const distinctVenues = Object.keys(vCount).length;
           const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
-          const totalSpent = f.shows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((ms, m) => ms + (parseFloat(m.price) || 0), 0) + extraCostTotal(c), 0);
           const tiles = [
             { value: `${f.shows.length}×`, label: "together" },
             avgR && { value: `★ ${avgR}`, label: "avg rating" },
             distinctVenues > 0 && { value: distinctVenues, label: "venues" },
-            totalSpent > 0 && { value: `€${totalSpent.toFixed(0)}`, label: "spent" },
             distinctCountries > 1 && { value: distinctCountries, label: "countries" },
           ].filter(Boolean);
           return (
@@ -4676,19 +4674,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
             </div>
           )}
 
-          {/* Highly rated shows together */}
-          {(() => {
-            const minRating = settings.ratingSystem === 10 ? 8 : 4;
-            const highlights = f.sortedShows.filter(c => c.rating && c.rating >= minRating);
-            if (highlights.length === 0) return null;
-            return (
-              <div style={card}>
-                <div style={sectionLabel}>Highlights together · {highlights.length}</div>
-                {[...highlights].sort((a,b) => b.date.localeCompare(a.date)).map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
-              </div>
-            );
-          })()}
-
           {/* Upcoming together */}
           {f.upcoming.length > 0 && (
             <div style={{ marginBottom: 12 }}>
@@ -4741,9 +4726,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>}
         </div>
         <div style={{ display: "flex", gap: 6, paddingBottom: 10, alignItems: "center" }}>
-          {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
-            <button key={id} onClick={() => setFilterType(id)} style={{ background: filterType===id?'#a78bfa':'none', border: `1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
-          ))}
           <div style={{ flex: 1 }} />
           <button onClick={() => setShowSortPanel(p => !p)} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-shows' ? ' ↕' : ''}
@@ -5235,7 +5217,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         )}
 
         {showFilters && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             {activeFilterCount > 0 && <button onClick={() => { setFilterGenre('all'); setFilterMinSeen(0); setFilterUpcoming(false); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Times seen</div>
@@ -8570,7 +8552,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
 
         {view === 'home' && showFilters && (
-          <div style={{ position: 'relative', zIndex: 5, background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
 
             <FilterGroup id="status" label="Status" activeLabel={filterStatus !== 'all' ? { want: 'Want to go', upcoming: 'Upcoming', past: 'Past' }[filterStatus] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>

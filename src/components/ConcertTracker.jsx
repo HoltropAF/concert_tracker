@@ -5453,7 +5453,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong }) {
             )}
           </div>
           {selectedSong.albumArt && (
-            <img src={selectedSong.albumArt} alt="" style={{ width: 54, height: 54, borderRadius: 6, flexShrink: 0, objectFit: 'cover' }} />
+            <img src={selectedSong.albumArt} alt="" style={{ width: 130, height: 130, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
           )}
         </div>
         {/* Stat tiles: times live, popularity */}

@@ -8472,7 +8472,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Type pills + compact/calendar/add */}
         {view === 'home' && (
-          <div style={{ display: 'flex', gap: 6, padding: '10px 12px 0', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, padding: '10px 16px 0', alignItems: 'center' }}>
             {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
               <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
             ))}
@@ -8497,7 +8497,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Search + sort + filters */}
         {view === 'home' && (
-          <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Artist, venue, friend, tour..."

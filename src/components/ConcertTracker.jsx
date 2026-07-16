@@ -5914,23 +5914,6 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           🗺 Map
         </button>
       </div>
-      {showVenuesMap && (
-        <div style={{ padding: '10px 12px 0' }}>
-          <VenueMap
-            points={venueEntries.map(v => {
-              const info = (settings.venueInfo || {})[v.name] || {};
-              return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape };
-            }).filter(p => typeof p.lat === 'number')}
-            onSelect={name => setSelectedVenue(name)}
-          />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 8, fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', marginRight: 4 }} />visited</span>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#34d399', marginRight: 4 }} />upcoming only</span>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#6b6a8f', marginRight: 4 }} />pin = concerts</span>
-            <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#6b6a8f', marginRight: 4, transform: 'rotate(45deg)' }} />diamond = festival</span>
-          </div>
-        </div>
-      )}
       {/* Search + sort */}
       <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
@@ -5952,6 +5935,26 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           </div>
         </div>
       )}
+
+      {showVenuesMap && (() => {
+        const mapPoints = venueEntries.map(v => {
+          const info = (settings.venueInfo || {})[v.name] || {};
+          return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, country: v.country };
+        }).filter(p => typeof p.lat === 'number');
+        const useCountryDefault = settings.mapDefaultRegion === 'country' && settings.defaultCountry;
+        const fitPoints = useCountryDefault ? mapPoints.filter(p => p.country === settings.defaultCountry) : null;
+        return (
+          <div style={{ padding: '0 12px' }}>
+            <VenueMap points={mapPoints} fitPoints={fitPoints && fitPoints.length > 0 ? fitPoints : null} onSelect={name => setSelectedVenue(name)} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap', overflowX: 'auto' }}>
+              <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', marginRight: 3 }} />visited</span>
+              <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#34d399', marginRight: 3 }} />upcoming</span>
+              <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#6b6a8f', marginRight: 3 }} />concert</span>
+              <span><span style={{ display: 'inline-block', width: 7, height: 7, background: '#6b6a8f', marginRight: 3, transform: 'rotate(45deg)' }} />festival</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Venue list */}
       {!showVenuesMap && (
@@ -7389,6 +7392,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Default country" sub="Pre-filled when adding a show">
             <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
           </SettingsRow>
+          <PreferenceBlock
+            label="Default map view" sub={local.defaultCountry ? `Where the venues map opens` : 'Set a default country above to enable'}
+            value={local.mapDefaultRegion === 'country' && local.defaultCountry ? 'country' : 'all'}
+            options={[{ id: 'all', label: 'All venues' }, { id: 'country', label: local.defaultCountry || 'My country' }]}
+            onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); onUpdate('mapDefaultRegion', v); }}
+            isLast
+          />
         </SettingsSection>
       </>}
 

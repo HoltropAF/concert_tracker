@@ -9,14 +9,14 @@ import 'leaflet/dist/leaflet.css'
 // Both carry a small music-note glyph so they read as "concert" at a glance,
 // similar to the fork/knife or "P" glyphs in the reference style.
 function pinIcon(color, shape) {
-  const size = 30
-  const noteSvg = `<svg viewBox="0 0 24 24" width="12" height="12" style="position:absolute;top:${shape === 'diamond' ? '7px' : '5px'};left:50%;transform:translateX(-50%) rotate(45deg);" fill="#fff"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`
+  const size = 15
+  const noteSvg = `<svg viewBox="0 0 24 24" width="6" height="6" style="position:absolute;top:${shape === 'diamond' ? '3.5px' : '2.5px'};left:50%;transform:translateX(-50%) rotate(45deg);" fill="#fff"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`
   const shapeStyle = shape === 'diamond'
-    ? `width:${size * 0.72}px;height:${size * 0.72}px;border-radius:6px;transform:rotate(45deg);`
+    ? `width:${size * 0.72}px;height:${size * 0.72}px;border-radius:3px;transform:rotate(45deg);`
     : `width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);`
   const html = `
     <div style="position:relative;width:${size}px;height:${size}px;">
-      <div style="${shapeStyle}position:absolute;left:0;top:0;right:0;bottom:0;margin:auto;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>
+      <div style="${shapeStyle}position:absolute;left:0;top:0;right:0;bottom:0;margin:auto;background:${color};border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);"></div>
       ${noteSvg}
     </div>`
   return L.divIcon({
@@ -38,7 +38,7 @@ const ICONS = {
 // points: [{ name, lat, lng, pastCount, upcomingCount, shape: 'pin' | 'diamond' }]
 // focus: optional { lat, lng, zoom } — if set, centers there instead of
 // fitting bounds to all points (used for the single-venue mini preview).
-export default function VenueMap({ points, onSelect, height = 360, focus = null, interactive = true, autoOpenName = null }) {
+export default function VenueMap({ points, onSelect, height = 360, focus = null, interactive = true, autoOpenName = null, fitPoints = null }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
 
@@ -90,14 +90,20 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
     })
     if (focus) {
       map.setView([focus.lat, focus.lng], focus.zoom ?? 14)
-    } else if (markers.length > 0) {
-      const group = L.featureGroup(markers)
-      map.fitBounds(group.getBounds().pad(0.2), { maxZoom: 13 })
     } else {
-      map.setView([20, 0], 2)
+      const boundsSource = (fitPoints && fitPoints.length > 0 ? fitPoints : points).filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')
+      if (boundsSource.length > 0) {
+        const b = L.latLngBounds(boundsSource.map(p => [p.lat, p.lng]))
+        map.fitBounds(b.pad(0.2), { maxZoom: 13 })
+      } else if (markers.length > 0) {
+        const group = L.featureGroup(markers)
+        map.fitBounds(group.getBounds().pad(0.2), { maxZoom: 13 })
+      } else {
+        map.setView([20, 0], 2)
+      }
     }
     return () => { markers.forEach(m => m.remove()) }
-  }, [points, onSelect, focus, autoOpenName])
+  }, [points, onSelect, focus, autoOpenName, fitPoints])
 
   return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden' }} />
 }

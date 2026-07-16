@@ -5665,8 +5665,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
                   <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
                   {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
-                  {vInfo.parking && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚗 Parking ↗</a>}
-                  {vInfo.transit && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{transitEmoji(vInfo.transit)} Transit ↗</a>}
+                  {vInfo.parking && settings.showVenueParking !== false && <a href={mapsQuery(vInfo.parking)} target="_blank" rel="noopener noreferrer" style={linkStyle}>🚗 Parking ↗</a>}
+                  {vInfo.transit && settings.showVenueTransit !== false && <a href={mapsQuery(vInfo.transit)} target="_blank" rel="noopener noreferrer" style={linkStyle}>{transitEmoji(vInfo.transit)} Transit ↗</a>}
                   <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] }); setEditingVenueInfo(true); }}
                     style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
                     edit
@@ -5766,8 +5766,10 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
         {(() => {
           const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
-          const displayRooms = vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms;
-          const displayTags = vInfo.tags || [];
+          const showRooms = settings.showVenueRooms !== false;
+          const showTags = settings.showVenueTags !== false;
+          const displayRooms = showRooms ? (vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms) : [];
+          const displayTags = showTags ? (vInfo.tags || []) : [];
           if (displayRooms.length === 0 && displayTags.length === 0) return null;
           return (
             <div style={{ padding: '10px 16px 0' }}>
@@ -7293,6 +7295,21 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         <SettingsSection title="Concert list" icon="list">
           <SettingsRow label="Group by year" sub="Year headers in concert list">
             <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); onUpdate("groupByYear", checked); }} />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title="Venue details" icon="layout">
+          <SettingsRow label="Parking" sub="Show the parking link on venue pages">
+            <SettingsToggle checked={local.showVenueParking !== false} onChange={checked => { lUpdate("showVenueParking", checked); onUpdate("showVenueParking", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Public transport" sub="Show the transit link on venue pages">
+            <SettingsToggle checked={local.showVenueTransit !== false} onChange={checked => { lUpdate("showVenueTransit", checked); onUpdate("showVenueTransit", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Rooms / stages" sub="Show saved rooms on venue pages">
+            <SettingsToggle checked={local.showVenueRooms !== false} onChange={checked => { lUpdate("showVenueRooms", checked); onUpdate("showVenueRooms", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Tags" sub='Show venue tags (e.g. "big venue")'>
+            <SettingsToggle checked={local.showVenueTags !== false} onChange={checked => { lUpdate("showVenueTags", checked); onUpdate("showVenueTags", checked); }} />
           </SettingsRow>
         </SettingsSection>
 

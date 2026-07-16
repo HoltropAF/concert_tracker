@@ -78,10 +78,15 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
       const label = p.pastCount > 0
         ? `${p.pastCount}× visited`
         : `${p.upcomingCount} upcoming`
+      const extraLines = [
+        p.parking ? `🚗 ${escapeHtml(p.parking)}` : null,
+        p.transit ? `🚌 ${escapeHtml(p.transit)}` : null,
+      ].filter(Boolean).map(l => `<div style="font-size:11px;color:#666;margin-top:3px">${l}</div>`).join('')
       marker.bindPopup(
         `<div style="font-family:'DM Sans',sans-serif;min-width:120px">` +
         `<div style="font-weight:700;margin-bottom:2px">${escapeHtml(p.name)}</div>` +
         `<div style="font-size:11px;color:#666">${label}${p.shape === 'diamond' ? ' · festival' : ''}</div>` +
+        extraLines +
         `</div>`
       )
       if (onSelect) marker.on('click', () => onSelect(p.name))

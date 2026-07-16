@@ -5816,7 +5816,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           return (
             <div style={{ padding: '12px 16px 0' }}>
               <button onClick={() => setShowVenueMapModal(true)} style={{ position: 'relative', width: '100%', padding: 0, border: 'none', cursor: 'pointer', display: 'block', borderRadius: 12, overflow: 'hidden' }}>
-                <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} height={130} />
+                <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, parking: settings.showVenueParking !== false ? vInfo.parking : null, transit: settings.showVenueTransit !== false ? vInfo.transit : null }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} height={130} />
                 <div style={{ position: 'absolute', top: 8, right: 8, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
                   ⤢ expand
                 </div>
@@ -5836,7 +5836,15 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
               <VenueMap
                 points={venueEntries.map(ve => {
                   const info = (settings.venueInfo || {})[ve.name] || {};
-                  return { name: ve.name, lat: info.lat, lng: info.lng, pastCount: ve.pastCount, upcomingCount: ve.upcoming.length, shape: ve.mapShape };
+                  // Parking/transit only surface on the pin for the venue you came
+                  // from — every other pin on this "zoomed out" map stays a plain
+                  // preview, same as the main overview map.
+                  const isCurrent = ve.name === selectedVenue;
+                  return {
+                    name: ve.name, lat: info.lat, lng: info.lng, pastCount: ve.pastCount, upcomingCount: ve.upcoming.length, shape: ve.mapShape,
+                    parking: isCurrent && settings.showVenueParking !== false ? info.parking : null,
+                    transit: isCurrent && settings.showVenueTransit !== false ? info.transit : null,
+                  };
                 }).filter(p => typeof p.lat === 'number')}
                 autoOpenName={selectedVenue}
                 onSelect={name => { setShowVenueMapModal(false); setSelectedVenue(name); }}

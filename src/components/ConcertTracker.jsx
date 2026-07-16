@@ -5653,52 +5653,58 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const rooms = [...new Set(v.past.filter(c => c.room).map(c => c.room))];
     return (
       <div style={{ padding: '0 0 100px' }}>
-        <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <button onClick={() => setSelectedVenue(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
+        {/* Sticky header, matching the show detail page */}
+        <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+          <button onClick={() => setSelectedVenue(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedVenue}</div>
-            <DetailSubtitle lines={[
-              [v.city, v.country],
-              [`${v.pastCount}× visited`, v.upcoming.length > 0 ? `${v.upcoming.length} upcoming` : null],
-            ]} />
-            {(() => {
-              const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
-              const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
-              const mapsQuery = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, q, v.city, v.country].filter(Boolean).join(' '))}`;
-              const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' };
-              const infoBtnStyle = { background: 'none', border: '1px solid #3a3858', borderRadius: '50%', width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#6b6a8f', fontSize: 9, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 };
-              const pinBtnStyle = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', fontSize: 11, textDecoration: 'none', flexShrink: 0 };
-              // A chip for an optional field: icon + label, an (i) that reveals the raw
-              // text you typed, and a separate pin that opens Maps for that spot.
-              const InfoChip = ({ id, icon, label, text }) => (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ ...linkStyle, color: '#9d9bc0' }}>{icon} {label}</span>
-                  <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={infoBtnStyle} aria-label={`${label} info`}>i</button>
-                  <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={pinBtnStyle} aria-label={`${label} on Maps`}>📍</a>
-                </span>
-              );
-              return (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-                    <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
-                    {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
-                    {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon="🚗" label="Parking" text={vInfo.parking} />}
-                    {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={transitEmoji(vInfo.transit)} label="Transit" text={vInfo.transit} />}
-                    <button onClick={() => { setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] }); setEditingVenueInfo(true); }}
-                      style={{ background: 'none', border: 'none', padding: 0, color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
-                      edit
-                    </button>
-                  </div>
-                  {openVenueInfoPopup === 'parking' && vInfo.parking && (
-                    <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>🚗 {vInfo.parking}</div>
-                  )}
-                  {openVenueInfoPopup === 'transit' && vInfo.transit && (
-                    <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{transitEmoji(vInfo.transit)} {vInfo.transit}</div>
-                  )}
-                </>
-              );
-            })()}
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVenue}</div>
+            <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
+              {[v.city, v.country].filter(Boolean).join(', ')}{v.city || v.country ? ' · ' : ''}{v.pastCount}× visited{v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}
+            </div>
           </div>
+          <button onClick={() => {
+            const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
+            const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
+            setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
+            setEditingVenueInfo(true);
+          }} style={{ background: '#1a1a30', border: '1px solid #2e2e50', color: '#a78bfa', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Edit</button>
+        </div>
+
+        {/* Hero: maps / website / parking / transit */}
+        <div style={{ padding: '14px 16px 0' }}>
+          {(() => {
+            const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
+            const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
+            const mapsQuery = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, q, v.city, v.country].filter(Boolean).join(' '))}`;
+            const linkStyle = { display: 'inline-flex', alignItems: 'center', gap: 4, color: '#38bdf8', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' };
+            const infoBtnStyle = { background: 'none', border: '1px solid #3a3858', borderRadius: '50%', width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#6b6a8f', fontSize: 9, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 };
+            const pinBtnStyle = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', fontSize: 11, textDecoration: 'none', flexShrink: 0 };
+            // A chip for an optional field: icon + label, an (i) that reveals the raw
+            // text you typed, and a separate pin that opens Maps for that spot.
+            const InfoChip = ({ id, icon, label, text }) => (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ ...linkStyle, color: '#9d9bc0' }}>{icon} {label}</span>
+                <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={infoBtnStyle} aria-label={`${label} info`}>i</button>
+                <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={pinBtnStyle} aria-label={`${label} on Maps`}>📍</a>
+              </span>
+            );
+            return (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={linkStyle}>📍 Maps ↗</a>
+                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>🔗 Website ↗</a>}
+                  {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon="🚗" label="Parking" text={vInfo.parking} />}
+                  {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={transitEmoji(vInfo.transit)} label="Transit" text={vInfo.transit} />}
+                </div>
+                {openVenueInfoPopup === 'parking' && vInfo.parking && (
+                  <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>🚗 {vInfo.parking}</div>
+                )}
+                {openVenueInfoPopup === 'transit' && vInfo.transit && (
+                  <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{transitEmoji(vInfo.transit)} {vInfo.transit}</div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Edit venue modal */}

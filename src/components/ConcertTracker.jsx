@@ -2256,28 +2256,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // labelTexts: array of strings to show on arcs instead of %; null = show %
   // centerText: string to show in center; null = hide center; undefined = show total count
 
-  // Most charts have been relocated directly into their relevant tab (shows-over-time,
-  // genres/ratings/language -> Shows; artist overview -> Artists; top songs/covers -> Songs;
-  // top venues/venue loyalty -> Venues; friends & group size -> Friends). What's left here
-  // has no single natural home: Year in pixels is too rich to rebuild as an inline widget,
-  // and Financial doesn't belong to any one category page.
-  const CHART_GROUPS = [
-    {
-      id: "activity", label: "Activity",
-      charts: [
-        { id: "day-pixels", label: "Year in pixels" },
-      ]
-    },
-    {
-      id: "financial", label: "Financial",
-      charts: [
-        { id: "year-spend", label: "Spending per year" },
-        { id: "averages",   label: "Averages" },
-        { id: "expensive",  label: "Most expensive shows" },
-        { id: "merch-overview", label: "Merch" },
-      ]
-    },
-  ].filter(g => g.charts.length > 0);
+  // Financial and Year-in-pixels have been retired: Financial's most useful
+  // piece (spending over time) is now an always-visible monthly chart embedded
+  // directly on Summary, and Year in pixels didn't have a natural home elsewhere.
+  const CHART_GROUPS = [];
 
   useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
@@ -3940,11 +3922,66 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0", flex: fillHeight ? 1 : undefined, overflowY: fillHeight ? "auto" : undefined, minHeight: 0 }}>
 
-          {/* Entry points to what doesn't live on a single tab */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={() => { setChartGroup('financial'); setStatsTab('charts'); }} style={{ flex: 1, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 10px", cursor: "pointer", color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>💰 Financial</button>
-            <button onClick={() => { setChartGroup('activity'); setStatsTab('charts'); }} style={{ flex: 1, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 10px", cursor: "pointer", color: "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>▦ Year in pixels</button>
-          </div>
+          {/* Monthly spending, past + upcoming */}
+          {(() => {
+            const monthlySpend = {};
+            concerts.filter(c => !isWish(c)).forEach(c => {
+              if (!c.date) return;
+              const month = c.date.slice(0, 7);
+              const cost = (c.ticketPrice || 0) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0) + extraCostTotal(c);
+              monthlySpend[month] = (monthlySpend[month] || 0) + cost;
+            });
+            const months = Object.keys(monthlySpend).sort();
+            if (months.length < 2) return null;
+            const todayMonth = new Date().toISOString().slice(0, 7);
+            const maxSpend = Math.max(...Object.values(monthlySpend), 1);
+            const midSpend = Math.round(maxSpend / 2);
+            const n = months.length;
+            const W = 320, H = 90, Y_PAD = 32;
+            const xOf = i => (i / (n - 1)) * (W - 6) + 3;
+            const yOf = v => H - 4 - (v / maxSpend) * (H - 14);
+            const splitIdx = months.findIndex(m => m > todayMonth);
+            const pastMonths = splitIdx === -1 ? months : months.slice(0, splitIdx);
+            const futureMonths = splitIdx === -1 ? [] : months.slice(Math.max(0, splitIdx - 1));
+            const pastPath = pastMonths.length > 1 ? "M " + pastMonths.map((m, i) => `${xOf(months.indexOf(m))},${yOf(monthlySpend[m])}`).join(" L ") : null;
+            const futurePath = futureMonths.length > 1 ? "M " + futureMonths.map(m => `${xOf(months.indexOf(m))},${yOf(monthlySpend[m])}`).join(" L ") : null;
+            // Label every month, but only draw text every few ticks so it doesn't overlap
+            const labelEvery = Math.max(1, Math.ceil(n / 8));
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Spending per month</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} /><span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1 }} /><span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-start" }}>
+                  <div style={{ width: Y_PAD, display: "flex", flexDirection: "column", justifyContent: "space-between", height: H + 14, paddingBottom: 14, flexShrink: 0 }}>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>€{maxSpend}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>€{midSpend}</span>
+                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>€0</span>
+                  </div>
+                  <svg style={{ flex: 1 }} height={H + 14} viewBox={`0 0 ${W} ${H + 14}`} preserveAspectRatio="none">
+                    <defs><linearGradient id="monthlySpendGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
+                    <line x1={0} y1={yOf(maxSpend)} x2={W} y2={yOf(maxSpend)} stroke="#1f1f35" strokeWidth="1" />
+                    <line x1={0} y1={yOf(midSpend)} x2={W} y2={yOf(midSpend)} stroke="#1a1a2e" strokeWidth="1" strokeDasharray="3,3" />
+                    <line x1={0} y1={yOf(0)} x2={W} y2={yOf(0)} stroke="#1f1f35" strokeWidth="1" />
+                    {months.map((m, i) => (
+                      <line key={m} x1={xOf(i)} y1={yOf(0)} x2={xOf(i)} y2={yOf(0) - 3} stroke="#2e2e50" strokeWidth="1" />
+                    ))}
+                    {months.map((m, i) => i % labelEvery === 0 && (
+                      <text key={m} x={xOf(i)} y={H + 11} textAnchor="middle" fill="#4a4870" fontSize="7.5" fontFamily="DM Mono,monospace">{m.slice(2).replace('-', '/')}</text>
+                    ))}
+                    {pastPath && <path d={pastPath + ` L ${xOf(pastMonths.length - 1)},${yOf(0)} L ${xOf(0)},${yOf(0)} Z`} fill="url(#monthlySpendGrad)" />}
+                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {futurePath && <path d={futurePath} fill="none" stroke="#34d399" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" />}
+                    {months.map((m, i) => <circle key={m} cx={xOf(i)} cy={yOf(monthlySpend[m])} r="2.2" fill={m > todayMonth ? "#34d399" : "#a78bfa"} />)}
+                  </svg>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Year scope toggle */}
           {(() => {
@@ -4695,44 +4732,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           </div>
         </div>
       )}
-      {/* Solo vs with friends, group size breakdown */}
-      {!search && past.length > 0 && (() => {
-        const groupSizeLabels = ["0","1","2","3","4","5","6+"];
-        const groupSizeColors = ["#6b6a8f","#a78bfa","#818cf8","#60a5fa","#34d399","#fbbf24","#f472b6"];
-        const gsLegendLabels = groupSizeLabels.map(k => k === "0" ? "Solo" : k === "1" ? "1 friend" : k === "6+" ? "6+ friends" : `${k} friends`);
-        const allGs = groupSizeLabels.map((k, i) => ({ label: gsLegendLabels[i], count: groupSizeDist[k] || 0, color: groupSizeColors[i] })).filter(x => x.count > 0).sort((a,b) => b.count - a.count);
-        const top4Gs = allGs.slice(0, 4);
-        const othersGs = allGs.slice(4).reduce((s, x) => s + x.count, 0);
-        return (
-          <div style={{ padding: "0 16px 12px", display: "flex", gap: 8 }}>
-            <div style={{ flex: 1, background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 12px" }}>
-              <Donut showLabels segments={[{ value: withFriends.length, color: "#a78bfa" }, { value: solo.length, color: "#6b6a8f" }]} size={64} centerText={[String(past.length), "shows"]} />
-              <div style={{ marginTop: 8 }}>
-                {[{ label: "With friends", value: withFriends.length, color: "#a78bfa" }, { label: "Solo", value: solo.length, color: "#6b6a8f" }].map(s => (
-                  <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: 1, background: s.color, flexShrink: 0 }} />
-                    <span style={{ color: "#9d9bc0", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{s.label} · {s.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={{ flex: 1, background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "10px 12px" }}>
-              <Donut size={64} centerText={["Group", "size"]} segments={[
-                ...top4Gs.map(x => ({ value: x.count, color: x.color })),
-                ...(othersGs > 0 ? [{ value: othersGs, color: "#4a4870" }] : [])
-              ]} />
-              <div style={{ marginTop: 8 }}>
-                {[...top4Gs, ...(othersGs > 0 ? [{ label: "Others", color: "#4a4870", count: othersGs }] : [])].slice(0, 3).map(x => (
-                  <div key={x.label} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: 1, background: x.color, flexShrink: 0 }} />
-                    <span style={{ color: "#9d9bc0", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{x.label} · {x.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
       {/* Search + sort */}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
         <div style={{ position: "relative", marginBottom: 8 }}>

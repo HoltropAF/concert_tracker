@@ -847,8 +847,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   if (effectiveCompact) {
     return (
       <button onClick={() => onOpen(concert)} style={{
-        width: "100%", textAlign: "left", background: past ? "#17172a" : "#0d1a15",
-        border: `1px solid ${past ? "#1f1f35" : "#2e2e50"}`,
+        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0d1a15",
+        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e50"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 8, padding: "7px 12px", cursor: "pointer", marginBottom: 4,
         display: "flex", alignItems: "center", gap: 10,
@@ -877,8 +877,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     <button
       onClick={() => onOpen(concert)}
       style={{
-        width: "100%", textAlign: "left", background: past ? "#17172a" : "#0d1a15",
-        border: `1px solid ${past ? "#1f1f35" : "#2e2e50"}`,
+        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0d1a15",
+        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e50"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 12, padding: "14px 16px", cursor: "pointer",
         transition: "all 0.15s ease", marginBottom: 8
@@ -8402,7 +8402,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const BottomNav = () => (
     <div data-bottom-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {navBtn('shows', '♪', 'Shows',   isShowsActive,                             () => setView(showsTab))}
-      {navBtn('stats', '◎', 'Stats',    view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
+      {navBtn('stats', <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="15" width="3.5" height="6" rx="1" fill="currentColor"/><rect x="8" y="9" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="14" y="12" width="3.5" height="9" rx="1" fill="currentColor"/><rect x="20" y="5" width="3.5" height="16" rx="1" fill="currentColor"/><path d="M3.75 11L9.75 6L15.75 9.5L21.75 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/><circle cx="3.75" cy="11" r="2" fill="currentColor"/><circle cx="9.75" cy="6" r="2" fill="currentColor"/><circle cx="15.75" cy="9.5" r="2" fill="currentColor"/><circle cx="21.75" cy="2.5" r="2" fill="currentColor"/></svg>, 'Stats',    view === 'stats' && statsTab === 'summary', () => { setView('stats'); setStatsTab('summary'); })}
       {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
     </div>
   )
@@ -8580,7 +8580,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
 
         {view === 'home' && showFilters && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <div style={{ position: 'relative', zIndex: 5, background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10, maxHeight: '55vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
             <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
 
             <FilterGroup id="status" label="Status" activeLabel={filterStatus !== 'all' ? { want: 'Want to go', upcoming: 'Upcoming', past: 'Past' }[filterStatus] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>

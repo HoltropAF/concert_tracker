@@ -5685,7 +5685,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             // A chip for an optional field: icon + label, an (i) that reveals the raw
             // text you typed, and a separate pin that opens Maps for that spot.
             const InfoChip = ({ id, icon, label, text }) => (
-              <span style={{ ...chipStyle, paddingRight: 6 }}>
+              <span style={{ ...chipStyle, paddingRight: 6, flexShrink: 0 }}>
                 {icon} {label}
                 <button onClick={() => setOpenVenueInfoPopup(p => p === id ? null : id)} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', padding: 0, display: 'inline-flex' }} aria-label={`${label} info`}>{ICONS.info}</button>
                 <a href={mapsQuery(text)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', color: '#6b6a8f' }} aria-label={`${label} on Maps`}>{ICONS.pin}</a>
@@ -5693,15 +5693,15 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             );
             return (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={chipStyle}>{ICONS.pin} Maps</a>
-                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={chipStyle}>{ICONS.link} Website</a>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2 }}>
+                  <a href={mapsQuery()} target="_blank" rel="noopener noreferrer" style={{ ...chipStyle, flexShrink: 0 }}>{ICONS.pin} Maps</a>
+                  {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={{ ...chipStyle, flexShrink: 0 }}>{ICONS.link} Website</a>}
                   {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon={ICONS.car} label="Parking" text={vInfo.parking} />}
                   {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={ICONS.transit} label="Transit" text={vInfo.transit} />}
                   <button onClick={() => {
                     setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
                     setEditingVenueInfo(true);
-                  }} style={chipStyle}>{ICONS.edit} Edit</button>
+                  }} style={{ ...chipStyle, flexShrink: 0 }}>{ICONS.edit} Edit</button>
                 </div>
                 {openVenueInfoPopup === 'parking' && vInfo.parking && (
                   <div style={{ marginTop: 6, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#c4c2f0', maxWidth: 280 }}>{vInfo.parking}</div>

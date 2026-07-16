@@ -8456,7 +8456,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;
           return (
-            <div style={{ padding: '14px 16px 0', marginBottom: 12 }}>
+            <div style={{ padding: '14px 16px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{pastAll.length}</span>
                 <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>

@@ -8467,15 +8467,15 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Type pills + compact/calendar/add */}
         {view === 'home' && (
-          <div style={{ display: 'flex', gap: 6, padding: '10px 16px 0', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, padding: '10px 12px 0', alignItems: 'center' }}>
             {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
               <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
             ))}
             <div style={{ flex: 1 }} />
-            <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+            <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
               {compact ? '▤' : '☰'}
             </button>
-            <button onClick={() => setShowCalendar(c => !c)} style={{ background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 10px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
+            <button onClick={() => setShowCalendar(c => !c)} style={{ background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
               📅
             </button>
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -8492,22 +8492,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Search + sort + filters */}
         {view === 'home' && (
-          <div style={{ display: 'flex', gap: 8, padding: '8px 16px 10px', alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#4a4870', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Artist, venue, friend, tour..."
-                style={{ width: '100%', background: '#13131f', border: `1px solid ${search ? '#a78bfa' : '#1f1f35'}`,
-                  borderRadius: 10, color: '#c4c2f0', padding: '9px 36px 9px 32px',
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }} />
-              {search && (
-                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
-              )}
-            </div>
-            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>
+          <div style={{ padding: '8px 12px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Artist, venue, friend, tour..."
+              style={{ flex: 1, minWidth: 0, background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 8, color: '#c4c2f0', padding: '7px 11px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: 'border-box' }}
+            />
+            <button onClick={() => { setShowSort(s => !s); setShowFilters(false) }} style={{ background: showSort || sortOrder !== defaultSortId ? '#1a1a30' : 'none', border: `1px solid ${showSort || sortOrder !== defaultSortId ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortOrder !== defaultSortId ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortOrder !== defaultSortId ? 700 : 400, flexShrink: 0 }}>
               Sort{sortOrder !== defaultSortId ? ` ↕` : ''}
             </button>
-            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '7px 12px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+            <button onClick={() => { setShowFilters(f => !f); setShowSort(false) }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
               {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
             </button>
           </div>

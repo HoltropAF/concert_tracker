@@ -8605,6 +8605,24 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             {concerts.length === 0 && (
               <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
             )}
+            {concerts.length > 0 && (() => {
+              const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
+              const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
+              const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
+              return (
+                <div style={{ padding: '14px 0 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{pastAll.length}</span>
+                    <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
+                  </div>
+                  {(distinctArtists > 0 || distinctVenues > 0) && (
+                    <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+                      across {distinctArtists} artist{distinctArtists !== 1 ? 's' : ''}, {distinctVenues} venue{distinctVenues !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {concerts.length > 0 && !showCalendar && (() => {
               const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
               const yearCounts = {};

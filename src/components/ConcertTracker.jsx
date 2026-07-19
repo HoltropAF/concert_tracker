@@ -6224,16 +6224,16 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   );
 }
 
-function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', concerts = [] }) {
+function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', initialAttendanceMode = 'in_person', initialWishlist = false, concerts = [] }) {
   useBackButton(onClose);
   const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
-    type: initialType === 'wish' ? 'concert' : initialType, wishlist: initialType === 'wish', tour: '', support: [], friends: [], solo: false,
+    type: initialType === 'wish' ? 'concert' : initialType, wishlist: initialType === 'wish' || initialWishlist, tour: '', support: [], friends: [], solo: false,
     rating: null, tickets: [], merch: [], notes: '',
     ticketType: null, ticketAddons: [],
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
-    acts: [], attendanceMode: 'in_person', onlineType: 'concert', platform: '',
+    acts: [], attendanceMode: initialAttendanceMode, onlineType: 'concert', platform: '',
   })
   const [supportInput, setSupportInput] = useState('')
   const [supportRole, setSupportRole] = useState('support')
@@ -8053,6 +8053,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
   const [selected, setSelected] = useState(null)
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
+  const [showAddAttendance, setShowAddAttendance] = useState('in_person')
+  const [showAddWishlist, setShowAddWishlist] = useState(false)
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
   const [chartGroup, setChartGroup] = useState('activity')
   const [search, setSearch] = useState('')
@@ -8077,8 +8079,15 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
   const [showActivity, setShowActivity] = useState(false)
   const [activityChartMode, setActivityChartMode] = useState('bar')
-  const [showAddTypeMenu, setShowAddTypeMenu] = useState(false)
+  const [addFlowStep, setAddFlowStep] = useState(null) // null | 'type' | 'timing' | 'ticket'
+  const [addFlowType, setAddFlowType] = useState(null) // 'concert' | 'festival'
+  const [addFlowAttendance, setAddFlowAttendance] = useState(null) // 'in_person' | 'online'
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
+  useBackButton(() => {
+    if (addFlowStep === 'type') setAddFlowStep(null)
+    else if (addFlowStep === 'timing') setAddFlowStep('type')
+    else if (addFlowStep === 'ticket') setAddFlowStep('timing')
+  }, addFlowStep !== null)
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
@@ -8427,6 +8436,63 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </div>
   )
 
+  if (addFlowStep) return (
+    <div data-theme-shell="" style={appShell}>
+      <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+          <button onClick={() => { if (addFlowStep === 'type') setAddFlowStep(null); else if (addFlowStep === 'timing') setAddFlowStep('type'); else setAddFlowStep('timing'); }} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff' }}>
+            {addFlowStep === 'type' ? 'What are you logging?' : addFlowStep === 'timing' ? 'When is it?' : 'Do you have a ticket?'}
+          </div>
+        </div>
+
+        {addFlowStep === 'type' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { type: 'concert', attendance: 'in_person', label: 'Offline show', sub: 'A concert you go to in person', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg> },
+              { type: 'concert', attendance: 'online', label: 'Online show', sub: 'A livestream or online performance', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg> },
+              { type: 'festival', attendance: 'in_person', label: 'Festival', sub: 'Multiple acts, one event', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 18H5L12 3z"/><path d="M9 14h6"/></svg> },
+            ].map(opt => (
+              <button key={opt.label} onClick={() => { setAddFlowType(opt.type); setAddFlowAttendance(opt.attendance); setAddFlowStep('timing'); }} style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer', color: '#a78bfa' }}>
+                {opt.icon}
+                <div>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>{opt.label}</div>
+                  <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>{opt.sub}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {addFlowStep === 'timing' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>Already happened</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>Log a show from the past</div>
+            </button>
+            <button onClick={() => setAddFlowStep('ticket')} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>Coming up</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>Something upcoming, or on your radar</div>
+            </button>
+          </div>
+        )}
+
+        {addFlowStep === 'ticket' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>Yes</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>It's booked — log the full details</div>
+            </button>
+            <button onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(true); setAddFlowStep(null); }} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#34d399' }}>Not yet</div>
+              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>Add it to your want-to-go list instead</div>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   if (showAdd) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
@@ -8443,6 +8509,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           }}
           onClose={() => setShowAdd(null)}
           initialType={showAdd}
+          initialAttendanceMode={showAddAttendance}
+          initialWishlist={showAddWishlist}
           settings={settings}
           onUpdateSetting={onUpdateSetting}
           friends={allFriends}
@@ -8525,7 +8593,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'home' && (
           <>
             {concerts.length === 0 && (
-              <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setShowAdd('concert')} />
+              <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />
             )}
         {view === 'home' && concerts.length > 0 && (() => {
           const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
@@ -8560,15 +8628,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <button onClick={() => setShowCalendar(c => !c)} style={{ background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', display: 'inline-flex', alignItems: 'center', flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
             </button>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button onClick={() => setShowAddTypeMenu(m => !m)} aria-label="Add a show" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700 }}>+</button>
-              {showAddTypeMenu && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 130 }}>
-                  <button onClick={() => { setShowAddTypeMenu(false); setShowAdd('concert'); }} style={{ width: '100%', background: 'none', border: 'none', borderBottom: '1px solid #0c0c14', padding: '10px 14px', cursor: 'pointer', textAlign: 'left', color: '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>Concert</button>
-                  <button onClick={() => { setShowAddTypeMenu(false); setShowAdd('festival'); }} style={{ width: '100%', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', textAlign: 'left', color: '#c4c2f0', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>Festival</button>
-                </div>
-              )}
-            </div>
+            <button onClick={() => { setAddFlowStep('type'); setAddFlowType(null); setAddFlowAttendance(null); }} aria-label="Add a show" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
           </div>
         )}
 

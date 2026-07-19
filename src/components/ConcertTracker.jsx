@@ -8083,11 +8083,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [addFlowType, setAddFlowType] = useState(null) // 'concert' | 'festival'
   const [addFlowAttendance, setAddFlowAttendance] = useState(null) // 'in_person' | 'online'
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
-  useBackButton(() => {
-    if (addFlowStep === 'type') setAddFlowStep(null)
-    else if (addFlowStep === 'timing') setAddFlowStep('type')
-    else if (addFlowStep === 'ticket') setAddFlowStep('timing')
-  }, addFlowStep !== null)
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)

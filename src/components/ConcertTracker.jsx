@@ -159,13 +159,18 @@ function FriendAvatar({ name, size = 36 }) {
 }
 // Extra costs beyond ticket price: travel, stay (accommodation), food, other misc.
 // Falls back to the legacy single `otherCost` number for shows saved before this breakdown existed.
-const extraCostTotal = c => {
-  if (c && c.costBreakdown) {
-    const b = c.costBreakdown;
-    return (b.travel || 0) + (b.stay || 0) + (b.food || 0) + (b.other || 0);
+// Sum of a concert's ticket line-items (name + price each, so add-ons/fan-club
+// fees/etc. can be itemized) — falls back to the legacy single ticketPrice
+// number for older entries that predate this.
+const ticketTotal = c => {
+  if (c && Array.isArray(c.tickets) && c.tickets.length > 0) {
+    return c.tickets.reduce((s, t) => s + (parseFloat(t.price) || 0), 0);
   }
-  return (c && c.otherCost) || 0;
+  return (c && c.ticketPrice) || 0;
 };
+// Kept as a no-op so old call sites that still add `+ extraCostTotal(c)` don't
+// break — the travel/stay/food/other cost breakdown itself has been removed.
+const extraCostTotal = () => 0;
 
 const DONUT_PALETTE = ["#a78bfa","#f472b6","#38bdf8","#34d399","#fb923c","#818cf8","#e879f9","#22d3ee","#facc15","#fb7185"];
 const GENRE_COLORS = DONUT_PALETTE;
@@ -263,31 +268,32 @@ function Badge({ children, color = "#1a2e26" }) {
   );
 }
 
-// Itemized extra-cost entry: travel, stay (accommodation), food, other misc.
-// Writes to form.costBreakdown = {travel, stay, food, other}; shows a running subtotal.
-function CostBreakdownFields({ value, onChange, labelStyle, inputStyle }) {
-  const b = value || {};
-  const set = (key, v) => onChange({ ...b, [key]: v ? parseFloat(v) : null });
-  const subtotal = (b.travel || 0) + (b.stay || 0) + (b.food || 0) + (b.other || 0);
-  const rows = [
-    ['travel', '✈️ Travel'],
-    ['stay', '🛏️ Stay'],
-    ['food', '🍔 Food'],
-    ['other', 'Other'],
-  ];
+// Itemized tickets: each line has a name (e.g. "Ticket", "Fan club add-on",
+// "Booking fee") and a price; the sum is the concert's ticket cost. Lets you
+// split out add-ons while still counting as one total for stats/graphs.
+function TicketsFields({ value, onChange, labelStyle, inputStyle }) {
+  const tickets = value || [];
+  const update = (i, key, v) => onChange(tickets.map((t, j) => j === i ? { ...t, [key]: v } : t));
+  const remove = i => onChange(tickets.filter((_, j) => j !== i));
+  const add = () => onChange([...tickets, { name: tickets.length === 0 ? 'Ticket' : '', price: '' }]);
+  const subtotal = tickets.reduce((s, t) => s + (parseFloat(t.price) || 0), 0);
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={labelStyle}>Extra costs</div>
-      {rows.map(([key, label]) => (
-        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <span style={{ flex: 1, fontSize: 13, color: '#c4c2f0' }}>{label}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={labelStyle}>Tickets</div>
+        <button onClick={add} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono',monospace" }}>+ Add item</button>
+      </div>
+      {tickets.map((t, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <input value={t.name || ''} placeholder="e.g. Ticket, Fee, Add-on" onChange={e => update(i, 'name', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
           <span style={{ color: '#6b6a8f' }}>€</span>
-          <input type="number" value={b[key] || ''} placeholder="0.00" onChange={e => set(key, e.target.value)} style={{ ...inputStyle, width: 90 }} />
+          <input type="number" value={t.price || ''} placeholder="0.00" onChange={e => update(i, 'price', e.target.value)} style={{ ...inputStyle, width: 80 }} />
+          <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#4a4870', fontSize: 16, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
         </div>
       ))}
       {subtotal > 0 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
-          <span>Extra costs subtotal</span>
+          <span>Ticket total</span>
           <span style={{ color: '#a78bfa' }}>€{subtotal.toFixed(2)}</span>
         </div>
       )}
@@ -1281,7 +1287,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
   if (!editing) {
     const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
     const merchTotal = (concert.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-    const totalCost = (concert.ticketPrice || 0) + merchTotal + extraCostTotal(concert);
+    const totalCost = ticketTotal(concert) + merchTotal;
     const companions = getFriends(concert);
     // Ticket sale block for wishlist items
     const ticketSaleBlock = concert.wishlist && concert.ticketSaleAt ? (() => {
@@ -1307,7 +1313,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
 
     const statCards = [
       past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—", nav: null },
-      concert.ticketPrice ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${concert.ticketPrice}`, nav: null } : null,
+      ticketTotal(concert) > 0 ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${ticketTotal(concert).toFixed(2)}`, nav: null } : null,
       past && companions.length > 0 && { label: "With", value: companions.length === 1 ? companions[0] : `${companions.length} friends`, nav: 'friends' },
       past && companions.length === 0 && { label: "With", value: "Solo", nav: null },
     ].filter(Boolean);
@@ -1378,20 +1384,14 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Costs */}
-          {(concert.ticketPrice || extraCostTotal(concert) || merchTotal > 0) && (
+          {((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div style={detailCard}>
               {sec("Costs")}
               {[
-                concert.ticketPrice ? [`Ticket${concert.ticketType ? ` (${concert.ticketType}${(concert.ticketAddons || []).length ? ' + ' + concert.ticketAddons.join(', ') : ''})` : (concert.ticketAddons || []).length ? ` (+ ${concert.ticketAddons.join(', ')})` : ''}`, concert.ticketPrice] : null,
+                ...((concert.tickets && concert.tickets.length > 0) ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0]) : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", concert.ticketPrice]] : []),
                 merchTotal > 0 ? ["Merch", merchTotal] : null,
-                ...(concert.costBreakdown ? [
-                  concert.costBreakdown.travel ? ["Travel", concert.costBreakdown.travel] : null,
-                  concert.costBreakdown.stay ? ["Stay", concert.costBreakdown.stay] : null,
-                  concert.costBreakdown.food ? ["Food", concert.costBreakdown.food] : null,
-                  concert.costBreakdown.other ? ["Other", concert.costBreakdown.other] : null,
-                ] : [concert.otherCost ? [isFestival ? "Travel & other" : "Other costs", concert.otherCost] : null]),
-              ].filter(Boolean).map(([label, amount]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+              ].filter(Boolean).map(([label, amount], i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
                   <span style={{ color: "#6b6a8f", fontSize: 12 }}>{label}</span>
                   <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{Number(amount).toFixed(2)}</span>
                 </div>
@@ -1753,12 +1753,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
               {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
             </div>
-            <div style={labelStyle}>Ticket price</div>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: 14 }}>
-              <span style={{ color:"#6b6a8f" }}>€</span>
-              <input type="number" value={form.ticketPrice || ""} placeholder="0.00" onChange={e => update("ticketPrice", e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, width: 100 }} />
-            </div>
-            <CostBreakdownFields value={form.costBreakdown} onChange={v => update('costBreakdown', v)} labelStyle={{ fontSize: 11, color: '#6b6a8f', marginBottom: 4 }} inputStyle={inputStyle} />
+            <TicketsFields value={form.tickets} onChange={v => update('tickets', v)} labelStyle={labelStyle} inputStyle={inputStyle} />
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8 }}>
               <div style={labelStyle}>Merch</div>
               <button onClick={addMerchItem} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"3px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>+ Add item</button>
@@ -5019,9 +5014,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </button>
           </div>
         ) : (() => {
-          const priced = pastShows.filter(c => c.ticketPrice > 0);
-          const avgTicket = priced.length ? priced.reduce((a, c) => a + c.ticketPrice, 0) / priced.length : null;
-          const totalSpentOnArtist = pastShows.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+          const priced = pastShows.filter(c => ticketTotal(c) > 0);
+          const avgTicket = priced.length ? priced.reduce((a, c) => a + ticketTotal(c), 0) / priced.length : null;
+          const totalSpentOnArtist = pastShows.reduce((s, c) => s + ticketTotal(c) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
           const totalSongsHeard = pastShows.reduce((s, c) => s + getSongList(c.setlist).length, 0);
           const costPerSong = totalSongsHeard > 0 && totalSpentOnArtist > 0 ? totalSpentOnArtist / totalSongsHeard : null;
           const merchItems = pastShows.flatMap(c => c.merch || []);
@@ -5693,7 +5688,7 @@ function ArtistShowRow({ concert, onOpen, showArtist = true }) {
         {concert.rating && <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(Math.min(concert.rating, 10))}</div>}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {concert.ticketPrice && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{concert.ticketPrice}</div>}
+        {ticketTotal(concert) > 0 && <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>€{ticketTotal(concert).toFixed(2)}</div>}
         {!past && <div style={{ fontSize: 9, color: "#a78bfa", fontFamily: "'DM Mono', monospace" }}>upcoming</div>}
       </div>
     </button>
@@ -5742,8 +5737,8 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const upcoming = shows.filter(c => !isPast(c.date));
     const rated = past.filter(c => c.rating);
     const avgRating = rated.length ? rated.reduce((s, c) => s + c.rating, 0) / rated.length : null;
-    const priced = past.filter(c => c.ticketPrice > 0);
-    const avgTicket = priced.length ? priced.reduce((s, c) => s + c.ticketPrice, 0) / priced.length : null;
+    const priced = past.filter(c => ticketTotal(c) > 0);
+    const avgTicket = priced.length ? priced.reduce((s, c) => s + ticketTotal(c), 0) / priced.length : null;
     const city = shows[0]?.city || null;
     const country = shows[0]?.country || null;
     const lastVisit = past.sort((a,b) => b.date.localeCompare(a.date))[0] || null;
@@ -5783,7 +5778,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const v = venueEntries.find(x => x.name === selectedVenue);
     if (!v) return null;
     const allShows = v.shows.sort((a,b) => b.date.localeCompare(a.date));
-    const totalSpent = v.past.reduce((s, c) => s + (c.ticketPrice || 0) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+    const totalSpent = v.past.reduce((s, c) => s + ticketTotal(c) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
     const artists = [...new Set(v.past.map(c => c.artist))];
     const friendCount = {};
     v.past.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
@@ -6028,7 +6023,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
                   {c.rating && <div style={{ fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>★ {c.rating}</div>}
-                  {c.ticketPrice && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>€{c.ticketPrice}</div>}
+                  {ticketTotal(c) > 0 && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>€{ticketTotal(c).toFixed(2)}</div>}
                 </div>
               </div>
             </button>
@@ -6240,7 +6235,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
     type: initialType === 'wish' ? 'concert' : initialType, wishlist: initialType === 'wish', tour: '', support: [], friends: [], solo: false,
-    rating: null, ticketPrice: null, otherCost: null, costBreakdown: null, merch: [], notes: '',
+    rating: null, tickets: [], merch: [], notes: '',
     ticketType: null, ticketAddons: [],
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
     acts: [], attendanceMode: 'in_person', onlineType: 'concert', platform: '',
@@ -6462,10 +6457,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                   {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
                 </div>
               </div>
-              <div style={{ marginBottom: 14 }}>
-                <div>{fieldLabel('Ticket')}<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ color: '#6b6a8f' }}>€</span><input type="number" value={form.ticketPrice || ''} placeholder="0.00" onChange={e => update('ticketPrice', e.target.value ? parseFloat(e.target.value) : null)} style={{ ...inputStyle, flex: 1 }} /></div></div>
-              </div>
-              <CostBreakdownFields value={form.costBreakdown} onChange={v => update('costBreakdown', v)} labelStyle={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }} inputStyle={inputStyle} />
+              <TicketsFields value={form.tickets} onChange={v => update('tickets', v)} labelStyle={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }} inputStyle={inputStyle} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>{fieldLabel('Merch')}<button onClick={addMerchItem} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono',monospace" }}>+ Add item</button></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(form.merch || []).map((m, i) => (
@@ -6646,7 +6638,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
               </>)}
               {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />, (form.acts || []).length > 0)}
               {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
-              {foldCard('Financial', financialContent, !!(form.ticketPrice || form.otherCost || extraCostTotal(form) || (form.merch || []).length))}
+              {foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
               {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}
             </>
           );
@@ -6722,7 +6714,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
               </>)}
               {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
-              {foldCard('Financial', financialContent, !!(form.ticketPrice || form.otherCost || extraCostTotal(form) || (form.merch || []).length))}
+              {foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
               {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}
             </>
           );
@@ -7179,7 +7171,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','Notes'];
     const rows = concerts.map(c => [
       c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
-      c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', c.ticketPrice||'',
+      c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', ticketTotal(c)||'',
       getFriends(c).join('; '), c.solo?'yes':'', c.venueSize||'', (c.notes||'').replace(/\n/g,' ')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
@@ -7199,7 +7191,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       City: c.city, Country: c.country, Type: c.type, Tour: c.tour || '',
       SeenAs: c.seenAs || '', Genre: c.genre || '', Subgenre: c.subgenre || '',
       Language: (Array.isArray(c.language) ? c.language : [c.language || '']).join('; '),
-      Rating: c.rating || '', TicketPrice: c.ticketPrice || '',
+      Rating: c.rating || '', TicketPrice: ticketTotal(c) || '',
       Friends: getFriends(c).join('; '), Solo: c.solo ? 'yes' : '',
       VenueSize: c.venueSize || '', Notes: (c.notes || '').replace(/\n/g, ' '),
     }))), 'Shows');
@@ -8257,7 +8249,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (sortOrder === 'oldest') return a.date.localeCompare(b.date)
     if (sortOrder === 'alpha') return (a.artist || '').localeCompare(b.artist || '')
     if (sortOrder === 'rating') return (b.rating || 0) - (a.rating || 0)
-    if (sortOrder === 'price') return (b.ticketPrice || 0) - (a.ticketPrice || 0)
+    if (sortOrder === 'price') return ticketTotal(b) - ticketTotal(a)
     return b.date.localeCompare(a.date)
   })
 

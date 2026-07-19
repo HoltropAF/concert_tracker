@@ -4517,8 +4517,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
       return 0;
     });
 
-  useBackButton(() => { if (selectedFriend) setSelectedFriend(null); }, selectedFriend !== null);
-  useBackButton(onBackToSummary, selectedFriend === null);
+  useBackButton(() => { if (selectedFriend) setSelectedFriend(null); else onBackToSummary(); }, true);
 
   if (selectedFriend) {
     const f = friendEntries.find(fd => fd.name === selectedFriend);
@@ -8076,7 +8075,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showSort, setShowSort] = useState(false)
   const [openFilterSection, setOpenFilterSection] = useState(null) // accordion: only one filter category open at a time
   const [filterFriend, setFilterFriend] = useState('all')
-  const [filterStatus, setFilterStatus] = useState('all') // 'all' | 'want' | 'upcoming' | 'past'
+  const [filterStatus, setFilterStatus] = useState([]) // subset of 'want' | 'upcoming' | 'past'
   const [filterVenue, setFilterVenue] = useState('all')
   const [filterRating, setFilterRating] = useState(0)
   const [filterSolo, setFilterSolo] = useState(false)
@@ -8216,9 +8215,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
     filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto,
-    filterType !== 'all', filterStatus !== 'all'
+    filterType !== 'all', filterStatus.length > 0
   ].filter(Boolean).length
-  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus('all'); }
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus([]); }
   const resetSort = () => setSortOrder(settings.defaultSort || 'newest')
 
   // Shared with both the past/upcoming list and the wishlist, so picking "Online"
@@ -8265,10 +8264,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const wishlist = concerts.filter(c => isWish(c) && matchesType(c))
   const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
   const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
-  const combinedShows = filterStatus === 'want' ? wishlist
-    : filterStatus === 'upcoming' ? upcoming
-    : filterStatus === 'past' ? past
-    : [...wishlist, ...upcoming, ...past]
+  const combinedShows = filterStatus.length === 0
+    ? [...wishlist, ...upcoming, ...past]
+    : [
+        ...(filterStatus.includes('want') ? wishlist : []),
+        ...(filterStatus.includes('upcoming') ? upcoming : []),
+        ...(filterStatus.includes('past') ? past : []),
+      ]
   const allPast = concerts.filter(c => !isWish(c) && isPastDate(c.date))
   const headerCounts = {
     concerts: allPast.filter(c => c.type !== 'festival').length,
@@ -8307,12 +8309,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     }
     const groups = []
     list.forEach(c => {
-      const key = (c.date || '').slice(0, 4)
+      const key = (isWish(c) || !isPastDate(c.date)) ? '__upcoming__' : (c.date || '').slice(0, 4)
       const last = groups[groups.length - 1]
       if (!last || last.key !== key) {
         groups.push({
           key,
-          label: key || 'Unknown',
+          label: key === '__upcoming__' ? 'Want to go & upcoming' : (key || 'Unknown'),
           items: [c],
         })
       } else {
@@ -8615,11 +8617,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
 
-            <FilterGroup id="status" label="Status" activeLabel={filterStatus !== 'all' ? { want: 'Want to go', upcoming: 'Upcoming', past: 'Past' }[filterStatus] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
-              {[['all','All'],['want','Want to go'],['upcoming','Upcoming'],['past','Past']].map(([id, label]) => (
-                <button key={id} onClick={() => setFilterStatus(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterStatus === id ? '#a78bfa' : '#0c0c14', color: filterStatus === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterStatus === id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
-              ))}
-            </FilterGroup>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Status</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[['want','Want to go'],['upcoming','Upcoming'],['past','Past']].map(([id, label]) => (
+                  <button key={id} onClick={() => setFilterStatus(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterStatus.includes(id) ? '#a78bfa' : '#0c0c14', color: filterStatus.includes(id) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterStatus.includes(id) ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+                ))}
+              </div>
+            </div>
 
             <FilterGroup id="type" label="Type" activeLabel={filterType !== 'all' ? {concerts:'Concerts',festivals:'Festivals',online:'Online'}[filterType] : null} openId={openFilterSection} onToggle={setOpenFilterSection}>
               {[['all','All'],['concerts','Concerts'],['festivals','Festivals'],['online','Online']].map(([id, label]) => (

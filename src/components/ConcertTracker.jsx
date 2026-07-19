@@ -4704,20 +4704,15 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
 
   return (
     <div style={{ padding: "0 0 100px" }}>
-      {/* Stat tiles */}
+      {/* Overview */}
       {!search && (
-        <div style={{ padding: "12px 16px 0" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
-            {[
-              { value: allFriends.length, label: "friends" },
-              { value: friendEntries.filter(f => f.shows.length > 1).length, label: "regulars" },
-              { value: past.filter(c => getFriends(c).length === 0).length, label: "solo" },
-            ].map(({ value, label }) => (
-              <div key={label} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
-              </div>
-            ))}
+        <div style={{ padding: "14px 16px 0" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{allFriends.length}</span>
+            <span style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>friends</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
+            {friendEntries.filter(f => f.shows.length > 1).length} regular{friendEntries.filter(f => f.shows.length > 1).length !== 1 ? 's' : ''}, {past.filter(c => getFriends(c).length === 0).length} solo show{past.filter(c => getFriends(c).length === 0).length !== 1 ? 's' : ''}
           </div>
         </div>
       )}

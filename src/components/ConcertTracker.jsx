@@ -2261,7 +2261,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // directly on Summary, and Year in pixels didn't have a natural home elsewhere.
   const CHART_GROUPS = [];
 
-  useBackButton(() => setStatsTab("summary"), statsTab === "charts" || statsTab === "friends");
+  useBackButton(() => setStatsTab("summary"), statsTab === "charts");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
   const handleSwipeStart = (e) => { swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; };
   const handleSwipeEnd = (e) => {
@@ -4445,17 +4445,22 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           </div>
         );
       })()}
-      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} />}
+      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} onBackToSummary={() => setStatsTab("summary")} />}
       </>}
     </div>
   );
 }
 
-function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
+function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackToSummary = () => {} }) {
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [showSortPanel, setShowSortPanel] = useState(false);
+  const [showFriendFilters, setShowFriendFilters] = useState(false);
+  const [filterMinTogether, setFilterMinTogether] = useState(0);
+  const [filterHasUpcoming, setFilterHasUpcoming] = useState(false);
+  const [showAddFriendForm, setShowAddFriendForm] = useState(false);
+  const [addFriendInput, setAddFriendInput] = useState('');
   const [editingProfile, setEditingProfile] = useState(null); // { name, nickname, contact, note }
   const [filterType, setFilterType] = useState('all');
   const [showAllTogether, setShowAllTogether] = useState(false);
@@ -4470,7 +4475,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
   const displayName = name => getProfile(name).nickname || name;
 
   const past = concerts.filter(c => isPast(c.date));
-  const allFriends = [...new Set(past.flatMap(c => getFriends(c)))].sort();
+  const knownFriends = (settings.knownFriends || []).filter(n => n && n.trim());
+  const allFriends = [...new Set([...past.flatMap(c => getFriends(c)), ...knownFriends])].sort();
 
   const solo = past.filter(c => getFriends(c).length === 0);
   const withFriends = past.filter(c => getFriends(c).length > 0);
@@ -4498,9 +4504,12 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
     return { name, shows, sortedShows, firstShow, lastShow, upcoming, topGenres, topArtists, concertCount, festivalCount };
   });
 
+  const activeFriendFilterCount = [filterMinTogether > 0, filterHasUpcoming].filter(Boolean).length;
   const filtered = friendEntries
     .filter(f => !search || f.name.toLowerCase().includes(search.toLowerCase()))
     .filter(f => filterType === 'all' || (filterType === 'concerts' ? f.concertCount > 0 : f.festivalCount > 0))
+    .filter(f => filterMinTogether === 0 || f.shows.length >= filterMinTogether)
+    .filter(f => !filterHasUpcoming || f.upcoming.length > 0)
     .sort((a, b) => {
       if (sortBy === 'most-shows') return b.shows.length - a.shows.length;
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
@@ -4509,6 +4518,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
     });
 
   useBackButton(() => { if (selectedFriend) setSelectedFriend(null); }, selectedFriend !== null);
+  useBackButton(onBackToSummary, selectedFriend === null);
 
   if (selectedFriend) {
     const f = friendEntries.find(fd => fd.name === selectedFriend);
@@ -4717,19 +4727,21 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
           </div>
         </div>
       )}
-      {/* Search + sort */}
+      {/* Search + sort + filters + add */}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
-        <div style={{ position: "relative", marginBottom: 8 }}>
-          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#4a4870", fontSize: 13, pointerEvents: "none" }}>🔍</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search friend..."
-            style={{ width: "100%", background: "#13131f", border: `1px solid ${search ? "#a78bfa" : "#1f1f35"}`, borderRadius: 10, color: "#c4c2f0", padding: "9px 32px 9px 32px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }} />
-          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4a4870", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>}
-        </div>
-        <div style={{ display: "flex", gap: 6, paddingBottom: 10, alignItems: "center" }}>
-          <div style={{ flex: 1 }} />
-          <button onClick={() => setShowSortPanel(p => !p)} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search friend..."
+            style={{ flex: 1, minWidth: 0, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "7px 11px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }}
+          />
+          <button onClick={() => { setShowSortPanel(p => !p); setShowFriendFilters(false); }} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-shows' ? ' ↕' : ''}
           </button>
+          <button onClick={() => { setShowFriendFilters(f => !f); setShowSortPanel(false); }} style={{ background: showFriendFilters || activeFriendFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFriendFilters || activeFriendFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFriendFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFriendFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+            {activeFriendFilterCount > 0 ? `Filters (${activeFriendFilterCount})` : 'Filters'}
+          </button>
+          <button onClick={() => { setAddFriendInput(''); setShowAddFriendForm(true); }} aria-label="Add a friend" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         </div>
         {showSortPanel && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
@@ -4738,6 +4750,53 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting }) {
               {[{id:'most-shows',label:'Most shows'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Most recent'}].map(s => (
                 <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
               ))}
+            </div>
+          </div>
+        )}
+        {showFriendFilters && (
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+            {activeFriendFilterCount > 0 && <button onClick={() => { setFilterMinTogether(0); setFilterHasUpcoming(false); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Min. shows together</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[0, 2, 3, 5].map(n => (
+                  <button key={n} onClick={() => setFilterMinTogether(n)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterMinTogether === n ? '#a78bfa' : '#0c0c14', color: filterMinTogether === n ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterMinTogether === n ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{n === 0 ? 'Any' : `${n}+`}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Upcoming</div>
+              <button onClick={() => setFilterHasUpcoming(u => !u)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterHasUpcoming ? '#a78bfa' : '#0c0c14', color: filterHasUpcoming ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterHasUpcoming ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Has upcoming show together</button>
+            </div>
+          </div>
+        )}
+        {showAddFriendForm && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowAddFriendForm(false)}>
+            <div style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 40px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: '#e2e0ff' }}>Add a friend</div>
+                <button onClick={() => setShowAddFriendForm(false)} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Name</div>
+                <input
+                  value={addFriendInput}
+                  onChange={e => setAddFriendInput(e.target.value)}
+                  placeholder="e.g. Sophie"
+                  autoFocus
+                  style={{ width: '100%', boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+                />
+              </div>
+              <button disabled={!addFriendInput.trim()} onClick={() => {
+                const name = addFriendInput.trim();
+                if (!name) return;
+                const next = [...(settings.knownFriends || []), name];
+                onUpdateSetting('knownFriends', next);
+                setShowAddFriendForm(false);
+                setSelectedFriend(name);
+              }} style={{ width: '100%', background: '#a78bfa', border: 'none', borderRadius: 10, color: '#0c0c14', fontSize: 14, fontWeight: 700, padding: '12px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", opacity: !addFriendInput.trim() ? 0.5 : 1 }}>
+                Add
+              </button>
             </div>
           </div>
         )}
@@ -5023,13 +5082,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           {allUpcoming.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Upcoming</div>
-              {allUpcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+              {allUpcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
             </div>
           )}
           {pastShows.length > 0 && (
             <div style={{ marginBottom: supportApps.length > 0 ? 16 : 0 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Headliner</div>
-              {pastShows.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
+              {pastShows.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
             </div>
           )}
           {artistSongs.length > 0 && (
@@ -5608,7 +5667,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   );
 }
 
-function ArtistShowRow({ concert, onOpen }) {
+function ArtistShowRow({ concert, onOpen, showArtist = true }) {
   const past = isPast(concert.date);
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
@@ -5624,7 +5683,8 @@ function ArtistShowRow({ concert, onOpen }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
           {isFestival && <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: "#1a1030", color: "#f472b6" }}>FEST</span>}
-          <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(concert.date)}</span>
+          {showArtist && <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{concert.artist}</span>}
+          <span style={{ fontSize: 13, color: showArtist ? "#6b6a8f" : "#e2e0ff", fontWeight: showArtist ? 500 : 500, flexShrink: 0 }}>{showArtist ? `· ${formatDate(concert.date)}` : formatDate(concert.date)}</span>
         </div>
         <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
           {online ? formatOnlineLocation(concert) : <>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}</>}

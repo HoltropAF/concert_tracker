@@ -6502,32 +6502,38 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           })();
           if (!isFest && !showDetails) return (
             <>
-              {card('Quick add', <>
+              {card(form.wishlist ? 'Want to go' : quickUpcoming ? 'Upcoming show' : 'Show details', <>
                 <button onClick={() => update('wishlist', !form.wishlist)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#34d399' : '#1f1f35'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
                   <span style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.wishlist ? '#34d399' : '#3d3564'}`, background: form.wishlist ? '#34d399' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '✓' : ''}</span>
                   <span style={{ fontSize: 12, color: form.wishlist ? '#34d399' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>No tickets yet — save as "want to go"</span>
                 </button>
+                <div style={{ marginBottom: 10, position: 'relative' }}>
+                  {fieldLabel('Artist *')}
+                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
+                </div>
+                {form.wishlist ? (
+                  <div style={{ marginBottom: 10 }}>{fieldLabel('Date (if known)')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                    <div>{fieldLabel('Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                    <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
+                  </div>
+                )}
+                {!form.wishlist && <>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                   <input value={sfUrl} onChange={e => setSfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillFromSetlistUrl()} placeholder="✨ Paste setlist.fm link to auto-fill…" style={{ ...inputStyle, flex: 1 }} />
                   <button onClick={fillFromSetlistUrl} disabled={!sfUrl.trim() || sfStatus === 'loading'} style={{ background: 'none', border: '1px solid #3d3564', borderRadius: 8, color: sfUrl.trim() ? '#a78bfa' : '#2e2e4a', fontSize: 12, padding: '0 14px', cursor: sfUrl.trim() ? 'pointer' : 'default', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? '…' : 'Fill'}</button>
                 </div>
                 {sfMsg && <div style={{ fontSize: 10, color: sfStatus === 'error' ? '#f87171' : '#4ade80', fontFamily: "'DM Mono', monospace", marginBottom: 8, textAlign: 'center' }}>{sfMsg}</div>}
                 <div style={{ height: 8 }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                  <div>{fieldLabel('Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
-                  <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
-                </div>
-                <div style={{ marginBottom: 10, position: 'relative' }}>
-                  {fieldLabel('Artist *')}
-                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
-                  {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
-                </div>
                 {form.artist && form.date && (
                   <a href={`https://www.setlist.fm/search?query=${encodeURIComponent(form.artist)}+${form.date.slice(0,4)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', marginBottom: 10, background: 'none', border: '1px solid #3d3564', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', textDecoration: 'none', fontFamily: "'DM Mono', monospace", boxSizing: 'border-box' }}>
                     Find on setlist.fm ↗
                   </a>
                 )}
                 <button disabled={!form.artist || !form.date || sfStatus === 'loading'} onClick={autoFillFromSearch} style={{ width: '100%', marginBottom: 12, background: 'none', border: '1px dashed #3d3564', borderRadius: 8, color: (!form.artist || !form.date) ? '#2e2e4a' : '#a78bfa', fontSize: 12, padding: '8px', cursor: (!form.artist || !form.date) ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? 'Searching setlist.fm…' : '✨ Auto-fill from setlist.fm (artist + date)'}</button>
+                </>}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   <button onClick={() => update('attendanceMode', 'in_person')} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: form.attendanceMode !== 'online' ? '#1a1a30' : '#0c0c14', border: `1px solid ${form.attendanceMode !== 'online' ? '#a78bfa' : '#2e2e50'}`, color: form.attendanceMode !== 'online' ? '#a78bfa' : '#6b6a8f', fontWeight: form.attendanceMode !== 'online' ? 700 : 400 }}>📍 In person</button>
                   <button onClick={() => update('attendanceMode', 'online')} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: form.attendanceMode === 'online' ? '#0a2a30' : '#0c0c14', border: `1px solid ${form.attendanceMode === 'online' ? ONLINE_COLOR : '#2e2e50'}`, color: form.attendanceMode === 'online' ? ONLINE_COLOR : '#6b6a8f', fontWeight: form.attendanceMode === 'online' ? 700 : 400 }}>💻 Online</button>
@@ -6553,7 +6559,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                   <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 </>}
-                {quickUpcoming
+                {form.wishlist ? null : quickUpcoming
                   ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming show — rating & extras unlock after the date</div>
                   : <>
                     {fieldLabel('Went with')}
@@ -6575,7 +6581,11 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           );
           if (isFest && !showDetails) return (
             <>
-              {card('Quick add festival', <>
+              {card(form.wishlist ? 'Want to go' : quickUpcoming ? 'Upcoming festival' : 'Festival details', <>
+                <button onClick={() => update('wishlist', !form.wishlist)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#34d399' : '#1f1f35'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
+                  <span style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.wishlist ? '#34d399' : '#3d3564'}`, background: form.wishlist ? '#34d399' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '✓' : ''}</span>
+                  <span style={{ fontSize: 12, color: form.wishlist ? '#34d399' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>No tickets yet — save as "want to go"</span>
+                </button>
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   {fieldLabel('Festival name *')}
                   <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={errors.artist ? errStyle : inputStyle} />
@@ -6594,13 +6604,13 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                   <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
                   <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
-                {quickUpcoming
+                {form.wishlist ? null : quickUpcoming
                   ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming festival — acts & extras unlock after the date</div>
                   : <>
                     {fieldLabel('Went with')}
                     {experienceContent}
                   </>}
-                <button onClick={() => setShowDetails(true)} style={{ width: '100%', marginTop: 14, minHeight: 40, borderRadius: 8, border: '1px solid #2e2e50', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>More details (acts, money, notes…)</button>
+                <button onClick={() => setShowDetails(true)} style={{ width: '100%', marginTop: 14, minHeight: 40, borderRadius: 8, border: '1px solid #2e2e50', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{form.wishlist ? 'Add lineup (optional)' : 'More details (acts, money, notes…)'}</button>
               </>)}
             </>
           );

@@ -2397,6 +2397,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
+  const [spendRange, setSpendRange] = useState([]) // subset of 'current'|'previous'|'prev2'|'older'
   const summaryFinType = settings.summaryFinType || 'all';
   const showsChartRef = useRef(null);
   const [showsChartDims, setShowsChartDims] = useState({ w: 300, h: 200 });
@@ -3946,67 +3947,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       {statsTab === "summary" && (
         <div style={{ padding: "16px 16px 0", flex: fillHeight ? 1 : undefined, overflowY: fillHeight ? "auto" : undefined, minHeight: 0 }}>
 
-          {/* Monthly spending, past + upcoming */}
-          {(() => {
-            const monthlySpend = {};
-            concerts.filter(c => !isWish(c)).forEach(c => {
-              if (!c.date) return;
-              const month = c.date.slice(0, 7);
-              const cost = (c.ticketPrice || 0) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0) + extraCostTotal(c);
-              monthlySpend[month] = (monthlySpend[month] || 0) + cost;
-            });
-            const months = Object.keys(monthlySpend).sort();
-            if (months.length < 2) return null;
-            const todayMonth = new Date().toISOString().slice(0, 7);
-            const maxSpend = Math.max(...Object.values(monthlySpend), 1);
-            const midSpend = Math.round(maxSpend / 2);
-            const n = months.length;
-            const W = 320, H = 90, Y_PAD = 32;
-            const xOf = i => (i / (n - 1)) * (W - 6) + 3;
-            const yOf = v => H - 4 - (v / maxSpend) * (H - 14);
-            const splitIdx = months.findIndex(m => m > todayMonth);
-            const pastMonths = splitIdx === -1 ? months : months.slice(0, splitIdx);
-            const futureMonths = splitIdx === -1 ? [] : months.slice(Math.max(0, splitIdx - 1));
-            const pastPath = pastMonths.length > 1 ? "M " + pastMonths.map((m, i) => `${xOf(months.indexOf(m))},${yOf(monthlySpend[m])}`).join(" L ") : null;
-            const futurePath = futureMonths.length > 1 ? "M " + futureMonths.map(m => `${xOf(months.indexOf(m))},${yOf(monthlySpend[m])}`).join(" L ") : null;
-            // Label every month, but only draw text every few ticks so it doesn't overlap
-            const labelEvery = Math.max(1, Math.ceil(n / 8));
-            return (
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Spending per month</div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#a78bfa", borderRadius: 1 }} /><span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Past</span></div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 14, height: 2, background: "#34d399", borderRadius: 1 }} /><span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-start" }}>
-                  <div style={{ width: Y_PAD, display: "flex", flexDirection: "column", justifyContent: "space-between", height: H + 14, paddingBottom: 14, flexShrink: 0 }}>
-                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>€{maxSpend}</span>
-                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>€{midSpend}</span>
-                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", textAlign: "right", lineHeight: 1 }}>€0</span>
-                  </div>
-                  <svg style={{ flex: 1 }} height={H + 14} viewBox={`0 0 ${W} ${H + 14}`} preserveAspectRatio="none">
-                    <defs><linearGradient id="monthlySpendGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
-                    <line x1={0} y1={yOf(maxSpend)} x2={W} y2={yOf(maxSpend)} stroke="#1f1f35" strokeWidth="1" />
-                    <line x1={0} y1={yOf(midSpend)} x2={W} y2={yOf(midSpend)} stroke="#1a1a2e" strokeWidth="1" strokeDasharray="3,3" />
-                    <line x1={0} y1={yOf(0)} x2={W} y2={yOf(0)} stroke="#1f1f35" strokeWidth="1" />
-                    {months.map((m, i) => (
-                      <line key={m} x1={xOf(i)} y1={yOf(0)} x2={xOf(i)} y2={yOf(0) - 3} stroke="#2e2e50" strokeWidth="1" />
-                    ))}
-                    {months.map((m, i) => i % labelEvery === 0 && (
-                      <text key={m} x={xOf(i)} y={H + 11} textAnchor="middle" fill="#4a4870" fontSize="7.5" fontFamily="DM Mono,monospace">{m.slice(2).replace('-', '/')}</text>
-                    ))}
-                    {pastPath && <path d={pastPath + ` L ${xOf(pastMonths.length - 1)},${yOf(0)} L ${xOf(0)},${yOf(0)} Z`} fill="url(#monthlySpendGrad)" />}
-                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                    {futurePath && <path d={futurePath} fill="none" stroke="#34d399" strokeWidth="2" strokeDasharray="4 2" strokeLinecap="round" strokeLinejoin="round" />}
-                    {months.map((m, i) => <circle key={m} cx={xOf(i)} cy={yOf(monthlySpend[m])} r="2.2" fill={m > todayMonth ? "#34d399" : "#a78bfa"} />)}
-                  </svg>
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Year scope toggle */}
           {(() => {
             const allDataYears = [...new Set(pastAll.map(c => c.date.slice(0,4)).filter(Boolean))].sort();
@@ -4076,7 +4016,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
 
           {/* Cumulative line chart */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div onClick={() => { setStatsTab("charts"); setChartGroup('activity'); setSelectedChart("shows"); document.getElementById('content-scroll')?.scrollTo(0,0); }} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
+          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>{summaryYear === 'all' ? "cumulative shows" : "shows per month"}</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -4119,7 +4059,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   </div>
                 );
               }
-              const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10).sort((a,b) => a.date.localeCompare(b.date));
+              const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31').sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
               const W = 300, H = 80;
@@ -4190,6 +4130,51 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               );
             })()}
           </div>}
+
+          {/* Spending per year, with a range filter */}
+          {(() => {
+            const yearlySpend = {};
+            concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31').forEach(c => {
+              const y = c.date.slice(0, 4);
+              yearlySpend[y] = (yearlySpend[y] || 0) + ticketTotal(c) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
+            });
+            const allYears = Object.keys(yearlySpend).sort();
+            if (allYears.length === 0) return null;
+            const thisYear = new Date().getFullYear();
+            const bucketOf = y => {
+              const diff = thisYear - parseInt(y, 10);
+              if (diff <= 0) return 'current';
+              if (diff === 1) return 'previous';
+              if (diff === 2) return 'prev2';
+              return 'older';
+            };
+            const shownYears = spendRange.length === 0 ? allYears : allYears.filter(y => spendRange.includes(bucketOf(y)));
+            const maxSpend = Math.max(...shownYears.map(y => yearlySpend[y]), 1);
+            const RANGE_OPTS = [['current', 'This year'], ['previous', 'Last year'], ['prev2', '2 years ago'], ['older', 'Older']];
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Spending per year</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  {RANGE_OPTS.map(([id, label]) => (
+                    <button key={id} onClick={() => setSpendRange(r => r.includes(id) ? r.filter(x => x !== id) : [...r, id])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: spendRange.includes(id) ? '#a78bfa' : '#0c0c14', color: spendRange.includes(id) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${spendRange.includes(id) ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+                  ))}
+                </div>
+                {shownYears.length === 0 ? (
+                  <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "10px 0" }}>No shows in this range</div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
+                    {shownYears.map(y => (
+                      <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>€{yearlySpend[y].toFixed(0)}</div>
+                        <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: "#a78bfa", height: `${Math.max(3, (yearlySpend[y] / maxSpend) * 60)}px` }} />
+                        <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{y}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Donut cards — stacked full width */}
           {!(settings.hiddenSummaryBlocks||[]).includes("pies") && (() => {

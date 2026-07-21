@@ -1340,7 +1340,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
               </>
             ) : (
               <>
-                <button onClick={() => onNavigate({ view: 'venues' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
+                <button onClick={() => onNavigate({ view: 'venues', venue: concert.venue })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
                 <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
               </>
             )}
@@ -1376,7 +1376,6 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
             {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
             {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
-            {langs.map(l => <Badge key={l} color="#13131f">{l}</Badge>)}
           </div>
         </div>
 
@@ -5692,8 +5691,9 @@ function ArtistShowRow({ concert, onOpen, showArtist = true }) {
   );
 }
 
-function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {} }) {
-  const [selectedVenue, setSelectedVenue] = useState(null);
+function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {} }) {
+  const [selectedVenue, setSelectedVenue] = useState(initialSelectedVenue);
+  useEffect(() => { if (initialSelectedVenue) { setSelectedVenue(initialSelectedVenue); onInitialVenueConsumed(); } }, [initialSelectedVenue]);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
   const [showSort, setShowSort] = useState(false);
@@ -8095,6 +8095,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [addFlowType, setAddFlowType] = useState(null) // 'concert' | 'festival'
   const [addFlowAttendance, setAddFlowAttendance] = useState(null) // 'in_person' | 'online'
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
+  const [pendingVenueSelect, setPendingVenueSelect] = useState(null)
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
@@ -8562,7 +8563,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); } }} allArtists={[...new Set([
+        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a, venue: ve }) => { setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -8900,7 +8901,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>
 

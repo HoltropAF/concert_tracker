@@ -8816,8 +8816,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               const BAR_H = 90;
               const Y_PAD = 24;
               return (
-                <div style={{ marginBottom: 10 }}>
-                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '4px 4px 10px' : '4px 4px 6px' }}>
+                <div style={{ marginBottom: showActivity ? 10 : 2 }}>
+                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '4px 4px 10px' : '4px 4px 2px' }}>
                     <span style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Activity</span>
                     <span style={{ fontSize: 11, color: '#4a4870', transform: showActivity ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                   </button>
@@ -8920,7 +8920,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               <EmptyState title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
             {!showCalendar && filtered.length > 0 && (
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: showActivity ? 10 : 2 }}>
                 {renderConcertList(combinedShows, settings.showListPhotos !== false)}
               </div>
             )}

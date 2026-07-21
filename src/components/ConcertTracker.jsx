@@ -1386,15 +1386,42 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
           {((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div style={detailCard}>
               {sec("Costs")}
-              {[
-                ...((concert.tickets && concert.tickets.length > 0) ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0]) : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", concert.ticketPrice]] : []),
-                merchTotal > 0 ? ["Merch", merchTotal] : null,
-              ].filter(Boolean).map(([label, amount], i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
-                  <span style={{ color: "#6b6a8f", fontSize: 12 }}>{label}</span>
-                  <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{Number(amount).toFixed(2)}</span>
-                </div>
-              ))}
+              {(() => {
+                const ticketItems = (concert.tickets && concert.tickets.length > 0)
+                  ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
+                  : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", concert.ticketPrice]] : [];
+                const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.name || "Item", parseFloat(m.price) || 0]);
+                const Group = (heading, items) => {
+                  if (items.length === 0) return null;
+                  if (items.length === 1) return (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                      <span style={{ color: "#6b6a8f", fontSize: 12 }}>{items[0][0]}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{items[0][1].toFixed(2)}</span>
+                    </div>
+                  );
+                  const subtotal = items.reduce((s, [, v]) => s + v, 0);
+                  return (
+                    <div style={{ padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 600 }}>{heading}</span>
+                        <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{subtotal.toFixed(2)}</span>
+                      </div>
+                      {items.map(([label, amount], i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", paddingLeft: 14, marginTop: 4 }}>
+                          <span style={{ color: "#6b6a8f", fontSize: 11 }}>· {label}</span>
+                          <span style={{ color: "#8b89ab", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>€{amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                };
+                return (
+                  <>
+                    {Group("Tickets", ticketItems)}
+                    {Group("Merch", merchItems)}
+                  </>
+                );
+              })()}
               {totalCost > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 7 }}>
                   <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 700 }}>Total</span>

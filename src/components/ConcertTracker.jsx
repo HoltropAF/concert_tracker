@@ -4004,15 +4004,20 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             sp.forEach(c => { const k = (c.country||'').trim(); if (k) spCountries[k] = (spCountries[k]||0)+1; });
             const spYears = [...new Set(sp.map(c => getYear(c.date)))];
             const spAvg = summaryYear === 'all' && spYears.length ? (sp.length / spYears.length).toFixed(1) : null;
+            const upcomingAll = concerts.filter(c => !isWish(c) && !isPast(c.date));
+            const upShows = upcomingAll.filter(c => c.type === 'concert').length;
+            const upFests = upcomingAll.filter(c => c.type === 'festival').length;
+            const upNewCountries = [...new Set(upcomingAll.map(c => (c.country||'').trim()).filter(k => k && !spCountries[k]))].length;
             return (
               <div style={{ display: "grid", gridTemplateColumns: `repeat(${spAvg !== null ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 8 }}>
                 {[
-                  { label: "shows", value: spShows.length, nav: { view: 'home', filterType: 'concerts' } },
-                  { label: "festivals", value: spFests.length, nav: { view: 'home', filterType: 'festivals' } },
-                  { label: "countries", value: Object.keys(spCountries).length, nav: { view: 'stats', chart: 'venues' } },
-                  ...(spAvg !== null ? [{ label: "avg / year", value: spAvg, nav: null }] : []),
+                  { label: "shows", value: spShows.length, upcoming: upShows, nav: { view: 'home', filterType: 'concerts' } },
+                  { label: "festivals", value: spFests.length, upcoming: upFests, nav: { view: 'home', filterType: 'festivals' } },
+                  { label: "countries", value: Object.keys(spCountries).length, upcoming: upNewCountries, nav: { view: 'venues' } },
+                  ...(spAvg !== null ? [{ label: "avg / year", value: spAvg, upcoming: 0, nav: null }] : []),
                 ].map(b => (
-                  <div key={b.label} onClick={b.nav ? () => { if (b.nav.chart) { setStatsTab("charts"); setChartGroup('places'); setSelectedChart(b.nav.chart); } else { onNavigate(b.nav); } } : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default" }}>
+                  <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default", position: "relative" }}>
+                    {b.upcoming > 0 && <div style={{ position: "absolute", top: 3, right: 4, fontSize: 8, color: "#34d399", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>+{b.upcoming}</div>}
                     <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
                     <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
                   </div>

@@ -1255,11 +1255,19 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
   const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => getSupportName(x) !== getSupportName(s)) }));
 
   const handleShare = () => {
+    const songCount = getSongList(concert.setlist).length;
+    const genres = getGenres(concert);
     const lines = [
       `🎤 ${concert.artist}${concert.tour ? ` — ${concert.tour}` : ''}`,
-      `📅 ${formatDate(concert.date)} · ${isOnline(concert) ? formatOnlineLocation(concert) : `${concert.venue}${concert.room ? ` · ${concert.room}` : ''} · ${concert.city}`}`,
+      concert.type === 'festival' ? '🎪 Festival' : null,
+      `📅 ${formatDate(concert.date)}`,
+      isOnline(concert)
+        ? `💻 ${formatOnlineLocation(concert)}`
+        : `📍 ${concert.venue}${concert.room ? ` · ${concert.room}` : ''}, ${concert.city}${concert.country ? `, ${concert.country}` : ''}`,
+      genres.length > 0 ? `🎵 ${genres.join(', ')}` : null,
       getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
-      concert.rating ? `⭐ ${'★'.repeat(concert.rating)}` : null,
+      concert.rating ? `${'★'.repeat(concert.rating)}${'☆'.repeat((settings.ratingSystem || 5) - concert.rating)}` : null,
+      songCount > 0 ? `${songCount} song${songCount !== 1 ? 's' : ''} heard live` : null,
       concert.notes ? `📝 ${concert.notes}` : null,
     ].filter(Boolean).join('\n');
     navigator.clipboard?.writeText(lines);

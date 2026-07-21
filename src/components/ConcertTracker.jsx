@@ -1335,16 +1335,17 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
           <div style={{ marginBottom: 14 }}>
             {online ? (
               <>
-                <div style={{ fontSize: 16, color: "#c4c2f0", fontWeight: 600 }}>{onlineTypeLabel(concert)}</div>
-                {concert.platform && <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.platform}</div>}
+                {concert.tour && <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, color: "#e2e0ff", fontWeight: 800 }}>{concert.tour}</div>}
+                <div style={{ fontSize: concert.tour ? 14 : 16, color: "#c4c2f0", fontWeight: 600, marginTop: concert.tour ? 4 : 0 }}>{onlineTypeLabel(concert)}</div>
+                {concert.platform && <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.platform}</div>}
               </>
             ) : (
               <>
-                <button onClick={() => onNavigate({ view: 'venues', venue: concert.venue })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
-                <div style={{ fontSize: 13, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
+                {concert.tour && <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, color: "#e2e0ff", fontWeight: 800, marginBottom: 4 }}>{concert.tour}</div>}
+                <button onClick={() => onNavigate({ view: 'venues', venue: concert.venue })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: concert.tour ? 14 : 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
+                <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
               </>
             )}
-            {concert.tour && <div style={{ fontSize: 12, color: "#4a4870", marginTop: 4 }}>{concert.tour}</div>}
           </div>
 
           {/* Photo */}

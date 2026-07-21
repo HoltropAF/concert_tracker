@@ -2405,7 +2405,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
-  const [spendRange, setSpendRange] = useState([]) // subset of 'current'|'previous'|'prev2'|'older'
   const summaryFinType = settings.summaryFinType || 'all';
   const showsChartRef = useRef(null);
   const [showsChartDims, setShowsChartDims] = useState({ w: 300, h: 200 });
@@ -4139,47 +4138,39 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             })()}
           </div>}
 
-          {/* Spending per year, with a range filter */}
+          {/* Spending per year (or per month within the selected year) */}
           {(() => {
-            const yearlySpend = {};
-            concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31').forEach(c => {
-              const y = c.date.slice(0, 4);
-              yearlySpend[y] = (yearlySpend[y] || 0) + ticketTotal(c) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-            });
-            const allYears = Object.keys(yearlySpend).sort();
-            if (allYears.length === 0) return null;
-            const thisYear = new Date().getFullYear();
-            const bucketOf = y => {
-              const diff = thisYear - parseInt(y, 10);
-              if (diff <= 0) return 'current';
-              if (diff === 1) return 'previous';
-              if (diff === 2) return 'prev2';
-              return 'older';
-            };
-            const shownYears = spendRange.length === 0 ? allYears : allYears.filter(y => spendRange.includes(bucketOf(y)));
-            const maxSpend = Math.max(...shownYears.map(y => yearlySpend[y]), 1);
-            const RANGE_OPTS = [['current', 'This year'], ['previous', 'Last year'], ['prev2', '2 years ago'], ['older', 'Older']];
+            const costOf = c => ticketTotal(c) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
+            const relevant = concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31');
+            if (relevant.length === 0) return null;
+            let buckets, labels;
+            if (summaryYear === 'all') {
+              const spend = {};
+              relevant.forEach(c => { const y = c.date.slice(0, 4); spend[y] = (spend[y] || 0) + costOf(c); });
+              labels = Object.keys(spend).sort();
+              buckets = labels.map(y => spend[y]);
+            } else {
+              const monthNames = ["J","F","M","A","M","J","J","A","S","O","N","D"];
+              const spend = Array(12).fill(0);
+              relevant.filter(c => c.date.slice(0, 4) === summaryYear).forEach(c => { spend[parseInt(c.date.slice(5,7), 10) - 1] += costOf(c); });
+              labels = monthNames;
+              buckets = spend;
+            }
+            const maxSpend = Math.max(...buckets, 1);
+            const total = buckets.reduce((a, b) => a + b, 0);
+            if (total === 0) return null;
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Spending per year</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                  {RANGE_OPTS.map(([id, label]) => (
-                    <button key={id} onClick={() => setSpendRange(r => r.includes(id) ? r.filter(x => x !== id) : [...r, id])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: spendRange.includes(id) ? '#a78bfa' : '#0c0c14', color: spendRange.includes(id) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${spendRange.includes(id) ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>{summaryYear === 'all' ? 'Spending per year' : `Spending per month · ${summaryYear}`}</div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: summaryYear === 'all' ? 8 : 4, height: 90 }}>
+                  {labels.map((label, i) => (
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                      <div style={{ fontSize: 8, color: buckets[i] > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1 }}>{buckets[i] > 0 ? `€${buckets[i].toFixed(0)}` : '0'}</div>
+                      <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: buckets[i] > 0 ? "#a78bfa" : "#1f1f35", height: `${Math.max(3, (buckets[i] / maxSpend) * 60)}px` }} />
+                      <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
+                    </div>
                   ))}
                 </div>
-                {shownYears.length === 0 ? (
-                  <div style={{ color: "#2e2e4a", fontSize: 11, fontFamily: "'DM Mono', monospace", textAlign: "center", padding: "10px 0" }}>No shows in this range</div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
-                    {shownYears.map(y => (
-                      <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>€{yearlySpend[y].toFixed(0)}</div>
-                        <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: "#a78bfa", height: `${Math.max(3, (yearlySpend[y] / maxSpend) * 60)}px` }} />
-                        <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{y}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })()}

@@ -1564,7 +1564,9 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
           /* ── WISHLIST STATUS (first card when editing a wish) ── */
           ...(form.wishlist !== undefined ? [{ title: 'Wishlist', content: <>
             <button onClick={() => {
+              const goingToBought = form.wishlist;
               update('wishlist', !form.wishlist);
+              if (goingToBought && form.date === '9999-12-31') update('date', '');
             }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#1f1f35' : '#34d399'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', marginBottom: 10 }}>
               <span style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${form.wishlist ? '#3d3564' : '#34d399'}`, background: form.wishlist ? 'none' : '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '' : '✓'}</span>
               <div>
@@ -2579,7 +2581,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         );
 
         const CumulativeChart = ({ w = 300, h = 160 }) => {
-          const cumSorted = [...concertsT].filter(c => !isWish(c) && c.date && c.date.length === 10).sort((a, b) => a.date.localeCompare(b.date));
+          const cumSorted = [...concertsT].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31').sort((a, b) => a.date.localeCompare(b.date));
           if (cumSorted.length < 2) return <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Not enough data yet</div>;
           const nowMs = Date.now();
           const cumPast = cumSorted.filter(c => new Date(c.date + 'T00:00:00').getTime() <= nowMs);
@@ -6512,15 +6514,15 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                   <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
                   {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
-                {form.wishlist ? (
-                  <div style={{ marginBottom: 10 }}>{fieldLabel('Date (if known)')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                {(form.wishlist || quickUpcoming) ? (
+                  <div style={{ marginBottom: 10 }}>{fieldLabel(form.wishlist ? 'Date (if known)' : 'Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                     <div>{fieldLabel('Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                     <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
                   </div>
                 )}
-                {!form.wishlist && <>
+                {!form.wishlist && !quickUpcoming && <>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                   <input value={sfUrl} onChange={e => setSfUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillFromSetlistUrl()} placeholder="✨ Paste setlist.fm link to auto-fill…" style={{ ...inputStyle, flex: 1 }} />
                   <button onClick={fillFromSetlistUrl} disabled={!sfUrl.trim() || sfStatus === 'loading'} style={{ background: 'none', border: '1px solid #3d3564', borderRadius: 8, color: sfUrl.trim() ? '#a78bfa' : '#2e2e4a', fontSize: 12, padding: '0 14px', cursor: sfUrl.trim() ? 'pointer' : 'default', fontFamily: "'DM Mono', monospace" }}>{sfStatus === 'loading' ? '…' : 'Fill'}</button>
@@ -6642,8 +6644,8 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 </div>
               </>)}
               {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />, (form.acts || []).length > 0)}
-              {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
-              {foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
+              {!form.wishlist && !quickUpcoming && foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
+              {!form.wishlist && !quickUpcoming && foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
               {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}
             </>
           );
@@ -6718,8 +6720,8 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {fieldLabel('Language')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
               </>)}
-              {foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
-              {foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
+              {!form.wishlist && !quickUpcoming && foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
+              {!form.wishlist && !quickUpcoming && foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
               {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}
             </>
           );
@@ -8208,7 +8210,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     return onUpdateSettings ? onUpdateSettings(next) : Promise.resolve()
   }
 
-  const years = [...new Set(concerts.map(c => c.date.slice(0,4)))].sort().reverse()
+  const years = [...new Set(concerts.filter(c => c.date !== '9999-12-31').map(c => c.date.slice(0,4)))].sort().reverse()
   const allVenues = [...new Set(concerts.map(c => c.venue))].sort()
   const activeFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
   const allCountries = [...new Set(concerts.map(c => (c.country || '').trim()).filter(Boolean))].sort()

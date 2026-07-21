@@ -348,23 +348,29 @@ git push
 
 ### The five tabs
 
-At the bottom of the screen you'll find five buttons:
+At the bottom of the screen you'll find five buttons: **Shows, Artists, Songs, Venues, Friends**. Stats live behind a small icon at the top-left of the header, and Settings behind the **⋯** icon at the top-right — reachable from any tab.
 
 | Tab | What it does |
 | --- | ------------ |
-| **Shows** | Your list of concerts and festivals |
-| **Stats** | Charts and breakdowns |
-| **Summary** | Quick overview — totals, top artists, spending |
-| **Friends** | Who you've gone with most |
-| **Settings** | Preferences, tags, data import/export |
+| **Shows** | Your list of concerts and festivals — past, upcoming, and want-to-go together |
+| **Artists** | Everyone you've seen live, plus artists you want to see |
+| **Songs** | Every song heard live, ranked by times heard |
+| **Venues** | Every place you've been, with a map, plus venues you want to visit |
+| **Friends** | Who you've gone with |
 
 ---
 
-### Adding a concert
+### Adding a show
 
-Tap **+ show** (for a regular concert) or **+ fest** (for a festival) in the top bar.
+Tap **+** (top right of the Shows list). It asks three quick questions:
 
-**For a concert, fill in:**
+1. **What are you logging?** — Offline show / Online show / Festival
+2. **When is it?** — Already happened / Coming up
+3. *(if coming up)* **Got a ticket?** — Yes opens the full form; No saves it as **Want to go**
+
+Want-to-go entries skip rating, setlist, and ticket fields since none of that exists yet — you can mark tickets as bought later, which brings the rest of the form back.
+
+**In the full form, fill in:**
 
 - **Artist** — the headliner's name. Start typing and suggestions appear from your existing concerts.
 - **Date** — when it was (or will be)
@@ -375,8 +381,8 @@ Tap **+ show** (for a regular concert) or **+ fest** (for a festival) in the top
 - **Genre / Subgenre** *(optional)* — helps with stats and filtering
 - **Language** *(optional)* — what language the artist performed in
 - **Venue size** *(optional)* — Club / Small hall / Mid-venue / Arena / Stadium
-- **Rating** — tap a star to rate the night
-- **Ticket price** — what you paid (just the number, no currency symbol)
+- **Rating** — tap a star to rate the night (once it's happened)
+- **Tickets** — add one or more priced line items (e.g. base ticket + a fan-club add-on) — they're summed automatically
 - **Friends** — who you went with. Tap a name to add, or type a new one.
 - **Solo** — toggle on if you went alone
 - **Notes** — anything you want to remember
@@ -388,7 +394,7 @@ Tap **Save** when done.
 
 ### Adding a festival
 
-Tap **+ fest**. A festival works differently from a concert:
+Pick **Festival** in step 1 of the add flow. A festival works differently from a concert:
 
 - **Festival name** — goes in the Artist field (e.g. "Lowlands 2024")
 - **Start date + End date** — for multi-day festivals
@@ -417,6 +423,7 @@ To delete, open a concert → tap **Edit** → scroll to the bottom → **Delete
 ### Importing a setlist
 
 Inside a concert (view or edit mode), find the **Setlist** section.
+
 
 **Option 1 — From setlist.fm:**
 

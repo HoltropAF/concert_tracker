@@ -6426,33 +6426,54 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort()
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#0c0c14', overflowY: 'auto', zIndex: 100 }}>
-      <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: form.type === 'festival' ? '#f472b6' : '#e2e0ff', flex: 1 }}>{form.type === 'festival' ? 'Add festival' : 'Add concert'}</div>
-        <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
-      </div>
-      <div style={{ padding: '20px' }}>
-        {/* Type toggle — always at top */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {[{ id: 'concert', label: '🎤 Concert' }, { id: 'festival', label: '🎪 Festival' }].map(t => (
-            <button key={t.id} onClick={() => { update('type', t.id); if (t.id === 'festival') setShowDetails(true); }} style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 14, cursor: 'pointer', background: form.type===t.id ? (t.id === 'festival' ? '#1a1030' : '#1a1a30') : '#0c0c14', border: `1px solid ${form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#2e2e50'}`, color: form.type===t.id ? (t.id === 'festival' ? '#f472b6' : '#a78bfa') : '#6b6a8f', fontWeight: form.type===t.id ? 700 : 400, fontFamily: "'DM Sans', sans-serif" }}>{t.label}</button>
-          ))}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ width: '100%', maxHeight: '94vh', background: '#0c0c14', borderRadius: '20px 20px 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#2e2e50' }} />
         </div>
+        <div style={{ padding: '12px 20px 14px', borderBottom: '1px solid #1e3028', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: form.type === 'festival' ? '#f472b6' : '#e2e0ff' }}>{form.type === 'festival' ? 'Add festival' : 'Add concert'}</div>
+            <button onClick={() => { update('type', form.type === 'festival' ? 'concert' : 'festival'); if (form.type !== 'festival') setShowDetails(true); }} style={{ background: 'none', border: 'none', padding: 0, marginTop: 1, cursor: 'pointer', fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              switch to {form.type === 'festival' ? 'concert' : 'festival'}
+            </button>
+          </div>
+          <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+        </div>
+        <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1 }}>
         {(() => {
           const isFest = form.type === 'festival';
+          const sectionIcon = (svg, color) => (
+            <div style={{ width: 26, height: 26, borderRadius: 8, background: `${color}22`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{svg}</div>
+          );
+          const ICONS = {
+            details: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>,
+            acts: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
+            experience: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17.3 6.2 21l1.6-6.6L2.5 10l6.7-.6L12 3.3l2.8 6.1 6.7.6-5.3 4.4 1.6 6.6z"/></svg>,
+            financial: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 15.5c.5.8 1.4 1.3 2.5 1.3 1.5 0 2.5-.8 2.5-2s-1-1.7-2.5-2-2.5-.8-2.5-2 1-2 2.5-2c1.1 0 2 .5 2.5 1.3M12 6.5v11"/></svg>,
+            notes: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>,
+          };
           const card = (title, content) => (
-            <div key={title} style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '16px', marginBottom: 12 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff', marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #1a1a2e' }}>{title}</div>
+            <div key={title} style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #1a1a2e' }}>
+                {sectionIcon(ICONS.details, isFest ? '#f472b6' : '#a78bfa')}
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>{title}</div>
+              </div>
               {content}
             </div>
           );
           const foldCard = (title, content, hasData = false) => {
             const open = openCards.includes(title);
+            const iconMap = { 'Acts seen': ['acts', '#818cf8'], 'Your experience': ['experience', '#a78bfa'], 'Financial': ['financial', '#34d399'], 'Notes': ['notes', '#6b6a8f'] };
+            const [iconKey, iconColor] = iconMap[title] || [null, '#a78bfa'];
             return (
-              <div key={title} style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
-                <button onClick={() => setOpenCards(o => open ? o.filter(t => t !== title) : [...o, title])} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px' }}>
-                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: open ? '#e2e0ff' : '#9b97d4' }}>{title}{!open && hasData && <span style={{ color: '#4ade80', fontSize: 11, marginLeft: 6 }}>●</span>}</span>
+              <div key={title} style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, marginBottom: 12, overflow: 'hidden' }}>
+                <button onClick={() => setOpenCards(o => open ? o.filter(t => t !== title) : [...o, title])} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: '12px 14px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {iconKey && sectionIcon(ICONS[iconKey], iconColor)}
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: open ? '#e2e0ff' : '#9b97d4' }}>{title}{!open && hasData && <span style={{ color: '#4ade80', fontSize: 11, marginLeft: 6 }}>●</span>}</span>
+                  </span>
                   <span style={{ color: '#4a4870', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{open ? '−' : '+'}</span>
                 </button>
                 {open && <div style={{ padding: '0 16px 16px' }}>{content}</div>}
@@ -6743,6 +6764,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
             </>
           );
         })()}
+        </div>
       </div>
       {pendingTag && (
         <SaveTagPrompt

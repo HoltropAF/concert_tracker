@@ -1399,7 +1399,7 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                 const ticketItems = (concert.tickets && concert.tickets.length > 0)
                   ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
                   : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", concert.ticketPrice]] : [];
-                const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.name || "Item", parseFloat(m.price) || 0]);
+                const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
                 const Group = (heading, items) => {
                   if (items.length === 0) return null;
                   if (items.length === 1) return (

@@ -8431,62 +8431,80 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </div>
   )
 
-  if (addFlowStep) return (
+  if (addFlowStep) {
+    const stepNum = { type: 1, timing: 2, ticket: 3 }[addFlowStep]
+    const stepTotal = addFlowStep === 'ticket' || (addFlowStep === 'timing') ? 3 : 3
+    const OptionCard = ({ color, icon, title, sub, onClick }) => (
+      <button onClick={onClick} style={{
+        display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', width: '100%',
+        background: '#13131f', border: '1px solid #1f1f35', borderLeft: `3px solid ${color}`,
+        borderRadius: 14, padding: '16px 16px 16px 15px', cursor: 'pointer',
+      }}>
+        {icon && (
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: `${color}22`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {icon}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff' }}>{title}</div>
+          <div style={{ fontSize: 12, color: '#6b6a8f', marginTop: 3, lineHeight: 1.4 }}>{sub}</div>
+        </div>
+        <span style={{ color: '#3a3858', fontSize: 18, flexShrink: 0 }}>›</span>
+      </button>
+    )
+    return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 40px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-          <button onClick={() => { if (addFlowStep === 'type') setAddFlowStep(null); else if (addFlowStep === 'timing') setAddFlowStep('type'); else setAddFlowStep('timing'); }} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#e2e0ff' }}>
-            {addFlowStep === 'type' ? 'What are you logging?' : addFlowStep === 'timing' ? 'When is it?' : 'Do you have a ticket?'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 6 }}>
+          <button onClick={() => { if (addFlowStep === 'type') setAddFlowStep(null); else if (addFlowStep === 'timing') setAddFlowStep('type'); else setAddFlowStep('timing'); }} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[1, 2, 3].map(n => (
+              <div key={n} style={{ width: n === stepNum ? 18 : 6, height: 6, borderRadius: 3, background: n <= stepNum ? '#a78bfa' : '#1f1f35', transition: 'width 0.2s' }} />
+            ))}
           </div>
+        </div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 27, fontWeight: 800, color: '#e2e0ff', lineHeight: 1.15, margin: '14px 0 4px' }}>
+          {addFlowStep === 'type' ? 'What are you logging?' : addFlowStep === 'timing' ? 'When is it?' : 'Got a ticket?'}
+        </div>
+        <div style={{ fontSize: 13, color: '#6b6a8f', marginBottom: 26 }}>
+          {addFlowStep === 'type' ? 'Pick the kind of show first.' : addFlowStep === 'timing' ? 'Past shows and upcoming plans both get logged, just a little differently.' : "We'll keep it lighter if you're still deciding."}
         </div>
 
         {addFlowStep === 'type' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
-              { type: 'concert', attendance: 'in_person', label: 'Offline show', sub: 'A concert you go to in person', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg> },
-              { type: 'concert', attendance: 'online', label: 'Online show', sub: 'A livestream or online performance', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg> },
-              { type: 'festival', attendance: 'in_person', label: 'Festival', sub: 'Multiple acts, one event', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 18H5L12 3z"/><path d="M9 14h6"/></svg> },
-            ].map(opt => (
-              <button key={opt.label} onClick={() => { setAddFlowType(opt.type); setAddFlowAttendance(opt.attendance); setAddFlowStep('timing'); }} style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer', color: '#a78bfa' }}>
-                {opt.icon}
-                <div>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>{opt.label}</div>
-                  <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>{opt.sub}</div>
-                </div>
-              </button>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <OptionCard color="#a78bfa" title="Offline show" sub="A concert you go to in person"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>}
+              onClick={() => { setAddFlowType('concert'); setAddFlowAttendance('in_person'); setAddFlowStep('timing'); }} />
+            <OptionCard color={ONLINE_COLOR} title="Online show" sub="A livestream or online performance"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>}
+              onClick={() => { setAddFlowType('concert'); setAddFlowAttendance('online'); setAddFlowStep('timing'); }} />
+            <OptionCard color="#f472b6" title="Festival" sub="Multiple acts, one event"
+              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 18H5L12 3z"/><path d="M9 14h6"/></svg>}
+              onClick={() => { setAddFlowType('festival'); setAddFlowAttendance('in_person'); setAddFlowStep('timing'); }} />
           </div>
         )}
 
         {addFlowStep === 'timing' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>Already happened</div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>Log a show from the past</div>
-            </button>
-            <button onClick={() => setAddFlowStep('ticket')} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>Coming up</div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>Something upcoming, or on your radar</div>
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <OptionCard color="#a78bfa" title="Already happened" sub="Log a show from the past"
+              onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} />
+            <OptionCard color="#818cf8" title="Coming up" sub="Something upcoming, or on your radar"
+              onClick={() => setAddFlowStep('ticket')} />
           </div>
         )}
 
         {addFlowStep === 'ticket' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#e2e0ff' }}>Yes</div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>It's booked — log the full details</div>
-            </button>
-            <button onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(true); setAddFlowStep(null); }} style={{ textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 14, padding: '16px', cursor: 'pointer' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#34d399' }}>Not yet</div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>Add it to your want-to-go list instead</div>
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <OptionCard color="#818cf8" title="Yes" sub="It's booked — log the full details"
+              onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} />
+            <OptionCard color="#34d399" title="Not yet" sub="Add it to your want-to-go list instead"
+              onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(true); setAddFlowStep(null); }} />
           </div>
         )}
       </div>
     </div>
   )
+  }
 
   if (showAdd) return (
     <div data-theme-shell="" style={appShell}>

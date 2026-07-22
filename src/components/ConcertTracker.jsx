@@ -3390,6 +3390,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
 
 function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onDetailChange = () => {} }) {
   const [selectedArtist, setSelectedArtist] = useState(null);
+  const [showArtistUpcoming, setShowArtistUpcoming] = useState(false);
+  const [showArtistHeadliner, setShowArtistHeadliner] = useState(false);
+  const [showArtistSupport, setShowArtistSupport] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
@@ -3644,15 +3647,27 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         )}
         <div style={{ padding: "14px 16px" }}>
           {allUpcoming.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Upcoming</div>
-              {allUpcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
+            <div style={{ marginBottom: 10 }}>
+              <button onClick={() => setShowArtistUpcoming(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Upcoming</span>
+                  <span style={{ fontSize: 10, color: "#4a4a8f", fontFamily: "'DM Mono', monospace", background: "#12122a", border: "1px solid #2e2e5a", borderRadius: 99, padding: "1px 7px" }}>{allUpcoming.length}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#818cf8", transform: showArtistUpcoming ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+              </button>
+              {showArtistUpcoming && allUpcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
             </div>
           )}
           {pastShows.length > 0 && (
-            <div style={{ marginBottom: supportApps.length > 0 ? 16 : 0 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Headliner</div>
-              {pastShows.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
+            <div style={{ marginBottom: supportApps.length > 0 ? 10 : 0 }}>
+              <button onClick={() => setShowArtistHeadliner(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Headliner</span>
+                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{pastShows.length}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistHeadliner ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+              </button>
+              {showArtistHeadliner && pastShows.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
             </div>
           )}
           {artistSongs.length > 0 && (
@@ -3700,8 +3715,14 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           )}
           {supportApps.length > 0 && (
             <div>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Support, guest & festival</div>
-              {supportApps.map(({ concert: c, role }) => {
+              <button onClick={() => setShowArtistSupport(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Support, guest & festival</span>
+                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{supportApps.length}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistSupport ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+              </button>
+              {showArtistSupport && supportApps.map(({ concert: c, role }) => {
                 const isFestRole = role === 'festival';
                 const online = isOnline(c);
                 const borderColor = online ? ONLINE_COLOR : role === 'guest' ? '#f472b6' : isFestRole ? '#f472b633' : '#3d3564';

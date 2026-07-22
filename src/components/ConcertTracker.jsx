@@ -7198,7 +7198,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Search + sort + filters */}
         {view === 'home' && (
-          <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ padding: '8px 16px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search shows..."
@@ -7286,7 +7286,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               const Y_PAD = 24;
               return (
                 <div style={{ marginBottom: showActivity ? 10 : 2 }}>
-                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '4px 4px 10px' : '4px 4px 2px' }}>
+                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '0 4px 10px' : '0 4px 2px' }}>
                     <span style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Activity</span>
                     <span style={{ fontSize: 11, color: '#4a4870', transform: showActivity ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                   </button>

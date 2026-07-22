@@ -1400,20 +1400,21 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                   ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
                   : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", concert.ticketPrice]] : [];
                 const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
-                const Group = (heading, items) => {
-                  if (items.length === 0) return null;
-                  if (items.length === 1) return (
+                const addons = concert.ticketAddons || [];
+                const Group = (heading, items, bold = false, extras = []) => {
+                  if (items.length === 0 && extras.length === 0) return null;
+                  if (items.length <= 1 && extras.length === 0) return (
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
-                      <span style={{ color: "#6b6a8f", fontSize: 12 }}>{items[0][0]}</span>
-                      <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{items[0][1].toFixed(2)}</span>
+                      <span style={{ color: bold ? "#c4c2f0" : "#6b6a8f", fontSize: 12, fontWeight: bold ? 700 : 400 }}>{items[0]?.[0] || heading}</span>
+                      {items[0] && <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: bold ? 700 : 400 }}>€{items[0][1].toFixed(2)}</span>}
                     </div>
                   );
                   const subtotal = items.reduce((s, [, v]) => s + v, 0);
                   return (
                     <div style={{ padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 600 }}>{heading}</span>
-                        <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{subtotal.toFixed(2)}</span>
+                        <span style={{ color: "#c4c2f0", fontSize: 12, fontWeight: bold ? 700 : 600 }}>{heading}</span>
+                        {items.length > 0 && <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: bold ? 700 : 400 }}>€{subtotal.toFixed(2)}</span>}
                       </div>
                       {items.map(([label, amount], i) => (
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", paddingLeft: 14, marginTop: 4 }}>
@@ -1421,12 +1422,17 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
                           <span style={{ color: "#8b89ab", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>€{amount.toFixed(2)}</span>
                         </div>
                       ))}
+                      {extras.map((label, i) => (
+                        <div key={`x${i}`} style={{ paddingLeft: 14, marginTop: 4 }}>
+                          <span style={{ color: "#f472b6", fontSize: 11 }}>· includes {label}</span>
+                        </div>
+                      ))}
                     </div>
                   );
                 };
                 return (
                   <>
-                    {Group("Tickets", ticketItems)}
+                    {Group("Tickets", ticketItems, true, addons)}
                     {Group("Merch", merchItems)}
                   </>
                 );
@@ -1445,19 +1451,6 @@ function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSettin
             <div style={detailCard}>
               {sec("Notes")}
               <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
-            </div>
-          )}
-
-          {/* Merch */}
-          {(concert.merch || []).length > 0 && (
-            <div style={detailCard}>
-              {sec("Merch")}
-              {concert.merch.map((m, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < concert.merch.length - 1 ? "1px solid #1a1a2e" : "none" }}>
-                  <span style={{ color: "#c4c2f0", fontSize: 13 }}>{m.item}</span>
-                  {m.price && <span style={{ color: "#a78bfa", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>€{parseFloat(m.price).toFixed(2)}</span>}
-                </div>
-              ))}
             </div>
           )}
 

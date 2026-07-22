@@ -5374,14 +5374,29 @@ function SettingsSectionIcon({ id }) {
   return <span style={{ width: 14, height: 14, display: "inline-flex", flexShrink: 0 }}>{svg}</span>;
 }
 
-function SettingsSection({ title, icon, children }) {
+function SettingsSection({ title, icon, children, collapsible = false, defaultOpen = true, subtitle = null }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isOpen = !collapsible || open;
   return (
     <div style={{ marginBottom: 22 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 8px 4px" }}>
-        {icon && <SettingsSectionIcon id={icon} />}
-        {title}
-      </div>
-      <div style={{ background: "#111119", borderRadius: 14, padding: "2px 12px", overflow: "hidden" }}>{children}</div>
+      {collapsible ? (
+        <button onClick={() => setOpen(o => !o)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0 8px 4px' }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em" }}>
+            {icon && <SettingsSectionIcon id={icon} />}
+            {title}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!isOpen && subtitle && <span style={{ fontSize: 10, color: subtitle.color || '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{subtitle.label}</span>}
+            <span style={{ fontSize: 10, color: '#4a4870', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+          </span>
+        </button>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 8px 4px" }}>
+          {icon && <SettingsSectionIcon id={icon} />}
+          {title}
+        </div>
+      )}
+      {isOpen && <div style={{ background: "#111119", borderRadius: 14, padding: "2px 12px", overflow: "hidden" }}>{children}</div>}
     </div>
   );
 }
@@ -6314,7 +6329,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
 
         {/* Notifications */}
-        <SettingsSection title="Notifications" icon="bell">
+        <SettingsSection title="Notifications" icon="bell" collapsible defaultOpen={false} subtitle={(notifyPermState === 'granted' || settings.ntfyTopic) ? { label: 'Enabled', color: '#4ade80' } : { label: 'Not enabled', color: '#4a4870' }}>
           <div style={{ padding: '14px 16px' }}>
             <div style={{ fontSize: 12, color: '#9d9bc0', marginBottom: 12, lineHeight: 1.5 }}>
               Ticket sale reminders (30 min before + when sales open) come in two layers: instant alerts while the app is open, and a daily background check for when it's closed.
@@ -6370,7 +6385,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         {/* Integrations */}
-        <SettingsSection title="Integrations" icon="plug">
+        <SettingsSection title="Integrations" icon="plug" collapsible defaultOpen={false} subtitle={settings.spotifyAccessToken ? { label: 'Spotify connected', color: '#4ade80' } : { label: 'Not connected', color: '#4a4870' }}>
           <div style={{ padding: "14px 16px" }}>
             {(() => {
               const spotifyConnected = Boolean(settings.spotifyAccessToken)
@@ -6448,7 +6463,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         {/* Your data */}
-        <SettingsSection title="Your data" icon="data">
+        <SettingsSection title="Your data" icon="data" collapsible defaultOpen={false}>
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
 
             {/* Export */}

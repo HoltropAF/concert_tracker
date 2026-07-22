@@ -8,6 +8,10 @@
 - Bottom nav is now Shows / Artists / Songs / Venues / Friends; Stats moved to a header icon
 - Custom show tags (Cried, Alt, Alt group, or your own) and an all-time-favorite flag, capped at 5 shows — favorites get a gold star rating
 - Filters panels across the app simplified: fewer taps, more options visible at once
+- Want to go and Upcoming are collapsible sections again, separate from Past
+- Fixed left/right alignment across every tab — headlines and controls now line up flush with the cards below them
+- Fixed the +N upcoming badge including future years it shouldn't have, and Up next showing want-to-go shows with no ticket or date
+- Cumulative shows chart is more compact; pie chart legends no longer cut off longer words
 - Fixed a bug where converting a want-to-go show to "tickets bought" without a date could leave a bogus placeholder date behind and mess up charts
 - Fixed several filter panels not opening properly, a friend-tap glitch, and the app losing its Filters button behind other content on Shows/Artists
 - Costs on a show's page now group tickets and merch under headings when there's more than one of each

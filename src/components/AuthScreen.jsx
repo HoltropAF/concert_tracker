@@ -220,7 +220,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
             {
               href: 'https://www.vinted.nl/member/50873825',
               label: 'Vinted',
-              icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4l4.5 15c.3 1 1.7 1 2 0L15 4"/><path d="M14 12c0-3 2-6 6-6"/></svg>
+              icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/></svg>
             },
             {
               href: 'https://open.spotify.com/user/lxvqdy1rt317aiskee5fh6bpm',

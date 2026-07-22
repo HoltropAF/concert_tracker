@@ -2625,7 +2625,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             sp.forEach(c => { const k = (c.country||'').trim(); if (k) spCountries[k] = (spCountries[k]||0)+1; });
             const spYears = [...new Set(sp.map(c => getYear(c.date)))];
             const spAvg = summaryYear === 'all' && spYears.length ? (sp.length / spYears.length).toFixed(1) : null;
-            const upcomingAll = (summaryYear === 'all' || summaryYear === currentYearStr) ? concerts.filter(c => !isWish(c) && !isPast(c.date)) : [];
+            const upcomingAll = summaryYear === 'all'
+              ? concerts.filter(c => !isWish(c) && !isPast(c.date))
+              : summaryYear === currentYearStr
+              ? concerts.filter(c => !isWish(c) && !isPast(c.date) && c.date.slice(0,4) === currentYearStr)
+              : [];
             const upShows = upcomingAll.filter(c => c.type === 'concert').length;
             const upFests = upcomingAll.filter(c => c.type === 'festival').length;
             const upNewCountries = [...new Set(upcomingAll.map(c => (c.country||'').trim()).filter(k => k && !spCountries[k]))].length;
@@ -5610,7 +5614,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     {
       href: "https://www.vinted.nl/member/50873825",
       label: "Vinted",
-      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4l4.5 15c.3 1 1.7 1 2 0L15 4"/><path d="M14 12c0-3 2-6 6-6"/></svg>
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#a78bfa" stroke="none"/></svg>
     },
   ];
   const cycleOption = (options, current) => {

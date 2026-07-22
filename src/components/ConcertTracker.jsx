@@ -6674,6 +6674,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [filterVenue, setFilterVenue] = useState('all')
   const [filterRating, setFilterRating] = useState(0)
   const [filterSolo, setFilterSolo] = useState(false)
+  const [filterFavorite, setFilterFavorite] = useState(false)
+  const [filterTags, setFilterTags] = useState([])
   const [filterGenre, setFilterGenre] = useState('all')
   const [filterSubgenre, setFilterSubgenre] = useState('all')
   const [filterCountry, setFilterCountry] = useState('all')
@@ -6814,9 +6816,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
     filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto,
-    filterType !== 'all', filterStatus.length > 0
+    filterType !== 'all', filterStatus.length > 0, filterFavorite, filterTags.length > 0
   ].filter(Boolean).length
-  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus([]); }
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus([]); setFilterFavorite(false); setFilterTags([]); }
   const resetSort = () => setSortOrder(settings.defaultSort || 'newest')
 
   // Shared with both the past/upcoming list and the wishlist, so picking "Online"
@@ -6837,6 +6839,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
     if (filterSolo && !(getFriends(c).length === 0 || c.solo)) return false
+    if (filterFavorite && !c.favorite) return false
+    if (filterTags.length > 0 && !filterTags.every(t => (c.tags || []).includes(t))) return false
     if (filterGenre !== 'all' && !getGenres(c).includes(filterGenre)) return false
     if (filterHasPhoto && !c.photo) return false
     if (filterSubgenre !== 'all' && c.subgenre !== filterSubgenre) return false
@@ -7290,6 +7294,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   ])}
 
                   {Row('Solo', [pill(filterSolo, 'Solo only', () => setFilterSolo(s => !s))])}
+
+                  {Row('Moments', [
+                    pill(filterFavorite, '★ All-time fave', () => setFilterFavorite(f => !f)),
+                    ...(settings.showTags || ['Cried','Alt group']).map(t => pill(filterTags.includes(t), t, () => setFilterTags(f => f.includes(t) ? f.filter(x => x !== t) : [...f, t]), '#f472b6')),
+                  ])}
 
                   {(settings.genres||[]).length > 0 && (() => {
                     const _g = settings.genres||[]; const _top = _g.slice(0,3); const _rest = _g.slice(3);

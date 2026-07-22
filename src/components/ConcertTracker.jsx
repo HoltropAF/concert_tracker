@@ -7390,7 +7390,31 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             )}
             {!showCalendar && filtered.length > 0 && (
               <div style={{ marginTop: showActivity ? 10 : 2 }}>
-                {renderConcertList(combinedShows, settings.showListPhotos !== false)}
+                {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
+                  <div style={{ marginBottom: 6 }}>
+                    <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showWishlist ? '4px 4px 10px' : '4px 4px 2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Want to go</span>
+                        <span style={{ fontSize: 10, color: '#2e4a3a', fontFamily: "'DM Mono', monospace", background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 99, padding: '1px 7px' }}>{wishlist.length}</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+                    </button>
+                    {showWishlist && renderConcertList(wishlist, false)}
+                  </div>
+                )}
+                {(filterStatus.length === 0 || filterStatus.includes('upcoming')) && upcoming.length > 0 && (
+                  <div style={{ marginBottom: 6 }}>
+                    <button onClick={() => setShowUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showUpcoming ? '4px 4px 10px' : '4px 4px 2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, color: '#818cf8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upcoming</span>
+                        <span style={{ fontSize: 10, color: '#4a4a8f', fontFamily: "'DM Mono', monospace", background: '#12122a', border: '1px solid #2e2e5a', borderRadius: 99, padding: '1px 7px' }}>{upcoming.length}</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#818cf8', transform: showUpcoming ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+                    </button>
+                    {showUpcoming && renderConcertList(upcoming, settings.showListPhotos !== false)}
+                  </div>
+                )}
+                {(filterStatus.length === 0 || filterStatus.includes('past')) && past.length > 0 && renderConcertList(past, settings.showListPhotos !== false)}
               </div>
             )}
           </>

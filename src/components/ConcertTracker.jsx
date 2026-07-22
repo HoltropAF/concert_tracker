@@ -853,8 +853,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   if (effectiveCompact) {
     return (
       <button onClick={() => onOpen(concert)} style={{
-        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0d1a15",
-        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e50"}`,
+        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#12122a",
+        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e5a"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 8, padding: "7px 12px", cursor: "pointer", marginBottom: 4,
         display: "flex", alignItems: "center", gap: 10,
@@ -883,8 +883,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     <button
       onClick={() => onOpen(concert)}
       style={{
-        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0d1a15",
-        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e50"}`,
+        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#12122a",
+        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e5a"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 12, padding: "14px 16px", cursor: "pointer",
         transition: "all 0.15s ease", marginBottom: 8
@@ -947,7 +947,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
             </div>
           )}
           {(getSongList(concert.setlist).length > 0 || Object.values(concert.supportSetlists || {}).some(s => getSongList(s).length > 0)) && (
-            <div style={{ fontSize: 11, color: "#4a4870", marginTop: 4 }}>♪</div>
+            <div style={{ fontSize: 17, color: "#6b6a8f", marginTop: 4 }}>♪</div>
           )}
         </div>
       </div>
@@ -1188,7 +1188,7 @@ function normalizeConcertForm(concert) {
   };
 }
 
-function ConcertDetail({ concert, onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
+function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -5235,7 +5235,21 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {fieldLabel('Subgenre')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}<AddNewTagPill accentColor="#38bdf8" onAdd={v => { update('subgenre', v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }} /></div>
                 {fieldLabel('Language')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
+                {fieldLabel('Tags')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.showTags || ['Cried','Alt','Alt group']).map(t => { const on = (form.tags || []).includes(t); return <button key={t} onClick={() => update('tags', on ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{t}</button>; })}<AddNewTagPill accentColor="#f472b6" onAdd={v => { update('tags', [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }} /></div>
+                {(() => {
+                  const favoriteCount = concerts.filter(c => c.favorite && c.id !== concert.id).length;
+                  const atLimit = favoriteCount >= 5 && !form.favorite;
+                  return (
+                    <button onClick={() => !atLimit && update('favorite', !form.favorite)} disabled={atLimit} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.favorite ? '#facc15' : '#2e2e50'}`, borderRadius: 8, padding: '8px 12px', cursor: atLimit ? 'default' : 'pointer', opacity: atLimit ? 0.5 : 1 }}>
+                      <span style={{ fontSize: 14, color: form.favorite ? '#facc15' : '#6b6a8f' }}>★</span>
+                      <span style={{ fontSize: 12, color: form.favorite ? '#facc15' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
+                        {form.favorite ? 'One of your all-time favorites' : atLimit ? "All-time faves are full (5/5) — remove one first" : 'Mark as an all-time favorite'}
+                      </span>
+                    </button>
+                  );
+                })()}
               </>)}
               {!form.wishlist && !quickUpcoming && foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
               {!form.wishlist && !quickUpcoming && foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
@@ -7075,7 +7089,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); } }} allArtists={[...new Set([
+        <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),

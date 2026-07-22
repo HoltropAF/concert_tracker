@@ -2698,10 +2698,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
 
 
-          {/* Cumulative line chart */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+          {/* Cumulative line chart — only shown for "all years"; the month-by-month view is merged into Spending below */}
+          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && summaryYear === 'all' && <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>{summaryYear === 'all' ? "cumulative shows" : "shows per month"}</div>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>cumulative shows</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <div style={{ width: 8, height: 2, background: "#a78bfa", borderRadius: 1 }} />
@@ -2714,34 +2714,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             </div>
             {(() => {
-              if (summaryYear !== 'all') {
-                const monthLabels = ["J","F","M","A","M","J","J","A","S","O","N","D"];
-                const pastM = Array(12).fill(0), upM = Array(12).fill(0);
-                concerts.filter(c => c.date.slice(0,4) === summaryYear).forEach(c => {
-                  const m = parseInt(c.date.slice(5,7), 10) - 1;
-                  if (m >= 0 && m < 12) (isPast(c.date) ? pastM : upM)[m] += 1;
-                });
-                const maxM = Math.max(...pastM.map((v, i) => v + upM[i]), 1);
-                const H = 43;
-                return (
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4, paddingTop: 8 }}>
-                    {monthLabels.map((ml, i) => {
-                      const total = pastM[i] + upM[i];
-                      return (
-                        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
-                          <div style={{ fontSize: 8, color: total > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{total || 0}</div>
-                          <div style={{ width: "100%", maxWidth: 14, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: H }}>
-                            {upM[i] > 0 && <div style={{ height: Math.max(2, (upM[i] / maxM) * H), background: "#38bdf8", opacity: 0.85, borderRadius: "3px 3px 0 0" }} />}
-                            {pastM[i] > 0 && <div style={{ height: Math.max(2, (pastM[i] / maxM) * H), background: "#a78bfa", borderRadius: upM[i] > 0 ? 0 : "3px 3px 0 0" }} />}
-                            {total === 0 && <div style={{ height: 2, background: "#1f1f35", borderRadius: 1 }} />}
-                          </div>
-                          <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{ml}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              }
               const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31' && (!summaryFavOnly || c.favorite)).sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
@@ -2824,7 +2796,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               const key = (c.type === 'festival' ? 'fest' : 'concert') + (isPast(c.date) ? 'Past' : 'Up');
               bucket[key] += costOf(c);
             };
-            let buckets, labels;
+            let buckets, labels, showCounts = null;
             if (summaryYear === 'all') {
               const spend = {};
               relevant.forEach(c => { const y = c.date.slice(0, 4); if (!spend[y]) spend[y] = empty(); add(spend[y], c); });
@@ -2833,9 +2805,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             } else {
               const monthNames = ["J","F","M","A","M","J","J","A","S","O","N","D"];
               const spend = Array.from({ length: 12 }, empty);
-              relevant.filter(c => c.date.slice(0, 4) === summaryYear).forEach(c => add(spend[parseInt(c.date.slice(5,7), 10) - 1], c));
+              const counts = Array(12).fill(0);
+              relevant.filter(c => c.date.slice(0, 4) === summaryYear).forEach(c => { const m = parseInt(c.date.slice(5,7), 10) - 1; add(spend[m], c); counts[m] += 1; });
               labels = monthNames;
               buckets = spend;
+              showCounts = counts;
             }
             const totals = buckets.map(b => b.concertPast + b.concertUp + b.festPast + b.festUp);
             const maxSpend = Math.max(...totals, 1);
@@ -2846,36 +2820,65 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{summaryYear === 'all' ? 'Spending per year' : `Spending per month · ${summaryYear}`}</div>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{summaryYear === 'all' ? 'Spending per year' : `Spending & shows per month · ${summaryYear}`}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows</span></div>
                     {hasFest && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#f472b6" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Festivals</span></div>}
                     {hasUpcoming && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa", opacity: 0.35 }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>}
+                    {showCounts && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#c0546b" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows count</span></div>}
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: summaryYear === 'all' ? 8 : 4, height: 90 }}>
-                  {labels.map((label, i) => {
-                    const b = buckets[i];
-                    const t = totals[i];
-                    const segs = [
-                      ['concertPast', b.concertPast, "#a78bfa", 1],
-                      ['festPast', b.festPast, "#f472b6", 1],
-                      ['concertUp', b.concertUp, "#a78bfa", 0.35],
-                      ['festUp', b.festUp, "#f472b6", 0.35],
-                    ];
-                    return (
-                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                        <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : '0'}</div>
-                        <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse", height: `${Math.max(3, (t / maxSpend) * 60)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
-                          {segs.map(([key, v, color, op]) => v > 0 && (
-                            <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />
-                          ))}
+                {showCounts ? (() => {
+                  const maxCount = Math.max(...showCounts, 1);
+                  const H_UP = 55, H_DOWN = 30;
+                  return (
+                    <div style={{ display: "flex", alignItems: "stretch", gap: 4 }}>
+                      {labels.map((label, i) => {
+                        const b = buckets[i]; const t = totals[i]; const cnt = showCounts[i];
+                        const segs = [
+                          ['concertPast', b.concertPast, "#a78bfa", 1], ['festPast', b.festPast, "#f472b6", 1],
+                          ['concertUp', b.concertUp, "#a78bfa", 0.35], ['festUp', b.festUp, "#f472b6", 0.35],
+                        ];
+                        return (
+                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : ''}</div>
+                            <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse", height: `${Math.max(2, (t / maxSpend) * H_UP)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
+                              {segs.map(([key, v, color, op]) => v > 0 && <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />)}
+                            </div>
+                            <div style={{ width: "100%", height: 1, background: "#2e2e50", margin: "2px 0" }} />
+                            <div style={{ width: "100%", maxWidth: 34, borderRadius: "0 0 4px 4px", background: cnt > 0 ? "#c0546b" : "#1f1f35", height: `${Math.max(2, (cnt / maxCount) * H_DOWN)}px` }} />
+                            <div style={{ fontSize: 8, color: cnt > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginTop: 2, lineHeight: 1 }}>{cnt || ''}</div>
+                            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })() : (
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
+                    {labels.map((label, i) => {
+                      const b = buckets[i];
+                      const t = totals[i];
+                      const segs = [
+                        ['concertPast', b.concertPast, "#a78bfa", 1],
+                        ['festPast', b.festPast, "#f472b6", 1],
+                        ['concertUp', b.concertUp, "#a78bfa", 0.35],
+                        ['festUp', b.festUp, "#f472b6", 0.35],
+                      ];
+                      return (
+                        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                          <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : '0'}</div>
+                          <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse", height: `${Math.max(3, (t / maxSpend) * 60)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
+                            {segs.map(([key, v, color, op]) => v > 0 && (
+                              <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />
+                            ))}
+                          </div>
+                          <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
                         </div>
-                        <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })()}

@@ -853,8 +853,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   if (effectiveCompact) {
     return (
       <button onClick={() => onOpen(concert)} style={{
-        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#12122a",
-        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e5a"}`,
+        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0f1638",
+        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#33397a"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 8, padding: "7px 12px", cursor: "pointer", marginBottom: 4,
         display: "flex", alignItems: "center", gap: 10,
@@ -883,8 +883,8 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     <button
       onClick={() => onOpen(concert)}
       style={{
-        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#12122a",
-        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#2e2e5a"}`,
+        width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0f1638",
+        border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#33397a"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 12, padding: "14px 16px", cursor: "pointer",
         transition: "all 0.15s ease", marginBottom: 8

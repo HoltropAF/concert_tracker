@@ -1771,7 +1771,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             />
             <div style={labelStyle}>Tags</div>
             <DropdownSelect
-              options={settings.showTags || ['Cried','Alt','Alt group']}
+              options={settings.showTags || ['Cried','Alt (group)']}
               selected={form.tags || []}
               onToggle={t => update("tags", (form.tags || []).includes(t) ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])}
               multi
@@ -5290,7 +5290,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {fieldLabel('Language')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
                 {fieldLabel('Tags')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.showTags || ['Cried','Alt','Alt group']).map(t => { const on = (form.tags || []).includes(t); return <button key={t} onClick={() => update('tags', on ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{t}</button>; })}<AddNewTagPill accentColor="#f472b6" onAdd={v => { update('tags', [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }} /></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.showTags || ['Cried','Alt (group)']).map(t => { const on = (form.tags || []).includes(t); return <button key={t} onClick={() => update('tags', on ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{t}</button>; })}<AddNewTagPill accentColor="#f472b6" onAdd={v => { update('tags', [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }} /></div>
                 {(() => {
                   const favoriteCount = concerts.filter(c => c.favorite && c.id !== concert.id).length;
                   const atLimit = favoriteCount >= 5 && !form.favorite;
@@ -7297,7 +7297,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
                   {Row('Moments', [
                     pill(filterFavorite, '★ All-time fave', () => setFilterFavorite(f => !f)),
-                    ...(settings.showTags || ['Cried','Alt group']).map(t => pill(filterTags.includes(t), t, () => setFilterTags(f => f.includes(t) ? f.filter(x => x !== t) : [...f, t]), '#f472b6')),
+                    ...(settings.showTags || ['Cried','Alt (group)']).map(t => pill(filterTags.includes(t), t, () => setFilterTags(f => f.includes(t) ? f.filter(x => x !== t) : [...f, t]), '#f472b6')),
                   ])}
 
                   {(settings.genres||[]).length > 0 && (() => {

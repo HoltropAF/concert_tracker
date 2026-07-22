@@ -30,6 +30,7 @@ function PhotoAdjust({ path, pos, onChange }) {
   }
   return (
     <div>
+      <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Detail view</div>
       <div ref={boxRef}
         onTouchStart={e => { const t = e.touches[0]; start(t.clientX, t.clientY) }}
         onTouchMove={e => { const t = e.touches[0]; move(t.clientX, t.clientY) }}
@@ -38,11 +39,15 @@ function PhotoAdjust({ path, pos, onChange }) {
         onMouseMove={e => { if (e.buttons === 1) move(e.clientX, e.clientY) }}
         onMouseUp={() => { drag.current = null }}
         onMouseLeave={() => { drag.current = null }}
-        style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden', touchAction: 'none', cursor: 'grab', background: '#13131f', position: 'relative' }}>
+        style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden', touchAction: 'none', cursor: 'grab', background: '#13131f', position: 'relative', border: '1px solid #2e2e50' }}>
         {url && <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: 'block', pointerEvents: 'none' }} />}
         <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, color: '#e2e0ff', background: '#0c0c14aa', padding: '3px 8px', borderRadius: 99, fontFamily: "'DM Mono', monospace", pointerEvents: 'none' }}>↕↔ drag to reframe</div>
       </div>
       <button onClick={() => onChange({ x: 50, y: 50 })} style={{ marginTop: 6, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '4px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>center</button>
+      <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 6px' }}>How it looks in your shows list</div>
+      <div style={{ width: '100%', aspectRatio: '5 / 2', borderRadius: 8, overflow: 'hidden', background: '#13131f', border: '1px solid #2e2e50' }}>
+        {url && <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: 'block' }} />}
+      </div>
     </div>
   )
 }
@@ -1755,6 +1760,28 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               placeholder="Select language(s)..."
               onAddNew={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }}
             />
+            <div style={labelStyle}>Tags</div>
+            <DropdownSelect
+              options={settings.showTags || ['Cried','Alt','Alt group']}
+              selected={form.tags || []}
+              onToggle={t => update("tags", (form.tags || []).includes(t) ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])}
+              multi
+              placeholder="Select tags..."
+              accentColor="#f472b6"
+              onAddNew={v => { update("tags", [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }}
+            />
+            {(() => {
+              const favoriteCount = concerts.filter(c => c.favorite && c.id !== concert.id).length;
+              const atLimit = favoriteCount >= 5 && !form.favorite;
+              return (
+                <button onClick={() => !atLimit && update('favorite', !form.favorite)} disabled={atLimit} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.favorite ? '#facc15' : '#2e2e50'}`, borderRadius: 8, padding: '8px 12px', cursor: atLimit ? 'default' : 'pointer', opacity: atLimit ? 0.5 : 1, marginTop: 4 }}>
+                  <span style={{ fontSize: 14, color: form.favorite ? '#facc15' : '#6b6a8f' }}>★</span>
+                  <span style={{ fontSize: 12, color: form.favorite ? '#facc15' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>
+                    {form.favorite ? 'One of your all-time favorites' : atLimit ? "All-time faves are full (5/5) — remove one first" : 'Mark as an all-time favorite'}
+                  </span>
+                </button>
+              );
+            })()}
           </> },
 
           /* ── YOUR EXPERIENCE ── */

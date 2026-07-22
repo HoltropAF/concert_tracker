@@ -92,7 +92,8 @@ const formatDate = (dateStr) => {
 const getYear = (dateStr) => dateStr.slice(0, 4);
 
 const today = new Date();
-const isPast = (dateStr) => new Date(dateStr + "T00:00:00") <= today;
+const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+const isPast = (dateStr) => dateStr < todayStr;
 const isWish = c => !!c?.wishlist;
 const isOnline = c => c?.attendanceMode === 'online';
 const ONLINE_COLOR = "#22d3ee";
@@ -6698,7 +6699,7 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
 
 export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail }) {
   const today = new Date()
-  const isPastDate = (dateStr) => new Date(dateStr + 'T00:00:00') <= today
+  const isPastDate = (dateStr) => dateStr < todayStr
 
   const showsGroup = ['home', 'artists', 'songs', 'venues']
   const [showStartupScreen, setShowStartupScreen] = useState(true)

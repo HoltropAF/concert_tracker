@@ -3487,6 +3487,19 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
       if (sortBy === 'recently-seen') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
       if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0) || b.pastCount - a.pastCount;
+      if (sortBy === 'cost-per-song') {
+        const costOf = e => {
+          const nonFest = e.pastShows.filter(c => c.type !== 'festival');
+          const songs = nonFest.reduce((s, c) => s + getSongList(c.setlist).length, 0);
+          const spend = nonFest.reduce((s, c) => s + ticketTotal(c) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+          return songs > 0 ? spend / songs : null;
+        };
+        const ca = costOf(a), cb = costOf(b);
+        if (ca === null && cb === null) return a.name.localeCompare(b.name);
+        if (ca === null) return 1;
+        if (cb === null) return -1;
+        return cb - ca;
+      }
       return 0;
     });
 
@@ -3819,7 +3832,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             {sortBy !== 'most-seen' && <button onClick={() => setSortBy('most-seen')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'}].map(s => (
+              {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'},{id:'cost-per-song',label:'€ / song'}].map(s => (
                 <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
               ))}
             </div>

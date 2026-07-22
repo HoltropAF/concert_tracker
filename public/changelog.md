@@ -1,6 +1,12 @@
 # Changelog
 
 ## 2026-07-22
+- Tags and all-time favorites: split onto their own row on cards/detail, a "Moments" filter (ATF + your tags) on Shows, an ATF toggle on Stats, and cried-count/alt-group info now shown on the Artist page
+- Merged Alt and Alt group into one "Alt (group)" tag
+- Sort artists by average € per song (festivals excluded from that calculation)
+- Artist page: Upcoming/Headliner/Support sections now collapse like Shows' Activity does, and photos are narrower so a third one peeks into view
+- Fixed a real bug: a show dated today was flipping to "past" the instant the clock struck midnight, hours before the show itself — it now stays "upcoming" until the day is actually over
+- Merged the Shows-per-month and Spending-per-month charts into one diverging bar chart (spending up, show count down) when a specific year is selected
 - Venues now have a real map (free, no API key) — pins for every venue, tap to open Google Maps, geocodes new venues automatically as you add them
 - Track venues you want to visit and artists you want to see, separate from ones you've actually been to
 - Rebuilt how you log a show: pick offline/online/festival, then already-happened/upcoming, then whether you have a ticket yet — want-to-go entries skip rating, setlist, and ticket fields since none of that exists yet

@@ -966,11 +966,16 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
           )}
         </div>
       </div>
-      {showGenreTags && (getGenres(concert).length > 0 || concert.subgenre || (concert.tags || []).length > 0) && (
+      {showGenreTags && (concert.favorite || (concert.tags || []).length > 0) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          {concert.favorite && <Badge color="#2a2410" textColor="#facc15">★ all-time fave</Badge>}
+          {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
+        </div>
+      )}
+      {showGenreTags && (getGenres(concert).length > 0 || concert.subgenre) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
           {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
           {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
-          {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
         </div>
       )}
     </button>
@@ -1392,9 +1397,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             </div>
           )}
 
-          {/* Tag pills */}
+          {/* Tag pills — favorite & moments first, category tags below */}
+          {(concert.favorite || (concert.tags || []).length > 0) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+              {concert.favorite && <Badge color="#2a2410" textColor="#facc15">★ all-time fave</Badge>}
+              {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-            {concert.favorite && <Badge color="#2a2410" textColor="#facc15">★ all-time fave</Badge>}
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
             {concert.wishlist ? <Badge color="#0a1a12">want to go</Badge> : !past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
@@ -1402,7 +1412,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
             {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
-            {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
           </div>
         </div>
 

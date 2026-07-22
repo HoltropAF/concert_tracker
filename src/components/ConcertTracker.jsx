@@ -258,12 +258,12 @@ function DropdownSelect({ options, selected, onToggle, multi = false, placeholde
   );
 }
 
-function Badge({ children, color = "#1a2e26" }) {
+function Badge({ children, color = "#1a2e26", textColor = "#a78bfa" }) {
   return (
     <span style={{
       display: "inline-block", padding: "2px 8px", borderRadius: 99,
       fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
-      background: color, color: "#a78bfa", border: "1px solid #2a3d35"
+      background: color, color: textColor, border: "1px solid #2a3d35"
     }}>{children}</span>
   );
 }
@@ -916,14 +916,24 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
               {concert.tour}
             </div>
           )}
-          <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-            {online
-              ? <>{formatDate(concert.date)} · {formatOnlineLocation(concert)}</>
-              : <>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {concert.venue}{concert.room ? ` · ${concert.room}` : ""} · {concert.city}</>}
+          <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
+            {online ? (
+              <>
+                <div>{formatDate(concert.date)}</div>
+                <div>{formatOnlineLocation(concert)}</div>
+              </>
+            ) : (
+              <>
+                <div>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''}</div>
+                <div>{concert.venue}{concert.room ? ` · ${concert.room}` : ""}</div>
+                {concert.city && <div>{concert.city}</div>}
+              </>
+            )}
           </div>
           {!showVenue && (
-            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-              {formatDate(concert.date)}{concert.city ? ` · ${concert.city}` : ""}
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
+              <div>{formatDate(concert.date)}</div>
+              {concert.city && <div>{concert.city}</div>}
             </div>
           )}
           {getFriends(concert).length > 0 && (
@@ -937,7 +947,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           {concert.rating && (
-            <div style={{ color: "#a78bfa", fontSize: 13 }}>
+            <div style={{ color: concert.favorite ? "#facc15" : "#a78bfa", fontSize: 13 }}>
               {"★".repeat(Math.min(concert.rating, 10))}
             </div>
           )}
@@ -951,10 +961,11 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
           )}
         </div>
       </div>
-      {showGenreTags && (getGenres(concert).length > 0 || concert.subgenre) && (
+      {showGenreTags && (getGenres(concert).length > 0 || concert.subgenre || (concert.tags || []).length > 0) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
           {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
+          {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
         </div>
       )}
     </button>
@@ -1369,7 +1380,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
               {statCards.map(({ label, value, nav }) => (
                 <div key={label} onClick={nav ? () => onNavigate({ view: nav }) : undefined} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: nav ? "pointer" : "default" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: label === "Rating" ? 13 : 15, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}{nav ? <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span> : null}</div>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: label === "Rating" ? 13 : 15, fontWeight: 800, color: label === "Rating" && concert.favorite ? "#facc15" : "#a78bfa", lineHeight: 1 }}>{value}{nav ? <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span> : null}</div>
                   <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
                 </div>
               ))}
@@ -1378,6 +1389,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           {/* Tag pills */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+            {concert.favorite && <Badge color="#2a2410" textColor="#facc15">★ all-time fave</Badge>}
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
             {concert.wishlist ? <Badge color="#0a1a12">want to go</Badge> : !past && <Badge color="#0d1a15">upcoming</Badge>}
             {concert.seenAs && <Badge color="#1a1a30">{concert.seenAs}</Badge>}
@@ -1385,6 +1397,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {concert.venueSize && <Badge color="#13131f">{concert.venueSize}</Badge>}
             {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
+            {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
           </div>
         </div>
 

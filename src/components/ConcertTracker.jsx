@@ -2864,11 +2864,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                           ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 8, rowGap: 3, marginTop: 8 }}>
                         {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others"]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap" }}>{name}</span>
                           </div>
                         ))}
                       </div>
@@ -2888,11 +2888,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                           ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 6px", marginTop: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 8, rowGap: 3, marginTop: 8 }}>
                         {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others"]] : [])].map(([name], i) => (
-                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
+                          <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
-                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
+                            <span style={{ fontSize: 8, color: name === "Others" ? "#4a4870" : "#c4c2f0", whiteSpace: "nowrap" }}>{name}</span>
                           </div>
                         ))}
                       </div>

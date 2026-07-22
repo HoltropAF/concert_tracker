@@ -2676,7 +2676,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   if (m >= 0 && m < 12) (isPast(c.date) ? pastM : upM)[m] += 1;
                 });
                 const maxM = Math.max(...pastM.map((v, i) => v + upM[i]), 1);
-                const H = 64;
+                const H = 43;
                 return (
                   <div style={{ display: "flex", alignItems: "flex-end", gap: 4, paddingTop: 8 }}>
                     {monthLabels.map((ml, i) => {
@@ -2699,7 +2699,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31').sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
-              const W = 300, H = 80;
+              const W = 300, H = 53;
               const firstMs = new Date(allSorted[0].date + 'T00:00:00').getTime();
               const lastMs = new Date(allSorted[n-1].date + 'T00:00:00').getTime();
               const rangeMs = Math.max(lastMs - firstMs, 1);
@@ -2906,7 +2906,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {/* Countdown — next 3 upcoming shows */}
           {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && (() => {
             const upcoming = concerts
-              .filter(c => !isPast(c.date))
+              .filter(c => !isWish(c) && !isPast(c.date) && c.date && c.date !== '9999-12-31')
               .sort((a,b) => a.date.localeCompare(b.date))
               .slice(0, 3);
             if (upcoming.length === 0) return null;

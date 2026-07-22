@@ -3191,7 +3191,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                   {photos.map(c => (
                     <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
                       <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.artist} · {c.date.slice(0, 4)}</div>
                     </button>
                   ))}
@@ -3566,16 +3566,23 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const priced = pastShows.filter(c => ticketTotal(c) > 0);
           const avgTicket = priced.length ? priced.reduce((a, c) => a + ticketTotal(c), 0) / priced.length : null;
           const totalSpentOnArtist = pastShows.reduce((s, c) => s + ticketTotal(c) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
-          const totalSongsHeard = pastShows.reduce((s, c) => s + getSongList(c.setlist).length, 0);
-          const costPerSong = totalSongsHeard > 0 && totalSpentOnArtist > 0 ? totalSpentOnArtist / totalSongsHeard : null;
+          // Per-song figures only make sense for concerts (a festival's cost/setlist isn't
+          // this artist's alone) — festivals are excluded here, not just under-counted.
+          const nonFestShows = pastShows.filter(c => c.type !== 'festival');
+          const totalSongsHeard = nonFestShows.reduce((s, c) => s + getSongList(c.setlist).length, 0);
+          const nonFestSpend = nonFestShows.reduce((s, c) => s + ticketTotal(c) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+          const costPerSong = totalSongsHeard > 0 && nonFestSpend > 0 ? nonFestSpend / totalSongsHeard : null;
           const merchItems = pastShows.flatMap(c => c.merch || []);
           const merchSpend = merchItems.reduce((a, m) => a + (parseFloat(m.price) || 0), 0);
           const photos = pastShows.filter(c => c.photo);
+          const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;
+          const isAltGroup = pastShows.some(c => (c.tags || []).includes('Alt (group)'));
           return (
             <>
               <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
+                {isAltGroup && <span style={{ fontSize: 10, color: "#3a6ea5", fontFamily: "'DM Mono', monospace", border: "1px solid #2e5a8f", borderRadius: 99, padding: "2px 8px" }}>alt (group)</span>}
               </div>
               <div style={{ padding: "0 16px" }}>
                 <DetailSubtitle lines={[
@@ -3583,13 +3590,14 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   merchItems.length > 0 ? `${merchItems.length} merch item${merchItems.length !== 1 ? 's' : ''} bought · €${merchSpend.toFixed(0)}` : null,
                   totalSongsHeard > 0 ? `${totalSongsHeard} songs heard live` : null,
                   costPerSong ? <>€{costPerSong.toFixed(2)} / song</> : null,
+                  criedCount > 0 ? <span style={{ color: "#facc15" }}>cried at {criedCount} show{criedCount !== 1 ? 's' : ''}</span> : null,
                 ]} />
               </div>
               {photos.length > 0 && (
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
                   {photos.map(c => (
                     <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 150, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
                       <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
                     </button>
                   ))}

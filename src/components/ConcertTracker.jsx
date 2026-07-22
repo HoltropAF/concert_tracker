@@ -2612,7 +2612,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             sp.forEach(c => { const k = (c.country||'').trim(); if (k) spCountries[k] = (spCountries[k]||0)+1; });
             const spYears = [...new Set(sp.map(c => getYear(c.date)))];
             const spAvg = summaryYear === 'all' && spYears.length ? (sp.length / spYears.length).toFixed(1) : null;
-            const upcomingAll = concerts.filter(c => !isWish(c) && !isPast(c.date));
+            const upcomingAll = (summaryYear === 'all' || summaryYear === currentYearStr) ? concerts.filter(c => !isWish(c) && !isPast(c.date)) : [];
             const upShows = upcomingAll.filter(c => c.type === 'concert').length;
             const upFests = upcomingAll.filter(c => c.type === 'festival').length;
             const upNewCountries = [...new Set(upcomingAll.map(c => (c.country||'').trim()).filter(k => k && !spCountries[k]))].length;

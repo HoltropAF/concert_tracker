@@ -2751,38 +2751,67 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             })()}
           </div>}
 
-          {/* Spending per year (or per month within the selected year) */}
+          {/* Spending per year (or per month within the selected year) — stacked by type, past vs upcoming */}
           {(() => {
             const costOf = c => ticketTotal(c) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
             const relevant = concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31');
             if (relevant.length === 0) return null;
+            const empty = () => ({ concertPast: 0, concertUp: 0, festPast: 0, festUp: 0 });
+            const add = (bucket, c) => {
+              const key = (c.type === 'festival' ? 'fest' : 'concert') + (isPast(c.date) ? 'Past' : 'Up');
+              bucket[key] += costOf(c);
+            };
             let buckets, labels;
             if (summaryYear === 'all') {
               const spend = {};
-              relevant.forEach(c => { const y = c.date.slice(0, 4); spend[y] = (spend[y] || 0) + costOf(c); });
+              relevant.forEach(c => { const y = c.date.slice(0, 4); if (!spend[y]) spend[y] = empty(); add(spend[y], c); });
               labels = Object.keys(spend).sort();
               buckets = labels.map(y => spend[y]);
             } else {
               const monthNames = ["J","F","M","A","M","J","J","A","S","O","N","D"];
-              const spend = Array(12).fill(0);
-              relevant.filter(c => c.date.slice(0, 4) === summaryYear).forEach(c => { spend[parseInt(c.date.slice(5,7), 10) - 1] += costOf(c); });
+              const spend = Array.from({ length: 12 }, empty);
+              relevant.filter(c => c.date.slice(0, 4) === summaryYear).forEach(c => add(spend[parseInt(c.date.slice(5,7), 10) - 1], c));
               labels = monthNames;
               buckets = spend;
             }
-            const maxSpend = Math.max(...buckets, 1);
-            const total = buckets.reduce((a, b) => a + b, 0);
+            const totals = buckets.map(b => b.concertPast + b.concertUp + b.festPast + b.festUp);
+            const maxSpend = Math.max(...totals, 1);
+            const total = totals.reduce((a, b) => a + b, 0);
             if (total === 0) return null;
+            const hasFest = buckets.some(b => b.festPast + b.festUp > 0);
+            const hasUpcoming = buckets.some(b => b.concertUp + b.festUp > 0);
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>{summaryYear === 'all' ? 'Spending per year' : `Spending per month · ${summaryYear}`}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{summaryYear === 'all' ? 'Spending per year' : `Spending per month · ${summaryYear}`}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows</span></div>
+                    {hasFest && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#f472b6" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Festivals</span></div>}
+                    {hasUpcoming && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa", opacity: 0.35 }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>}
+                  </div>
+                </div>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: summaryYear === 'all' ? 8 : 4, height: 90 }}>
-                  {labels.map((label, i) => (
-                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                      <div style={{ fontSize: 8, color: buckets[i] > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1 }}>{buckets[i] > 0 ? `€${buckets[i].toFixed(0)}` : '0'}</div>
-                      <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: buckets[i] > 0 ? "#a78bfa" : "#1f1f35", height: `${Math.max(3, (buckets[i] / maxSpend) * 60)}px` }} />
-                      <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
-                    </div>
-                  ))}
+                  {labels.map((label, i) => {
+                    const b = buckets[i];
+                    const t = totals[i];
+                    const segs = [
+                      ['concertPast', b.concertPast, "#a78bfa", 1],
+                      ['festPast', b.festPast, "#f472b6", 1],
+                      ['concertUp', b.concertUp, "#a78bfa", 0.35],
+                      ['festUp', b.festUp, "#f472b6", 0.35],
+                    ];
+                    return (
+                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                        <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 3, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : '0'}</div>
+                        <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse", height: `${Math.max(3, (t / maxSpend) * 60)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
+                          {segs.map(([key, v, color, op]) => v > 0 && (
+                            <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

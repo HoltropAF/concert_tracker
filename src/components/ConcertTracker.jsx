@@ -3657,15 +3657,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
-                {isAltGroup && <span style={{ fontSize: 10, color: "#3a6ea5", fontFamily: "'DM Mono', monospace", border: "1px solid #2e5a8f", borderRadius: 99, padding: "2px 8px" }}>ult (group)</span>}
               </div>
-              <div style={{ padding: "0 16px" }}>
+              {(isAltGroup || criedCount > 0) && (
+                <div style={{ padding: "2px 16px 0", fontSize: 11, color: "#3a6ea5", fontFamily: "'DM Mono', monospace" }}>
+                  {[isAltGroup ? "your ult group" : null, criedCount > 0 ? `cried at ${criedCount} show${criedCount !== 1 ? 's' : ''}` : null].filter(Boolean).join(" · ")}
+                </div>
+              )}
+              <div style={{ padding: "6px 16px 0" }}>
                 <DetailSubtitle lines={[
                   avgTicket !== null ? <>avg ticket <span style={{ color: "#c4c2f0" }}>€{avgTicket.toFixed(0)}</span></> : null,
                   merchItems.length > 0 ? `${merchItems.length} merch item${merchItems.length !== 1 ? 's' : ''} bought · €${merchSpend.toFixed(0)}` : null,
                   totalSongsHeard > 0 ? `${totalSongsHeard} songs heard live` : null,
                   costPerSong ? <>€{costPerSong.toFixed(2)} / song</> : null,
-                  criedCount > 0 ? <span style={{ color: "#facc15" }}>cried at {criedCount} show{criedCount !== 1 ? 's' : ''}</span> : null,
                 ]} />
               </div>
               {photos.length > 0 && (

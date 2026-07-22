@@ -2447,6 +2447,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
+  const [summaryFavOnly, setSummaryFavOnly] = useState(false);
   const summaryFinType = settings.summaryFinType || 'all';
   const showsChartRef = useRef(null);
   const [showsChartDims, setShowsChartDims] = useState({ w: 300, h: 200 });
@@ -2468,7 +2469,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     window.addEventListener('resize', measure);
     return () => { clearTimeout(t); ro.disconnect(); window.removeEventListener('resize', measure); };
   }, [statsTab, chartGroup]);
-  const summaryPast = pastAll.filter(c => summaryYear === 'all' || c.date.slice(0,4) === summaryYear);
+  const summaryPast = pastAll.filter(c => (summaryYear === 'all' || c.date.slice(0,4) === summaryYear) && (!summaryFavOnly || c.favorite));
 
   // Measure available chart height so content never overflows
   const chartAreaRef = useRef(null);
@@ -2647,6 +2648,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     {olderYears.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 )}
+                <button onClick={() => setSummaryFavOnly(f => !f)} style={{
+                  background: summaryFavOnly ? "#facc15" : "none",
+                  border: `1px solid ${summaryFavOnly ? "#facc15" : "#1f1f35"}`,
+                  borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
+                  fontSize: 11, fontFamily: "'DM Mono', monospace",
+                  color: summaryFavOnly ? "#0c0c14" : "#4a4870",
+                  fontWeight: summaryFavOnly ? 700 : 400,
+                }}>★ ATF</button>
               </div>
             );
           })()}
@@ -2732,7 +2741,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   </div>
                 );
               }
-              const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31').sort((a,b) => a.date.localeCompare(b.date));
+              const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31' && (!summaryFavOnly || c.favorite)).sort((a,b) => a.date.localeCompare(b.date));
               if (allSorted.length < 2) return null;
               const n = allSorted.length;
               const W = 300, H = 53;
@@ -2807,7 +2816,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {/* Spending per year (or per month within the selected year) — stacked by type, past vs upcoming */}
           {(() => {
             const costOf = c => ticketTotal(c) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-            const relevant = concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31');
+            const relevant = concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31' && (!summaryFavOnly || c.favorite));
             if (relevant.length === 0) return null;
             const empty = () => ({ concertPast: 0, concertUp: 0, festPast: 0, festUp: 0 });
             const add = (bucket, c) => {

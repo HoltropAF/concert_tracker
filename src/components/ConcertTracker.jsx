@@ -2822,36 +2822,38 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                   <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{summaryYear === 'all' ? 'Spending per year' : `Spending & shows per month · ${summaryYear}`}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows</span></div>
+                    {showCounts && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#38bdf8" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows count</span></div>}
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Spending</span></div>
                     {hasFest && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#f472b6" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Festivals</span></div>}
                     {hasUpcoming && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa", opacity: 0.35 }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Upcoming</span></div>}
-                    {showCounts && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#c0546b" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows count</span></div>}
                   </div>
                 </div>
                 {showCounts ? (() => {
                   const maxCount = Math.max(...showCounts, 1);
-                  const H_UP = 55, H_DOWN = 30;
+                  const H = 45;
                   return (
-                    <div style={{ display: "flex", alignItems: "stretch", gap: 4 }}>
-                      {labels.map((label, i) => {
-                        const b = buckets[i]; const t = totals[i]; const cnt = showCounts[i];
-                        const segs = [
-                          ['concertPast', b.concertPast, "#a78bfa", 1], ['festPast', b.festPast, "#f472b6", 1],
-                          ['concertUp', b.concertUp, "#a78bfa", 0.35], ['festUp', b.festUp, "#f472b6", 0.35],
-                        ];
-                        return (
-                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                            <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : ''}</div>
-                            <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse", height: `${Math.max(2, (t / maxSpend) * H_UP)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
-                              {segs.map(([key, v, color, op]) => v > 0 && <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />)}
+                    <div style={{ position: "relative" }}>
+                      <div style={{ display: "flex", alignItems: "stretch", gap: 4 }}>
+                        {labels.map((label, i) => {
+                          const b = buckets[i]; const t = totals[i]; const cnt = showCounts[i];
+                          const segs = [
+                            ['concertPast', b.concertPast, "#a78bfa", 1], ['festPast', b.festPast, "#f472b6", 1],
+                            ['concertUp', b.concertUp, "#a78bfa", 0.35], ['festUp', b.festUp, "#f472b6", 0.35],
+                          ];
+                          return (
+                            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                              <div style={{ fontSize: 8, color: cnt > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{cnt || ''}</div>
+                              <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: cnt > 0 ? "#38bdf8" : "#1f1f35", height: `${Math.max(2, (cnt / maxCount) * H)}px` }} />
+                              <div style={{ width: "100%", height: 2, background: "#3a3858", zIndex: 1 }} />
+                              <div style={{ width: "100%", maxWidth: 34, borderRadius: "0 0 4px 4px", overflow: "hidden", display: "flex", flexDirection: "column", height: `${Math.max(2, (t / maxSpend) * H)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
+                                {segs.map(([key, v, color, op]) => v > 0 && <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />)}
+                              </div>
+                              <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginTop: 2, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : ''}</div>
+                              <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
                             </div>
-                            <div style={{ width: "100%", height: 1, background: "#2e2e50", margin: "2px 0" }} />
-                            <div style={{ width: "100%", maxWidth: 34, borderRadius: "0 0 4px 4px", background: cnt > 0 ? "#c0546b" : "#1f1f35", height: `${Math.max(2, (cnt / maxCount) * H_DOWN)}px` }} />
-                            <div style={{ fontSize: 8, color: cnt > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginTop: 2, lineHeight: 1 }}>{cnt || ''}</div>
-                            <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })() : (

@@ -2698,6 +2698,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
 
 
+          {!summaryFavOnly && (
+            <>
           {/* Cumulative line chart — only shown for "all years"; the month-by-month view is merged into Spending below */}
           {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && summaryYear === 'all' && <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
@@ -2953,6 +2955,55 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             );
           })()}
+            </>
+          )}
+
+          {/* All-time faves view — replaces the charts above when ATF is on */}
+          {summaryFavOnly && (() => {
+            const faves = concerts.filter(c => c.favorite && !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
+            if (faves.length === 0) return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "24px 14px", marginBottom: 12, textAlign: "center" }}>
+                <div style={{ color: "#4a4870", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>No all-time faves marked yet — star up to 5 shows from their Edit page</div>
+              </div>
+            );
+            const years = faves.map(c => c.date.slice(0, 4));
+            const span = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : years[0];
+            const gCount = {};
+            faves.forEach(c => getGenres(c).forEach(g => { gCount[g] = (gCount[g] || 0) + 1; }));
+            const topGenre = Object.entries(gCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+            const avgRating = faves.filter(c => c.rating).length ? (faves.filter(c => c.rating).reduce((s, c) => s + c.rating, 0) / faves.filter(c => c.rating).length).toFixed(1) : null;
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "#facc15", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>★ Your all-time faves</div>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${avgRating ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 16 }}>
+                  <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{faves.length}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>shows</div></div>
+                  <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{span}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>span</div></div>
+                  <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{topGenre}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top genre</div></div>
+                  {avgRating && <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>★{avgRating}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg rating</div></div>}
+                </div>
+                {faves.length > 1 && (
+                  <svg width="100%" height="34" viewBox="0 0 300 34" style={{ marginBottom: 12 }}>
+                    <line x1="10" y1="20" x2="290" y2="20" stroke="#1f1f35" strokeWidth="2" />
+                    {faves.map((c, i) => {
+                      const x = 10 + (i / (faves.length - 1)) * 280;
+                      return <circle key={c.id} cx={x} cy={20} r="5" fill="#facc15" />;
+                    })}
+                  </svg>
+                )}
+                {faves.map((c, i) => (
+                  <button key={c.id} onClick={() => onOpen(c)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0", cursor: "pointer", textAlign: "left" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2a2410", color: "#facc15", fontFamily: "'Syne', sans-serif", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+                    {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: "#e2e0ff", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist}</div>
+                      <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.rating ? ` · ${"★".repeat(c.rating)}` : ""}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
 
           {/* Countdown — next 3 upcoming shows */}
           {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && (() => {

@@ -6110,19 +6110,18 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               ))}
             </SettingsSection>
 
-            {/* Social links */}
-            <SettingsSection title="Find me online" icon="online">
-              <div style={{ display: "flex", gap: 10, padding: "10px 2px", overflowX: "auto" }}>
-                {socialLinks.map(({ href, label, icon }) => (
-                  <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none", flexShrink: 0 }}>
-                    <span style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                      {icon}
-                    </span>
-                    <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", color: "#4a4870", textAlign: "center", letterSpacing: "0.03em" }}>{label}</span>
-                  </a>
+            {/* Social links — quiet footer credit instead of its own card */}
+            <div style={{ textAlign: "center", padding: "18px 10px 4px", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.8 }}>
+              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
+              <div>
+                {socialLinks.map(({ href, label }, i) => (
+                  <span key={label}>
+                    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
+                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> &nbsp;/&nbsp; </span>}
+                  </span>
                 ))}
               </div>
-            </SettingsSection>
+            </div>
           </div>
         );
       })()}

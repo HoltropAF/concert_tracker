@@ -872,7 +872,10 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
           {concert.date && concert.date !== '9999-12-31' ? formatDate(concert.date) : ''}
         </span>
         {concert.rating ? (
-          <span style={{ color: "#a78bfa", fontSize: 11, flexShrink: 0 }}>{"★".repeat(Math.min(concert.rating, 10))}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+            {(concert.tags || []).includes('Cried') && <span title="Cried here" style={{ fontSize: 10 }}>💧</span>}
+            <span style={{ color: concert.favorite ? "#facc15" : "#a78bfa", fontSize: 11 }}>{"★".repeat(Math.min(concert.rating, 10))}</span>
+          </span>
         ) : concert.wishlist ? (
           <span style={{ fontSize: 10, color: "#34d399", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>optional</span>
         ) : !past ? (
@@ -953,8 +956,11 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           {concert.rating && (
-            <div style={{ color: concert.favorite ? "#facc15" : "#a78bfa", fontSize: 13 }}>
-              {"★".repeat(Math.min(concert.rating, 10))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+              {(concert.tags || []).includes('Cried') && <span title="Cried here" style={{ fontSize: 11 }}>💧</span>}
+              <span style={{ color: concert.favorite ? "#facc15" : "#a78bfa", fontSize: 13 }}>
+                {"★".repeat(Math.min(concert.rating, 10))}
+              </span>
             </div>
           )}
           {!past && (

@@ -3098,7 +3098,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
             distinctCountries > 1 && { value: distinctCountries, label: "countries" },
           ].filter(Boolean);
           return (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 0 0" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 16px 0" }}>
               {tiles.map(({ value, label }) => (
                 <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
@@ -3215,7 +3215,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
     <div style={{ padding: "0 0 100px" }}>
       {/* Overview */}
       {!search && (
-        <div style={{ padding: "14px 0 0" }}>
+        <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{allFriends.length}</span>
             <span style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>friends</span>
@@ -3507,7 +3507,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         </div>
         {/* Hero count + money stats */}
         {totalAppearances === 0 ? (
-          <div style={{ padding: "14px 0 0" }}>
+          <div style={{ padding: "14px 16px 0" }}>
             <div style={{ fontSize: 13, color: "#6b6a8f", marginBottom: 10 }}>Haven't seen them live yet.</div>
             <button onClick={() => {
               const next = (settings.wantToSeeArtists || []).filter(w => w.toLowerCase() !== selectedArtist.toLowerCase());
@@ -3528,7 +3528,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const photos = pastShows.filter(c => c.photo);
           return (
             <>
-              <div style={{ padding: "14px 0 0", display: "flex", alignItems: "baseline", gap: 10 }}>
+              <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
               </div>
@@ -3691,7 +3691,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     <div style={{ padding: "0 0 100px" }}>
       {/* Artist overview header */}
       {!search && activeFilterCount === 0 && (
-        <div style={{ padding: "14px 0 0" }}>
+        <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalArtists}</span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
@@ -3705,7 +3705,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       )}
 
       {/* Type pills */}
-      <div style={{ padding: '10px 0 0', display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
@@ -4046,7 +4046,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       {!search && totalUnique > 0 && (() => {
         const totalArtists = [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length;
         return (
-          <div style={{ padding: '14px 0 0' }}>
+          <div style={{ padding: '14px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalUnique}</span>
               <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
@@ -4060,13 +4060,13 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         );
       })()}
       {/* Type pills */}
-      <div style={{ padding: '10px 0 0', display: 'flex', gap: 6 }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6 }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
       </div>
       {/* Search + sort + filters */}
-      <div style={{ padding: '8px 0 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search songs..."
@@ -4309,7 +4309,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
 
         {/* Hero: maps / website / parking / transit / edit */}
-        <div style={{ padding: '14px 0 0' }}>
+        <div style={{ padding: '14px 16px 0' }}>
           {(() => {
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
             const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
@@ -4412,7 +4412,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           </div>
         )}
         {!v.wantToVisit && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '14px 0 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '14px 16px 0' }}>
           <div style={{ background: '#13131f', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{v.pastCount}×</div>
             <div style={{ fontSize: 8, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>visited</div>
@@ -4438,7 +4438,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
         )}
         {v.wantToVisit && (
-          <div style={{ padding: '14px 0 0' }}>
+          <div style={{ padding: '14px 16px 0' }}>
             <button onClick={() => {
               const next = (settings.wantToVisitVenues || []).filter(w => w.name.toLowerCase() !== selectedVenue.toLowerCase());
               onUpdateSetting('wantToVisitVenues', next);
@@ -4456,7 +4456,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           const displayTags = showTags ? (vInfo.tags || []) : [];
           if (displayRooms.length === 0 && displayTags.length === 0) return null;
           return (
-            <div style={{ padding: '10px 0 0' }}>
+            <div style={{ padding: '10px 16px 0' }}>
               {displayRooms.length > 0 && <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: displayTags.length > 0 ? 6 : 0 }}>Rooms/stages: {displayRooms.join(', ')}</div>}
               {displayTags.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
@@ -4550,7 +4550,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     <div style={{ padding: '0 0 100px' }}>
       {/* Overview: one headline stat, location breakdown, top 3 */}
       {!search && totalVenues > 0 && (
-        <div style={{ padding: '14px 0 0' }}>
+        <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalVenues}</span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>venues visited</span>
@@ -4563,7 +4563,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
       )}
       {/* Type pills + map toggle */}
-      <div style={{ padding: '10px 0 0', display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
         {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
@@ -4639,7 +4639,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
       )}
       {/* Search + sort */}
-      <div style={{ padding: '8px 0 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search venues..."
@@ -7169,7 +7169,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;
           return (
-            <div style={{ padding: '14px 0 0' }}>
+            <div style={{ padding: '14px 16px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{pastAll.length}</span>
                 <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
@@ -7185,7 +7185,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Type pills + compact/calendar/add */}
         {view === 'home' && (
-          <div style={{ display: 'flex', gap: 6, padding: '10px 0 0', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, padding: '10px 16px 0', alignItems: 'center' }}>
             {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
               <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
             ))}
@@ -7202,7 +7202,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
         {/* Search + sort + filters */}
         {view === 'home' && (
-          <div style={{ padding: '8px 0 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ padding: '8px 16px 10px', display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search shows..."
@@ -7290,7 +7290,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               const Y_PAD = 24;
               return (
                 <div style={{ marginBottom: showActivity ? 10 : 2 }}>
-                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '0 0 10px' : '0 0 2px' }}>
+                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '0 4px 10px' : '0 4px 2px' }}>
                     <span style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Activity</span>
                     <span style={{ fontSize: 11, color: '#4a4870', transform: showActivity ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                   </button>
@@ -7396,7 +7396,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               <div style={{ marginTop: showActivity ? 10 : 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
                   <div style={{ marginBottom: 6 }}>
-                    <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showWishlist ? '4px 0 10px' : '4px 0 2px' }}>
+                    <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showWishlist ? '4px 4px 10px' : '4px 4px 2px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Want to go</span>
                         <span style={{ fontSize: 10, color: '#2e4a3a', fontFamily: "'DM Mono', monospace", background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 99, padding: '1px 7px' }}>{wishlist.length}</span>
@@ -7408,7 +7408,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 )}
                 {(filterStatus.length === 0 || filterStatus.includes('upcoming')) && upcoming.length > 0 && (
                   <div style={{ marginBottom: 6 }}>
-                    <button onClick={() => setShowUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showUpcoming ? '4px 0 10px' : '4px 0 2px' }}>
+                    <button onClick={() => setShowUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showUpcoming ? '4px 4px 10px' : '4px 4px 2px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 10, color: '#818cf8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upcoming</span>
                         <span style={{ fontSize: 10, color: '#4a4a8f', fontFamily: "'DM Mono', monospace", background: '#12122a', border: '1px solid #2e2e5a', borderRadius: 99, padding: '1px 7px' }}>{upcoming.length}</span>

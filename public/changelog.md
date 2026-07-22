@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed the diverging monthly chart: shows count grows up, spending grows down (was backwards); cleaner symmetrical bars
+- All-time faves gets its own dedicated view on Stats (stat tiles, timeline, ranked list with photos) instead of showing charts that don't say much about 5 specific shows
+- Cried / Ult group info on Artist pages redesigned as a small subtitle line instead of a badge
+- A droplet icon now shows next to the star rating on any show tagged "Cried"
+- Renamed "Alt (group)" to "Ult (group)" — it's ultimate group, not alternative
 - Tags and all-time favorites: split onto their own row on cards/detail, a "Moments" filter (ATF + your tags) on Shows, an ATF toggle on Stats, and cried-count/alt-group info now shown on the Artist page
 - Merged Alt and Alt group into one "Alt (group)" tag
 - Sort artists by average € per song (festivals excluded from that calculation)

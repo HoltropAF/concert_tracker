@@ -6891,22 +6891,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const visibleStatGroups = CHART_GROUP_IDS.filter(g => !(settings.hiddenChartGroups||[]).includes(g.id))
 
-  const ChartGroupNav = () => view === 'stats' && statsTab === 'charts' ? (
-    <div data-chart-group-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #1f1f35', display: 'flex', gap: 4, padding: '6px 12px' }}>
-      {visibleStatGroups.map(g => (
-        <button key={g.id} onClick={() => setChartGroup(g.id)} style={{
-          flex: 1, background: chartGroup === g.id ? '#1a1a30' : 'none',
-          border: `1px solid ${chartGroup === g.id ? '#a78bfa' : '#1f1f35'}`,
-          borderRadius: 6, padding: '5px 2px', cursor: 'pointer',
-          fontFamily: "'DM Mono', monospace", fontSize: 9,
-          fontWeight: chartGroup === g.id ? 700 : 400,
-          color: chartGroup === g.id ? '#a78bfa' : '#5a5880',
-          textAlign: 'center', whiteSpace: 'nowrap'
-        }}>{g.label}</button>
-      ))}
-    </div>
-  ) : null
-
   const isShowsActive = showsGroup.includes(view)
 
   const navBtn = (id, icon, label, active, onClick) => (
@@ -7046,7 +7030,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         />
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
-      <ChartGroupNav />
       <BottomNav />
     </div>
   )
@@ -7061,7 +7044,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         ])].filter(Boolean).sort()} />
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
-      <ChartGroupNav />
       <BottomNav />
     </div>
   )
@@ -7397,7 +7379,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
-      <ChartGroupNav />
       <BottomNav />
 
       {/* Spotify link prompt after adding a concert with songs */}

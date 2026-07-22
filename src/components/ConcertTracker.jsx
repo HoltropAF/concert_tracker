@@ -3397,6 +3397,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistUpcoming, setShowArtistUpcoming] = useState(false);
   const [showArtistHeadliner, setShowArtistHeadliner] = useState(false);
   const [showArtistSupport, setShowArtistSupport] = useState(false);
+  const [showArtistSongs, setShowArtistSongs] = useState(false);
+  const [showArtistCovers, setShowArtistCovers] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
@@ -3675,46 +3677,58 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </div>
           )}
           {artistSongs.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
-                Songs heard live · {artistSongs.length} unique
-              </div>
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
-                {artistSongs.map(([song, count], i) => (
-                  <div key={song} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < artistSongs.length - 1 ? 6 : 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
-                      <span style={{ color: "#c4c2f0", fontSize: 12 }}>{song}</span>
+            <div style={{ marginBottom: 10 }}>
+              <button onClick={() => setShowArtistSongs(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs heard live</span>
+                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistSongs ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+              </button>
+              {showArtistSongs && (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                  {artistSongs.map(([song, count], i) => (
+                    <div key={song} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < artistSongs.length - 1 ? 6 : 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{song}</span>
+                      </div>
+                      {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
                     </div>
-                    {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {coversByOthers.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
-                Covered by others · {coversByOthers.length} {coversByOthers.length === 1 ? 'time' : 'times'}
-              </div>
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
-                {coversByOthers.map(({ songName, concert: c, performingArtist }, i) => (
-                  <button key={`cover-${i}`} onClick={() => onOpen(c)} style={{
-                    width: "100%", textAlign: "left", background: "none", border: "none",
-                    borderBottom: i < coversByOthers.length - 1 ? "1px solid #1f1f35" : "none",
-                    padding: "6px 0", cursor: "pointer",
-                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8
-                  }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 500 }}>{songName}</div>
-                      <div style={{ color: "#fb923c", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>↩ {performingArtist}</div>
-                    </div>
-                    <div style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0, textAlign: "right" }}>
-                      {formatDate(c.date)}
-                    </div>
-                  </button>
-                ))}
-              </div>
+            <div style={{ marginBottom: 10 }}>
+              <button onClick={() => setShowArtistCovers(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Covered by others</span>
+                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{coversByOthers.length}</span>
+                </div>
+                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistCovers ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+              </button>
+              {showArtistCovers && (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                  {coversByOthers.map(({ songName, concert: c, performingArtist }, i) => (
+                    <button key={`cover-${i}`} onClick={() => onOpen(c)} style={{
+                      width: "100%", textAlign: "left", background: "none", border: "none",
+                      borderBottom: i < coversByOthers.length - 1 ? "1px solid #1f1f35" : "none",
+                      padding: "6px 0", cursor: "pointer",
+                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 500 }}>{songName}</div>
+                        <div style={{ color: "#fb923c", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>↩ {performingArtist}</div>
+                      </div>
+                      <div style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0, textAlign: "right" }}>
+                        {formatDate(c.date)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {supportApps.length > 0 && (

@@ -3470,9 +3470,11 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
+  const [sortDir, setSortDir] = useState('desc');
   const [filterGenre, setFilterGenre] = useState("all");
   const [filterMinSeen, setFilterMinSeen] = useState(0);
   const [filterUpcoming, setFilterUpcoming] = useState(false);
+  const [filterUltGroup, setFilterUltGroup] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
@@ -3543,7 +3545,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     });
   });
 
-  const activeFilterCount = [filterGenre !== 'all', filterMinSeen > 0, filterUpcoming].filter(Boolean).length;
+  const activeFilterCount = [filterGenre !== 'all', filterMinSeen > 0, filterUpcoming, filterUltGroup].filter(Boolean).length;
 
   const sorted = artistEntries
     .filter(a => {
@@ -3553,17 +3555,19 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       if (filterUpcoming && a.upcomingShows.length === 0 && a.upcomingSupportApps.length === 0) return false;
       if (filterType === 'concerts' && a.pastCount === 0) return false;
       if (filterType === 'festivals' && a.festivalCount === 0 && a.upcomingSupportApps.filter(u => u.role === 'festival').length === 0) return false;
+      if (filterUltGroup && !a.pastShows.some(c => (c.tags || []).includes('Ult (group)'))) return false;
       return true;
     })
     .sort((a, b) => {
+      const dir = sortDir === 'asc' ? -1 : 1;
       if (sortBy === 'most-seen') {
         const totA = a.pastCount + a.supportCount + a.guestCount + a.festivalCount;
         const totB = b.pastCount + b.supportCount + b.guestCount + b.festivalCount;
-        return totB - totA || a.name.localeCompare(b.name);
+        return dir * (totB - totA) || a.name.localeCompare(b.name);
       }
-      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
-      if (sortBy === 'recently-seen') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
-      if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0) || b.pastCount - a.pastCount;
+      if (sortBy === 'alpha') return -dir * a.name.localeCompare(b.name);
+      if (sortBy === 'recently-seen') return dir * (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
+      if (sortBy === 'rating') return dir * ((b.avgRating || 0) - (a.avgRating || 0)) || b.pastCount - a.pastCount;
       if (sortBy === 'cost-per-song') {
         const costOf = e => {
           const nonFest = e.pastShows.filter(c => c.type !== 'festival');
@@ -3575,7 +3579,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         if (ca === null && cb === null) return a.name.localeCompare(b.name);
         if (ca === null) return 1;
         if (cb === null) return -1;
-        return cb - ca;
+        return dir * (cb - ca);
       }
       return 0;
     });
@@ -3941,17 +3945,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         {showSort && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             {sortBy !== 'most-seen' && <button onClick={() => setSortBy('most-seen')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
               {[{id:'most-seen',label:'Most seen'},{id:'alpha',label:'A–Z'},{id:'recently-seen',label:'Recently seen'},{id:'rating',label:'Avg rating'},{id:'cost-per-song',label:'€ / song'}].map(s => (
                 <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
               ))}
+              <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Flip direction" style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: '#0c0c14', color: '#a78bfa', border: '1px solid #2e2e50', fontFamily: "'DM Mono', monospace" }}>
+                {sortDir === 'asc' ? '↑ asc' : '↓ desc'}
+              </button>
             </div>
           </div>
         )}
 
         {showFilters && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
-            {activeFilterCount > 0 && <button onClick={() => { setFilterGenre('all'); setFilterMinSeen(0); setFilterUpcoming(false); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+            {activeFilterCount > 0 && <button onClick={() => { setFilterGenre('all'); setFilterMinSeen(0); setFilterUpcoming(false); setFilterUltGroup(false); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Times seen</div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -3975,9 +3982,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 </div>
               </div>
             )}
-            <div>
+            <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Upcoming only</div>
               <button onClick={() => setFilterUpcoming(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterUpcoming ? '#818cf8' : '#0c0c14', color: filterUpcoming ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterUpcoming ? '#818cf8' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Has upcoming</button>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Moments</div>
+              <button onClick={() => setFilterUltGroup(f => !f)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterUltGroup ? '#3a6ea5' : '#0c0c14', color: filterUltGroup ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterUltGroup ? '#3a6ea5' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>Ult group</button>
             </div>
           </div>
         )}

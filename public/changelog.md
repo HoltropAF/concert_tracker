@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- ATF card redesigned: dropped the meaningless timeline dots and year span, added a ◆ marker for ult groups right on the row
 - Fixed a duplicate avg-rating tile on the Artist page that appeared twice; removed the redundant songs-heard-live shortcut and swapped the "since [year]" tile for Cried
 - Cried-song indicator moved from a standalone line into the setlist itself, next to the actual song
 - Fixed a real data-loss risk: export/backup was missing Tags, Favorite, criedSong, and itemized tickets/merch entirely — now included in both CSV and Excel, and read back in on import too

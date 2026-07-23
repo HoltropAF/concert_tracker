@@ -2628,16 +2628,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             const pills = [{ id: 'all', label: 'All' }, ...recentYears.map(y => ({ id: y, label: y }))];
             return (
               <div style={{ display: "flex", gap: 4, marginBottom: 10, alignItems: "center" }}>
-                {pills.map(({ id, label }) => (
-                  <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
-                    background: summaryYear === id ? "#a78bfa" : "none",
-                    border: `1px solid ${summaryYear === id ? "#a78bfa" : "#1f1f35"}`,
-                    borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
-                    fontSize: 11, fontFamily: "'DM Mono', monospace",
-                    color: summaryYear === id ? "#0c0c14" : "#4a4870",
-                    fontWeight: summaryYear === id ? 700 : 400,
-                  }}>{label}</button>
-                ))}
+                {pills.map(({ id, label }) => {
+                  const active = summaryYear === id && !(summaryFavOnly && id === 'all');
+                  return (
+                    <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
+                      background: active ? "#a78bfa" : "none",
+                      border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
+                      borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
+                      fontSize: 11, fontFamily: "'DM Mono', monospace",
+                      color: active ? "#0c0c14" : "#4a4870",
+                      fontWeight: active ? 700 : 400,
+                    }}>{label}</button>
+                  );
+                })}
                 {olderYears.length > 0 && (
                   <select
                     value={olderYears.includes(summaryYear) ? summaryYear : ''}
@@ -2655,7 +2658,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     {olderYears.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 )}
-                <button onClick={() => setSummaryFavOnly(f => !f)} style={{
+                <button onClick={() => { setSummaryFavOnly(f => { if (!f) onUpdateSetting('summaryYear', 'all'); return !f; }); }} style={{
                   background: summaryFavOnly ? "#facc15" : "none",
                   border: `1px solid ${summaryFavOnly ? "#facc15" : "#1f1f35"}`,
                   borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
@@ -2677,7 +2680,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             sp.forEach(c => { const k = (c.country||'').trim(); if (k) spCountries[k] = (spCountries[k]||0)+1; });
             const spYears = [...new Set(sp.map(c => getYear(c.date)))];
             const spAvg = summaryYear === 'all' && spYears.length ? (sp.length / spYears.length).toFixed(1) : null;
-            const upcomingAll = summaryYear === 'all'
+            const upcomingAll = summaryFavOnly ? [] : summaryYear === 'all'
               ? concerts.filter(c => !isWish(c) && !isPast(c.date))
               : summaryYear === currentYearStr
               ? concerts.filter(c => !isWish(c) && !isPast(c.date) && c.date.slice(0,4) === currentYearStr)
@@ -3012,7 +3015,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
 
           {/* Countdown — next 3 upcoming shows */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && (() => {
+          {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && !summaryFavOnly && (() => {
             const upcoming = concerts
               .filter(c => !isWish(c) && !isPast(c.date) && c.date && c.date !== '9999-12-31')
               .sort((a,b) => a.date.localeCompare(b.date))

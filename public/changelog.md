@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed the diverging chart's broken layout (values/labels were wrapping and staggering the grid)
+- ATF page fixes: forces All-years scope, only ATF highlights, no more stray upcoming badges or Up Next box
+- Fixed artist navigation from a show page — was landing on the general Artists list instead of the specific artist
+- Artists: every sort can now go either direction, €/song shown on the row when sorted by it, new Ult group filter
+- Cried can now be linked to a specific song from the setlist; Songs page shows a "cried X times" tile
 - Rebuilt how you log a show: type → timing → ticket status, with want-to-go entries skipping fields that don't apply yet
 - Bottom nav is now Shows / Artists / Songs / Venues / Friends; Stats moved to a header icon
 - Custom tags (Cried, Ult (group), or your own) and an all-time-favorite flag capped at 5 shows — favorites get a gold star, and a dedicated view on Stats

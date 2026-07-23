@@ -4211,19 +4211,31 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           )}
           </div>
         </div>
-        {/* Stat tiles: times live, popularity */}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${1 + (typeof selectedSong.popularity === 'number' ? 1 : 0)}, 1fr)`, gap: 6, padding: '12px 16px 0' }}>
-          <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{appearances.length}×</div>
-            <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>live</div>
-          </div>
-          {typeof selectedSong.popularity === 'number' && (
-            <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#1DB954', lineHeight: 1 }}>{selectedSong.popularity}</div>
-              <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>popularity</div>
+        {/* Stat tiles: times live, cried, popularity */}
+        {(() => {
+          const criedCount = appearances.filter(a => a.concert.criedSong === selectedSong.name).length;
+          const tileCount = 1 + (criedCount > 0 ? 1 : 0) + (typeof selectedSong.popularity === 'number' ? 1 : 0);
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tileCount}, 1fr)`, gap: 6, padding: '12px 16px 0' }}>
+              <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{appearances.length}×</div>
+                <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>live</div>
+              </div>
+              {criedCount > 0 && (
+                <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#3a6ea5', lineHeight: 1 }}>💧{criedCount}×</div>
+                  <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>cried</div>
+                </div>
+              )}
+              {typeof selectedSong.popularity === 'number' && (
+                <div style={{ background: '#13131f', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: '#1DB954', lineHeight: 1 }}>{selectedSong.popularity}</div>
+                  <div style={{ fontSize: 7.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.03em', marginTop: 4 }}>popularity</div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
         <div style={{ padding: '14px 16px' }}>
           {appearances.map(({ concert: c, artist, info, cover, isSupport, occurrenceIndex, occurrenceTotal }) => {
             const online = isOnline(c);

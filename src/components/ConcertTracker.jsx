@@ -5991,10 +5991,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
 
   const handleCsvExport = () => {
-    const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','Friends','Solo','VenueSize','Notes'];
+    const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','TicketItems','Merch','Favorite','Tags','CriedSong','Friends','Solo','VenueSize','Notes'];
     const rows = concerts.map(c => [
       c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
       c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', ticketTotal(c)||'',
+      (c.tickets||[]).map(t => `${t.name||'Ticket'}:${t.price||0}`).join('; '),
+      (c.merch||[]).map(m => `${m.item||'Item'}:${m.price||0}`).join('; '),
+      c.favorite ? 'yes' : '', (c.tags||[]).join('; '), c.criedSong || '',
       getFriends(c).join('; '), c.solo?'yes':'', c.venueSize||'', (c.notes||'').replace(/\n/g,' ')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
     const csv = [headers.join(','), ...rows].join('\n');
@@ -6015,6 +6018,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       SeenAs: c.seenAs || '', Genre: c.genre || '', Subgenre: c.subgenre || '',
       Language: (Array.isArray(c.language) ? c.language : [c.language || '']).join('; '),
       Rating: c.rating || '', TicketPrice: ticketTotal(c) || '',
+      TicketItems: (c.tickets||[]).map(t => `${t.name||'Ticket'}:${t.price||0}`).join('; '),
+      Merch: (c.merch||[]).map(m => `${m.item||'Item'}:${m.price||0}`).join('; '),
+      Favorite: c.favorite ? 'yes' : '', Tags: (c.tags||[]).join('; '), CriedSong: c.criedSong || '',
       Friends: getFriends(c).join('; '), Solo: c.solo ? 'yes' : '',
       VenueSize: c.venueSize || '', Notes: (c.notes || '').replace(/\n/g, ' '),
     }))), 'Shows');
@@ -6210,9 +6216,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         language: obj.Language ? obj.Language.split('; ').filter(Boolean) : [],
         rating: obj.Rating ? parseInt(obj.Rating) : null,
         ticketPrice: obj.TicketPrice ? parseFloat(obj.TicketPrice) : null,
+        tickets: obj.TicketItems ? obj.TicketItems.split('; ').filter(Boolean).map(s => { const idx = s.lastIndexOf(':'); return { name: idx > -1 ? s.slice(0, idx) : s, price: idx > -1 ? parseFloat(s.slice(idx + 1)) || 0 : 0 }; }) : [],
+        merch: obj.Merch ? obj.Merch.split('; ').filter(Boolean).map(s => { const idx = s.lastIndexOf(':'); return { item: idx > -1 ? s.slice(0, idx) : s, price: idx > -1 ? parseFloat(s.slice(idx + 1)) || 0 : 0 }; }) : [],
+        favorite: obj.Favorite === 'yes', tags: obj.Tags ? obj.Tags.split('; ').filter(Boolean) : [], criedSong: obj.CriedSong || null,
         friends: obj.Friends ? obj.Friends.split('; ').filter(Boolean) : [],
         solo: obj.Solo === 'yes', venueSize: obj.VenueSize || null, notes: obj.Notes || null,
-        seenAs: obj.SeenAs || null, merch: [], support: [],
+        seenAs: obj.SeenAs || null, support: [],
       };
     });
   };
@@ -6293,9 +6302,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           language: r.Language ? r.Language.split('; ').filter(Boolean) : [],
           rating: r.Rating ? parseInt(r.Rating) : null,
           ticketPrice: r.TicketPrice ? parseFloat(r.TicketPrice) : null,
+          tickets: r.TicketItems ? String(r.TicketItems).split('; ').filter(Boolean).map(s => { const idx = s.lastIndexOf(':'); return { name: idx > -1 ? s.slice(0, idx) : s, price: idx > -1 ? parseFloat(s.slice(idx + 1)) || 0 : 0 }; }) : [],
+          merch: r.Merch ? String(r.Merch).split('; ').filter(Boolean).map(s => { const idx = s.lastIndexOf(':'); return { item: idx > -1 ? s.slice(0, idx) : s, price: idx > -1 ? parseFloat(s.slice(idx + 1)) || 0 : 0 }; }) : [],
+          favorite: r.Favorite === 'yes', tags: r.Tags ? String(r.Tags).split('; ').filter(Boolean) : [], criedSong: r.CriedSong || null,
           friends: r.Friends ? r.Friends.split('; ').filter(Boolean) : [],
           solo: r.Solo === 'yes', venueSize: r.VenueSize || null, notes: r.Notes || null,
-          seenAs: r.SeenAs || null, merch: [], support: [],
+          seenAs: r.SeenAs || null, support: [],
         }));
         await doImport(parsed);
       } catch (err) {

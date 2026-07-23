@@ -4,5 +4,13 @@
       "path": "/api/cron-notify",
       "schedule": "0 9 * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/changelog.md",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+      ]
+    }
   ]
 }

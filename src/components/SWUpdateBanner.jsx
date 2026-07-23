@@ -13,7 +13,7 @@ export default function SWUpdateBanner() {
   const toggleChangelog = async () => {
     if (!showChangelog && changelogText === null) {
       try {
-        const res = await fetch('/changelog.md')
+        const res = await fetch(`/changelog.md?v=${Date.now()}`, { cache: 'no-store' })
         setChangelogText(res.ok ? await res.text() : '')
       } catch {
         setChangelogText('')

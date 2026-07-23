@@ -3691,24 +3691,42 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const photos = pastShows.filter(c => c.photo);
           const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;
           const isAltGroup = pastShows.some(c => (c.tags || []).includes('Ult (group)'));
+          const ratedShows = pastShows.filter(c => c.rating);
+          const artistAvgRating = ratedShows.length ? (ratedShows.reduce((s, c) => s + c.rating, 0) / ratedShows.length).toFixed(1) : null;
           return (
             <>
               <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
+                {isAltGroup && <span style={{ fontSize: 10, color: "#3a6ea5", fontFamily: "'DM Mono', monospace" }}>your ult group</span>}
               </div>
-              {(isAltGroup || criedCount > 0) && (
-                <div style={{ padding: "2px 16px 0", fontSize: 11, color: "#3a6ea5", fontFamily: "'DM Mono', monospace" }}>
-                  {[isAltGroup ? "your ult group" : null, criedCount > 0 ? `cried at ${criedCount} show${criedCount !== 1 ? 's' : ''}` : null].filter(Boolean).join(" · ")}
+              {(artistAvgRating || criedCount > 0) && (
+                <div style={{ display: "flex", gap: 6, padding: "8px 16px 0" }}>
+                  {artistAvgRating && (
+                    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>★{artistAvgRating}</div>
+                      <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg rating</div>
+                    </div>
+                  )}
+                  {criedCount > 0 && (
+                    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#3a6ea5" }}>💧{criedCount}</div>
+                      <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>cried</div>
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ padding: "6px 16px 0" }}>
                 <DetailSubtitle lines={[
                   avgTicket !== null ? <>avg ticket <span style={{ color: "#c4c2f0" }}>€{avgTicket.toFixed(0)}</span></> : null,
                   merchItems.length > 0 ? `${merchItems.length} merch item${merchItems.length !== 1 ? 's' : ''} bought · €${merchSpend.toFixed(0)}` : null,
-                  totalSongsHeard > 0 ? `${totalSongsHeard} songs heard live` : null,
                   costPerSong ? <>€{costPerSong.toFixed(2)} / song</> : null,
                 ]} />
+                {totalSongsHeard > 0 && (
+                  <button onClick={() => onNavigate({ view: 'songs', search: selectedArtist })} style={{ background: 'none', border: 'none', padding: 0, marginTop: 2, cursor: 'pointer', fontSize: 12, color: '#a78bfa', fontFamily: "'DM Mono', monospace", textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                    {totalSongsHeard} songs heard live ›
+                  </button>
+                )}
               </div>
               {photos.length > 0 && (
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
@@ -4078,9 +4096,10 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   );
 }
 
-function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDetailChange = () => {} }) {
+function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDetailChange = () => {}, initialSearch = null, onInitialSearchConsumed = () => {} }) {
   const past = concerts.filter(c => isPast(c.date));
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch || '');
+  useEffect(() => { if (initialSearch) { setSearch(initialSearch); onInitialSearchConsumed(); } }, [initialSearch]);
   const [sortBy, setSortBy] = useState('count');
   const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
@@ -6888,6 +6907,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [venueReturnConcert, setVenueReturnConcert] = useState(null)
   const [pendingArtistSelect, setPendingArtistSelect] = useState(null)
   const [artistReturnConcert, setArtistReturnConcert] = useState(null)
+  const [pendingSongsSearch, setPendingSongsSearch] = useState(null)
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
@@ -7663,8 +7683,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
-        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

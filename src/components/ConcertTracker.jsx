@@ -2841,7 +2841,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   const H = 45;
                   return (
                     <div style={{ position: "relative" }}>
-                      <div style={{ display: "flex", alignItems: "stretch", gap: 4 }}>
+                      <div style={{ display: "flex", alignItems: "stretch", gap: 2 }}>
                         {labels.map((label, i) => {
                           const b = buckets[i]; const t = totals[i]; const cnt = showCounts[i];
                           const segs = [
@@ -2849,15 +2849,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                             ['concertUp', b.concertUp, "#a78bfa", 0.35], ['festUp', b.festUp, "#f472b6", 0.35],
                           ];
                           return (
-                            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                              <div style={{ fontSize: 8, color: cnt > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1 }}>{cnt || ''}</div>
+                            <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                              <div style={{ fontSize: 8, color: cnt > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1, whiteSpace: "nowrap" }}>{cnt || ''}</div>
                               <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: cnt > 0 ? "#38bdf8" : "#1f1f35", height: `${Math.max(2, (cnt / maxCount) * H)}px` }} />
                               <div style={{ width: "100%", height: 2, background: "#3a3858", zIndex: 1 }} />
                               <div style={{ width: "100%", maxWidth: 34, borderRadius: "0 0 4px 4px", overflow: "hidden", display: "flex", flexDirection: "column", height: `${Math.max(2, (t / maxSpend) * H)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
                                 {segs.map(([key, v, color, op]) => v > 0 && <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />)}
                               </div>
-                              <div style={{ fontSize: 8, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginTop: 2, lineHeight: 1 }}>{t > 0 ? `€${t.toFixed(0)}` : ''}</div>
-                              <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{label}</div>
+                              <div style={{ fontSize: 7, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginTop: 2, lineHeight: 1, whiteSpace: "nowrap" }}>{t > 0 ? `€${t.toFixed(0)}` : ''}</div>
+                              <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>
                             </div>
                           );
                         })}

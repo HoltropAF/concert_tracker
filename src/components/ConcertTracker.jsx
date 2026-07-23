@@ -2468,6 +2468,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
   const [summaryFavOnly, setSummaryFavOnly] = useState(false);
+  const [editingFaveOrder, setEditingFaveOrder] = useState(false);
   const summaryFinType = settings.summaryFinType || 'all';
   const showsChartRef = useRef(null);
   const [showsChartDims, setShowsChartDims] = useState({ w: 300, h: 200 });
@@ -2989,19 +2990,37 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
           {/* All-time faves view — replaces the charts above when ATF is on */}
           {summaryFavOnly && (() => {
-            const faves = concerts.filter(c => c.favorite && !isWish(c)).sort((a, b) => a.date.localeCompare(b.date));
+            const order = settings.favoriteOrder || [];
+            const rawFaves = concerts.filter(c => c.favorite && !isWish(c));
+            const faves = [...rawFaves].sort((a, b) => {
+              const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+              if (ia === -1 && ib === -1) return a.date.localeCompare(b.date);
+              if (ia === -1) return 1;
+              if (ib === -1) return -1;
+              return ia - ib;
+            });
             if (faves.length === 0) return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "24px 14px", marginBottom: 12, textAlign: "center" }}>
                 <div style={{ color: "#4a4870", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>No all-time faves marked yet — star up to 5 shows from their Edit page</div>
               </div>
             );
+            const moveFave = (idx, dir) => {
+              const newFaves = [...faves];
+              const swapIdx = idx + dir;
+              if (swapIdx < 0 || swapIdx >= newFaves.length) return;
+              [newFaves[idx], newFaves[swapIdx]] = [newFaves[swapIdx], newFaves[idx]];
+              onUpdateSetting('favoriteOrder', newFaves.map(c => c.id));
+            };
             const gCount = {};
             faves.forEach(c => getGenres(c).forEach(g => { gCount[g] = (gCount[g] || 0) + 1; }));
             const topGenre = Object.entries(gCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
             const criedCount = faves.filter(c => (c.tags || []).includes('Cried')).length;
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#facc15", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>★ Your all-time faves</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: "#facc15", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>★ Your all-time faves</div>
+                  <button onClick={() => setEditingFaveOrder(v => !v)} title="Reorder" style={{ background: "none", border: "none", color: editingFaveOrder ? "#facc15" : "#4a4870", cursor: "pointer", fontSize: 13, padding: 0 }}>✎</button>
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: `repeat(${criedCount > 0 ? 3 : 2}, 1fr)`, gap: 6, marginBottom: 12 }}>
                   <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{faves.length}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>shows</div></div>
                   <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{topGenre}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top genre</div></div>
@@ -3029,7 +3048,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 })()}
                 {faves.map((c, i) => (
                   <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0" }}>
-                    <button onClick={() => onOpen(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+                    <button onClick={() => !editingFaveOrder && onOpen(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, cursor: editingFaveOrder ? "default" : "pointer", textAlign: "left" }}>
                       <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2a2410", color: "#facc15", fontFamily: "'Syne', sans-serif", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
                       {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -3040,22 +3059,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                         <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.rating ? ` · ${"★".repeat(c.rating)}` : ""}</div>
                       </div>
                     </button>
-                    <button onClick={() => onSaveConcert({ ...c, favorite: false })} title="Remove from all-time faves" style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 9px", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                    {editingFaveOrder && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+                        <button onClick={() => moveFave(i, -1)} disabled={i === 0} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 6, color: i === 0 ? "#2e2e4a" : "#facc15", fontSize: 10, padding: "2px 8px", cursor: i === 0 ? "default" : "pointer", lineHeight: 1.4 }}>▲</button>
+                        <button onClick={() => moveFave(i, 1)} disabled={i === faves.length - 1} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 6, color: i === faves.length - 1 ? "#2e2e4a" : "#facc15", fontSize: 10, padding: "2px 8px", cursor: i === faves.length - 1 ? "default" : "pointer", lineHeight: 1.4 }}>▼</button>
+                      </div>
+                    )}
                   </div>
                 ))}
-                {(() => {
-                  const withPhotos = faves.filter(c => c.photo);
-                  if (withPhotos.length === 0) return null;
-                  return (
-                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${withPhotos.length}, 1fr)`, gap: 4, marginTop: 12 }}>
-                      {withPhotos.map(c => (
-                        <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                          <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8 }} />
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
               </div>
             );
           })()}

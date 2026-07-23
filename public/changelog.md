@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- ATF card: added a real date-scaled timeline and a photo collage, sized to fit whatever screen it's on
 - ATF card redesigned: dropped the meaningless timeline dots and year span, added a ◆ marker for ult groups right on the row
 - Fixed a duplicate avg-rating tile on the Artist page that appeared twice; removed the redundant songs-heard-live shortcut and swapped the "since [year]" tile for Cried
 - Cried-song indicator moved from a standalone line into the setlist itself, next to the actual song

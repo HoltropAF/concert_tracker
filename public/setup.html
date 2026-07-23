@@ -523,6 +523,10 @@
     <h1 data-t="s9_h1"></h1>
     <div class="why" data-t-html="s9_why"></div>
     <div id="install-body"></div>
+    <div class="callout">
+      <span class="callout-icon">🔔</span>
+      <div data-t-html="s9_notify_callout"></div>
+    </div>
     <div class="actions" id="install-actions"></div>
   </section>
 
@@ -613,6 +617,7 @@ const T = {
     err_spotify_cid: 'Please paste your Spotify Client ID before continuing.',
     s9_h1:           'Install on your phone',
     s9_why:          'The app is a PWA — it can be added to your home screen and opens fullscreen like a native app, with no browser bar.',
+    s9_notify_callout: 'One last thing: once you\'re in the app, open <strong>Settings → Notifications</strong> to turn on ticket sale reminders. It\'s fully self-contained — no accounts or keys needed, just a couple of taps.',
     ios_safari_note: 'On iPhone, use <strong>Safari</strong> to install — it won\'t work from Chrome or Firefox on iOS.',
     ios_step1:       (url) => `Open <strong>${url}</strong> in <strong>Safari</strong> — the install option doesn\'t appear in other browsers on iPhone.`,
     ios_step2:       'Tap the <strong>Share</strong> button at the bottom of the screen <span class="share-icon">⎙</span> (a box with an upward arrow).',
@@ -714,6 +719,7 @@ const T = {
     err_spotify_cid: 'Plak eerst je Spotify Client ID voordat je verdergaat.',
     s9_h1:           'Installeer op je telefoon',
     s9_why:          'De app is een PWA — je kunt hem aan je beginscherm toevoegen en hij opent volledig scherm zoals een native app, zonder browserbalk.',
+    s9_notify_callout: 'Nog één ding: zodra je in de app zit, ga naar <strong>Instellingen → Meldingen</strong> om herinneringen voor ticketverkoop aan te zetten. Volledig zelfvoorzienend — geen accounts of sleutels nodig, gewoon een paar tikjes.',
     ios_safari_note: 'Gebruik op iPhone <strong>Safari</strong> om te installeren — in Chrome of Firefox werkt dit niet op iOS.',
     ios_step1:       (url) => `Open <strong>${url}</strong> in <strong>Safari</strong> — de installatieoptie verschijnt niet in andere browsers op iPhone.`,
     ios_step2:       'Tik op de <strong>Deel</strong>-knop onderaan het scherm <span class="share-icon">⎙</span> (een vak met een pijl omhoog).',

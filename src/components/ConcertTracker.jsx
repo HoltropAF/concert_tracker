@@ -2867,10 +2867,14 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                           return (
                             <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
                               <div style={{ fontSize: 8, color: cnt > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginBottom: 2, lineHeight: 1, whiteSpace: "nowrap" }}>{cnt || ''}</div>
-                              <div style={{ width: "100%", maxWidth: 34, borderRadius: "4px 4px 0 0", background: cnt > 0 ? "#38bdf8" : "#1f1f35", height: `${Math.max(2, (cnt / maxCount) * H)}px` }} />
+                              <div style={{ width: "100%", height: H, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                                <div style={{ width: "100%", maxWidth: 34, margin: "0 auto", borderRadius: "4px 4px 0 0", background: cnt > 0 ? "#38bdf8" : "#1f1f35", height: `${Math.max(2, (cnt / maxCount) * H)}px` }} />
+                              </div>
                               <div style={{ width: "100%", height: 2, background: "#3a3858", zIndex: 1 }} />
-                              <div style={{ width: "100%", maxWidth: 34, borderRadius: "0 0 4px 4px", overflow: "hidden", display: "flex", flexDirection: "column", height: `${Math.max(2, (t / maxSpend) * H)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
-                                {segs.map(([key, v, color, op]) => v > 0 && <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />)}
+                              <div style={{ width: "100%", height: H }}>
+                                <div style={{ width: "100%", maxWidth: 34, margin: "0 auto", borderRadius: "0 0 4px 4px", overflow: "hidden", display: "flex", flexDirection: "column", height: `${Math.max(2, (t / maxSpend) * H)}px`, background: t > 0 ? undefined : "#1f1f35" }}>
+                                  {segs.map(([key, v, color, op]) => v > 0 && <div key={key} style={{ width: "100%", background: color, opacity: op, height: `${(v / t) * 100}%` }} />)}
+                                </div>
                               </div>
                               <div style={{ fontSize: 7, color: t > 0 ? "#6b6a8f" : "transparent", fontFamily: "'DM Mono', monospace", marginTop: 2, lineHeight: 1, whiteSpace: "nowrap" }}>{t > 0 ? `€${t.toFixed(0)}` : ''}</div>
                               <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>

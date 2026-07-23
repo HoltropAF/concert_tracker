@@ -1786,6 +1786,19 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               accentColor="#f472b6"
               onAddNew={v => { update("tags", [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }}
             />
+            {(form.tags || []).includes('Cried') && getSongList(form.setlist).length > 0 && (
+              <div style={{ marginTop: 4, marginBottom: 4 }}>
+                <div style={{ ...labelStyle, fontSize: 11, color: '#8b89cf' }}>💧 Which song?</div>
+                <select value={form.criedSong || ''} onChange={e => update('criedSong', e.target.value || null)} style={{
+                  width: '100%', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8,
+                  color: form.criedSong ? '#c4c2f0' : '#4a4870', fontSize: 13, padding: '8px 10px',
+                  fontFamily: "'DM Sans', sans-serif", WebkitAppearance: 'none', appearance: 'none'
+                }}>
+                  <option value="">Not sure / whole show</option>
+                  {getSongList(form.setlist).map((s, i) => <option key={i} value={getSongName(s)}>{getSongName(s)}</option>)}
+                </select>
+              </div>
+            )}
             {(() => {
               const favoriteCount = concerts.filter(c => c.favorite && c.id !== concert.id).length;
               const atLimit = favoriteCount >= 5 && !form.favorite;

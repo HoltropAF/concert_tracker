@@ -1411,6 +1411,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
             </div>
           )}
+          {concert.criedSong && (
+            <div style={{ fontSize: 11, color: "#3a6ea5", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>💧 cried during: {concert.criedSong}</div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}
             {concert.wishlist ? <Badge color="#0a1a12">want to go</Badge> : !past && <Badge color="#0d1a15">upcoming</Badge>}

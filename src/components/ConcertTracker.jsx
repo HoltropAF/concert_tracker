@@ -2642,29 +2642,32 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             return (
               <div style={{ display: "flex", gap: 4, marginBottom: 10, alignItems: "center" }}>
                 {pills.map(({ id, label }) => {
-                  const active = summaryYear === id && !(summaryFavOnly && id === 'all');
+                  const active = summaryYear === id && !summaryFavOnly;
                   return (
-                    <button key={id} onClick={() => onUpdateSetting('summaryYear', id)} style={{
+                    <button key={id} disabled={summaryFavOnly} onClick={() => onUpdateSetting('summaryYear', id)} style={{
                       background: active ? "#a78bfa" : "none",
                       border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
-                      borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
+                      borderRadius: 99, cursor: summaryFavOnly ? "default" : "pointer", padding: "3px 10px", flexShrink: 0,
                       fontSize: 11, fontFamily: "'DM Mono', monospace",
                       color: active ? "#0c0c14" : "#4a4870",
                       fontWeight: active ? 700 : 400,
+                      opacity: summaryFavOnly ? 0.4 : 1,
                     }}>{label}</button>
                   );
                 })}
                 {olderYears.length > 0 && (
                   <select
+                    disabled={summaryFavOnly}
                     value={olderYears.includes(summaryYear) ? summaryYear : ''}
                     onChange={e => e.target.value && onUpdateSetting('summaryYear', e.target.value)}
                     style={{
-                      background: olderYears.includes(summaryYear) ? "#a78bfa" : "#0c0c14",
-                      border: `1px solid ${olderYears.includes(summaryYear) ? "#a78bfa" : "#1f1f35"}`,
-                      borderRadius: 99, cursor: "pointer", padding: "3px 10px",
+                      background: olderYears.includes(summaryYear) && !summaryFavOnly ? "#a78bfa" : "#0c0c14",
+                      border: `1px solid ${olderYears.includes(summaryYear) && !summaryFavOnly ? "#a78bfa" : "#1f1f35"}`,
+                      borderRadius: 99, cursor: summaryFavOnly ? "default" : "pointer", padding: "3px 10px",
                       fontSize: 11, fontFamily: "'DM Mono', monospace",
-                      color: olderYears.includes(summaryYear) ? "#0c0c14" : "#4a4870",
+                      color: olderYears.includes(summaryYear) && !summaryFavOnly ? "#0c0c14" : "#4a4870",
                       WebkitAppearance: "none", appearance: "none",
+                      opacity: summaryFavOnly ? 0.4 : 1,
                     }}
                   >
                     <option value="">older ▾</option>
@@ -2684,7 +2687,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
 
           {/* Row 1: shows / festivals / countries / avg per year */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && (() => {
+          {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && !summaryFavOnly && (() => {
             const currentYearStr = String(new Date().getFullYear());
             const sp = summaryPast;
             const spShows = sp.filter(c => c.type === 'concert');
@@ -2997,15 +3000,15 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             const gCount = {};
             faves.forEach(c => getGenres(c).forEach(g => { gCount[g] = (gCount[g] || 0) + 1; }));
             const topGenre = Object.entries(gCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-            const avgRating = faves.filter(c => c.rating).length ? (faves.filter(c => c.rating).reduce((s, c) => s + c.rating, 0) / faves.filter(c => c.rating).length).toFixed(1) : null;
+            const criedCount = faves.filter(c => (c.tags || []).includes('Cried')).length;
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: "#facc15", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>★ Your all-time faves</div>
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${avgRating ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${criedCount > 0 ? 4 : 3}, 1fr)`, gap: 6, marginBottom: 16 }}>
                   <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{faves.length}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>shows</div></div>
                   <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{span}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>span</div></div>
                   <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{topGenre}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top genre</div></div>
-                  {avgRating && <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>★{avgRating}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg rating</div></div>}
+                  {criedCount > 0 && <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>💧{criedCount}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>cried</div></div>}
                 </div>
                 {faves.length > 1 && (
                   <svg width="100%" height="34" viewBox="0 0 300 34" style={{ marginBottom: 12 }}>

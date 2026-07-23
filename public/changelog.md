@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-07-22
+- Actually fixed the diverging chart's zero line — it now sits at the same height across every column
+- ATF page: year picker disabled entirely while ATF is on, redundant top stat row removed, cried-count tile instead of always-5-star avg rating
+- Artist page: avg rating and cried count are now proper stat tiles, songs heard live is clickable and jumps to Songs pre-searched
+- Songs: cried-for and top-rated songs now sort first; search no longer misses songs outside the visible top-N
 - Fixed the diverging chart's broken layout (values/labels were wrapping and staggering the grid)
 - ATF page fixes: forces All-years scope, only ATF highlights, no more stray upcoming badges or Up Next box
 - Fixed artist navigation from a show page — was landing on the general Artists list instead of the specific artist

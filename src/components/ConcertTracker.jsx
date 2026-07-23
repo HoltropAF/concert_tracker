@@ -3007,6 +3007,26 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>{topGenre}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top genre</div></div>
                   {criedCount > 0 && <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#facc15" }}>💧{criedCount}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>cried</div></div>}
                 </div>
+                {faves.length > 1 && (() => {
+                  const times = faves.map(c => new Date(c.date + 'T00:00:00').getTime());
+                  const minT = Math.min(...times), maxT = Math.max(...times);
+                  const span = maxT - minT || 1;
+                  const W = 300;
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <svg width="100%" height="38" viewBox={`0 0 ${W} 38`}>
+                        <line x1="10" y1="18" x2={W - 10} y2="18" stroke="#2e2e50" strokeWidth="2" />
+                        {faves.map((c, i) => {
+                          const t = new Date(c.date + 'T00:00:00').getTime();
+                          const x = 10 + ((t - minT) / span) * (W - 20);
+                          return <circle key={c.id} cx={x} cy={18} r="5" fill="#facc15" />;
+                        })}
+                        <text x="10" y="34" fontSize="8" fill="#4a4870" fontFamily="DM Mono, monospace">{faves[0].date.slice(0,4)}</text>
+                        <text x={W - 10} y="34" fontSize="8" fill="#4a4870" fontFamily="DM Mono, monospace" textAnchor="end">{faves[faves.length - 1].date.slice(0,4)}</text>
+                      </svg>
+                    </div>
+                  );
+                })()}
                 {faves.map((c, i) => (
                   <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0" }}>
                     <button onClick={() => onOpen(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
@@ -3023,6 +3043,19 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <button onClick={() => onSaveConcert({ ...c, favorite: false })} title="Remove from all-time faves" style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 9px", cursor: "pointer", flexShrink: 0 }}>✕</button>
                   </div>
                 ))}
+                {(() => {
+                  const withPhotos = faves.filter(c => c.photo);
+                  if (withPhotos.length === 0) return null;
+                  return (
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${withPhotos.length}, 1fr)`, gap: 4, marginTop: 12 }}>
+                      {withPhotos.map(c => (
+                        <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                          <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8 }} />
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}

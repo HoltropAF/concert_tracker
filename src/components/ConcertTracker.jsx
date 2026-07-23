@@ -3625,7 +3625,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const upcomingShows = shows.filter(c => !isPast(c.date));
     const rated = pastShows.filter(c => c.rating);
     const avgRating = rated.length ? (rated.reduce((s,c) => s + c.rating, 0) / rated.length).toFixed(1) : null;
-    const sinceYear = pastShows.length ? [...pastShows].sort((a,b) => a.date.localeCompare(b.date))[0].date.slice(0,4) : null;
+    const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;
     const friendCount = {};
     pastShows.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
@@ -3695,10 +3695,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const merchItems = pastShows.flatMap(c => c.merch || []);
           const merchSpend = merchItems.reduce((a, m) => a + (parseFloat(m.price) || 0), 0);
           const photos = pastShows.filter(c => c.photo);
-          const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;
           const isUltGroup = (settings.ultGroups || []).includes(selectedArtist);
-          const ratedShows = pastShows.filter(c => c.rating);
-          const artistAvgRating = ratedShows.length ? (ratedShows.reduce((s, c) => s + c.rating, 0) / ratedShows.length).toFixed(1) : null;
           return (
             <>
               <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
@@ -3708,33 +3705,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   {isUltGroup ? '◆ your ult group' : '◇ mark as ult group'}
                 </button>
               </div>
-              {(artistAvgRating || criedCount > 0) && (
-                <div style={{ display: "flex", gap: 6, padding: "8px 16px 0" }}>
-                  {artistAvgRating && (
-                    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>★{artistAvgRating}</div>
-                      <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg rating</div>
-                    </div>
-                  )}
-                  {criedCount > 0 && (
-                    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#3a6ea5" }}>💧{criedCount}</div>
-                      <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>cried</div>
-                    </div>
-                  )}
-                </div>
-              )}
               <div style={{ padding: "6px 16px 0" }}>
                 <DetailSubtitle lines={[
                   avgTicket !== null ? <>avg ticket <span style={{ color: "#c4c2f0" }}>€{avgTicket.toFixed(0)}</span></> : null,
                   merchItems.length > 0 ? `${merchItems.length} merch item${merchItems.length !== 1 ? 's' : ''} bought · €${merchSpend.toFixed(0)}` : null,
                   costPerSong ? <>€{costPerSong.toFixed(2)} / song</> : null,
                 ]} />
-                {totalSongsHeard > 0 && (
-                  <button onClick={() => onNavigate({ view: 'songs', search: selectedArtist })} style={{ background: 'none', border: 'none', padding: 0, marginTop: 2, cursor: 'pointer', fontSize: 12, color: '#a78bfa', fontFamily: "'DM Mono', monospace", textDecoration: 'underline', textUnderlineOffset: 2 }}>
-                    {totalSongsHeard} songs heard live ›
-                  </button>
-                )}
               </div>
               {photos.length > 0 && (
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
@@ -3750,18 +3726,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           );
         })()}
         {/* Quick stats row */}
-        {(avgRating || sinceYear || topFriend) && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, sinceYear, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
-            {sinceYear && (
-              <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{sinceYear}</div>
-                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>since</div>
-              </div>
-            )}
+        {(avgRating || criedCount > 0 || topFriend) && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
             {avgRating && (
               <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>★{avgRating}</div>
                 <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>avg rating</div>
+              </div>
+            )}
+            {criedCount > 0 && (
+              <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#3a6ea5", lineHeight: 1 }}>💧{criedCount}</div>
+                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>cried</div>
               </div>
             )}
             {topFriend && (

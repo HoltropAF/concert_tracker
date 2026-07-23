@@ -1778,7 +1778,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             />
             <div style={labelStyle}>Tags</div>
             <DropdownSelect
-              options={settings.showTags || ['Cried','Ult (group)']}
+              options={settings.showTags || ['Cried']}
               selected={form.tags || []}
               onToggle={t => update("tags", (form.tags || []).includes(t) ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])}
               multi
@@ -3575,7 +3575,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       if (filterUpcoming && a.upcomingShows.length === 0 && a.upcomingSupportApps.length === 0) return false;
       if (filterType === 'concerts' && a.pastCount === 0) return false;
       if (filterType === 'festivals' && a.festivalCount === 0 && a.upcomingSupportApps.filter(u => u.role === 'festival').length === 0) return false;
-      if (filterUltGroup && !a.pastShows.some(c => (c.tags || []).includes('Ult (group)'))) return false;
+      if (filterUltGroup && !(settings.ultGroups || []).includes(a.name)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -3690,7 +3690,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const merchSpend = merchItems.reduce((a, m) => a + (parseFloat(m.price) || 0), 0);
           const photos = pastShows.filter(c => c.photo);
           const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;
-          const isAltGroup = pastShows.some(c => (c.tags || []).includes('Ult (group)'));
+          const isUltGroup = (settings.ultGroups || []).includes(selectedArtist);
           const ratedShows = pastShows.filter(c => c.rating);
           const artistAvgRating = ratedShows.length ? (ratedShows.reduce((s, c) => s + c.rating, 0) / ratedShows.length).toFixed(1) : null;
           return (
@@ -3698,7 +3698,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
-                {isAltGroup && <span style={{ fontSize: 10, color: "#3a6ea5", fontFamily: "'DM Mono', monospace" }}>your ult group</span>}
+                <button onClick={() => { const list = settings.ultGroups || []; onUpdateSetting('ultGroups', isUltGroup ? list.filter(n => n !== selectedArtist) : [...list, selectedArtist]); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: isUltGroup ? "#3a6ea5" : "#3a3858", fontFamily: "'DM Mono', monospace" }}>
+                  {isUltGroup ? '◆ your ult group' : '◇ mark as ult group'}
+                </button>
               </div>
               {(artistAvgRating || criedCount > 0) && (
                 <div style={{ display: "flex", gap: 6, padding: "8px 16px 0" }}>
@@ -5506,7 +5508,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {fieldLabel('Language')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
                 {fieldLabel('Tags')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.showTags || ['Cried','Ult (group)']).map(t => { const on = (form.tags || []).includes(t); return <button key={t} onClick={() => update('tags', on ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{t}</button>; })}<AddNewTagPill accentColor="#f472b6" onAdd={v => { update('tags', [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }} /></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.showTags || ['Cried']).map(t => { const on = (form.tags || []).includes(t); return <button key={t} onClick={() => update('tags', on ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{t}</button>; })}<AddNewTagPill accentColor="#f472b6" onAdd={v => { update('tags', [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }} /></div>
                 {(() => {
                   const favoriteCount = concerts.filter(c => c.favorite && c.id !== concert.id).length;
                   const atLimit = favoriteCount >= 5 && !form.favorite;
@@ -7528,7 +7530,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
                   {Row('Moments', [
                     pill(filterFavorite, '★ All-time fave', () => setFilterFavorite(f => !f)),
-                    ...(settings.showTags || ['Cried','Ult (group)']).map(t => pill(filterTags.includes(t), t, () => setFilterTags(f => f.includes(t) ? f.filter(x => x !== t) : [...f, t]), '#f472b6')),
+                    ...(settings.showTags || ['Cried']).map(t => pill(filterTags.includes(t), t, () => setFilterTags(f => f.includes(t) ? f.filter(x => x !== t) : [...f, t]), '#f472b6')),
                   ])}
 
                   {(settings.genres||[]).length > 0 && (() => {

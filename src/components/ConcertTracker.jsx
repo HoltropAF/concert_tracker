@@ -1093,6 +1093,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</span>
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
+                      {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
                     {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
                     {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {typeof cover === 'string' ? cover : 'cover'}</div>}
@@ -1403,16 +1404,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               ))}
             </div>
           )}
-
           {/* Tag pills — favorite & moments first, category tags below */}
           {(concert.favorite || (concert.tags || []).length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
               {concert.favorite && <Badge color="#2a2410" textColor="#facc15">★ all-time fave</Badge>}
               {(concert.tags || []).map(t => <Badge key={t} color="#1a1030">{t}</Badge>)}
             </div>
-          )}
-          {concert.criedSong && (
-            <div style={{ fontSize: 11, color: "#3a6ea5", fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>💧 cried during: {concert.criedSong}</div>
           )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
             {isFestival && <Badge color="#1a1030">🎪 Festival</Badge>}

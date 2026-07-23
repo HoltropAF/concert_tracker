@@ -1359,7 +1359,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ position: "sticky", top: 0, background: "#0c0c14", borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <button onClick={() => onNavigate({ view: 'artists' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
+            <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
           <button onClick={handleShare} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
@@ -1537,7 +1537,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 9, color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>{role}</span>
-                          <span onClick={e => { e.stopPropagation(); onNavigate({ view: 'artists' }); }} style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{name}</span>
+                          <span onClick={e => { e.stopPropagation(); onNavigate({ view: 'artists', artist: name }); }} style={{ color: '#c4c2f0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{name}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                           {songs.length > 0
@@ -3454,8 +3454,14 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
   );
 }
 
-function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onDetailChange = () => {} }) {
-  const [selectedArtist, setSelectedArtist] = useState(null);
+function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
+  const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
+  const [enteredViaArtist] = useState(initialSelectedArtist);
+  useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
+  const goBackFromArtist = () => {
+    if (selectedArtist && selectedArtist === enteredViaArtist && onBackToOrigin) onBackToOrigin();
+    else setSelectedArtist(null);
+  };
   const [showArtistUpcoming, setShowArtistUpcoming] = useState(false);
   const [showArtistHeadliner, setShowArtistHeadliner] = useState(false);
   const [showArtistSupport, setShowArtistSupport] = useState(false);
@@ -3581,7 +3587,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     return '#2e2e4a';
   };
 
-  useBackButton(() => setSelectedArtist(null), selectedArtist !== null);
+  useBackButton(goBackFromArtist, selectedArtist !== null);
 
   if (selectedArtist) {
     const shows = (artistMap[selectedArtist] || []).sort((a,b) => b.date.localeCompare(a.date));
@@ -3623,7 +3629,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     return (
       <div style={{ padding: "0 0 100px" }}>
         <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <button onClick={() => setSelectedArtist(null)} style={{
+          <button onClick={goBackFromArtist} style={{
             background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px"
           }}>←</button>
           <div>
@@ -6827,6 +6833,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
   const [pendingVenueSelect, setPendingVenueSelect] = useState(null)
   const [venueReturnConcert, setVenueReturnConcert] = useState(null)
+  const [pendingArtistSelect, setPendingArtistSelect] = useState(null)
+  const [artistReturnConcert, setArtistReturnConcert] = useState(null)
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
@@ -7279,7 +7287,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); } }} allArtists={[...new Set([
+        <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -7603,7 +7611,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

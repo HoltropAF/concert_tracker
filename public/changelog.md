@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed a real data-loss risk: export/backup was missing Tags, Favorite, criedSong, and itemized tickets/merch entirely — now included in both CSV and Excel, and read back in on import too
+- Ult (group) is now set once per artist instead of needing to re-tag every single show by that group
+- ATF favorites list has a quick-remove button so swapping out a favorite is one tap
+- The song you cried to now shows on the concert's own detail page, not just the edit form
+- Onboarding wizard now points new users to the notification settings on its last step
 - Actually fixed the diverging chart's zero line — it now sits at the same height across every column
 - ATF page: year picker disabled entirely while ATF is on, redundant top stat row removed, cried-count tile instead of always-5-star avg rating
 - Artist page: avg rating and cried count are now proper stat tiles, songs heard live is clickable and jumps to Songs pre-searched

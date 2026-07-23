@@ -4138,6 +4138,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
 
   const songCount = {};
+  const maxRating = settings.ratingSystem || 5;
   past.filter(c => filterType === 'all' || (filterType === 'concerts' ? c.type !== 'festival' : c.type === 'festival')).forEach(c => {
     const tally = (s, performer) => {
       const n = getSongName(s); if (!n) return;
@@ -4145,8 +4146,10 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       const a = (typeof cov === 'string' && cov) || performer || '';
       const k = n + '\n' + a;
       const sp = (s && typeof s === 'object') ? s : null;
-      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, spotifyId: null, spotifyName: null, albumName: null, albumId: null, albumArt: null, durationMs: null, popularity: null, trackNumber: null };
+      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, spotifyId: null, spotifyName: null, albumName: null, albumId: null, albumArt: null, durationMs: null, popularity: null, trackNumber: null, criedFor: false, topRated: false };
       songCount[k].count += 1;
+      if (c.criedSong === n) songCount[k].criedFor = true;
+      if (c.rating === maxRating) songCount[k].topRated = true;
       if (sp?.spotifyId && !songCount[k].spotifyId) {
         songCount[k].spotifyId = sp.spotifyId;
         songCount[k].spotifyName = sp.spotifyName || null;
@@ -4166,13 +4169,14 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   const totalHeard = songEntries.reduce((a, e) => a + e.count, 0);
   const linkedCount = songEntries.filter(e => e.spotifyId).length;
 
-  const byCount = [...songEntries].sort((a, b) => b.count - a.count);
+  const rank = e => (e.criedFor ? 2 : 0) + (e.topRated ? 1 : 0);
+  const byCount = [...songEntries].sort((a, b) => (rank(b) - rank(a)) || (b.count - a.count));
   const topSet = topN ? new Set(byCount.slice(0, topN)) : null;
   const filtered = songEntries
-    .filter(e => (!topSet || topSet.has(e))
+    .filter(e => (!search && topSet ? topSet.has(e) : true)
       && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase()))
       && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
-    .sort((a, b) => sortBy === 'count' ? b.count - a.count : (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist)));
+    .sort((a, b) => sortBy === 'count' ? ((rank(b) - rank(a)) || (b.count - a.count)) : (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist)));
 
   if (selectedSong) {
     const matchSong = (s, performer) => {

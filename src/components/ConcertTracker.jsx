@@ -2058,7 +2058,7 @@ function Collapsible({ title, icon, defaultOpen = true, children, open: controll
   );
 }
 
-function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false, fillHeight = false }) {
+function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, onSaveConcert = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false, fillHeight = false }) {
   const {
     topArtistsRows = 6, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -3023,14 +3023,17 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   </svg>
                 )}
                 {faves.map((c, i) => (
-                  <button key={c.id} onClick={() => onOpen(c)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0", cursor: "pointer", textAlign: "left" }}>
-                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2a2410", color: "#facc15", fontFamily: "'Syne', sans-serif", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
-                    {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: "#e2e0ff", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist}</div>
-                      <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.rating ? ` · ${"★".repeat(c.rating)}` : ""}</div>
-                    </div>
-                  </button>
+                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0" }}>
+                    <button onClick={() => onOpen(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+                      <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2a2410", color: "#facc15", fontFamily: "'Syne', sans-serif", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+                      {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: "#e2e0ff", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist}</div>
+                        <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.rating ? ` · ${"★".repeat(c.rating)}` : ""}</div>
+                      </div>
+                    </button>
+                    <button onClick={() => onSaveConcert({ ...c, favorite: false })} title="Remove from all-time faves" style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 9px", cursor: "pointer", flexShrink: 0 }}>✕</button>
+                  </div>
                 ))}
               </div>
             );
@@ -7703,7 +7706,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             )}
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}

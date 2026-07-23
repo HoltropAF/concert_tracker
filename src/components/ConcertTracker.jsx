@@ -3996,11 +3996,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
       {/* Artist list */}
       <div style={{ padding: "0 16px" }}>
-        {sorted.map(({ name, pastCount, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps, wantToSee }) => {
+        {sorted.map(({ name, pastCount, pastShows, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps, wantToSee }) => {
           const total = pastCount + supportCount + guestCount + festivalCount;
           const latestSupportDate = supportApps.length > 0 ? supportApps.slice().sort((a,b) => b.concert.date.localeCompare(a.concert.date))[0].concert.date : null;
           const displayDate = lastShow ? lastShow.date : latestSupportDate;
           const soonCount = upcomingShows.length + upcomingSupportApps.length;
+          let costPerSongDisplay = null;
+          if (sortBy === 'cost-per-song' && pastShows) {
+            const nonFest = pastShows.filter(c => c.type !== 'festival');
+            const songs = nonFest.reduce((s, c) => s + getSongList(c.setlist).length, 0);
+            const spend = nonFest.reduce((s, c) => s + ticketTotal(c) + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0);
+            costPerSongDisplay = songs > 0 ? spend / songs : null;
+          }
           return (
           <button key={name} onClick={() => setSelectedArtist(name)} style={{
             width: "100%", textAlign: "left", background: "#13131f",
@@ -4036,6 +4043,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               )}
               {soonCount > 0 && (
                 <div style={{ fontSize: 9, color: '#818cf8', fontFamily: "'DM Mono', monospace" }}>+{soonCount} soon</div>
+              )}
+              {costPerSongDisplay !== null && (
+                <div style={{ fontSize: 10, color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>€{costPerSongDisplay.toFixed(2)}/song</div>
               )}
             </div>
           </button>

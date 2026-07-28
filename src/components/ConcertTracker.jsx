@@ -3792,6 +3792,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   {isUltGroup ? '◆ your ult group' : '◇ mark as ult group'}
                 </button>
               </div>
+              {pastShows.length > 0 && festivalOnlyCount > 0 && (
+                <div style={{ display: "flex", gap: 16, padding: "6px 16px 0" }}>
+                  <div><span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>{pastShows.length}×</span> <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>concerts</span></div>
+                  <div><span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#f472b6" }}>{festivalOnlyCount}×</span> <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>festivals</span></div>
+                </div>
+              )}
               <div style={{ padding: "6px 16px 0" }}>
                 <DetailSubtitle lines={[
                   avgTicket !== null ? <>avg ticket <span style={{ color: "#c4c2f0" }}>€{avgTicket.toFixed(0)}</span></> : null,

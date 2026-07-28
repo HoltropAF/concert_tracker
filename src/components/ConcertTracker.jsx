@@ -1418,6 +1418,21 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               ))}
             </div>
           )}
+          {/* Cross-link to other years of the same recurring festival */}
+          {isFestival && (() => {
+            const others = concerts.filter(c => c.id !== concert.id && c.type === 'festival' && c.artist === concert.artist && isPast(c.date)).sort((a, b) => a.date.localeCompare(b.date));
+            if (others.length === 0) return null;
+            return (
+              <div style={{ background: "#12122a", border: "1px solid #2e2e5a", borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 12, color: "#818cf8" }}>
+                You've also been in {others.map((c, i) => (
+                  <span key={c.id}>
+                    <button onClick={() => onOpenOther(c)} style={{ background: 'none', border: 'none', padding: 0, color: "#a78bfa", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, fontSize: 12, fontFamily: "inherit" }}>{c.date.slice(0, 4)}</button>
+                    {i < others.length - 2 ? ", " : i === others.length - 2 ? " and " : ""}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
           {/* Tag pills — favorite & moments first, category tags below */}
           {(concert.favorite || (concert.tags || []).length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
@@ -1501,22 +1516,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
             </div>
           )}
-
-          {/* Cross-link to other years of the same recurring festival */}
-          {isFestival && (() => {
-            const others = concerts.filter(c => c.id !== concert.id && c.type === 'festival' && c.artist === concert.artist && isPast(c.date)).sort((a, b) => a.date.localeCompare(b.date));
-            if (others.length === 0) return null;
-            return (
-              <div style={{ background: "#12122a", border: "1px solid #2e2e5a", borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 12, color: "#818cf8" }}>
-                You've also been in {others.map((c, i) => (
-                  <span key={c.id}>
-                    <button onClick={() => onOpenOther(c)} style={{ background: 'none', border: 'none', padding: 0, color: "#a78bfa", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, fontSize: 12, fontFamily: "inherit" }}>{c.date.slice(0, 4)}</button>
-                    {i < others.length - 2 ? ", " : i === others.length - 2 ? " and " : ""}
-                  </span>
-                ))}
-              </div>
-            );
-          })()}
 
           {/* Acts — festivals */}
           {isFestival && (concert.acts || []).length > 0 && (
@@ -5660,7 +5659,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
               </>)}
               {foldCard('Lineup & genre', <>
                 {fieldLabel('Seen as')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 14 }}>{['Headliner','Support','Guest','Festival'].map(opt => <button key={opt} onClick={() => update('seenAs', form.seenAs===opt ? null : opt)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.seenAs===opt ? '#a78bfa' : '#0c0c14', color: form.seenAs===opt ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.seenAs===opt ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.seenAs===opt ? 700 : 400 }}>{opt}</button>)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 14 }}>{['Headliner','Support','Guest'].map(opt => <button key={opt} onClick={() => update('seenAs', form.seenAs===opt ? null : opt)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.seenAs===opt ? '#a78bfa' : '#0c0c14', color: form.seenAs===opt ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.seenAs===opt ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.seenAs===opt ? 700 : 400 }}>{opt}</button>)}</div>
                 {fieldLabel('Support acts')}
                 {form.support.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>{form.support.map(s => { const name = getSupportName(s); const role = getSupportRole(s); const toggleRole = () => setForm(f => ({ ...f, support: f.support.map(x => getSupportName(x)===name ? { name, role: getSupportRole(x)==='guest' ? 'support' : 'guest' } : x) })); return <span key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 99, padding: '3px 10px', fontSize: 12, color: '#a78bfa' }}>{name}<button onClick={toggleRole} style={{ fontSize: 9, color: role==='guest' ? '#f472b6' : '#4a4870', fontFamily: "'DM Mono',monospace", padding: '1px 4px', background: role==='guest' ? '#1a1030' : 'none', borderRadius: 99, border: `1px solid ${role==='guest' ? '#f472b6' : '#2e2e50'}`, cursor: 'pointer', lineHeight: 1.4 }}>{role}</button><button onClick={() => setForm(f => ({ ...f, support: f.support.filter(x => getSupportName(x)!==name) }))} style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button></span>; })}</div>}
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>{['support','guest'].map(r => <button key={r} onClick={() => setSupportRole(r)} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: supportRole===r ? '#a78bfa' : '#0c0c14', color: supportRole===r ? '#0c0c14' : '#6b6a8f', border: `1px solid ${supportRole===r ? '#a78bfa' : '#2e2e50'}`, fontWeight: supportRole===r ? 700 : 400, fontFamily: "'DM Mono',monospace" }}>{r}</button>)}</div>

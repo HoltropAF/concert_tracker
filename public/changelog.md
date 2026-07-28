@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-07-22
+- Removed the all-years spending chart from Summary
+- Fixed festival act notes showing the festival's start date instead of the actual day that act performed
+- Recurring-festival card on Venue pages no longer needs a tap to expand — years show directly
+- Confirmed all 5 festival venues already have their festival-specific website set correctly
 - Removed Cumulative shows chart from Summary
 - Fixed Invalid Date on Artist page festival notes
 - Redesigned the recurring-festival card on Venues: location, attendance count, avg show rating, avg spend, and avg act rating, years behind a toggle

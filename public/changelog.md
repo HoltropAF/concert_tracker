@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Recurring festivals: grouped by year on their Venue page, a cross-link between years on each festival's own page, and a "Festivals you keep coming back to" card on Summary
 - Removed Festival highlights from Stats (didn't like it)
 - Fixed act notes showing at the bottom of each day instead of under the actual act
 - Festivals no longer show Subgenre, Language, Ticket type, or Add-ons — just Genre and a plain ticket

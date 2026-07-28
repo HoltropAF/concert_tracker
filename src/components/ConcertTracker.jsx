@@ -2797,93 +2797,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
           {!summaryFavOnly && (
             <>
-          {/* Cumulative line chart — only shown for "all years"; the month-by-month view is merged into Spending below */}
-          {!(settings.hiddenSummaryBlocks||[]).includes("cumulative") && summaryYear === 'all' && <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>cumulative shows</div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 8, height: 2, background: "#a78bfa", borderRadius: 1 }} />
-                  <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>past</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 8, height: 2, background: "#38bdf8", borderRadius: 1, opacity: 0.7 }} />
-                  <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>upcoming</span>
-                </div>
-              </div>
-            </div>
-            {(() => {
-              const allSorted = [...concerts].filter(c => !isWish(c) && c.date && c.date.length === 10 && c.date !== '9999-12-31' && (!summaryFavOnly || c.favorite)).sort((a,b) => a.date.localeCompare(b.date));
-              if (allSorted.length < 2) return null;
-              const n = allSorted.length;
-              const W = 300, H = 53;
-              const firstMs = new Date(allSorted[0].date + 'T00:00:00').getTime();
-              const lastMs = new Date(allSorted[n-1].date + 'T00:00:00').getTime();
-              const rangeMs = Math.max(lastMs - firstMs, 1);
-              const todayMs = Date.now();
-              const todayX = Math.min(W - 3, ((todayMs - firstMs) / rangeMs) * (W - 6) + 3);
-
-              const coords = allSorted.map((c, i) => ({
-                x: ((new Date(c.date + 'T00:00:00').getTime() - firstMs) / rangeMs) * (W - 6) + 3,
-                y: H - 6 - ((i + 1) / n) * (H - 14),
-                isPast: new Date(c.date + 'T00:00:00').getTime() <= todayMs,
-              }));
-
-              // Split into past and upcoming segments — join at today
-              const pastCoords = coords.filter(p => p.isPast);
-              const upcomingCoords = coords.filter(p => !p.isPast);
-
-              // Find y at today's x by interpolating between last past and first upcoming
-              let todayY = pastCoords.length > 0 ? pastCoords[pastCoords.length - 1].y : coords[0].y;
-
-              const pastPath = pastCoords.length > 0
-                ? "M " + pastCoords.map(p => `${p.x},${p.y}`).join(" L ")
-                : null;
-
-              const upcomingPath = upcomingCoords.length > 0
-                ? `M ${todayX},${todayY} L ` + upcomingCoords.map(p => `${p.x},${p.y}`).join(" L ")
-                : null;
-
-              const areaPath = pastCoords.length > 0
-                ? pastPath + ` L ${todayX},${H-4} L ${pastCoords[0].x},${H-4} Z`
-                : null;
-
-              const yearLabels = [...new Set(allSorted.map(c => c.date.slice(0,4)))].map(y => ({
-                y, x: Math.max(8, Math.min(W-16, ((new Date(`${y}-01-01`).getTime() - firstMs) / rangeMs) * (W-6) + 3))
-              }));
-
-              return (
-                <div style={{ display: "flex", gap: 4 }}>
-                  <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingBottom: 14, flexShrink: 0 }}>
-                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{n}</span>
-                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{Math.round(n/2)}</span>
-                    <span style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>0</span>
-                  </div>
-                  <svg style={{ flex: 1, overflow: "visible" }} viewBox={`0 0 ${W} ${H+14}`}>
-                    <defs>
-                      <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/>
-                        <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
-                      </linearGradient>
-                    </defs>
-                    {yearLabels.map(({y, x}) => (
-                      <g key={y}>
-                        <line x1={x} y1={0} x2={x} y2={H-4} stroke="#1f1f35" strokeWidth="1" strokeDasharray="3,3" />
-                        <text x={x} y={H+10} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Sans,sans-serif">{y}</text>
-                      </g>
-                    ))}
-                    <line x1={todayX} y1={0} x2={todayX} y2={H-4} stroke="#2e2e50" strokeWidth="1" />
-                    {areaPath && <path d={areaPath} fill="url(#cumGrad)" />}
-                    {pastPath && <path d={pastPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                    {upcomingPath && <path d={upcomingPath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,3" opacity="0.8" />}
-                    {pastCoords.length > 0 && <circle cx={pastCoords[0].x} cy={pastCoords[0].y} r="3" fill="#a78bfa" />}
-                    {pastCoords.length > 0 && <circle cx={todayX} cy={todayY} r="3" fill="#a78bfa" />}
-                    {upcomingCoords.length > 0 && <circle cx={upcomingCoords[upcomingCoords.length-1].x} cy={upcomingCoords[upcomingCoords.length-1].y} r="3" fill="#38bdf8" opacity="0.8" />}
-                  </svg>
-                </div>
-              );
-            })()}
-          </div>}
 
           {/* Spending per year (or per month within the selected year) — stacked by type, past vs upcoming */}
           {(() => {
@@ -3754,7 +3667,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const supportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => isPast(a.concert.date)).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
     const festivalActRatings = supportApps.filter(a => a.role === 'festival' && a.act?.rating);
     const festivalAvgRating = festivalActRatings.length ? (festivalActRatings.reduce((s, a) => s + a.act.rating, 0) / festivalActRatings.length).toFixed(1) : null;
-    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
+    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: a.concert.date, festival: a.concert.artist, note: a.act.note, concert: a.concert })).sort((a,b) => b.date.localeCompare(a.date));
     const friendCount = {};
     pastShows.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;

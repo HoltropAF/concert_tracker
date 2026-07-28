@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Festival acts can now have notes, like concerts already do
+- Artist page shows festival act ratings as a separate tile from concert ratings, plus festival notes as a mini history
 - ATF card: removed the photo gallery and the ✕ buttons, added a ✎ toggle to reorder your top 5 with ▲▼ instead
 - ATF card: added a real date-scaled timeline and a photo collage, sized to fit whatever screen it's on
 - ATF card redesigned: dropped the meaningless timeline dots and year span, added a ◆ marker for ult groups right on the row

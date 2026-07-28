@@ -480,6 +480,17 @@ function festivalDays(startDate, endDate) {
   return Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1);
 }
 
+// An act's own performance date within a multi-day festival — day 1 is the
+// festival's start date, day 2 is +1 day, etc. Falls back to the start date
+// if the act has no day set (single-day festival or untagged).
+function actDate(festivalStartDate, act) {
+  if (!festivalStartDate) return festivalStartDate;
+  if (!act?.day || act.day <= 1) return festivalStartDate;
+  const d = new Date(festivalStartDate + 'T00:00:00');
+  d.setDate(d.getDate() + (act.day - 1));
+  return d.toISOString().slice(0, 10);
+}
+
 function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly = false, ratingMax = 5 }) {
   const [input, setInput] = useState('');
   const [day, setDay] = useState(1);
@@ -3588,7 +3599,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const festivalCount = supportApps.filter(a => a.role === 'festival').length;
     const festivalActRatings = supportApps.filter(a => a.role === 'festival' && a.act?.rating);
     const festivalAvgRating = festivalActRatings.length ? festivalActRatings.reduce((s, a) => s + a.act.rating, 0) / festivalActRatings.length : null;
-    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: a.concert.date, festival: a.concert.artist, note: a.act.note, concert: a.concert }));
+    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: actDate(a.concert.date, a.act), festival: a.concert.artist, note: a.act.note, concert: a.concert }));
     return { name, shows, pastShows, upcomingShows, upcomingSupportApps, pastCount: pastShows.length, avgRating, festivalAvgRating, festivalNotes, firstShow, lastShow, topGenre, supportApps, supportCount, guestCount, festivalCount };
   });
 
@@ -3662,7 +3673,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const supportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => isPast(a.concert.date)).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
     const festivalActRatings = supportApps.filter(a => a.role === 'festival' && a.act?.rating);
     const festivalAvgRating = festivalActRatings.length ? (festivalActRatings.reduce((s, a) => s + a.act.rating, 0) / festivalActRatings.length).toFixed(1) : null;
-    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: a.concert.date, festival: a.concert.artist, note: a.act.note, concert: a.concert })).sort((a,b) => b.date.localeCompare(a.date));
+    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: actDate(a.concert.date, a.act), festival: a.concert.artist, note: a.act.note, concert: a.concert })).sort((a,b) => b.date.localeCompare(a.date));
     const friendCount = {};
     pastShows.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;

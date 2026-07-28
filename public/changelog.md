@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-22
+- Festival Highlights card on Summary: hearted acts across all festivals, grouped by which festival
+- Per-festival stats (acts seen / hearted / avg rating) and a rating-by-day chart on multi-day festivals
+- Artist page shows a concerts/festivals split when you've seen someone as both
 - Festival acts can now have notes, like concerts already do
 - Artist page shows festival act ratings as a separate tile from concert ratings, plus festival notes as a mini history
 - ATF card: removed the photo gallery and the ✕ buttons, added a ✎ toggle to reorder your top 5 with ▲▼ instead

@@ -1507,6 +1507,40 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {isFestival && (concert.acts || []).length > 0 && (
             <div style={detailCard}>
               {sec("Acts seen")}
+              {(() => {
+                const acts = concert.acts || [];
+                const hearted = acts.filter(a => a.highlight).length;
+                const ratedActs = acts.filter(a => a.rating);
+                const avgActRating = ratedActs.length ? (ratedActs.reduce((s, a) => s + a.rating, 0) / ratedActs.length).toFixed(1) : null;
+                const numDays = festivalDays(concert.date, concert.endDate);
+                const dayRatings = numDays > 1 ? Array.from({ length: numDays }, (_, i) => {
+                  const dayActs = acts.filter(a => a.day === i + 1 && a.rating);
+                  return dayActs.length ? dayActs.reduce((s, a) => s + a.rating, 0) / dayActs.length : 0;
+                }) : [];
+                const maxDayRating = Math.max(...dayRatings, 1);
+                return (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${avgActRating ? 3 : 2}, 1fr)`, gap: 6, marginBottom: 14 }}>
+                      <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>{acts.length}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>acts seen</div></div>
+                      {hearted > 0 && <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#f472b6" }}>{hearted}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>hearted</div></div>}
+                      {avgActRating && <div style={{ background: "#0c0c14", borderRadius: 8, padding: "8px 4px", textAlign: "center" }}><div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>★{avgActRating}</div><div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>avg rating</div></div>}
+                    </div>
+                    {numDays > 1 && dayRatings.some(r => r > 0) && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Rating by day</div>
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 44 }}>
+                          {dayRatings.map((r, i) => (
+                            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                              <div style={{ width: "100%", maxWidth: 34, background: r > 0 ? "#a78bfa" : "#1f1f35", borderRadius: "4px 4px 0 0", height: `${Math.max(3, (r / maxDayRating) * 34)}px` }} />
+                              <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>Day {i + 1}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <FestivalActsSection
                 acts={concert.acts || []}
                 onChange={() => {}}

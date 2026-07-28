@@ -3576,7 +3576,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     (c.acts || []).forEach(act => {
       const name = (act.name || '').trim();
       if (!supportAppearancesMap[name]) supportAppearancesMap[name] = [];
-      supportAppearancesMap[name].push({ concert: c, role: 'festival' });
+      supportAppearancesMap[name].push({ concert: c, role: 'festival', act });
     });
   });
 
@@ -3603,7 +3603,10 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const supportCount = supportApps.filter(a => a.role === 'support').length;
     const guestCount = supportApps.filter(a => a.role === 'guest').length;
     const festivalCount = supportApps.filter(a => a.role === 'festival').length;
-    return { name, shows, pastShows, upcomingShows, upcomingSupportApps, pastCount: pastShows.length, avgRating, firstShow, lastShow, topGenre, supportApps, supportCount, guestCount, festivalCount };
+    const festivalActRatings = supportApps.filter(a => a.role === 'festival' && a.act?.rating);
+    const festivalAvgRating = festivalActRatings.length ? festivalActRatings.reduce((s, a) => s + a.act.rating, 0) / festivalActRatings.length : null;
+    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: a.concert.date, festival: a.concert.artist, note: a.act.note, concert: a.concert }));
+    return { name, shows, pastShows, upcomingShows, upcomingSupportApps, pastCount: pastShows.length, avgRating, festivalAvgRating, festivalNotes, firstShow, lastShow, topGenre, supportApps, supportCount, guestCount, festivalCount };
   });
 
   // Artists you haven't seen yet, but want to — kept separate so they never
@@ -3673,10 +3676,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const rated = pastShows.filter(c => c.rating);
     const avgRating = rated.length ? (rated.reduce((s,c) => s + c.rating, 0) / rated.length).toFixed(1) : null;
     const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;
+    const supportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => isPast(a.concert.date)).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
+    const festivalActRatings = supportApps.filter(a => a.role === 'festival' && a.act?.rating);
+    const festivalAvgRating = festivalActRatings.length ? (festivalActRatings.reduce((s, a) => s + a.act.rating, 0) / festivalActRatings.length).toFixed(1) : null;
+    const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
     const friendCount = {};
     pastShows.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
-    const supportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => isPast(a.concert.date)).sort((a,b) => b.concert.date.localeCompare(a.concert.date));
     const upcomingSupportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => !isPast(a.concert.date)).sort((a,b) => a.concert.date.localeCompare(b.concert.date));
     const allUpcoming = [...upcomingShows, ...upcomingSupportApps.map(a => a.concert)].sort((a,b) => a.date.localeCompare(b.date));
     const supportOnlyCount = supportApps.filter(a => a.role === 'support').length;
@@ -3773,12 +3779,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           );
         })()}
         {/* Quick stats row */}
-        {(avgRating || criedCount > 0 || topFriend) && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
+        {(avgRating || festivalAvgRating || criedCount > 0 || topFriend) && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, festivalAvgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
             {avgRating && (
               <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>★{avgRating}</div>
-                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>avg rating</div>
+                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>{festivalAvgRating ? "concert rating" : "avg rating"}</div>
+              </div>
+            )}
+            {festivalAvgRating && (
+              <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#f472b6", lineHeight: 1 }}>★{festivalAvgRating}</div>
+                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>festival rating</div>
               </div>
             )}
             {criedCount > 0 && (
@@ -3793,6 +3805,17 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>top friend · {topFriend[1]}×</div>
               </div>
             )}
+          </div>
+        )}
+        {festivalNotes.length > 0 && (
+          <div style={{ padding: "10px 16px 0" }}>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Festival notes</div>
+            {festivalNotes.map((a, i) => (
+              <button key={i} onClick={() => onOpen(a.concert)} style={{ display: "block", width: "100%", textAlign: "left", background: "#13131f", border: "none", borderRadius: 8, padding: "8px 10px", marginBottom: 6, cursor: "pointer" }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>{a.festival} · {formatDate(a.date)}</div>
+                <div style={{ fontSize: 12, color: "#c4c2f0" }}>{a.note}</div>
+              </button>
+            ))}
           </div>
         )}
         <div style={{ padding: "14px 16px" }}>

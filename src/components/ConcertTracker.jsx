@@ -3034,6 +3034,28 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               </div>
             );
           })()}
+
+          {/* Festival highlights — hearted acts, grouped by festival */}
+          {(() => {
+            const festivals = summaryPast.filter(c => c.type === 'festival' && (c.acts || []).some(a => a.highlight));
+            if (festivals.length === 0) return null;
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "#f472b6", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>♥ Festival highlights</div>
+                {festivals.map((c, fi) => (
+                  <div key={c.id} style={{ marginTop: fi > 0 ? 10 : 0 }}>
+                    <button onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#a78bfa", fontFamily: "'DM Mono', monospace", marginBottom: 4, display: "block" }}>{c.artist} · {c.date.slice(0,4)}</button>
+                    {c.acts.filter(a => a.highlight).map(a => (
+                      <div key={a.name} style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4, marginTop: 3 }}>
+                        <span style={{ color: "#f472b6", fontSize: 11 }}>♥</span>
+                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{a.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
             </>
           )}
 

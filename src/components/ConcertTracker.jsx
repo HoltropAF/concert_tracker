@@ -4878,20 +4878,48 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
             <span style={{ fontSize: 11, color: '#4a4870', transform: showVenuePast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
           </button>
-          {showVenuePast && v.past.sort((a,b) => b.date.localeCompare(a.date)).map(c => (
-            <button key={c.id} onClick={() => onOpen(c)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: '3px solid #a78bfa', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', marginBottom: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{c.artist}</div>
-                  <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.room ? ` · ${c.room}` : ''}</div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
-                  {c.rating && <div style={{ fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>★ {c.rating}</div>}
-                  {ticketTotal(c) > 0 && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>€{ticketTotal(c).toFixed(2)}</div>}
-                </div>
-              </div>
-            </button>
-          ))}
+          {showVenuePast && (() => {
+            const sorted = [...v.past].sort((a,b) => b.date.localeCompare(a.date));
+            // Group festivals with the same name (recurring festivals) into one row
+            const festGroups = {};
+            sorted.forEach(c => { if (c.type === 'festival') { (festGroups[c.artist] = festGroups[c.artist] || []).push(c); } });
+            const groupedNames = new Set(Object.keys(festGroups).filter(name => festGroups[name].length > 1));
+            const rendered = new Set();
+            return sorted.map(c => {
+              if (c.type === 'festival' && groupedNames.has(c.artist)) {
+                if (rendered.has(c.artist)) return null;
+                rendered.add(c.artist);
+                const group = festGroups[c.artist].sort((a,b) => b.date.localeCompare(a.date));
+                return (
+                  <div key={c.artist} style={{ background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: '3px solid #f472b6', borderRadius: 10, padding: '10px 14px', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{c.artist}</div>
+                      <span style={{ fontSize: 10, color: '#f472b6', fontFamily: "'DM Mono', monospace", background: '#1a1030', border: '1px solid #4a2350', borderRadius: 99, padding: '1px 7px' }}>{group.length}×</span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {group.map(g => (
+                        <button key={g.id} onClick={() => onOpen(g)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 99, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{g.date.slice(0,4)}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <button key={c.id} onClick={() => onOpen(c)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: '3px solid #a78bfa', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{c.artist}</div>
+                      <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.room ? ` · ${c.room}` : ''}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                      {c.rating && <div style={{ fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>★ {c.rating}</div>}
+                      {ticketTotal(c) > 0 && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>€{ticketTotal(c).toFixed(2)}</div>}
+                    </div>
+                  </div>
+                </button>
+              );
+            });
+          })()}
         </div>
       </div>
     );

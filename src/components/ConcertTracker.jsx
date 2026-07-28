@@ -2989,28 +2989,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-          {/* Festivals you keep coming back to — recurring festival attendance count */}
-          {(() => {
-            const festCounts = {};
-            summaryPast.filter(c => c.type === 'festival').forEach(c => { festCounts[c.artist] = (festCounts[c.artist] || 0) + 1; });
-            const repeats = Object.entries(festCounts).filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]);
-            if (repeats.length === 0) return null;
-            return (
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#f472b6", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Festivals you keep coming back to</div>
-                {repeats.map(([name, count], i) => {
-                  const mostRecent = summaryPast.filter(c => c.type === 'festival' && c.artist === name).sort((a, b) => b.date.localeCompare(a.date))[0];
-                  return (
-                    <button key={name} onClick={() => onOpen(mostRecent)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0", cursor: "pointer", textAlign: "left" }}>
-                      <span style={{ color: "#e2e0ff", fontSize: 13, fontWeight: 600 }}>{name}</span>
-                      <span style={{ fontSize: 11, color: "#f472b6", fontFamily: "'DM Mono', monospace", background: "#1a1030", border: "1px solid #4a2350", borderRadius: 99, padding: "2px 8px" }}>{count}×</span>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
           {/* Donut cards — stacked full width */}
           {!(settings.hiddenSummaryBlocks||[]).includes("pies") && (() => {
             const gCount = {};
@@ -3160,6 +3138,24 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                         <button onClick={() => moveFave(i, 1)} disabled={i === faves.length - 1} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 6, color: i === faves.length - 1 ? "#2e2e4a" : "#facc15", fontSize: 10, padding: "2px 8px", cursor: i === faves.length - 1 ? "default" : "pointer", lineHeight: 1.4 }}>▼</button>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {summaryFavOnly && (() => {
+            const festCounts = {};
+            concerts.filter(c => c.type === 'festival' && isPast(c.date)).forEach(c => { festCounts[c.artist] = (festCounts[c.artist] || 0) + 1; });
+            const repeats = Object.entries(festCounts).filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]);
+            if (repeats.length === 0) return null;
+            return (
+              <div style={{ background: "#0e0e17", border: "1px solid #1a1a2e", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                <div style={{ fontSize: 9, color: "#5a5880", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Festivals you keep going back to</div>
+                {repeats.map(([name, count]) => (
+                  <div key={name} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#8b89ab", padding: "2px 0" }}>
+                    <span>{name}</span>
+                    <span style={{ fontFamily: "'DM Mono', monospace" }}>{count}×</span>
                   </div>
                 ))}
               </div>

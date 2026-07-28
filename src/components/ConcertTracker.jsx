@@ -2798,8 +2798,8 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           {!summaryFavOnly && (
             <>
 
-          {/* Spending per year (or per month within the selected year) — stacked by type, past vs upcoming */}
-          {(() => {
+          {/* Spending per month within the selected year — the all-years "cumulative" bar view was removed */}
+          {summaryYear !== 'all' && (() => {
             const costOf = c => ticketTotal(c) + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
             const relevant = concerts.filter(c => !isWish(c) && c.date && c.date !== '9999-12-31' && (!summaryFavOnly || c.favorite));
             if (relevant.length === 0) return null;
@@ -2809,12 +2809,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               bucket[key] += costOf(c);
             };
             let buckets, labels, showCounts = null;
-            if (summaryYear === 'all') {
-              const spend = {};
-              relevant.forEach(c => { const y = c.date.slice(0, 4); if (!spend[y]) spend[y] = empty(); add(spend[y], c); });
-              labels = Object.keys(spend).sort();
-              buckets = labels.map(y => spend[y]);
-            } else {
+            {
               const monthNames = ["J","F","M","A","M","J","J","A","S","O","N","D"];
               const spend = Array.from({ length: 12 }, empty);
               const counts = Array(12).fill(0);
@@ -2832,7 +2827,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{summaryYear === 'all' ? 'Spending per year' : `Spending & shows per month · ${summaryYear}`}</div>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{`Spending & shows per month · ${summaryYear}`}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                     {showCounts && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#38bdf8" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Shows count</span></div>}
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa" }} /><span style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif" }}>Spending</span></div>

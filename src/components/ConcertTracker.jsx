@@ -1231,7 +1231,7 @@ function normalizeConcertForm(concert) {
   };
 }
 
-function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {} }) {
+function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {}, onOpenOther = null }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -1501,6 +1501,22 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
             </div>
           )}
+
+          {/* Cross-link to other years of the same recurring festival */}
+          {isFestival && (() => {
+            const others = concerts.filter(c => c.id !== concert.id && c.type === 'festival' && c.artist === concert.artist && isPast(c.date)).sort((a, b) => a.date.localeCompare(b.date));
+            if (others.length === 0) return null;
+            return (
+              <div style={{ background: "#12122a", border: "1px solid #2e2e5a", borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 12, color: "#818cf8" }}>
+                You've also been in {others.map((c, i) => (
+                  <span key={c.id}>
+                    <button onClick={() => onOpenOther(c)} style={{ background: 'none', border: 'none', padding: 0, color: "#a78bfa", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, fontSize: 12, fontFamily: "inherit" }}>{c.date.slice(0, 4)}</button>
+                    {i < others.length - 2 ? ", " : i === others.length - 2 ? " and " : ""}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Acts — festivals */}
           {isFestival && (concert.acts || []).length > 0 && (
@@ -7512,7 +7528,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),

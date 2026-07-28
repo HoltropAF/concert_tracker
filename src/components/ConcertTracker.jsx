@@ -4516,6 +4516,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   const [filterMinVisited, setFilterMinVisited] = useState(0);
   const [filterType, setFilterType] = useState('all');
   const [showVenuePast, setShowVenuePast] = useState(false);
+  const [expandedFestGroups, setExpandedFestGroups] = useState(() => new Set());
   const [showVenueUpcoming, setShowVenueUpcoming] = useState(false);
   const [editingVenueInfo, setEditingVenueInfo] = useState(false);
   const [venueEditInput, setVenueEditInput] = useState({ url: '', parking: '', transit: '', rooms: [], tags: [] });
@@ -4836,17 +4837,34 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
                 if (rendered.has(c.artist)) return null;
                 rendered.add(c.artist);
                 const group = festGroups[c.artist].sort((a,b) => b.date.localeCompare(a.date));
+                const ratedShows = group.filter(g => g.rating);
+                const avgShowRating = ratedShows.length ? (ratedShows.reduce((s, g) => s + g.rating, 0) / ratedShows.length).toFixed(1) : null;
+                const pricedShows = group.filter(g => ticketTotal(g) > 0);
+                const avgSpend = pricedShows.length ? (pricedShows.reduce((s, g) => s + ticketTotal(g), 0) / pricedShows.length).toFixed(0) : null;
+                const allActRatings = group.flatMap(g => (g.acts || []).filter(a => a.rating).map(a => a.rating));
+                const avgActRating = allActRatings.length ? (allActRatings.reduce((s, r) => s + r, 0) / allActRatings.length).toFixed(1) : null;
+                const expanded = expandedFestGroups.has(c.artist);
                 return (
                   <div key={c.artist} style={{ background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: '3px solid #f472b6', borderRadius: 10, padding: '10px 14px', marginBottom: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{c.artist}</div>
-                      <span style={{ fontSize: 10, color: '#f472b6', fontFamily: "'DM Mono', monospace", background: '#1a1030', border: '1px solid #4a2350', borderRadius: 99, padding: '1px 7px' }}>{group.length}×</span>
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {group.map(g => (
-                        <button key={g.id} onClick={() => onOpen(g)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 99, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{g.date.slice(0,4)}</button>
-                      ))}
-                    </div>
+                    <button onClick={() => setExpandedFestGroups(s => { const next = new Set(s); next.has(c.artist) ? next.delete(c.artist) : next.add(c.artist); return next; })} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 700 }}>{c.artist}</div>
+                        <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{c.city}</div>
+                        <div style={{ fontSize: 10, color: '#f472b6', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>been {group.length}× {expanded ? '▾' : '▸'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                        {avgShowRating && <div style={{ fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>★ {avgShowRating} avg</div>}
+                        {avgSpend && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>€{avgSpend} avg</div>}
+                        {avgActRating && <div style={{ fontSize: 10, color: '#f472b6', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>★ {avgActRating} acts</div>}
+                      </div>
+                    </button>
+                    {expanded && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                        {group.map(g => (
+                          <button key={g.id} onClick={() => onOpen(g)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 99, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{g.date.slice(0,4)}</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               }

@@ -562,7 +562,8 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
           {list.map((act) => {
             const i = acts.indexOf(act);
             return (
-              <div key={act.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+              <div key={act.name} style={{ marginBottom: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {numDays > 1 && !readOnly && (
                   <select value={act.day ?? ''} onChange={e => update(i, { day: e.target.value ? parseInt(e.target.value) : null })}
                     style={{ ...inputStyle, padding: '4px 6px', width: 62, flexShrink: 0 }}>
@@ -590,19 +591,17 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
                 )}
                 {!readOnly && <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>}
               </div>
+              {!readOnly && noteOpenFor === act.name && (
+                <textarea value={act.note || ''} onChange={e => update(i, { note: e.target.value })}
+                  placeholder={`Note about ${act.name}…`} rows={2}
+                  style={{ ...inputStyle, width: '100%', resize: 'vertical', marginTop: 4, boxSizing: 'border-box' }} />
+              )}
+              {readOnly && act.note && (
+                <div style={{ fontSize: 11, color: '#8b89ab', fontStyle: 'italic', marginTop: 3, paddingLeft: 4, borderLeft: '2px solid #2e2e50' }}>{act.note}</div>
+              )}
+              </div>
             );
           })}
-          {!readOnly && list.some(act => noteOpenFor === act.name) && list.filter(act => noteOpenFor === act.name).map(act => {
-            const i = acts.indexOf(act);
-            return (
-              <textarea key={`note-${act.name}`} value={act.note || ''} onChange={e => update(i, { note: e.target.value })}
-                placeholder={`Note about ${act.name}…`} rows={2}
-                style={{ ...inputStyle, width: '100%', resize: 'vertical', marginBottom: 6, boxSizing: 'border-box' }} />
-            );
-          })}
-          {readOnly && list.filter(act => act.note).map(act => (
-            <div key={`note-ro-${act.name}`} style={{ fontSize: 11, color: '#8b89ab', fontStyle: 'italic', marginBottom: 6, paddingLeft: 4, borderLeft: '2px solid #2e2e50' }}>{act.name}: {act.note}</div>
-          ))}
         </div>
       ))}
       {!readOnly && (
@@ -3035,27 +3034,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-          {/* Festival highlights — hearted acts, grouped by festival */}
-          {(() => {
-            const festivals = summaryPast.filter(c => c.type === 'festival' && (c.acts || []).some(a => a.highlight));
-            if (festivals.length === 0) return null;
-            return (
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#f472b6", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>♥ Festival highlights</div>
-                {festivals.map((c, fi) => (
-                  <div key={c.id} style={{ marginTop: fi > 0 ? 10 : 0 }}>
-                    <button onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#a78bfa", fontFamily: "'DM Mono', monospace", marginBottom: 4, display: "block" }}>{c.artist} · {c.date.slice(0,4)}</button>
-                    {c.acts.filter(a => a.highlight).map(a => (
-                      <div key={a.name} style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4, marginTop: 3 }}>
-                        <span style={{ color: "#f472b6", fontSize: 11 }}>♥</span>
-                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{a.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
             </>
           )}
 

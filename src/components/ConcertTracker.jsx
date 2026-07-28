@@ -1806,24 +1806,28 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               placeholder="Select genre(s)..."
               onAddNew={v => { const cur=getGenres(form); update("genre", [...cur, v]); setPendingTag({ value: v, settingsKey: 'genres', label: 'genres' }); }}
             />
-            <div style={labelStyle}>Subgenre</div>
-            <DropdownSelect
-              options={settings.subgenres||[]}
-              selected={form.subgenre||[]}
-              onToggle={g => update("subgenre", form.subgenre===g ? null : g)}
-              placeholder="Select subgenre..."
-              accentColor="#38bdf8"
-              onAddNew={v => { update("subgenre", v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }}
-            />
-            <div style={labelStyle}>Language</div>
-            <DropdownSelect
-              options={settings.languages||[]}
-              selected={Array.isArray(form.language) ? form.language : form.language ? [form.language] : []}
-              onToggle={l => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", langs.includes(l) ? langs.filter(x=>x!==l) : [...langs, l]); }}
-              multi
-              placeholder="Select language(s)..."
-              onAddNew={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }}
-            />
+            {!isFestival && (
+              <>
+                <div style={labelStyle}>Subgenre</div>
+                <DropdownSelect
+                  options={settings.subgenres||[]}
+                  selected={form.subgenre||[]}
+                  onToggle={g => update("subgenre", form.subgenre===g ? null : g)}
+                  placeholder="Select subgenre..."
+                  accentColor="#38bdf8"
+                  onAddNew={v => { update("subgenre", v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }}
+                />
+                <div style={labelStyle}>Language</div>
+                <DropdownSelect
+                  options={settings.languages||[]}
+                  selected={Array.isArray(form.language) ? form.language : form.language ? [form.language] : []}
+                  onToggle={l => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", langs.includes(l) ? langs.filter(x=>x!==l) : [...langs, l]); }}
+                  multi
+                  placeholder="Select language(s)..."
+                  onAddNew={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update("language", [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }}
+                />
+              </>
+            )}
             <div style={labelStyle}>Tags</div>
             <DropdownSelect
               options={settings.showTags || ['Cried']}
@@ -1892,14 +1896,18 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           /* ── FINANCIAL ── */
           { title: 'Financial', content: <>
-            <div style={labelStyle}>Ticket type</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-              {(settings.ticketTypes || ['GA','GC','Seated']).map(t => <button key={t} onClick={() => update('ticketType', form.ticketType === t ? null : t)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.ticketType === t ? '#a78bfa' : '#0c0c14', color: form.ticketType === t ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.ticketType === t ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.ticketType === t ? 700 : 400 }}>{t}</button>)}
-            </div>
-            <div style={labelStyle}>Add-ons</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
-            </div>
+            {!isFestival && (
+              <>
+                <div style={labelStyle}>Ticket type</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {(settings.ticketTypes || ['GA','GC','Seated']).map(t => <button key={t} onClick={() => update('ticketType', form.ticketType === t ? null : t)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.ticketType === t ? '#a78bfa' : '#0c0c14', color: form.ticketType === t ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.ticketType === t ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.ticketType === t ? 700 : 400 }}>{t}</button>)}
+                </div>
+                <div style={labelStyle}>Add-ons</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                  {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
+                </div>
+              </>
+            )}
             <TicketsFields value={form.tickets} onChange={v => update('tickets', v)} labelStyle={labelStyle} inputStyle={inputStyle} />
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8 }}>
               <div style={labelStyle}>Merch</div>
@@ -5324,16 +5332,18 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           };
           const financialContent = (
             <>
-              <div style={{ marginBottom: 12 }}>
-                {fieldLabel('Ticket type')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                  {(settings.ticketTypes || ['GA','GC','Seated']).map(t => <button key={t} onClick={() => update('ticketType', form.ticketType === t ? null : t)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.ticketType === t ? '#a78bfa' : '#0c0c14', color: form.ticketType === t ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.ticketType === t ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.ticketType === t ? 700 : 400 }}>{t}</button>)}
+              {!isFest && (
+                <div style={{ marginBottom: 12 }}>
+                  {fieldLabel('Ticket type')}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {(settings.ticketTypes || ['GA','GC','Seated']).map(t => <button key={t} onClick={() => update('ticketType', form.ticketType === t ? null : t)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.ticketType === t ? '#a78bfa' : '#0c0c14', color: form.ticketType === t ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.ticketType === t ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.ticketType === t ? 700 : 400 }}>{t}</button>)}
+                  </div>
+                  {fieldLabel('Add-ons')}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
+                  </div>
                 </div>
-                {fieldLabel('Add-ons')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(settings.ticketAddons || ['Barricade','VIP','Soundcheck','Hi-touch','Send-off','Early entry']).map(a => { const on = (form.ticketAddons || []).includes(a); return <button key={a} onClick={() => update('ticketAddons', on ? (form.ticketAddons || []).filter(x => x !== a) : [...(form.ticketAddons || []), a])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{a}</button>; })}
-                </div>
-              </div>
+              )}
               <TicketsFields value={form.tickets} onChange={v => update('tickets', v)} labelStyle={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }} inputStyle={inputStyle} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>{fieldLabel('Merch')}<button onClick={addMerchItem} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono',monospace" }}>+ Add item</button></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -5595,10 +5605,14 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}><input value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => e.key==='Enter' && addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex: 1 }} /><button onClick={addSupport} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>+</button></div>
                 {fieldLabel('Genre')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.genres||[]).map(g => <button key={g} onClick={()=>{ const cur=getGenres(form); const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g]; update('genre', next.length===0?null:next.length===1?next[0]:next); }} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: getGenres(form).includes(g) ? '#a78bfa' : '#0c0c14', color: getGenres(form).includes(g) ? '#0c0c14' : '#6b6a8f', border: `1px solid ${getGenres(form).includes(g) ? '#a78bfa' : '#2e2e50'}`, fontWeight: getGenres(form).includes(g) ? 700 : 400 }}>{g}</button>)}<AddNewTagPill onAdd={v => { const cur=getGenres(form); update('genre', [...cur, v]); setPendingTag({ value: v, settingsKey: 'genres', label: 'genres' }); }} /></div>
-                {fieldLabel('Subgenre')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}<AddNewTagPill accentColor="#38bdf8" onAdd={v => { update('subgenre', v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }} /></div>
-                {fieldLabel('Language')}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
+                {!isFest && (
+                  <>
+                    {fieldLabel('Subgenre')}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.subgenres||[]).map(g => <button key={g} onClick={()=>update('subgenre', form.subgenre===g ? null : g)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.subgenre===g ? '#38bdf8' : '#0c0c14', color: form.subgenre===g ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.subgenre===g ? '#38bdf8' : '#2e2e50'}`, fontWeight: form.subgenre===g ? 700 : 400 }}>{g}</button>)}<AddNewTagPill accentColor="#38bdf8" onAdd={v => { update('subgenre', v); setPendingTag({ value: v, settingsKey: 'subgenres', label: 'subgenres' }); }} /></div>
+                    {fieldLabel('Language')}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(() => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; return (settings.languages||[]).map(l => { const on = langs.includes(l); return <button key={l} onClick={()=>update('language', on ? langs.filter(x=>x!==l) : [...langs, l])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#a78bfa' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#a78bfa' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{l}</button>; }); })()}<AddNewTagPill onAdd={v => { const langs = Array.isArray(form.language) ? form.language : form.language ? [form.language] : []; update('language', [...langs, v]); setPendingTag({ value: v, settingsKey: 'languages', label: 'languages' }); }} /></div>
+                  </>
+                )}
                 {fieldLabel('Tags')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 }}>{(settings.showTags || ['Cried']).map(t => { const on = (form.tags || []).includes(t); return <button key={t} onClick={() => update('tags', on ? (form.tags || []).filter(x => x !== t) : [...(form.tags || []), t])} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: on ? '#f472b6' : '#0c0c14', color: on ? '#0c0c14' : '#6b6a8f', border: `1px solid ${on ? '#f472b6' : '#2e2e50'}`, fontWeight: on ? 700 : 400 }}>{t}</button>; })}<AddNewTagPill accentColor="#f472b6" onAdd={v => { update('tags', [...(form.tags || []), v]); setPendingTag({ value: v, settingsKey: 'showTags', label: 'tags' }); }} /></div>
                 {(() => {

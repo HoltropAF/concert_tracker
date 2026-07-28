@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed a data bug: two of your four Liquicity Festival entries had the festival name typed into the venue field instead of "Geestmerambacht" — now all four group together correctly
+- Moved "Festivals you keep coming back to" from Summary onto the ATF page, small and muted
+- Moved the "You've also been in..." cross-link to sit above the tags instead of after Notes
+- Removed "Festival" from the Seen as options
 - Recurring festivals: grouped by year on their Venue page, a cross-link between years on each festival's own page, and a "Festivals you keep coming back to" card on Summary
 - Removed Festival highlights from Stats (didn't like it)
 - Fixed act notes showing at the bottom of each day instead of under the actual act

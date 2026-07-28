@@ -486,6 +486,7 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
   const [urlInput, setUrlInput] = useState('');
   const [importState, setImportState] = useState('idle');
   const [importError, setImportError] = useState('');
+  const [noteOpenFor, setNoteOpenFor] = useState(null);
   const numDays = festivalDays(startDate, endDate);
 
   const add = () => {
@@ -584,10 +585,24 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
                 ) : act.rating ? (
                   <span style={{ fontSize: 11, color: '#a78bfa' }}>{'★'.repeat(act.rating)}</span>
                 ) : null}
+                {!readOnly && (
+                  <button onClick={() => setNoteOpenFor(noteOpenFor === act.name ? null : act.name)} title="Add a note" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: act.note ? '#a78bfa' : '#2e2e4a', padding: 0, lineHeight: 1 }}>📝</button>
+                )}
                 {!readOnly && <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>}
               </div>
             );
           })}
+          {!readOnly && list.some(act => noteOpenFor === act.name) && list.filter(act => noteOpenFor === act.name).map(act => {
+            const i = acts.indexOf(act);
+            return (
+              <textarea key={`note-${act.name}`} value={act.note || ''} onChange={e => update(i, { note: e.target.value })}
+                placeholder={`Note about ${act.name}…`} rows={2}
+                style={{ ...inputStyle, width: '100%', resize: 'vertical', marginBottom: 6, boxSizing: 'border-box' }} />
+            );
+          })}
+          {readOnly && list.filter(act => act.note).map(act => (
+            <div key={`note-ro-${act.name}`} style={{ fontSize: 11, color: '#8b89ab', fontStyle: 'italic', marginBottom: 6, paddingLeft: 4, borderLeft: '2px solid #2e2e50' }}>{act.name}: {act.note}</div>
+          ))}
         </div>
       ))}
       {!readOnly && (

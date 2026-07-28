@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-07-22
+- Removed Cumulative shows chart from Summary
+- Fixed Invalid Date on Artist page festival notes
+- Redesigned the recurring-festival card on Venues: location, attendance count, avg show rating, avg spend, and avg act rating, years behind a toggle
+- Updated festival venue websites in your data to the festival's own site instead of the generic venue site (Liquicity, C2C, Central Park)
 - Fixed a data bug: two of your four Liquicity Festival entries had the festival name typed into the venue field instead of "Geestmerambacht" — now all four group together correctly
 - Moved "Festivals you keep coming back to" from Summary onto the ATF page, small and muted
 - Moved the "You've also been in..." cross-link to sit above the tags instead of after Notes

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-22
+- Removed Festival highlights from Stats (didn't like it)
+- Fixed act notes showing at the bottom of each day instead of under the actual act
+- Festivals no longer show Subgenre, Language, Ticket type, or Add-ons — just Genre and a plain ticket
 - Festival Highlights card on Summary: hearted acts across all festivals, grouped by which festival
 - Per-festival stats (acts seen / hearted / avg rating) and a rating-by-day chart on multi-day festivals
 - Artist page shows a concerts/festivals split when you've seen someone as both

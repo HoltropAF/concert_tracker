@@ -3564,7 +3564,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
   );
 }
 
-function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
+function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
   const [enteredViaArtist] = useState(initialSelectedArtist);
   useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
@@ -3581,19 +3581,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   useEffect(() => {
     if (!selectedArtist) return;
     if ((settings.artistSpotifyInfo || {})[selectedArtist] !== undefined) return; // already cached (or cached-as-not-found)
-    const tokenValid = settings.spotifyAccessToken && (!settings.spotifyTokenExpiry || settings.spotifyTokenExpiry > Date.now());
-    if (!tokenValid) return;
+    if (!settings.spotifyAccessToken) return; // Spotify not connected at all
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(selectedArtist)}&type=artist&limit=1`, { headers: { Authorization: `Bearer ${settings.spotifyAccessToken}` } });
+        const token = await getValidSpotifyToken(settings, onUpdateSettings || (async () => {})).catch(() => null);
+        if (!token || cancelled) return;
+        const r = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(selectedArtist)}&type=artist&limit=1`, { headers: { Authorization: `Bearer ${token}` } });
         if (!r.ok || cancelled) return;
         const data = await r.json();
         const item = data?.artists?.items?.[0];
         if (!item) { if (!cancelled) onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: null }); return; }
         let topTrack = null;
         try {
-          const tr = await fetch(`https://api.spotify.com/v1/artists/${item.id}/top-tracks?market=US`, { headers: { Authorization: `Bearer ${settings.spotifyAccessToken}` } });
+          const tr = await fetch(`https://api.spotify.com/v1/artists/${item.id}/top-tracks?market=US`, { headers: { Authorization: `Bearer ${token}` } });
           if (tr.ok) {
             const td = await tr.json();
             const t = td?.tracks?.[0];
@@ -7942,7 +7943,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); } }} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

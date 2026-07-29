@@ -3824,7 +3824,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               {avgRating !== null && (
                 <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>★{avgRating}</div>
-                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>your rating</div>
+                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{festivalAvgRating ? "concert rating" : "your rating"}</div>
                 </div>
               )}
             </div>
@@ -3933,14 +3933,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           );
         })()}
         {/* Quick stats row */}
-        {(avgRating || festivalAvgRating || criedCount > 0 || topFriend) && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[avgRating, festivalAvgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
-            {avgRating && (
-              <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>★{avgRating}</div>
-                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>{festivalAvgRating ? "concert rating" : "avg rating"}</div>
-              </div>
-            )}
+        {(festivalAvgRating || criedCount > 0 || topFriend) && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[festivalAvgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
             {festivalAvgRating && (
               <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#f472b6", lineHeight: 1 }}>★{festivalAvgRating}</div>

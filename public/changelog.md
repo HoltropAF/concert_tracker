@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Overview: added the MusicBrainz/fandom tile row, moved cried count from Songs into the main rating row
 - Built the missing Info tab: formation date, group/solo type, country, album count (via MusicBrainz, unaffected by Spotify's restrictions), plus an editable fandom name field
 - Fixed stray extra dots on the Shows and Songs timelines
 - Moved festival rating and top friend into the Overview stats card alongside concert rating/popularity

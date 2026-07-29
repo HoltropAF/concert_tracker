@@ -1246,6 +1246,11 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
 }
 
 function normalizeConcertForm(concert) {
+  // Shows logged before the itemized-tickets feature existed only have the old
+  // single `ticketPrice` field. Without this, the edit form's Tickets list looks
+  // empty even though a price was recorded — migrate it into one visible row.
+  const hasItemizedTickets = Array.isArray(concert.tickets) && concert.tickets.length > 0;
+  const tickets = hasItemizedTickets ? concert.tickets : (concert.ticketPrice ? [{ name: 'Ticket', price: concert.ticketPrice }] : []);
   return {
     ...concert,
     friends: Array.isArray(concert.friends) ? concert.friends : [],
@@ -1253,6 +1258,7 @@ function normalizeConcertForm(concert) {
     merch: Array.isArray(concert.merch) ? concert.merch : [],
     ticketAddons: Array.isArray(concert.ticketAddons) ? concert.ticketAddons : [],
     acts: Array.isArray(concert.acts) ? concert.acts : [],
+    tickets,
   };
 }
 

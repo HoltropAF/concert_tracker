@@ -52,6 +52,42 @@ function PhotoAdjust({ path, pos, onChange }) {
   )
 }
 
+function ArtistBannerReframe({ path, pos, onChange, onDone }) {
+  const [url, setUrl] = useState(null)
+  const boxRef = useRef(null)
+  const drag = useRef(null)
+  useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
+  const p = pos || { x: 50, y: 50 }
+  const start = (cx, cy) => { drag.current = { x: cx, y: cy, px: p.x ?? 50, py: p.y ?? 50 } }
+  const move = (cx, cy) => {
+    if (!drag.current || !boxRef.current) return
+    const rect = boxRef.current.getBoundingClientRect()
+    const nx = Math.max(0, Math.min(100, drag.current.px - ((cx - drag.current.x) / rect.width) * 100))
+    const ny = Math.max(0, Math.min(100, drag.current.py - ((cy - drag.current.y) / rect.height) * 100))
+    onChange({ x: Math.round(nx), y: Math.round(ny) })
+  }
+  return (
+    <div style={{ background: "#0c0c14" }}>
+      <div ref={boxRef}
+        onTouchStart={e => { const t = e.touches[0]; start(t.clientX, t.clientY) }}
+        onTouchMove={e => { const t = e.touches[0]; move(t.clientX, t.clientY) }}
+        onTouchEnd={() => { drag.current = null }}
+        onMouseDown={e => start(e.clientX, e.clientY)}
+        onMouseMove={e => { if (e.buttons === 1) move(e.clientX, e.clientY) }}
+        onMouseUp={() => { drag.current = null }}
+        onMouseLeave={() => { drag.current = null }}
+        style={{ width: "100%", height: 150, position: "relative", overflow: "hidden", touchAction: "none", cursor: "grab", background: "#13131f" }}>
+        {url && <img src={url} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: "block", pointerEvents: "none" }} />}
+        <div style={{ position: "absolute", top: 10, left: 10, fontSize: 10, color: "#e2e0ff", background: "#0c0c14aa", padding: "3px 9px", borderRadius: 99, fontFamily: "'DM Mono', monospace", pointerEvents: "none" }}>↕↔ drag to move</div>
+      </div>
+      <div style={{ display: "flex", gap: 8, padding: "10px 16px" }}>
+        <button onClick={() => onChange({ x: 50, y: 50 })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 12, padding: "6px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Center</button>
+        <button onClick={onDone} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "6px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Done</button>
+      </div>
+    </div>
+  )
+}
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -3567,6 +3603,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
 function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
   const [artistTab, setArtistTab] = useState('overview');
+  const [reframingArtistPhoto, setReframingArtistPhoto] = useState(false);
   const [enteredViaArtist] = useState(initialSelectedArtist);
   useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
   const goBackFromArtist = () => {
@@ -3580,7 +3617,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistCovers, setShowArtistCovers] = useState(settings.artistSectionsDefaultOpen || false);
   const [artistPhotoUploading, setArtistPhotoUploading] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
-  useEffect(() => { setArtistTab('overview'); }, [selectedArtist]);
+  useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); }, [selectedArtist]);
   useEffect(() => {
     if (!selectedArtist) return;
     const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
@@ -3798,36 +3835,53 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     });
     const spotifyInfo = (settings.artistSpotifyInfo || {})[selectedArtist] || null;
     const bannerPhotoPath = (settings.artistPhotos || {})[selectedArtist] || null;
+    const bannerPos = (settings.artistPhotoPos || {})[selectedArtist] || { x: 50, y: 50 };
     const handleBannerPick = e => {
       const file = e.target.files?.[0];
       e.target.value = '';
       if (!file) return;
       setArtistPhotoUploading(true);
       uploadArtistPhoto(selectedArtist, file)
-        .then(path => onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path }))
+        .then(path => { onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path }); setReframingArtistPhoto(true); })
         .catch(() => {})
         .finally(() => setArtistPhotoUploading(false));
     };
     return (
       <div style={{ padding: "0 0 100px" }}>
-        <label style={{ display: "block", height: 150, position: "relative", cursor: "pointer", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
-          <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
-          {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} style={{ width: "100%", height: 150, position: "absolute", inset: 0 }} />}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)" }} />
-          <button onClick={e => { e.preventDefault(); goBackFromArtist(); }} style={{ position: "absolute", top: 14, left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
-          <span style={{ position: "absolute", top: 14, right: 16, color: "#fff", fontSize: 13, zIndex: 2, opacity: 0.85, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>{artistPhotoUploading ? "···" : "✎"}</span>
-          <div style={{ position: "absolute", bottom: 14, left: 16, right: 16, zIndex: 2 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{selectedArtist}</div>
-              {spotifyInfo?.url && <a href={spotifyInfo.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} title="Open on Spotify" style={{ color: "#3dd968", fontSize: 13, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>●</a>}
+        {reframingArtistPhoto && bannerPhotoPath ? (
+          <ArtistBannerReframe
+            path={bannerPhotoPath}
+            pos={bannerPos}
+            onChange={p => onUpdateSetting('artistPhotoPos', { ...(settings.artistPhotoPos || {}), [selectedArtist]: p })}
+            onDone={() => setReframingArtistPhoto(false)}
+          />
+        ) : (
+          <div style={{ height: 150, position: "relative", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
+            {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} pos={bannerPos} style={{ width: "100%", height: 150, position: "absolute", inset: 0 }} />}
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)" }} />
+            <button onClick={goBackFromArtist} style={{ position: "absolute", top: 14, left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
+            <div style={{ position: "absolute", top: 12, right: 16, zIndex: 2, display: "flex", gap: 8 }}>
+              {bannerPhotoPath && (
+                <button onClick={() => setReframingArtistPhoto(true)} title="Move photo" style={{ background: "#0c0c14aa", border: "none", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>↕↔</button>
+              )}
+              <label style={{ background: "#0c0c14aa", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer", display: "inline-block" }} title={bannerPhotoPath ? "Change photo" : "Add photo"}>
+                <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
+                {artistPhotoUploading ? "···" : "✎"}
+              </label>
             </div>
-            <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#fff", opacity: 0.9, marginTop: 3, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
-              {[spotifyInfo?.genres?.[0], `${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`].filter(Boolean).join(" · ")}
+            <div style={{ position: "absolute", bottom: 14, left: 16, right: 16, zIndex: 2 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{selectedArtist}</div>
+                {spotifyInfo?.url && <a href={spotifyInfo.url} target="_blank" rel="noopener noreferrer" title="Open on Spotify" style={{ color: "#3dd968", fontSize: 13, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>●</a>}
+              </div>
+              <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#fff", opacity: 0.9, marginTop: 3, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
+                {[spotifyInfo?.genres?.[0], `${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`].filter(Boolean).join(" · ")}
+              </div>
             </div>
           </div>
-        </label>
+        )}
         <div style={{ display: "flex", gap: 6, padding: "12px 16px 4px" }}>
-          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Moments']].map(([id, label]) => (
+          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs Live']].map(([id, label]) => (
             <button key={id} onClick={() => setArtistTab(id)} style={{
               background: artistTab === id ? "#a78bfa" : "#13131f", color: artistTab === id ? "#0c0c14" : "#6b6a8f",
               border: `1px solid ${artistTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
@@ -4266,8 +4320,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
               {!artistsCompact && (() => {
                 const photoPath = (settings.artistPhotos || {})[name] || null;
+                const photoPos = (settings.artistPhotoPos || {})[name] || null;
                 return photoPath ? (
-                  <PhotoImg path={photoPath} style={{ width: 40, height: 40, borderRadius: 8, flexShrink: 0 }} />
+                  <PhotoImg path={photoPath} pos={photoPos} style={{ width: 40, height: 40, borderRadius: 8, flexShrink: 0 }} />
                 ) : (
                   <div style={{ width: 40, height: 40, borderRadius: 8, background: "#1a1a30", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, color: "#4a4870", fontSize: 15 }}>{name.charAt(0).toUpperCase()}</div>
                 );

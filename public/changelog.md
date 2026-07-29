@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed "Invalid Date" showing in the Shows timeline (a want-to-go entry was leaking in)
+- Banner is bigger, and move/upload controls are hidden until you tap the pencil icon
+- Songs Live rows are clickable — jump to that song's page, back returns you here
+- Artist popularity/followers/top-tracks: confirmed this is a Spotify Developer Mode restriction from Feb 2026, not a bug — removed the dead code chasing it
 - Artist banner photo: drag to reposition after uploading, with a live preview
 - Renamed Moments tab to Songs Live, and gave the songs list a dotted-timeline treatment
 - More robust Spotify fetch — fetches the artist directly by ID too, since search alone was coming back incomplete

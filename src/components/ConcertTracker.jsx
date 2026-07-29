@@ -3622,7 +3622,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   useEffect(() => {
     if (!selectedArtist) return;
     const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
-    const cacheIsUseless = cached && typeof cached === 'object' && cached.popularity == null && cached.followers == null && (!cached.genres || cached.genres.length === 0);
+    const cacheIsUseless = cached && typeof cached === 'object' && cached.genres == null;
     if (cached !== undefined && !cacheIsUseless) return; // already cached with real data (or cached-as-not-found)
     if (!settings.spotifyAccessToken) return; // Spotify not connected at all
     let cancelled = false;
@@ -3635,28 +3635,15 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         const data = await r.json();
         const item = data?.artists?.items?.[0];
         if (!item) { if (!cancelled) onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: null }); return; }
-        // The search endpoint can return an abbreviated object — fetch the artist
-        // directly by ID too, which always includes popularity/genres/followers.
-        let full = item;
-        try {
-          const ar = await fetch(`https://api.spotify.com/v1/artists/${item.id}`, { headers: { Authorization: `Bearer ${token}` } });
-          if (ar.ok) full = await ar.json();
-        } catch { /* fall back to the search result if this fails */ }
-        let topTrack = null;
-        try {
-          const tr = await fetch(`https://api.spotify.com/v1/artists/${item.id}/top-tracks?market=US`, { headers: { Authorization: `Bearer ${token}` } });
-          if (tr.ok) {
-            const td = await tr.json();
-            const t = td?.tracks?.[0];
-            if (t) topTrack = { name: t.name, url: t.external_urls?.spotify || null };
-          }
-        } catch { /* top track is a nice-to-have, fine without it */ }
+        // Note: as of Spotify's Feb 2026 Developer Mode restrictions, artist
+        // popularity, follower counts, and top-tracks are no longer available
+        // to apps at this access tier — only url/genres/images still work.
         const info = {
-          url: full.external_urls?.spotify || item.external_urls?.spotify || null,
-          genres: (full.genres && full.genres.length ? full.genres : item.genres) || [],
-          popularity: typeof full.popularity === 'number' ? full.popularity : (typeof item.popularity === 'number' ? item.popularity : null),
-          followers: full.followers?.total ?? item.followers?.total ?? null,
-          topTrack,
+          url: item.external_urls?.spotify || null,
+          genres: item.genres || [],
+          popularity: null,
+          followers: null,
+          topTrack: null,
           fetchedAt: Date.now(),
         };
         if (!cancelled) onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: info });

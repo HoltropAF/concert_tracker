@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed a duplicate rating tile on the Artist page that showed up alongside the new popularity/followers card
 - Artist photo is now yours to upload — no longer auto-pulled from Spotify, moved to a bigger circle above the seen-live number with an edit-pen placeholder until you add one
 - Popularity/followers/your-rating tiles all together again on the Spotify card
 - Fixed why the Spotify artist info never showed: your access token had expired and the page never tried to refresh it. Now refreshes automatically like Songs already does

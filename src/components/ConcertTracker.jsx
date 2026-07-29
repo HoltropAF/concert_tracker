@@ -76,7 +76,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
         onMouseMove={e => { if (e.buttons === 1) move(e.clientX, e.clientY) }}
         onMouseUp={() => { drag.current = null }}
         onMouseLeave={() => { drag.current = null }}
-        style={{ width: "100%", height: 150, position: "relative", overflow: "hidden", touchAction: "none", cursor: "grab", background: "#13131f" }}>
+        style={{ width: "100%", height: 190, position: "relative", overflow: "hidden", touchAction: "none", cursor: "grab", background: "#13131f" }}>
         {url && <img src={url} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: "block", pointerEvents: "none" }} />}
         <div style={{ position: "absolute", top: 10, left: 10, fontSize: 10, color: "#e2e0ff", background: "#0c0c14aa", padding: "3px 9px", borderRadius: 99, fontFamily: "'DM Mono', monospace", pointerEvents: "none" }}>↕↔ drag to move</div>
       </div>
@@ -3604,6 +3604,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
   const [artistTab, setArtistTab] = useState('overview');
   const [reframingArtistPhoto, setReframingArtistPhoto] = useState(false);
+  const [bannerEditMode, setBannerEditMode] = useState(false);
   const [enteredViaArtist] = useState(initialSelectedArtist);
   useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
   const goBackFromArtist = () => {
@@ -3617,7 +3618,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistCovers, setShowArtistCovers] = useState(settings.artistSectionsDefaultOpen || false);
   const [artistPhotoUploading, setArtistPhotoUploading] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
-  useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); }, [selectedArtist]);
+  useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, [selectedArtist]);
   useEffect(() => {
     if (!selectedArtist) return;
     const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
@@ -3853,21 +3854,24 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             path={bannerPhotoPath}
             pos={bannerPos}
             onChange={p => onUpdateSetting('artistPhotoPos', { ...(settings.artistPhotoPos || {}), [selectedArtist]: p })}
-            onDone={() => setReframingArtistPhoto(false)}
+            onDone={() => { setReframingArtistPhoto(false); setBannerEditMode(false); }}
           />
         ) : (
-          <div style={{ height: 150, position: "relative", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
-            {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} pos={bannerPos} style={{ width: "100%", height: 150, position: "absolute", inset: 0 }} />}
+          <div style={{ height: 190, position: "relative", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
+            {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} pos={bannerPos} style={{ width: "100%", height: 190, position: "absolute", inset: 0 }} />}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)" }} />
             <button onClick={goBackFromArtist} style={{ position: "absolute", top: 14, left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
             <div style={{ position: "absolute", top: 12, right: 16, zIndex: 2, display: "flex", gap: 8 }}>
-              {bannerPhotoPath && (
+              {bannerEditMode && bannerPhotoPath && (
                 <button onClick={() => setReframingArtistPhoto(true)} title="Move photo" style={{ background: "#0c0c14aa", border: "none", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>↕↔</button>
               )}
-              <label style={{ background: "#0c0c14aa", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer", display: "inline-block" }} title={bannerPhotoPath ? "Change photo" : "Add photo"}>
-                <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
-                {artistPhotoUploading ? "···" : "✎"}
-              </label>
+              {bannerEditMode && (
+                <label style={{ background: "#0c0c14aa", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer", display: "inline-block" }} title={bannerPhotoPath ? "Change photo" : "Add photo"}>
+                  <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
+                  {artistPhotoUploading ? "···" : "↑"}
+                </label>
+              )}
+              <button onClick={() => setBannerEditMode(m => !m)} title="Edit photo" style={{ background: bannerEditMode ? "#a78bfa" : "#0c0c14aa", border: "none", borderRadius: 99, color: bannerEditMode ? "#0c0c14" : "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>✎</button>
             </div>
             <div style={{ position: "absolute", bottom: 14, left: 16, right: 16, zIndex: 2 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -3808,44 +3808,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             ]} />
           </div>
         </div>
-        {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null || avgRating !== null) && (
-          <div style={{ padding: "12px 16px 0" }}>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null, avgRating !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
-              {spotifyInfo.popularity !== null && (
-                <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
-                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>popularity</div>
-                </div>
-              )}
-              {spotifyInfo.followers !== null && (
-                <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers}</div>
-                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>followers</div>
-                </div>
-              )}
-              {avgRating !== null && (
-                <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>★{avgRating}</div>
-                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{festivalAvgRating ? "concert rating" : "your rating"}</div>
-                </div>
-              )}
-            </div>
-            <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 6 }}>
-              last pulled {(() => {
-                const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
-                if (days <= 0) return 'today';
-                if (days === 1) return 'yesterday';
-                if (days < 30) return `${days}d ago`;
-                return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-              })()}
-            </div>
-            {spotifyInfo.topTrack && (
-              <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
-                ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
-              </a>
-            )}
-          </div>
-        )}
         {/* Hero count + money stats */}
         {totalAppearances === 0 ? (
           <div style={{ padding: "14px 16px 0" }}>
@@ -3901,6 +3863,44 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   );
                 })()}
               </div>
+              {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null || avgRating !== null) && (
+                <div style={{ padding: "12px 16px 0" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null, avgRating !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
+                    {spotifyInfo.popularity !== null && (
+                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
+                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>popularity</div>
+                      </div>
+                    )}
+                    {spotifyInfo.followers !== null && (
+                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers}</div>
+                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>followers</div>
+                      </div>
+                    )}
+                    {avgRating !== null && (
+                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>★{avgRating}</div>
+                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{festivalAvgRating ? "concert rating" : "your rating"}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 6 }}>
+                    last pulled {(() => {
+                      const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
+                      if (days <= 0) return 'today';
+                      if (days === 1) return 'yesterday';
+                      if (days < 30) return `${days}d ago`;
+                      return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                    })()}
+                  </div>
+                  {spotifyInfo.topTrack && (
+                    <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
+                      ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
+                    </a>
+                  )}
+                </div>
+              )}
               <div style={{ padding: "10px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>

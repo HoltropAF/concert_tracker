@@ -4024,29 +4024,35 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             ))}
           </div>
         )}
-        {/* Songs heard live + Covered by others — still Moments tab */}
+        {/* Songs heard live — dotted timeline style, matching Shows tab */}
         {artistSongs.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <button onClick={() => setShowArtistSongs(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs heard live</span>
-                <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs heard live</span>
+              <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ width: 2, background: "#1f1f35", marginLeft: 5, position: "relative", flexShrink: 0 }}>
+                {artistSongs.map(([song], i) => {
+                  const criedHere = pastShows.some(c => c.criedSong === song);
+                  return <div key={song} style={{ width: 12, height: 12, borderRadius: "50%", background: criedHere ? "#3a6ea5" : "#a78bfa", border: "2px solid #0c0c14", position: "absolute", left: -6, top: `${i * 42}px` }} />;
+                })}
               </div>
-              <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistSongs ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
-            </button>
-            {showArtistSongs && (
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
-                {artistSongs.map(([song, count], i) => (
-                  <div key={song} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < artistSongs.length - 1 ? 6 : 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
-                      <span style={{ color: "#c4c2f0", fontSize: 12 }}>{song}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {artistSongs.map(([song, count], i) => {
+                  const criedHere = pastShows.some(c => c.criedSong === song);
+                  return (
+                    <div key={song} style={{ background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "#c4c2f0", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                        {song}
+                        {criedHere && <span title="Cried to this one">💧</span>}
+                      </span>
+                      {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
                     </div>
-                    {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            )}
+            </div>
           </div>
         )}
         {coversByOthers.length > 0 && (

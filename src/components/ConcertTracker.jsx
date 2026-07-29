@@ -3712,8 +3712,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const allGenres = [...new Set(concerts.flatMap(c => getGenres(c)))].sort();
 
   const artistEntries = Object.entries(artistMap).map(([name, shows]) => {
-    const pastShows = shows.filter(c => isPast(c.date));
-    const upcomingShows = shows.filter(c => !isPast(c.date));
+    const pastShows = shows.filter(c => !c.wishlist && c.date && c.date !== '9999-12-31' && isPast(c.date));
+    const upcomingShows = shows.filter(c => !c.wishlist && c.date && c.date !== '9999-12-31' && !isPast(c.date));
     const rated = pastShows.filter(c => c.rating);
     const avgRating = rated.length ? rated.reduce((s, c) => s + c.rating, 0) / rated.length : null;
     const sortedPast = [...pastShows].sort((a, b) => a.date.localeCompare(b.date));
@@ -3795,8 +3795,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
   if (selectedArtist) {
     const shows = (artistMap[selectedArtist] || []).sort((a,b) => b.date.localeCompare(a.date));
-    const pastShows = shows.filter(c => isPast(c.date));
-    const upcomingShows = shows.filter(c => !isPast(c.date));
+    const pastShows = shows.filter(c => !c.wishlist && c.date && c.date !== '9999-12-31' && isPast(c.date));
+    const upcomingShows = shows.filter(c => !c.wishlist && c.date && c.date !== '9999-12-31' && !isPast(c.date));
     const rated = pastShows.filter(c => c.rating);
     const avgRating = rated.length ? (rated.reduce((s,c) => s + c.rating, 0) / rated.length).toFixed(1) : null;
     const criedCount = pastShows.filter(c => (c.tags || []).includes('Cried')).length;

@@ -3572,11 +3572,11 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     if (selectedArtist && selectedArtist === enteredViaArtist && onBackToOrigin) onBackToOrigin();
     else setSelectedArtist(null);
   };
-  const [showArtistUpcoming, setShowArtistUpcoming] = useState(false);
-  const [showArtistHeadliner, setShowArtistHeadliner] = useState(false);
-  const [showArtistSupport, setShowArtistSupport] = useState(false);
-  const [showArtistSongs, setShowArtistSongs] = useState(false);
-  const [showArtistCovers, setShowArtistCovers] = useState(false);
+  const [showArtistUpcoming, setShowArtistUpcoming] = useState(settings.artistSectionsDefaultOpen || false);
+  const [showArtistHeadliner, setShowArtistHeadliner] = useState(settings.artistSectionsDefaultOpen || false);
+  const [showArtistSupport, setShowArtistSupport] = useState(settings.artistSectionsDefaultOpen || false);
+  const [showArtistSongs, setShowArtistSongs] = useState(settings.artistSectionsDefaultOpen || false);
+  const [showArtistCovers, setShowArtistCovers] = useState(settings.artistSectionsDefaultOpen || false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => {
     if (!selectedArtist) return;
@@ -6639,6 +6639,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </SettingsRow>
           <SettingsRow label="Show upcoming" sub="On by default when opening app">
             <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); onUpdate("defaultShowUpcoming", v); }} />
+          </SettingsRow>
+          <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
+            <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); onUpdate("artistSectionsDefaultOpen", checked); }} />
           </SettingsRow>
           <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast compact />
         </SettingsSection>

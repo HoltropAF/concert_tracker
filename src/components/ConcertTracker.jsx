@@ -4046,13 +4046,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 {artistSongs.map(([song, count], i) => {
                   const criedHere = pastShows.some(c => c.criedSong === song);
                   return (
-                    <div key={song} style={{ background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <button key={song} onClick={() => onNavigate({ view: 'songs', songSelect: { name: song, artist: selectedArtist }, fromArtist: selectedArtist })} style={{ width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ color: "#c4c2f0", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
                         {song}
                         {criedHere && <span title="Cried to this one">💧</span>}
                       </span>
                       {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -4381,13 +4381,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   );
 }
 
-function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDetailChange = () => {}, initialSearch = null, onInitialSearchConsumed = () => {} }) {
+function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDetailChange = () => {}, initialSearch = null, onInitialSearchConsumed = () => {}, initialSongSelect = null, onInitialSongSelectConsumed = () => {}, onBackToOrigin = null }) {
   const past = concerts.filter(c => isPast(c.date));
   const [search, setSearch] = useState(initialSearch || '');
   useEffect(() => { if (initialSearch) { setSearch(initialSearch); onInitialSearchConsumed(); } }, [initialSearch]);
   const [sortBy, setSortBy] = useState('count');
   const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [enteredViaSong, setEnteredViaSong] = useState(null);
+  const goBackFromSong = () => {
+    if (selectedSong && selectedSong === enteredViaSong && onBackToOrigin) onBackToOrigin();
+    else setSelectedSong(null);
+  };
   useEffect(() => { onDetailChange(selectedSong !== null); return () => onDetailChange(false); }, [selectedSong]);
   const [songMatcher, setSongMatcher] = useState(null);
   const [filterType, setFilterType] = useState('all');
@@ -4420,8 +4425,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       setRefreshingInfo(false);
     }
   };
-  useBackButton(() => setSelectedSong(null), selectedSong !== null);
-
+  useBackButton(goBackFromSong, selectedSong !== null);
   const songCount = {};
   const maxRating = settings.ratingSystem || 5;
   past.filter(c => filterType === 'all' || (filterType === 'concerts' ? c.type !== 'festival' : c.type === 'festival')).forEach(c => {
@@ -4450,6 +4454,12 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     Object.entries(c.supportSetlists || {}).forEach(([an, songs]) => getSongList(songs).forEach(s => tally(s, an)));
   });
   const songEntries = Object.values(songCount);
+  useEffect(() => {
+    if (!initialSongSelect) return;
+    const match = songEntries.find(e => e.name === initialSongSelect.name && e.artist === initialSongSelect.artist);
+    if (match) { setSelectedSong(match); setEnteredViaSong(match); }
+    onInitialSongSelectConsumed();
+  }, [initialSongSelect]);
   const totalUnique = songEntries.length;
   const totalHeard = songEntries.reduce((a, e) => a + e.count, 0);
   const linkedCount = songEntries.filter(e => e.spotifyId).length;
@@ -4491,7 +4501,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     return (
       <div style={{ padding: '0 0 100px' }}>
         <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <button onClick={() => setSelectedSong(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
+          <button onClick={goBackFromSong} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
@@ -7272,6 +7282,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [pendingArtistSelect, setPendingArtistSelect] = useState(null)
   const [artistReturnConcert, setArtistReturnConcert] = useState(null)
   const [pendingSongsSearch, setPendingSongsSearch] = useState(null)
+  const [pendingSongSelect, setPendingSongSelect] = useState(null)
+  const [songReturnArtist, setSongReturnArtist] = useState(null)
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
@@ -8047,8 +8059,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
-        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); } }} />}
+        {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

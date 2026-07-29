@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Moved festival rating and top friend into the Overview stats card alongside concert rating/popularity
+- "X× seen live" now shows once, in the banner under the artist name (smaller than the title), instead of showing twice
 - Fixed "Invalid Date" showing in the Shows timeline (a want-to-go entry was leaking in)
 - Banner is bigger, and move/upload controls are hidden until you tap the pencil icon
 - Songs Live rows are clickable — jump to that song's page, back returns you here

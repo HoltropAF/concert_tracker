@@ -491,7 +491,7 @@ function actDate(festivalStartDate, act) {
   return d.toISOString().slice(0, 10);
 }
 
-function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly = false, ratingMax = 5 }) {
+function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly = false, ratingMax = 5, onArtistClick = null }) {
   const [input, setInput] = useState('');
   const [day, setDay] = useState(1);
   const [urlInput, setUrlInput] = useState('');
@@ -583,7 +583,12 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
                     {days.map(d2 => <option key={d2} value={d2}>Day {d2}</option>)}
                   </select>
                 )}
-                <span style={{ flex: 1, fontSize: 13, color: act.highlight ? '#f472b6' : '#c4c2f0', fontWeight: act.highlight ? 600 : 400 }}>{act.name}</span>
+                {readOnly && onArtistClick ? (
+                  <button onClick={() => onArtistClick(act.name)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: act.highlight ? '#f472b6' : '#c4c2f0', fontWeight: act.highlight ? 600 : 400, textDecoration: 'underline', textDecorationColor: 'transparent' }}
+                    onMouseEnter={e => e.currentTarget.style.textDecorationColor = 'currentcolor'} onMouseLeave={e => e.currentTarget.style.textDecorationColor = 'transparent'}>{act.name}</button>
+                ) : (
+                  <span style={{ flex: 1, fontSize: 13, color: act.highlight ? '#f472b6' : '#c4c2f0', fontWeight: act.highlight ? 600 : 400 }}>{act.name}</span>
+                )}
                 {!readOnly && (
                   <button onClick={() => update(i, { highlight: !act.highlight })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: act.highlight ? '#f472b6' : '#2e2e4a', padding: 0, lineHeight: 1 }}>♥</button>
                 )}
@@ -1593,6 +1598,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 endDate={concert.endDate}
                 readOnly
                 ratingMax={settings.ratingSystem || 5}
+                onArtistClick={name => onNavigate({ view: 'artists', artist: name })}
               />
             </div>
           )}

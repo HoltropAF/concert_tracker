@@ -4169,6 +4169,60 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           })()}
         </div>
         )}
+        {/* Info tab: formation date, type, country, album count, fandom name */}
+        {artistTab === 'info' && (() => {
+          const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
+          const fandomName = (settings.artistFandomNames || {})[selectedArtist] || '';
+          return (
+            <div style={{ padding: "14px 16px" }}>
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Fandom name</div>
+                <input
+                  value={fandomName}
+                  onChange={e => onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: e.target.value })}
+                  placeholder="e.g. STAY, ARMY, MOA…"
+                  style={{ width: "100%", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "8px 10px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }}
+                />
+              </div>
+              {mb ? (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>From MusicBrainz</div>
+                  {mb.startDate && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>{mb.type === 'Person' ? 'Started performing' : 'Formed'}</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.startDate}{mb.endDate ? ` – ${mb.endDate}` : ''}</span>
+                    </div>
+                  )}
+                  {mb.type && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Type</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.type === 'Person' ? 'Solo artist' : mb.type}</span>
+                    </div>
+                  )}
+                  {mb.country && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Country</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.country}</span>
+                    </div>
+                  )}
+                  {mb.albumCount != null && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Albums released</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.albumCount}</span>
+                    </div>
+                  )}
+                  {!mb.startDate && !mb.type && !mb.country && mb.albumCount == null && (
+                    <div style={{ fontSize: 12, color: "#4a4870" }}>Found them on MusicBrainz, but no extra details were listed.</div>
+                  )}
+                </div>
+              ) : mb === null ? (
+                <div style={{ fontSize: 12, color: "#4a4870", padding: "0 2px" }}>Couldn't find this artist on MusicBrainz.</div>
+              ) : (
+                <div style={{ fontSize: 12, color: "#4a4870", padding: "0 2px" }}>Looking them up…</div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl } from '../lib/photos'
+import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
 import { geocodeVenue } from '../lib/geocode'
@@ -3577,6 +3577,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistSupport, setShowArtistSupport] = useState(settings.artistSectionsDefaultOpen || false);
   const [showArtistSongs, setShowArtistSongs] = useState(settings.artistSectionsDefaultOpen || false);
   const [showArtistCovers, setShowArtistCovers] = useState(settings.artistSectionsDefaultOpen || false);
+  const [artistPhotoUploading, setArtistPhotoUploading] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => {
     if (!selectedArtist) return;
@@ -3602,7 +3603,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           }
         } catch { /* top track is a nice-to-have, fine without it */ }
         const info = {
-          image: item.images?.[0]?.url || null,
           url: item.external_urls?.spotify || null,
           genres: item.genres || [],
           popularity: typeof item.popularity === 'number' ? item.popularity : null,
@@ -3790,11 +3790,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           <button onClick={goBackFromArtist} style={{
             background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px"
           }}>←</button>
-          {spotifyInfo?.image && (
-            <a href={spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" title="Open on Spotify" style={{ flexShrink: 0 }}>
-              <img src={spotifyInfo.image} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }} />
-            </a>
-          )}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedArtist}</div>
@@ -3811,9 +3806,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             ]} />
           </div>
         </div>
-        {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null) && (
+        {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null || avgRating !== null) && (
           <div style={{ padding: "12px 16px 0" }}>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null, avgRating !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
               {spotifyInfo.popularity !== null && (
                 <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
@@ -3824,6 +3819,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers}</div>
                   <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>followers</div>
+                </div>
+              )}
+              {avgRating !== null && (
+                <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>★{avgRating}</div>
+                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>your rating</div>
                 </div>
               )}
             </div>
@@ -3871,7 +3872,34 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const isUltGroup = (settings.ultGroups || []).includes(selectedArtist);
           return (
             <>
-              <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
+              <div style={{ padding: "14px 16px 0" }}>
+                {(() => {
+                  const photoPath = (settings.artistPhotos || {})[selectedArtist] || null;
+                  const handlePick = e => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setArtistPhotoUploading(true);
+                    uploadArtistPhoto(selectedArtist, file)
+                      .then(path => onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path }))
+                      .catch(() => {})
+                      .finally(() => setArtistPhotoUploading(false));
+                  };
+                  return (
+                    <label style={{ display: "inline-block", width: 72, height: 72, borderRadius: "50%", cursor: "pointer", position: "relative", overflow: "hidden", background: "#13131f", border: "1px solid #2e2e50" }}>
+                      <input type="file" accept="image/*" onChange={handlePick} style={{ display: "none" }} />
+                      {photoPath ? (
+                        <PhotoImg path={photoPath} style={{ width: 72, height: 72, borderRadius: "50%" }} />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#4a4870", fontSize: 18 }}>
+                          {artistPhotoUploading ? "···" : "✎"}
+                        </div>
+                      )}
+                    </label>
+                  );
+                })()}
+              </div>
+              <div style={{ padding: "10px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
                 <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
                 <button onClick={() => { const list = settings.ultGroups || []; onUpdateSetting('ultGroups', isUltGroup ? list.filter(n => n !== selectedArtist) : [...list, selectedArtist]); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: isUltGroup ? "#3a6ea5" : "#3a3858", fontFamily: "'DM Mono', monospace" }}>

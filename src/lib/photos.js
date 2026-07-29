@@ -48,6 +48,33 @@ export async function deleteConcertPhoto(path) {
   urlCache.delete(path)
 }
 
+// * Same idea as concert photos, but keyed by a slugified artist name so it's
+// * one personal photo per artist rather than per show.
+function slugifyArtist(name) {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+export async function uploadArtistPhoto(artistName, file) {
+  if (!supabase) throw new Error('Not connected')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Sign in to add photos')
+  const blob = await resizeImage(file)
+  const path = `${user.id}/artist-${slugifyArtist(artistName)}.jpg`
+  const { error } = await supabase.storage.from('photos').upload(path, blob, {
+    upsert: true,
+    contentType: 'image/jpeg',
+    cacheControl: '3600',
+  })
+  if (error) throw error
+  urlCache.delete(path)
+  return path
+}
+
+export async function deleteArtistPhoto(path) {
+  if (!supabase || !path) return
+  await supabase.storage.from('photos').remove([path])
+  urlCache.delete(path)
+}
+
 // * Signed URLs are valid for 60 min but cached for only 50 min to avoid
 // * serving an expired URL in the last window before the signature expires.
 const urlCache = new Map()

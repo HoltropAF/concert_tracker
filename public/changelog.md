@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Artists list: compact/non-compact toggle (its own setting, separate from Shows), non-compact shows your personal artist photo as a small square on the left
 - Fixed a duplicate rating tile on the Artist page that showed up alongside the new popularity/followers card
 - Artist photo is now yours to upload — no longer auto-pulled from Spotify, moved to a bigger circle above the seen-live number with an edit-pen placeholder until you add one
 - Popularity/followers/your-rating tiles all together again on the Spotify card

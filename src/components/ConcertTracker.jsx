@@ -498,6 +498,7 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
   const [importState, setImportState] = useState('idle');
   const [importError, setImportError] = useState('');
   const [noteOpenFor, setNoteOpenFor] = useState(null);
+  const [noteInput, setNoteInput] = useState('');
   const numDays = festivalDays(startDate, endDate);
 
   const add = () => {
@@ -598,17 +599,30 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
                   <span style={{ fontSize: 11, color: '#a78bfa' }}>{'★'.repeat(act.rating)}</span>
                 ) : null}
                 {!readOnly && (
-                  <button onClick={() => setNoteOpenFor(noteOpenFor === act.name ? null : act.name)} title="Add a note" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: act.note ? '#a78bfa' : '#2e2e4a', padding: 0, lineHeight: 1 }}>📝</button>
+                  <button onClick={() => { if (noteOpenFor === act.name) { setNoteOpenFor(null); } else { setNoteOpenFor(act.name); setNoteInput(act.note || ''); } }}
+                    style={{ background: 'none', border: 'none', color: act.note || noteOpenFor === act.name ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1 }}>✎</button>
                 )}
                 {!readOnly && <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>}
               </div>
-              {!readOnly && noteOpenFor === act.name && (
-                <textarea value={act.note || ''} onChange={e => update(i, { note: e.target.value })}
-                  placeholder={`Note about ${act.name}…`} rows={2}
-                  style={{ ...inputStyle, width: '100%', resize: 'vertical', marginTop: 4, boxSizing: 'border-box' }} />
+              {act.note && noteOpenFor !== act.name && (
+                <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{act.note}</div>
               )}
-              {readOnly && act.note && (
-                <div style={{ fontSize: 11, color: '#8b89ab', fontStyle: 'italic', marginTop: 3, paddingLeft: 4, borderLeft: '2px solid #2e2e50' }}>{act.note}</div>
+              {!readOnly && noteOpenFor === act.name && (
+                <div style={{ marginTop: 4 }}>
+                  <input
+                    autoFocus value={noteInput}
+                    onChange={e => setNoteInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { update(i, { note: noteInput.trim() || null }); setNoteOpenFor(null); } if (e.key === 'Escape') setNoteOpenFor(null); }}
+                    placeholder={`Note about ${act.name}…`}
+                    style={{ width: '100%', background: '#0c0c14', border: '1px solid #a78bfa44', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <button onMouseDown={() => { update(i, { note: noteInput.trim() || null }); setNoteOpenFor(null); }} style={{ background: 'none', border: '1px solid #a78bfa55', borderRadius: 6, color: '#a78bfa', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+                      Save note
+                    </button>
+                    {act.note && <button onMouseDown={() => { update(i, { note: null }); setNoteOpenFor(null); }} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
+                  </div>
+                </div>
               )}
               </div>
             );

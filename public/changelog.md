@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Artist page: photo and Spotify link click through to their Spotify page, genre pill, popularity/follower tiles, "last pulled" timestamp, and a "Popular right now" track — richer version of the Spotify photo feature, rebuilt after a sandbox reset lost the original
+- Restored the Artist page sections default-open Settings toggle, also caught from that same reset
 - Shows-per-year chart added to Summary; year picker stays usable even with ATF on
 - ATF list simplified: no rank numbers or star ratings, just the shows
 - Festival act notes redesigned to match the concert setlist's pencil-icon pattern

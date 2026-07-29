@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-22
+- Artist banner photo: drag to reposition after uploading, with a live preview
+- Renamed Moments tab to Songs Live, and gave the songs list a dotted-timeline treatment
+- More robust Spotify fetch — fetches the artist directly by ID too, since search alone was coming back incomplete
 - Artist detail page: personal photo now sits right after the header, above the popularity/followers card instead of below it
 - Artists list: compact/non-compact toggle (its own setting, separate from Shows), non-compact shows your personal artist photo as a small square on the left
 - Fixed a duplicate rating tile on the Artist page that showed up alongside the new popularity/followers card

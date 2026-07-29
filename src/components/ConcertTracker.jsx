@@ -3651,6 +3651,38 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     })();
     return () => { cancelled = true; };
   }, [selectedArtist]);
+  useEffect(() => {
+    if (!selectedArtist) return;
+    if ((settings.artistMusicBrainzInfo || {})[selectedArtist] !== undefined) return; // already cached
+    let cancelled = false;
+    (async () => {
+      try {
+        const sr = await fetch(`https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(`artist:"${selectedArtist}"`)}&fmt=json&limit=1`);
+        if (!sr.ok || cancelled) return;
+        const sd = await sr.json();
+        const artist = sd?.artists?.[0];
+        if (!artist) { if (!cancelled) onUpdateSetting('artistMusicBrainzInfo', { ...(settings.artistMusicBrainzInfo || {}), [selectedArtist]: null }); return; }
+        let albumCount = null;
+        try {
+          const rr = await fetch(`https://musicbrainz.org/ws/2/release-group?artist=${artist.id}&type=album&fmt=json&limit=100`);
+          if (rr.ok) {
+            const rd = await rr.json();
+            albumCount = typeof rd['release-group-count'] === 'number' ? rd['release-group-count'] : (rd['release-groups']?.length ?? null);
+          }
+        } catch { /* album count is a nice-to-have */ }
+        const info = {
+          startDate: artist['life-span']?.begin || null,
+          endDate: artist['life-span']?.end || null,
+          type: artist.type || null, // "Group" or "Person" — the closest thing to solo/band
+          country: artist.country || null,
+          albumCount,
+          fetchedAt: Date.now(),
+        };
+        if (!cancelled) onUpdateSetting('artistMusicBrainzInfo', { ...(settings.artistMusicBrainzInfo || {}), [selectedArtist]: info });
+      } catch { /* silent — MusicBrainz info is a bonus, not critical */ }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedArtist]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
   const [sortDir, setSortDir] = useState('desc');
@@ -3878,7 +3910,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           </div>
         )}
         <div style={{ display: "flex", gap: 6, padding: "12px 16px 4px" }}>
-          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs Live']].map(([id, label]) => (
+          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Info']].map(([id, label]) => (
             <button key={id} onClick={() => setArtistTab(id)} style={{
               background: artistTab === id ? "#a78bfa" : "#13131f", color: artistTab === id ? "#0c0c14" : "#6b6a8f",
               border: `1px solid ${artistTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
@@ -4023,31 +4055,27 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         {artistSongs.length > 0 && (
           <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs heard live</span>
+              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs</span>
               <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
             </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <div style={{ width: 2, background: "#1f1f35", marginLeft: 5, position: "relative", flexShrink: 0 }}>
-                {artistSongs.map(([song], i) => {
-                  const criedHere = pastShows.some(c => c.criedSong === song);
-                  return <div key={song} style={{ width: 12, height: 12, borderRadius: "50%", background: criedHere ? "#3a6ea5" : "#a78bfa", border: "2px solid #0c0c14", position: "absolute", left: -6, top: `${i * 42}px` }} />;
-                })}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {artistSongs.map(([song, count], i) => {
-                  const criedHere = pastShows.some(c => c.criedSong === song);
-                  return (
-                    <button key={song} onClick={() => onNavigate({ view: 'songs', songSelect: { name: song, artist: selectedArtist }, fromArtist: selectedArtist })} style={{ width: "100%", textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ color: "#c4c2f0", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                        {song}
-                        {criedHere && <span title="Cried to this one">💧</span>}
-                      </span>
-                      {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {artistSongs.map(([song, count], i) => {
+              const criedHere = pastShows.some(c => c.criedSong === song);
+              return (
+                <div key={song} style={{ display: "flex", gap: 12 }}>
+                  <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: criedHere ? "#3a6ea5" : "#a78bfa", flexShrink: 0, marginTop: 10 }} />
+                    {i < artistSongs.length - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
+                  </div>
+                  <button onClick={() => onNavigate({ view: 'songs', songSelect: { name: song, artist: selectedArtist }, fromArtist: selectedArtist })} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#c4c2f0", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                      {song}
+                      {criedHere && <span title="Cried to this one">💧</span>}
+                    </span>
+                    {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
         {coversByOthers.length > 0 && (
@@ -4108,37 +4136,34 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             return (
               <div>
                 <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>{timelineItems.length} shows</div>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <div style={{ width: 2, background: "#1f1f35", marginLeft: 5, position: "relative", flexShrink: 0 }}>
-                    {timelineItems.map((item, i) => (
-                      <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: dotColor(item.role), border: "2px solid #0c0c14", position: "absolute", left: -6, top: i === 0 ? 0 : `${i * 84}px` }} />
-                    ))}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {timelineItems.map((item, i) => {
-                      const c = item.concert;
-                      const online = isOnline(c);
-                      const borderColor = item.role === 'headliner' ? (c.favorite ? '#facc15' : '#a78bfa') : online ? ONLINE_COLOR : dotColor(item.role);
-                      return (
-                        <button key={`${c.id}-${item.role}`} onClick={() => onOpen(c)} style={{
-                          width: "100%", textAlign: "left", background: "#0e0e1a",
-                          border: "1px solid #1f1f35", borderLeft: `3px solid ${borderColor}`,
-                          borderRadius: 10, padding: "10px 14px", cursor: "pointer",
-                          marginBottom: i < timelineItems.length - 1 ? 14 : 0
-                        }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                            <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: item.role === 'headliner' ? "#1a1a30" : "#1a1030", color: item.role === 'headliner' ? "#a78bfa" : "#f472b6", textTransform: "uppercase" }}>{item.role}</span>
-                            <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)}</span>
-                          </div>
-                          <div style={{ fontWeight: 700, fontSize: 13, color: "#e2e0ff" }}>{online ? formatOnlineLocation(c) : c.venue}</div>
-                          <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                            {formatDate(c.date)}{item.role === 'headliner' && c.rating ? ` · ${"★".repeat(c.rating)}` : ""}{item.role === 'headliner' && c.favorite ? " · ★ all-time fave" : ""}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                {timelineItems.map((item, i) => {
+                  const c = item.concert;
+                  const online = isOnline(c);
+                  const borderColor = item.role === 'headliner' ? (c.favorite ? '#facc15' : '#a78bfa') : online ? ONLINE_COLOR : dotColor(item.role);
+                  return (
+                    <div key={`${c.id}-${item.role}`} style={{ display: "flex", gap: 12 }}>
+                      <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                        <div style={{ width: 12, height: 12, borderRadius: "50%", background: dotColor(item.role), flexShrink: 0, marginTop: 14 }} />
+                        {i < timelineItems.length - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
+                      </div>
+                      <button onClick={() => onOpen(c)} style={{
+                        flex: 1, minWidth: 0, textAlign: "left", background: "#0e0e1a",
+                        border: "1px solid #1f1f35", borderLeft: `3px solid ${borderColor}`,
+                        borderRadius: 10, padding: "10px 14px", cursor: "pointer",
+                        marginBottom: i < timelineItems.length - 1 ? 14 : 0
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: item.role === 'headliner' ? "#1a1a30" : "#1a1030", color: item.role === 'headliner' ? "#a78bfa" : "#f472b6", textTransform: "uppercase" }}>{item.role}</span>
+                          <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)}</span>
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: "#e2e0ff" }}>{online ? formatOnlineLocation(c) : c.venue}</div>
+                        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                          {formatDate(c.date)}{item.role === 'headliner' && c.rating ? ` · ${"★".repeat(c.rating)}` : ""}{item.role === 'headliner' && c.favorite ? " · ★ all-time fave" : ""}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}

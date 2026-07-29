@@ -3578,6 +3578,42 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistSongs, setShowArtistSongs] = useState(false);
   const [showArtistCovers, setShowArtistCovers] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
+  useEffect(() => {
+    if (!selectedArtist) return;
+    if ((settings.artistSpotifyInfo || {})[selectedArtist] !== undefined) return; // already cached (or cached-as-not-found)
+    const tokenValid = settings.spotifyAccessToken && (!settings.spotifyTokenExpiry || settings.spotifyTokenExpiry > Date.now());
+    if (!tokenValid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(selectedArtist)}&type=artist&limit=1`, { headers: { Authorization: `Bearer ${settings.spotifyAccessToken}` } });
+        if (!r.ok || cancelled) return;
+        const data = await r.json();
+        const item = data?.artists?.items?.[0];
+        if (!item) { if (!cancelled) onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: null }); return; }
+        let topTrack = null;
+        try {
+          const tr = await fetch(`https://api.spotify.com/v1/artists/${item.id}/top-tracks?market=US`, { headers: { Authorization: `Bearer ${settings.spotifyAccessToken}` } });
+          if (tr.ok) {
+            const td = await tr.json();
+            const t = td?.tracks?.[0];
+            if (t) topTrack = { name: t.name, url: t.external_urls?.spotify || null };
+          }
+        } catch { /* top track is a nice-to-have, fine without it */ }
+        const info = {
+          image: item.images?.[0]?.url || null,
+          url: item.external_urls?.spotify || null,
+          genres: item.genres || [],
+          popularity: typeof item.popularity === 'number' ? item.popularity : null,
+          followers: item.followers?.total ?? null,
+          topTrack,
+          fetchedAt: Date.now(),
+        };
+        if (!cancelled) onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: info });
+      } catch { /* silent — no artist info, not critical */ }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedArtist]);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("most-seen");
   const [sortDir, setSortDir] = useState('desc');
@@ -3746,20 +3782,66 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       checkSongs(c.setlist, c.artist);
       Object.entries(c.supportSetlists || {}).forEach(([a, songs]) => checkSongs(songs, a));
     });
+    const spotifyInfo = (settings.artistSpotifyInfo || {})[selectedArtist] || null;
     return (
       <div style={{ padding: "0 0 100px" }}>
         <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <button onClick={goBackFromArtist} style={{
             background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px"
           }}>←</button>
+          {spotifyInfo?.image && (
+            <a href={spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" title="Open on Spotify" style={{ flexShrink: 0 }}>
+              <img src={spotifyInfo.image} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+            </a>
+          )}
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedArtist}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedArtist}</div>
+              {spotifyInfo?.url && <a href={spotifyInfo.url} target="_blank" rel="noopener noreferrer" title="Open on Spotify" style={{ color: "#1DB954", fontSize: 13, lineHeight: 1 }}>●</a>}
+            </div>
+            {spotifyInfo?.genres?.[0] && (
+              <div style={{ marginTop: 4 }}>
+                <span style={{ fontSize: 10, color: "#3a6ea5", background: "#12122a", border: "1px solid #2a2a5a", borderRadius: 99, padding: "2px 8px", fontFamily: "'DM Mono', monospace" }}>{spotifyInfo.genres[0]}</span>
+              </div>
+            )}
             <DetailSubtitle lines={[
               [`${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`, ...(roleParts.length > 0 && pastShows.length !== totalAppearances ? roleParts : [])],
               allUpcoming.length > 0 ? `${allUpcoming.length} upcoming` : null,
             ]} />
           </div>
         </div>
+        {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null) && (
+          <div style={{ padding: "12px 16px 0" }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
+              {spotifyInfo.popularity !== null && (
+                <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
+                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>popularity</div>
+                </div>
+              )}
+              {spotifyInfo.followers !== null && (
+                <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers}</div>
+                  <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>followers</div>
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 6 }}>
+              last pulled {(() => {
+                const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
+                if (days <= 0) return 'today';
+                if (days === 1) return 'yesterday';
+                if (days < 30) return `${days}d ago`;
+                return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+              })()}
+            </div>
+            {spotifyInfo.topTrack && (
+              <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
+                ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
+              </a>
+            )}
+          </div>
+        )}
         {/* Hero count + money stats */}
         {totalAppearances === 0 ? (
           <div style={{ padding: "14px 16px 0" }}>

@@ -3581,7 +3581,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => {
     if (!selectedArtist) return;
-    if ((settings.artistSpotifyInfo || {})[selectedArtist] !== undefined) return; // already cached (or cached-as-not-found)
+    const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
+    const cacheIsUseless = cached && typeof cached === 'object' && cached.popularity == null && cached.followers == null && (!cached.genres || cached.genres.length === 0);
+    if (cached !== undefined && !cacheIsUseless) return; // already cached with real data (or cached-as-not-found)
     if (!settings.spotifyAccessToken) return; // Spotify not connected at all
     let cancelled = false;
     (async () => {

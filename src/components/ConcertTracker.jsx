@@ -2727,30 +2727,27 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 {pills.map(({ id, label }) => {
                   const active = summaryYear === id && !summaryFavOnly;
                   return (
-                    <button key={id} disabled={summaryFavOnly} onClick={() => onUpdateSetting('summaryYear', id)} style={{
+                    <button key={id} onClick={() => { if (summaryFavOnly) setSummaryFavOnly(false); onUpdateSetting('summaryYear', id); }} style={{
                       background: active ? "#a78bfa" : "none",
                       border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
-                      borderRadius: 99, cursor: summaryFavOnly ? "default" : "pointer", padding: "3px 10px", flexShrink: 0,
+                      borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
                       fontSize: 11, fontFamily: "'DM Mono', monospace",
                       color: active ? "#0c0c14" : "#4a4870",
                       fontWeight: active ? 700 : 400,
-                      opacity: summaryFavOnly ? 0.4 : 1,
                     }}>{label}</button>
                   );
                 })}
                 {olderYears.length > 0 && (
                   <select
-                    disabled={summaryFavOnly}
-                    value={olderYears.includes(summaryYear) ? summaryYear : ''}
-                    onChange={e => e.target.value && onUpdateSetting('summaryYear', e.target.value)}
+                    value={olderYears.includes(summaryYear) && !summaryFavOnly ? summaryYear : ''}
+                    onChange={e => { if (!e.target.value) return; if (summaryFavOnly) setSummaryFavOnly(false); onUpdateSetting('summaryYear', e.target.value); }}
                     style={{
                       background: olderYears.includes(summaryYear) && !summaryFavOnly ? "#a78bfa" : "#0c0c14",
                       border: `1px solid ${olderYears.includes(summaryYear) && !summaryFavOnly ? "#a78bfa" : "#1f1f35"}`,
-                      borderRadius: 99, cursor: summaryFavOnly ? "default" : "pointer", padding: "3px 10px",
+                      borderRadius: 99, cursor: "pointer", padding: "3px 10px",
                       fontSize: 11, fontFamily: "'DM Mono', monospace",
                       color: olderYears.includes(summaryYear) && !summaryFavOnly ? "#0c0c14" : "#4a4870",
                       WebkitAppearance: "none", appearance: "none",
-                      opacity: summaryFavOnly ? 0.4 : 1,
                     }}
                   >
                     <option value="">older ▾</option>
@@ -2805,6 +2802,27 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
+          {!summaryFavOnly && summaryYear === 'all' && (() => {
+            const yearCounts = {};
+            concerts.filter(c => !isWish(c) && isPast(c.date) && c.date !== '9999-12-31').forEach(c => { const y = c.date.slice(0,4); yearCounts[y] = (yearCounts[y] || 0) + 1; });
+            const years = Object.keys(yearCounts).sort();
+            if (years.length < 2) return null;
+            const maxCount = Math.max(...years.map(y => yearCounts[y]), 1);
+            return (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Shows per year</div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
+                  {years.map(y => (
+                    <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>{yearCounts[y]}</div>
+                      <div style={{ width: "100%", maxWidth: 30, borderRadius: "3px 3px 0 0", background: "#a78bfa", height: `${Math.max(3, (yearCounts[y] / maxCount) * 44)}px` }} />
+                      <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{y}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {!summaryFavOnly && (
             <>
@@ -3040,14 +3058,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 {faves.map((c, i) => (
                   <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0" }}>
                     <button onClick={() => !editingFaveOrder && onOpen(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, cursor: editingFaveOrder ? "default" : "pointer", textAlign: "left" }}>
-                      <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2a2410", color: "#facc15", fontFamily: "'Syne', sans-serif", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
                       {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
                           <span style={{ color: "#e2e0ff", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist}</span>
                           {(settings.ultGroups || []).includes(c.artist) && <span title="Ult group" style={{ color: "#3a6ea5", fontSize: 11, flexShrink: 0 }}>◆</span>}
                         </div>
-                        <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.rating ? ` · ${"★".repeat(c.rating)}` : ""}</div>
+                        <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}</div>
                       </div>
                     </button>
                     {editingFaveOrder && (

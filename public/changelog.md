@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed why the Spotify artist info never showed: your access token had expired and the page never tried to refresh it. Now refreshes automatically like Songs already does
 - Artist page: photo and Spotify link click through to their Spotify page, genre pill, popularity/follower tiles, "last pulled" timestamp, and a "Popular right now" track — richer version of the Spotify photo feature, rebuilt after a sandbox reset lost the original
 - Restored the Artist page sections default-open Settings toggle, also caught from that same reset
 - Shows-per-year chart added to Summary; year picker stays usable even with ATF on

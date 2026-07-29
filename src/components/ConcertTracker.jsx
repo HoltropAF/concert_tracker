@@ -3623,6 +3623,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [filterUpcoming, setFilterUpcoming] = useState(false);
   const [filterUltGroup, setFilterUltGroup] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [artistsCompact, setArtistsCompact] = useState(!!settings.artistsCompactView);
+  useEffect(() => { setArtistsCompact(!!settings.artistsCompactView); }, [settings.artistsCompactView]);
   const [showSort, setShowSort] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [filterType, setFilterType] = useState('all');
@@ -4130,6 +4132,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
+        <button onClick={() => onUpdateSetting('artistsCompactView', !artistsCompact)} style={{ background: artistsCompact ? '#1a1a30' : 'none', border: `1px solid ${artistsCompact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: artistsCompact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={artistsCompact ? 'Switch to expanded view' : 'Switch to compact view'}>
+          {artistsCompact ? '▤' : '☰'}
+        </button>
         <button onClick={() => { setAddArtistInput(''); setShowAddArtistForm(true); }} aria-label="Add an artist you want to see" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
       </div>
 
@@ -4255,7 +4260,16 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
           }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+              {!artistsCompact && (() => {
+                const photoPath = (settings.artistPhotos || {})[name] || null;
+                return photoPath ? (
+                  <PhotoImg path={photoPath} style={{ width: 40, height: 40, borderRadius: 8, flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 40, height: 40, borderRadius: 8, background: "#1a1a30", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne', sans-serif", fontWeight: 800, color: "#4a4870", fontSize: 15 }}>{name.charAt(0).toUpperCase()}</div>
+                );
+              })()}
+              <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
                 {wantToSee && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to see</span>}
@@ -4267,6 +4281,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 {wantToSee ? 'not seen yet' : firstShow && lastShow && firstShow.date !== lastShow.date
                   ? `${firstShow.date.slice(0,4)} – ${lastShow.date.slice(0,4)} · last ${formatDate(lastShow.date)}`
                   : displayDate ? formatDate(displayDate) : ''}
+              </div>
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>

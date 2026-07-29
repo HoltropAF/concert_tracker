@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Artist photo is now yours to upload — no longer auto-pulled from Spotify, moved to a bigger circle above the seen-live number with an edit-pen placeholder until you add one
+- Popularity/followers/your-rating tiles all together again on the Spotify card
 - Fixed why the Spotify artist info never showed: your access token had expired and the page never tried to refresh it. Now refreshes automatically like Songs already does
 - Artist page: photo and Spotify link click through to their Spotify page, genre pill, popularity/follower tiles, "last pulled" timestamp, and a "Popular right now" track — richer version of the Spotify photo feature, rebuilt after a sandbox reset lost the original
 - Restored the Artist page sections default-open Settings toggle, also caught from that same reset

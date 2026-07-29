@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Built the missing Info tab: formation date, group/solo type, country, album count (via MusicBrainz, unaffected by Spotify's restrictions), plus an editable fandom name field
+- Fixed stray extra dots on the Shows and Songs timelines
 - Moved festival rating and top friend into the Overview stats card alongside concert rating/popularity
 - "X× seen live" now shows once, in the banner under the artist name (smaller than the title), instead of showing twice
 - Fixed "Invalid Date" showing in the Shows timeline (a want-to-go entry was leaking in)

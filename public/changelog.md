@@ -1,6 +1,12 @@
 # Changelog
 
 ## 2026-07-22
+- Shows-per-year chart added to Summary; year picker stays usable even with ATF on
+- ATF list simplified: no rank numbers or star ratings, just the shows
+- Festival act notes redesigned to match the concert setlist's pencil-icon pattern
+- Fixed festival tickets not showing on re-edit — legacy prices now migrate automatically
+- Festival act names are now clickable through to their Artist page
+- Fixed the misleading "artists" tile on festival Venue pages — now shows real lineup count
 - Removed the all-years spending chart from Summary
 - Fixed festival act notes showing the festival's start date instead of the actual day that act performed
 - Recurring-festival card on Venue pages no longer needs a tap to expand — years show directly

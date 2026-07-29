@@ -3566,6 +3566,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
 
 function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
+  const [artistTab, setArtistTab] = useState('overview');
   const [enteredViaArtist] = useState(initialSelectedArtist);
   useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
   const goBackFromArtist = () => {
@@ -3579,6 +3580,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistCovers, setShowArtistCovers] = useState(settings.artistSectionsDefaultOpen || false);
   const [artistPhotoUploading, setArtistPhotoUploading] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
+  useEffect(() => { setArtistTab('overview'); }, [selectedArtist]);
   useEffect(() => {
     if (!selectedArtist) return;
     const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
@@ -3788,30 +3790,46 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       Object.entries(c.supportSetlists || {}).forEach(([a, songs]) => checkSongs(songs, a));
     });
     const spotifyInfo = (settings.artistSpotifyInfo || {})[selectedArtist] || null;
+    const bannerPhotoPath = (settings.artistPhotos || {})[selectedArtist] || null;
+    const handleBannerPick = e => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      setArtistPhotoUploading(true);
+      uploadArtistPhoto(selectedArtist, file)
+        .then(path => onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path }))
+        .catch(() => {})
+        .finally(() => setArtistPhotoUploading(false));
+    };
     return (
       <div style={{ padding: "0 0 100px" }}>
-        <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <button onClick={goBackFromArtist} style={{
-            background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px"
-          }}>←</button>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>{selectedArtist}</div>
-              {spotifyInfo?.url && <a href={spotifyInfo.url} target="_blank" rel="noopener noreferrer" title="Open on Spotify" style={{ color: "#1DB954", fontSize: 13, lineHeight: 1 }}>●</a>}
+        <label style={{ display: "block", height: 150, position: "relative", cursor: "pointer", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
+          <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
+          {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} style={{ width: "100%", height: 150, position: "absolute", inset: 0 }} />}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)" }} />
+          <button onClick={e => { e.preventDefault(); goBackFromArtist(); }} style={{ position: "absolute", top: 14, left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
+          <span style={{ position: "absolute", top: 14, right: 16, color: "#fff", fontSize: 13, zIndex: 2, opacity: 0.85, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>{artistPhotoUploading ? "···" : "✎"}</span>
+          <div style={{ position: "absolute", bottom: 14, left: 16, right: 16, zIndex: 2 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{selectedArtist}</div>
+              {spotifyInfo?.url && <a href={spotifyInfo.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} title="Open on Spotify" style={{ color: "#3dd968", fontSize: 13, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>●</a>}
             </div>
-            {spotifyInfo?.genres?.[0] && (
-              <div style={{ marginTop: 4 }}>
-                <span style={{ fontSize: 10, color: "#3a6ea5", background: "#12122a", border: "1px solid #2a2a5a", borderRadius: 99, padding: "2px 8px", fontFamily: "'DM Mono', monospace" }}>{spotifyInfo.genres[0]}</span>
-              </div>
-            )}
-            <DetailSubtitle lines={[
-              [`${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`, ...(roleParts.length > 0 && pastShows.length !== totalAppearances ? roleParts : [])],
-              allUpcoming.length > 0 ? `${allUpcoming.length} upcoming` : null,
-            ]} />
+            <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#fff", opacity: 0.9, marginTop: 3, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
+              {[spotifyInfo?.genres?.[0], `${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`].filter(Boolean).join(" · ")}
+            </div>
           </div>
+        </label>
+        <div style={{ display: "flex", gap: 6, padding: "12px 16px 4px" }}>
+          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Moments']].map(([id, label]) => (
+            <button key={id} onClick={() => setArtistTab(id)} style={{
+              background: artistTab === id ? "#a78bfa" : "#13131f", color: artistTab === id ? "#0c0c14" : "#6b6a8f",
+              border: `1px solid ${artistTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
+              padding: "6px 14px", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer"
+            }}>{label}</button>
+          ))}
         </div>
-        {/* Hero count + money stats */}
-        {totalAppearances === 0 ? (
+        {/* Hero count + money stats — Overview tab */}
+        {artistTab === 'overview' && (totalAppearances === 0 ? (
           <div style={{ padding: "14px 16px 0" }}>
             <div style={{ fontSize: 13, color: "#6b6a8f", marginBottom: 10 }}>Haven't seen them live yet.</div>
             <button onClick={() => {
@@ -3838,35 +3856,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const isUltGroup = (settings.ultGroups || []).includes(selectedArtist);
           return (
             <>
-              <div style={{ padding: "14px 16px 0" }}>
-                {(() => {
-                  const photoPath = (settings.artistPhotos || {})[selectedArtist] || null;
-                  const handlePick = e => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (!file) return;
-                    setArtistPhotoUploading(true);
-                    uploadArtistPhoto(selectedArtist, file)
-                      .then(path => onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path }))
-                      .catch(() => {})
-                      .finally(() => setArtistPhotoUploading(false));
-                  };
-                  return (
-                    <label style={{ display: "inline-block", width: 72, height: 72, borderRadius: "50%", cursor: "pointer", position: "relative", overflow: "hidden", background: "#13131f", border: "1px solid #2e2e50" }}>
-                      <input type="file" accept="image/*" onChange={handlePick} style={{ display: "none" }} />
-                      {photoPath ? (
-                        <PhotoImg path={photoPath} style={{ width: 72, height: 72, borderRadius: "50%" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#4a4870", fontSize: 18 }}>
-                          {artistPhotoUploading ? "···" : "✎"}
-                        </div>
-                      )}
-                    </label>
-                  );
-                })()}
-              </div>
               {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null || avgRating !== null) && (
-                <div style={{ padding: "12px 16px 0" }}>
+                <div style={{ padding: "14px 16px 0" }}>
                   <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null, avgRating !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
                     {spotifyInfo.popularity !== null && (
                       <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
@@ -3935,10 +3926,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               )}
             </>
           );
-        })()}
-        {/* Quick stats row */}
+        })())}
+        {/* Moments tab: cried, festival rating, top friend, festival notes */}
+        {artistTab === 'moments' && (
+        <div style={{ padding: "14px 16px 0" }}>
         {(festivalAvgRating || criedCount > 0 || topFriend) && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[festivalAvgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[festivalAvgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, marginBottom: 14 }}>
             {festivalAvgRating && (
               <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#f472b6", lineHeight: 1 }}>★{festivalAvgRating}</div>
@@ -3960,7 +3953,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           </div>
         )}
         {festivalNotes.length > 0 && (
-          <div style={{ padding: "10px 16px 0" }}>
+          <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Festival notes</div>
             {festivalNotes.map((a, i) => (
               <button key={i} onClick={() => onOpen(a.concert)} style={{ display: "block", width: "100%", textAlign: "left", background: "#13131f", border: "none", borderRadius: 8, padding: "8px 10px", marginBottom: 6, cursor: "pointer" }}>
@@ -3970,9 +3963,69 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             ))}
           </div>
         )}
+        {/* Songs heard live + Covered by others — still Moments tab */}
+        {artistSongs.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <button onClick={() => setShowArtistSongs(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs heard live</span>
+                <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
+              </div>
+              <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistSongs ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+            </button>
+            {showArtistSongs && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                {artistSongs.map(([song, count], i) => (
+                  <div key={song} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < artistSongs.length - 1 ? 6 : 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                      <span style={{ color: "#c4c2f0", fontSize: 12 }}>{song}</span>
+                    </div>
+                    {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {coversByOthers.length > 0 && (
+          <div>
+            <button onClick={() => setShowArtistCovers(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Covered by others</span>
+                <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{coversByOthers.length}</span>
+              </div>
+              <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistCovers ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
+            </button>
+            {showArtistCovers && (
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                {coversByOthers.map(({ songName, concert: c, performingArtist }, i) => (
+                  <button key={`cover-${i}`} onClick={() => onOpen(c)} style={{
+                    width: "100%", textAlign: "left", background: "none", border: "none",
+                    borderBottom: i < coversByOthers.length - 1 ? "1px solid #1f1f35" : "none",
+                    padding: "6px 0", cursor: "pointer",
+                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 500 }}>{songName}</div>
+                      <div style={{ color: "#fb923c", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>↩ {performingArtist}</div>
+                    </div>
+                    <div style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0, textAlign: "right" }}>
+                      {formatDate(c.date)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        </div>
+        )}
+        {/* Shows tab: Upcoming + a real chronological timeline of every appearance */}
+        {artistTab === 'shows' && (
         <div style={{ padding: "14px 16px" }}>
           {allUpcoming.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ marginBottom: 16 }}>
               <button onClick={() => setShowArtistUpcoming(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Upcoming</span>
@@ -3983,111 +4036,52 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               {showArtistUpcoming && allUpcoming.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
             </div>
           )}
-          {pastShows.length > 0 && (
-            <div style={{ marginBottom: supportApps.length > 0 ? 10 : 0 }}>
-              <button onClick={() => setShowArtistHeadliner(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Headliner</span>
-                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{pastShows.length}</span>
+          {(() => {
+            const timelineItems = [
+              ...pastShows.map(c => ({ concert: c, role: 'headliner' })),
+              ...supportApps.map(a => ({ concert: a.concert, role: a.role })),
+            ].sort((a, b) => a.concert.date.localeCompare(b.concert.date));
+            if (timelineItems.length === 0) return null;
+            const dotColor = role => role === 'headliner' ? '#a78bfa' : role === 'festival' ? '#f472b6' : role === 'guest' ? '#f472b6' : '#3d3564';
+            return (
+              <div>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>{timelineItems.length} shows</div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ width: 2, background: "#1f1f35", marginLeft: 5, position: "relative", flexShrink: 0 }}>
+                    {timelineItems.map((item, i) => (
+                      <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: dotColor(item.role), border: "2px solid #0c0c14", position: "absolute", left: -6, top: i === 0 ? 0 : `${i * 84}px` }} />
+                    ))}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {timelineItems.map((item, i) => {
+                      const c = item.concert;
+                      const online = isOnline(c);
+                      const borderColor = item.role === 'headliner' ? (c.favorite ? '#facc15' : '#a78bfa') : online ? ONLINE_COLOR : dotColor(item.role);
+                      return (
+                        <button key={`${c.id}-${item.role}`} onClick={() => onOpen(c)} style={{
+                          width: "100%", textAlign: "left", background: "#0e0e1a",
+                          border: "1px solid #1f1f35", borderLeft: `3px solid ${borderColor}`,
+                          borderRadius: 10, padding: "10px 14px", cursor: "pointer",
+                          marginBottom: i < timelineItems.length - 1 ? 14 : 0
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: item.role === 'headliner' ? "#1a1a30" : "#1a1030", color: item.role === 'headliner' ? "#a78bfa" : "#f472b6", textTransform: "uppercase" }}>{item.role}</span>
+                            <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)}</span>
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: "#e2e0ff" }}>{online ? formatOnlineLocation(c) : c.venue}</div>
+                          <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                            {formatDate(c.date)}{item.role === 'headliner' && c.rating ? ` · ${"★".repeat(c.rating)}` : ""}{item.role === 'headliner' && c.favorite ? " · ★ all-time fave" : ""}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistHeadliner ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
-              </button>
-              {showArtistHeadliner && pastShows.map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} showArtist={false} />)}
-            </div>
-          )}
-          {artistSongs.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <button onClick={() => setShowArtistSongs(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs heard live</span>
-                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
-                </div>
-                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistSongs ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
-              </button>
-              {showArtistSongs && (
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
-                  {artistSongs.map(([song, count], i) => (
-                    <div key={song} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: i < artistSongs.length - 1 ? 6 : 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ color: "#4a4870", fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
-                        <span style={{ color: "#c4c2f0", fontSize: 12 }}>{song}</span>
-                      </div>
-                      {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {coversByOthers.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <button onClick={() => setShowArtistCovers(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Covered by others</span>
-                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{coversByOthers.length}</span>
-                </div>
-                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistCovers ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
-              </button>
-              {showArtistCovers && (
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
-                  {coversByOthers.map(({ songName, concert: c, performingArtist }, i) => (
-                    <button key={`cover-${i}`} onClick={() => onOpen(c)} style={{
-                      width: "100%", textAlign: "left", background: "none", border: "none",
-                      borderBottom: i < coversByOthers.length - 1 ? "1px solid #1f1f35" : "none",
-                      padding: "6px 0", cursor: "pointer",
-                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8
-                    }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ color: "#c4c2f0", fontSize: 12, fontWeight: 500 }}>{songName}</div>
-                        <div style={{ color: "#fb923c", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>↩ {performingArtist}</div>
-                      </div>
-                      <div style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0, textAlign: "right" }}>
-                        {formatDate(c.date)}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {supportApps.length > 0 && (
-            <div>
-              <button onClick={() => setShowArtistSupport(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Support, guest & festival</span>
-                  <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{supportApps.length}</span>
-                </div>
-                <span style={{ fontSize: 11, color: "#a78bfa", transform: showArtistSupport ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▾</span>
-              </button>
-              {showArtistSupport && supportApps.map(({ concert: c, role }) => {
-                const isFestRole = role === 'festival';
-                const online = isOnline(c);
-                const borderColor = online ? ONLINE_COLOR : role === 'guest' ? '#f472b6' : isFestRole ? '#f472b633' : '#3d3564';
-                const badgeBg = role === 'guest' ? '#1a1030' : isFestRole ? '#1a1030' : '#1a1a30';
-                const badgeColor = role === 'guest' ? '#f472b6' : isFestRole ? '#f472b6' : '#a78bfa';
-                return (
-                  <button key={`${c.id}-${role}`} onClick={() => onOpen(c)} style={{
-                    width: "100%", textAlign: "left", background: "#0e0e1a",
-                    border: "1px solid #1f1f35", borderLeft: `3px solid ${borderColor}`,
-                    borderRadius: 10, padding: "11px 14px", cursor: "pointer", marginBottom: 6,
-                    display: "flex", alignItems: "center", gap: 12
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                        <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: badgeBg, color: badgeColor, textTransform: "uppercase" }}>{isFestRole ? 'festival' : role}</span>
-                        <span style={{ fontSize: 13, color: "#e2e0ff", fontWeight: 500 }}>{formatDate(c.date)}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#c4c2f0", fontWeight: 500 }}>{c.artist}</div>
-                      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
-                        {online ? formatOnlineLocation(c) : <>{c.venue}{c.room ? ` · ${c.room}` : ""} · {c.city}</>}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
+        )}
       </div>
     );
   }

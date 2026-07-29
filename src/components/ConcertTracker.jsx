@@ -3865,9 +3865,15 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{selectedArtist}</div>
                 {spotifyInfo?.url && <a href={spotifyInfo.url} target="_blank" rel="noopener noreferrer" title="Open on Spotify" style={{ color: "#3dd968", fontSize: 13, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>●</a>}
               </div>
-              <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#fff", opacity: 0.9, marginTop: 3, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
-                {[spotifyInfo?.genres?.[0], `${totalAppearances} appearance${totalAppearances !== 1 ? "s" : ""}`].filter(Boolean).join(" · ")}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 3 }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>{totalAppearances}×</span>
+                <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#fff", opacity: 0.9, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>seen live</span>
               </div>
+              {spotifyInfo?.genres?.[0] && (
+                <div style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: "#fff", opacity: 0.8, marginTop: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
+                  {spotifyInfo.genres[0]}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -3908,16 +3914,16 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const isUltGroup = (settings.ultGroups || []).includes(selectedArtist);
           return (
             <>
-              {spotifyInfo && (spotifyInfo.popularity !== null || spotifyInfo.followers !== null || avgRating !== null) && (
+              {(spotifyInfo?.popularity != null || spotifyInfo?.followers != null || avgRating !== null || festivalAvgRating || topFriend) && (
                 <div style={{ padding: "14px 16px 0" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo.popularity !== null, spotifyInfo.followers !== null, avgRating !== null].filter(Boolean).length}, 1fr)`, gap: 6 }}>
-                    {spotifyInfo.popularity !== null && (
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo?.popularity != null, spotifyInfo?.followers != null, avgRating !== null, !!festivalAvgRating, !!topFriend].filter(Boolean).length}, 1fr)`, gap: 6 }}>
+                    {spotifyInfo?.popularity != null && (
                       <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
                         <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>popularity</div>
                       </div>
                     )}
-                    {spotifyInfo.followers !== null && (
+                    {spotifyInfo?.followers != null && (
                       <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers}</div>
                         <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>followers</div>
@@ -3929,7 +3935,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{festivalAvgRating ? "concert rating" : "your rating"}</div>
                       </div>
                     )}
+                    {festivalAvgRating && (
+                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#f472b6" }}>★{festivalAvgRating}</div>
+                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>festival rating</div>
+                      </div>
+                    )}
+                    {topFriend && (
+                      <div onClick={() => onNavigate({ view: 'friends' })} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center", cursor: "pointer" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1.15, whiteSpace: "normal", wordBreak: "break-word" }}>{topFriend[0]}</div>
+                        <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top friend · {topFriend[1]}×</div>
+                      </div>
+                    )}
                   </div>
+                  {spotifyInfo && (
                   <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 6 }}>
                     last pulled {(() => {
                       const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
@@ -3939,17 +3958,16 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                       return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
                     })()}
                   </div>
-                  {spotifyInfo.topTrack && (
+                  )}
+                  {spotifyInfo?.topTrack && (
                     <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
                       ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
                     </a>
                   )}
                 </div>
               )}
-              <div style={{ padding: "10px 16px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{totalAppearances}×</span>
-                <span style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>seen live</span>
-                <button onClick={() => { const list = settings.ultGroups || []; onUpdateSetting('ultGroups', isUltGroup ? list.filter(n => n !== selectedArtist) : [...list, selectedArtist]); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10, color: isUltGroup ? "#3a6ea5" : "#3a3858", fontFamily: "'DM Mono', monospace" }}>
+              <div style={{ padding: "10px 16px 0" }}>
+                <button onClick={() => { const list = settings.ultGroups || []; onUpdateSetting('ultGroups', isUltGroup ? list.filter(n => n !== selectedArtist) : [...list, selectedArtist]); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: isUltGroup ? "#3a6ea5" : "#3a3858", fontFamily: "'DM Mono', monospace" }}>
                   {isUltGroup ? '◆ your ult group' : '◇ mark as ult group'}
                 </button>
               </div>
@@ -3979,29 +3997,15 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </>
           );
         })())}
-        {/* Moments tab: cried, festival rating, top friend, festival notes */}
+        {/* Moments tab: cried count, festival notes */}
         {artistTab === 'moments' && (
         <div style={{ padding: "14px 16px 0" }}>
-        {(festivalAvgRating || criedCount > 0 || topFriend) && (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[festivalAvgRating, criedCount > 0, topFriend].filter(Boolean).length}, 1fr)`, gap: 6, marginBottom: 14 }}>
-            {festivalAvgRating && (
-              <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#f472b6", lineHeight: 1 }}>★{festivalAvgRating}</div>
-                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>festival rating</div>
-              </div>
-            )}
-            {criedCount > 0 && (
-              <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#3a6ea5", lineHeight: 1 }}>💧{criedCount}</div>
-                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>cried</div>
-              </div>
-            )}
-            {topFriend && (
-              <div onClick={() => onNavigate({ view: 'friends' })} style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center", cursor: "pointer" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1.15, whiteSpace: "normal", wordBreak: "break-word" }}>{topFriend[0]}</div>
-                <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>top friend · {topFriend[1]}×</div>
-              </div>
-            )}
+        {criedCount > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center", maxWidth: 120 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#3a6ea5", lineHeight: 1 }}>💧{criedCount}</div>
+              <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>cried</div>
+            </div>
           </div>
         )}
         {festivalNotes.length > 0 && (

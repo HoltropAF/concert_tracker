@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-22
+- Renamed Info tab to Dates, slimmer tab pills
+- Moved "last pulled" below both tile rows; fandom name tile always shows now with a "+ add" prompt instead of vanishing when unset
+- Ult-group toggle only shows in edit mode; timeline dots are smaller
 - Overview: added the MusicBrainz/fandom tile row, moved cried count from Songs into the main rating row
 - Built the missing Info tab: formation date, group/solo type, country, album count (via MusicBrainz, unaffected by Spotify's restrictions), plus an editable fandom name field
 - Fixed stray extra dots on the Shows and Songs timelines

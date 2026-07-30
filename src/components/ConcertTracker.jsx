@@ -3909,12 +3909,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </div>
           </div>
         )}
-        <div style={{ display: "flex", gap: 6, padding: "12px 16px 4px" }}>
-          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Info']].map(([id, label]) => (
+        <div style={{ display: "flex", gap: 5, padding: "10px 16px 4px" }}>
+          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Dates']].map(([id, label]) => (
             <button key={id} onClick={() => setArtistTab(id)} style={{
               background: artistTab === id ? "#a78bfa" : "#13131f", color: artistTab === id ? "#0c0c14" : "#6b6a8f",
               border: `1px solid ${artistTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
-              padding: "6px 14px", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer"
+              padding: "4px 11px", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer"
             }}>{label}</button>
           ))}
         </div>
@@ -3986,17 +3986,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                       </div>
                     )}
                   </div>
-                  {spotifyInfo && (
-                  <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 6 }}>
-                    last pulled {(() => {
-                      const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
-                      if (days <= 0) return 'today';
-                      if (days === 1) return 'yesterday';
-                      if (days < 30) return `${days}d ago`;
-                      return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-                    })()}
-                  </div>
-                  )}
                   {spotifyInfo?.topTrack && (
                     <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
                       ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
@@ -4012,28 +4001,43 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   debutYear && { label: 'debuted', value: debutYear },
                   mb?.country && { label: 'country', value: mb.country },
                   mb?.albumCount != null && { label: 'albums', value: mb.albumCount },
-                  fandomName && { label: 'fandom', value: fandomName },
+                  { label: 'fandom', value: fandomName || '＋ add', onClick: () => setArtistTab('info'), muted: !fandomName },
                 ].filter(Boolean);
-                if (tiles.length === 0) return null;
                 return (
                   <div style={{ padding: "8px 16px 0" }}>
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 6 }}>
                       {tiles.map(t => (
-                        <div key={t.label} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
-                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: "#8b7fb0" }}>{t.value}</div>
+                        <div key={t.label} onClick={t.onClick} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: t.onClick ? "pointer" : "default" }}>
+                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: t.muted ? "#4a4870" : "#8b7fb0" }}>{t.value}</div>
                           <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textTransform: "uppercase" }}>{t.label}</div>
                         </div>
                       ))}
                     </div>
-                    {mb && <div style={{ fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 5 }}>from MusicBrainz</div>}
                   </div>
                 );
               })()}
+              {spotifyInfo && (
+                <div style={{ padding: "6px 16px 0", fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace" }}>
+                  last pulled {(() => {
+                    const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
+                    if (days <= 0) return 'today';
+                    if (days === 1) return 'yesterday';
+                    if (days < 30) return `${days}d ago`;
+                    return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                  })()}
+                </div>
+              )}
+              {(bannerEditMode || isUltGroup) && (
               <div style={{ padding: "10px 16px 0" }}>
-                <button onClick={() => { const list = settings.ultGroups || []; onUpdateSetting('ultGroups', isUltGroup ? list.filter(n => n !== selectedArtist) : [...list, selectedArtist]); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: isUltGroup ? "#3a6ea5" : "#3a3858", fontFamily: "'DM Mono', monospace" }}>
-                  {isUltGroup ? '◆ your ult group' : '◇ mark as ult group'}
-                </button>
+                {bannerEditMode ? (
+                  <button onClick={() => { const list = settings.ultGroups || []; onUpdateSetting('ultGroups', isUltGroup ? list.filter(n => n !== selectedArtist) : [...list, selectedArtist]); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: isUltGroup ? "#3a6ea5" : "#3a3858", fontFamily: "'DM Mono', monospace" }}>
+                    {isUltGroup ? '◆ your ult group' : '◇ mark as ult group'}
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 11, color: "#3a6ea5", fontFamily: "'DM Mono', monospace" }}>◆ your ult group</span>
+                )}
               </div>
+              )}
               {pastShows.length > 0 && festivalOnlyCount > 0 && (
                 <div style={{ display: "flex", gap: 16, padding: "6px 16px 0" }}>
                   <div><span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>{pastShows.length}×</span> <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>concerts</span></div>
@@ -4086,7 +4090,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               return (
                 <div key={song} style={{ display: "flex", gap: 12 }}>
                   <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: criedHere ? "#3a6ea5" : "#a78bfa", flexShrink: 0, marginTop: 10 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: criedHere ? "#3a6ea5" : "#a78bfa", flexShrink: 0, marginTop: 12 }} />
                     {i < artistSongs.length - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
                   </div>
                   <button onClick={() => onNavigate({ view: 'songs', songSelect: { name: song, artist: selectedArtist }, fromArtist: selectedArtist })} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -4166,7 +4170,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   return (
                     <div key={`${c.id}-${item.role}`} style={{ display: "flex", gap: 12 }}>
                       <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                        <div style={{ width: 12, height: 12, borderRadius: "50%", background: dotColor(item.role), flexShrink: 0, marginTop: 14 }} />
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor(item.role), flexShrink: 0, marginTop: 16 }} />
                         {i < timelineItems.length - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
                       </div>
                       <button onClick={() => onOpen(c)} style={{

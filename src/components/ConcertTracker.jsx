@@ -3987,9 +3987,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const isUltGroup = (settings.ultGroups || []).includes(selectedArtist);
           return (
             <>
-              {(spotifyInfo?.popularity != null || spotifyInfo?.followers != null || avgRating !== null || festivalAvgRating || criedCount > 0 || topFriend) && (
+              {(() => {
+                const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
+                const overrides = (settings.artistInfoOverrides || {})[selectedArtist] || {};
+                const country = overrides.country ?? (mb?.country || null);
+                return (spotifyInfo?.popularity != null || spotifyInfo?.followers != null || avgRating !== null || festivalAvgRating || criedCount > 0 || topFriend || country || bannerEditMode) && (
                 <div style={{ padding: "14px 16px 0" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo?.popularity != null, spotifyInfo?.followers != null, avgRating !== null, !!festivalAvgRating, criedCount > 0, !!topFriend].filter(Boolean).length}, 1fr)`, gap: 6 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo?.popularity != null, spotifyInfo?.followers != null, avgRating !== null, !!festivalAvgRating, criedCount > 0, !!topFriend, !!(country || bannerEditMode)].filter(Boolean).length}, 1fr)`, gap: 6 }}>
                     {spotifyInfo?.popularity != null && (
                       <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
@@ -4026,6 +4030,19 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top friend · {topFriend[1]}×</div>
                       </div>
                     )}
+                    {(country || bannerEditMode) && (bannerEditMode ? (
+                      <input
+                        value={country ?? ''}
+                        onChange={e => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, country: e.target.value } })}
+                        placeholder="country"
+                        style={{ width: "100%", background: "#0e0e1a", border: "1px solid #3a3560", borderRadius: 10, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, textAlign: "center", padding: "8px 2px", boxSizing: "border-box" }}
+                      />
+                    ) : (
+                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#8b7fb0" }}>{country}</div>
+                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>country</div>
+                      </div>
+                    ))}
                   </div>
                   {spotifyInfo?.topTrack && (
                     <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
@@ -4033,19 +4050,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                     </a>
                   )}
                 </div>
-              )}
+                );
+              })()}
               {(() => {
                 const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
                 const overrides = (settings.artistInfoOverrides || {})[selectedArtist] || {};
                 const fandomName = (settings.artistFandomNames || {})[selectedArtist] || '';
                 const setOverride = (key, val) => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, [key]: val } });
                 const debutYear = (overrides.debutDate ?? mb?.startDate) ? (overrides.debutDate ?? mb.startDate).slice(0, 4) : null;
-                const country = overrides.country ?? (mb?.country || null);
                 const albumCount = overrides.albumCount ?? (mb?.albumCount ?? null);
                 const tiles = [
                   (debutYear || bannerEditMode) && { key: 'debutYear', label: 'debuted', value: debutYear, type: 'text', readOnlyInEdit: true },
-                  (country || bannerEditMode) && { key: 'country', label: 'country', value: country, type: 'text' },
-                  (albumCount != null || bannerEditMode) && { key: 'albumCount', label: 'albums', value: albumCount, type: 'number' },
+                  (albumCount || bannerEditMode) && { key: 'albumCount', label: 'albums', value: albumCount, type: 'number' },
                   (fandomName || bannerEditMode) && { key: 'fandom', label: 'fandom', value: fandomName, type: 'text', isFandom: true },
                 ].filter(Boolean);
                 if (tiles.length === 0) return null;

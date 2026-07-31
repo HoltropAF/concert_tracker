@@ -4002,16 +4002,14 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
                 // Every possible tile. `row` is its default row (1 = main, 2 = thinner secondary row).
                 const allTiles = [
-                  { key: 'popularity', label: 'popularity', value: spotifyInfo?.popularity ?? null, color: '#1DB954', row: 1 },
-                  { key: 'followers', label: 'followers', value: spotifyInfo?.followers != null ? (spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers) : null, color: '#a78bfa', row: 1 },
-                  { key: 'rating', label: festivalAvgRating ? 'concert rating' : 'your rating', value: avgRating !== null ? `★${avgRating}` : null, color: '#a78bfa', row: 1 },
-                  { key: 'festivalRating', label: 'festival rating', value: festivalAvgRating ? `★${festivalAvgRating}` : null, color: '#f472b6', row: 1 },
-                  { key: 'cried', label: 'cried', value: criedCount > 0 ? `💧${criedCount}` : null, color: '#3a6ea5', row: 1 },
-                  { key: 'topFriend', label: topFriend ? `top friend · ${topFriend[1]}×` : 'top friend', value: topFriend ? topFriend[0] : null, color: '#a78bfa', row: 1, onClick: () => onNavigate({ view: 'friends' }) },
-                  { key: 'country', label: 'country', value: country, color: '#8b7fb0', row: 1, editable: true, onEdit: v => setOverride('country', v) },
-                  { key: 'debutYear', label: 'debuted', value: debutYear, color: '#8b7fb0', row: 2, editable: true, editHint: 'edit in Dates', onEditClick: () => setArtistTab('info') },
-                  { key: 'albumCount', label: 'albums', value: albumCount || null, color: '#8b7fb0', row: 2, editable: true, numeric: true, onEdit: v => setOverride('albumCount', v ? parseInt(v) : null) },
-                  { key: 'fandom', label: 'fandom', value: fandomName || null, color: '#8b7fb0', row: 2, editable: true, onEdit: v => onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: v }) },
+                  { key: 'rating', label: festivalAvgRating ? 'concert rating' : 'your rating', value: avgRating !== null ? `★${avgRating}` : null, color: '#a78bfa' },
+                  { key: 'festivalRating', label: 'festival rating', value: festivalAvgRating ? `★${festivalAvgRating}` : null, color: '#f472b6' },
+                  { key: 'cried', label: 'cried', value: criedCount > 0 ? `💧${criedCount}` : null, color: '#3a6ea5' },
+                  { key: 'topFriend', label: topFriend ? `top friend · ${topFriend[1]}×` : 'top friend', value: topFriend ? topFriend[0] : null, color: '#a78bfa', onClick: () => onNavigate({ view: 'friends' }) },
+                  { key: 'country', label: 'country', value: country, color: '#8b7fb0', editable: true, onEdit: v => setOverride('country', v) },
+                  { key: 'debutYear', label: 'debuted', value: debutYear, color: '#8b7fb0', editable: true, editHint: 'edit in Dates', onEditClick: () => setArtistTab('info') },
+                  { key: 'albumCount', label: 'albums', value: albumCount || null, color: '#8b7fb0', editable: true, numeric: true, onEdit: v => setOverride('albumCount', v ? parseInt(v) : null) },
+                  { key: 'fandom', label: 'fandom', value: fandomName || null, color: '#8b7fb0', editable: true, onEdit: v => onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: v }) },
                 ];
 
                 const config = (settings.artistTileConfig || {})[selectedArtist] || {};
@@ -4019,26 +4017,18 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 const setConfig = patch => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...config, ...patch } });
 
                 const visible = allTiles.filter(t => (t.value !== null || bannerEditMode) && !hidden.includes(t.key));
-                const rowOf = key => config.rows?.[key] ?? allTiles.find(t => t.key === key)?.row ?? 1;
-                const orderKey = row => (config.order || []).filter(k => rowOf(k) === row && visible.some(t => t.key === k));
-                const buildRow = row => {
-                  const ordered = orderKey(row);
-                  const rest = visible.filter(t => rowOf(t.key) === row && !ordered.includes(t.key)).map(t => t.key);
-                  return [...ordered, ...rest].map(k => visible.find(t => t.key === k)).filter(Boolean);
-                };
-                const row1 = buildRow(1), row2 = buildRow(2);
+                const ordered = (config.order || []).filter(k => visible.some(t => t.key === k));
+                const rest = visible.filter(t => !ordered.includes(t.key)).map(t => t.key);
+                const row1 = [...ordered, ...rest].map(k => visible.find(t => t.key === k)).filter(Boolean);
 
                 const move = (key, dir) => {
-                  const row = rowOf(key);
-                  const keys = buildRow(row).map(t => t.key);
+                  const keys = row1.map(t => t.key);
                   const i = keys.indexOf(key);
                   const j = i + dir;
                   if (j < 0 || j >= keys.length) return;
                   [keys[i], keys[j]] = [keys[j], keys[i]];
-                  const otherOrder = (config.order || []).filter(k => rowOf(k) !== row);
-                  setConfig({ order: [...otherOrder, ...keys] });
+                  setConfig({ order: keys });
                 };
-                const toggleRow = key => setConfig({ rows: { ...(config.rows || {}), [key]: rowOf(key) === 1 ? 2 : 1 } });
                 const hide = key => setConfig({ hidden: [...hidden, key] });
                 const unhide = key => setConfig({ hidden: hidden.filter(k => k !== key) });
 
@@ -4051,13 +4041,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 };
                 const moveDrag = (e, key) => {
                   if (dragStartRef.current?.key !== key) return;
-                  setDragOffset({ dx: e.clientX - dragStartRef.current.x, dy: e.clientY - dragStartRef.current.y });
+                  setDragOffset({ dx: e.clientX - dragStartRef.current.x, dy: 0 });
                 };
                 const endDrag = (e, key) => {
                   if (dragStartRef.current?.key !== key) return;
-                  const dx = e.clientX - dragStartRef.current.x, dy = e.clientY - dragStartRef.current.y;
-                  if (Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx)) toggleRow(key);
-                  else if (Math.abs(dx) > 32) move(key, dx > 0 ? 1 : -1);
+                  const dx = e.clientX - dragStartRef.current.x;
+                  if (Math.abs(dx) > 32) move(key, dx > 0 ? 1 : -1);
                   dragStartRef.current = null;
                   setDragTileKey(null);
                   setDragOffset({ dx: 0, dy: 0 });
@@ -4102,7 +4091,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   <>
                     {row1.length > 0 && (
                       <div style={{ padding: "14px 16px 0" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${row1.length}, 1fr)`, gap: 6 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${row1.length}, minmax(0, 1fr))`, gap: 6 }}>
                           {row1.map(t => renderTile(t))}
                         </div>
                         {spotifyInfo?.topTrack && (
@@ -4112,16 +4101,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         )}
                       </div>
                     )}
-                    {row2.length > 0 && (
-                      <div style={{ padding: "8px 16px 0" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${row2.length}, 1fr)`, gap: 6 }}>
-                          {row2.map(t => renderTile(t))}
-                        </div>
-                      </div>
-                    )}
                     {bannerEditMode && (
                       <div style={{ padding: "8px 16px 0" }}>
-                        <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>hold and drag a tile — left/right to reorder, up/down to switch rows</div>
+                        <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>hold and drag a tile left/right to reorder</div>
                         <button onClick={() => setShowTileManager(s => !s)} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
                           {showTileManager ? "Hide tile list ▾" : "Show/hide tiles ▸"}
                         </button>

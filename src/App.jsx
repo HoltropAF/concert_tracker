@@ -330,11 +330,9 @@ export default function App() {
     </div>
   )
 
-  if (authLoading) return <><LoadingSplash label="loading..." counts={splashCounts} />{banner}</>
+  if (authLoading || (user && !loaded)) return <><LoadingSplash label="loading..." counts={splashCounts} />{banner}</>
 
   if (!user) return <><AuthScreen onSignIn={signIn} onGuest={enterGuest} />{banner}</>
-
-  if (!loaded) return <><LoadingSplash label="loading your shows..." counts={splashCounts} />{banner}</>
 
   return (
     <>

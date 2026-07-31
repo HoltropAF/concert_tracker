@@ -4344,9 +4344,16 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                           <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)}</span>
                         </div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: "#e2e0ff" }}>{online ? formatOnlineLocation(c) : c.venue}</div>
-                        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                          {formatDate(c.date)}{item.role === 'headliner' && c.rating ? ` · ${"★".repeat(c.rating)}` : ""}{item.role === 'headliner' && c.favorite ? " · ★ all-time fave" : ""}
-                        </div>
+                        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{formatDate(c.date)}</div>
+                        {item.role === 'headliner' && c.rating > 0 && (
+                          <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(c.rating)}</div>
+                        )}
+                        {item.role === 'headliner' && c.favorite && (
+                          <div style={{ fontSize: 11, color: "#facc15", marginTop: 3 }}>★ all-time fave</div>
+                        )}
+                        {c.notes && (
+                          <div style={{ fontSize: 11, color: "#8b89ab", marginTop: 3, fontStyle: "italic" }}>{c.notes.length > 80 ? c.notes.slice(0, 80) + "…" : c.notes}</div>
+                        )}
                       </button>
                     </div>
                   );

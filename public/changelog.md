@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Overview tiles are now fully customizable per artist in edit mode: reorder, move between rows, or hide any of them — remembered forever per artist
 - Songs page gets the banner treatment too — bigger album art with a gradient scrim, matching the artist page
 - New: the first time you open an artist, if Spotify has a photo and you haven't set your own, a popup lets you choose it or set your own instead
 - Renamed Info tab to Dates, slimmer tab pills

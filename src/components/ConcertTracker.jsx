@@ -3995,24 +3995,46 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               )}
               {(() => {
                 const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
+                const overrides = (settings.artistInfoOverrides || {})[selectedArtist] || {};
                 const fandomName = (settings.artistFandomNames || {})[selectedArtist] || '';
-                const debutYear = mb?.startDate ? mb.startDate.slice(0, 4) : null;
+                const setOverride = (key, val) => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, [key]: val } });
+                const debutYear = (overrides.debutDate ?? mb?.startDate) ? (overrides.debutDate ?? mb.startDate).slice(0, 4) : null;
+                const country = overrides.country ?? (mb?.country || null);
+                const albumCount = overrides.albumCount ?? (mb?.albumCount ?? null);
                 const tiles = [
-                  debutYear && { label: 'debuted', value: debutYear },
-                  mb?.country && { label: 'country', value: mb.country },
-                  mb?.albumCount != null && { label: 'albums', value: mb.albumCount },
-                  { label: 'fandom', value: fandomName || '＋ add', onClick: () => setArtistTab('info'), muted: !fandomName },
+                  (debutYear || bannerEditMode) && { key: 'debutYear', label: 'debuted', value: debutYear, type: 'text', readOnlyInEdit: true },
+                  (country || bannerEditMode) && { key: 'country', label: 'country', value: country, type: 'text' },
+                  (albumCount != null || bannerEditMode) && { key: 'albumCount', label: 'albums', value: albumCount, type: 'number' },
+                  (fandomName || bannerEditMode) && { key: 'fandom', label: 'fandom', value: fandomName, type: 'text', isFandom: true },
                 ].filter(Boolean);
+                if (tiles.length === 0) return null;
                 return (
                   <div style={{ padding: "8px 16px 0" }}>
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 6 }}>
-                      {tiles.map(t => (
-                        <div key={t.label} onClick={t.onClick} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: t.onClick ? "pointer" : "default" }}>
-                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: t.muted ? "#4a4870" : "#8b7fb0" }}>{t.value}</div>
+                      {tiles.map(t => bannerEditMode && t.readOnlyInEdit ? (
+                        <button key={t.key} onClick={() => setArtistTab('info')} style={{ background: "#0e0e1a", border: "1px dashed #3a3560", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: "pointer" }}>
+                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: "#8b7fb0" }}>{t.value || "edit"}</div>
+                          <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textTransform: "uppercase" }}>{t.label} → Dates</div>
+                        </button>
+                      ) : bannerEditMode ? (
+                        <input
+                          key={t.key}
+                          type={t.type}
+                          value={t.value ?? ''}
+                          onChange={e => t.isFandom
+                            ? onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: e.target.value })
+                            : setOverride(t.key, t.type === 'number' ? (e.target.value ? parseInt(e.target.value) : null) : e.target.value)}
+                          placeholder={t.label}
+                          style={{ width: "100%", background: "#0e0e1a", border: "1px solid #3a3560", borderRadius: 8, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, textAlign: "center", padding: "6px 2px", boxSizing: "border-box" }}
+                        />
+                      ) : (
+                        <div key={t.key} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
+                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: "#8b7fb0" }}>{t.value}</div>
                           <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textTransform: "uppercase" }}>{t.label}</div>
                         </div>
                       ))}
                     </div>
+                    {bannerEditMode && <div style={{ fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 5 }}>editing — fixes a wrong MusicBrainz match too</div>}
                   </div>
                 );
               })()}
@@ -4199,53 +4221,49 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         {/* Info tab: formation date, type, country, album count, fandom name */}
         {artistTab === 'info' && (() => {
           const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
-          const fandomName = (settings.artistFandomNames || {})[selectedArtist] || '';
+          const overrides = (settings.artistInfoOverrides || {})[selectedArtist] || {};
+          const debutDate = overrides.debutDate ?? mb?.startDate ?? null;
+          const customDates = (settings.artistCustomDates || {})[selectedArtist] || [];
+          const setCustomDates = list => onUpdateSetting('artistCustomDates', { ...(settings.artistCustomDates || {}), [selectedArtist]: list });
           return (
             <div style={{ padding: "14px 16px" }}>
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Fandom name</div>
-                <input
-                  value={fandomName}
-                  onChange={e => onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: e.target.value })}
-                  placeholder="e.g. STAY, ARMY, MOA…"
-                  style={{ width: "100%", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "8px 10px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }}
-                />
-              </div>
-              {mb ? (
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px" }}>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>From MusicBrainz</div>
-                  {mb.startDate && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>{mb.type === 'Person' ? 'Started performing' : 'Formed'}</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.startDate}{mb.endDate ? ` – ${mb.endDate}` : ''}</span>
-                    </div>
-                  )}
-                  {mb.type && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Type</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.type === 'Person' ? 'Solo artist' : mb.type}</span>
-                    </div>
-                  )}
-                  {mb.country && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Country</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.country}</span>
-                    </div>
-                  )}
-                  {mb.albumCount != null && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Albums released</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.albumCount}</span>
-                    </div>
-                  )}
-                  {!mb.startDate && !mb.type && !mb.country && mb.albumCount == null && (
-                    <div style={{ fontSize: 12, color: "#4a4870" }}>Found them on MusicBrainz, but no extra details were listed.</div>
+              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0" }}>
+                  <span style={{ fontSize: 12, color: "#6b6a8f" }}>Started performing</span>
+                  {bannerEditMode ? (
+                    <input type="date" value={overrides.debutDate ?? mb?.startDate ?? ''}
+                      onChange={e => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, debutDate: e.target.value } })}
+                      style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: "4px 6px" }} />
+                  ) : (
+                    <span style={{ fontSize: 12, color: debutDate ? "#c4c2f0" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>{debutDate || "—"}</span>
                   )}
                 </div>
-              ) : mb === null ? (
-                <div style={{ fontSize: 12, color: "#4a4870", padding: "0 2px" }}>Couldn't find this artist on MusicBrainz.</div>
-              ) : (
-                <div style={{ fontSize: 12, color: "#4a4870", padding: "0 2px" }}>Looking them up…</div>
+              </div>
+              {customDates.map((d, i) => (
+                <div key={i} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                  {bannerEditMode ? (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input value={d.label} onChange={e => setCustomDates(customDates.map((x, xi) => xi === i ? { ...x, label: e.target.value } : x))} placeholder="Label (e.g. First album)"
+                        style={{ flex: 1, background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontSize: 12, padding: "5px 8px", minWidth: 0 }} />
+                      <input type="date" value={d.date || ''} onChange={e => setCustomDates(customDates.map((x, xi) => xi === i ? { ...x, date: e.target.value } : x))}
+                        style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "5px 6px" }} />
+                      <button onClick={() => setCustomDates(customDates.filter((_, xi) => xi !== i))} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 14, cursor: "pointer", padding: 0 }}>×</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>{d.label || "Untitled"}</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {bannerEditMode && (
+                <button onClick={() => setCustomDates([...customDates, { label: '', date: '' }])} style={{ width: "100%", background: "none", border: "1px dashed #3a3560", borderRadius: 10, color: "#6b6a8f", fontSize: 12, padding: "10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                  + Add a date
+                </button>
+              )}
+              {!bannerEditMode && customDates.length === 0 && !debutDate && (
+                <div style={{ fontSize: 12, color: "#4a4870" }}>No dates yet — tap ✎ on the banner to add some.</div>
               )}
             </div>
           );

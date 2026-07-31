@@ -3990,109 +3990,120 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               {(() => {
                 const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
                 const overrides = (settings.artistInfoOverrides || {})[selectedArtist] || {};
-                const country = overrides.country ?? (mb?.country || null);
-                return (spotifyInfo?.popularity != null || spotifyInfo?.followers != null || avgRating !== null || festivalAvgRating || criedCount > 0 || topFriend || country || bannerEditMode) && (
-                <div style={{ padding: "14px 16px 0" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${[spotifyInfo?.popularity != null, spotifyInfo?.followers != null, avgRating !== null, !!festivalAvgRating, criedCount > 0, !!topFriend, !!(country || bannerEditMode)].filter(Boolean).length}, 1fr)`, gap: 6 }}>
-                    {spotifyInfo?.popularity != null && (
-                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#1DB954" }}>{spotifyInfo.popularity}</div>
-                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>popularity</div>
-                      </div>
-                    )}
-                    {spotifyInfo?.followers != null && (
-                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>{spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers}</div>
-                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>followers</div>
-                      </div>
-                    )}
-                    {avgRating !== null && (
-                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#a78bfa" }}>★{avgRating}</div>
-                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{festivalAvgRating ? "concert rating" : "your rating"}</div>
-                      </div>
-                    )}
-                    {festivalAvgRating && (
-                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#f472b6" }}>★{festivalAvgRating}</div>
-                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>festival rating</div>
-                      </div>
-                    )}
-                    {criedCount > 0 && (
-                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#3a6ea5" }}>💧{criedCount}</div>
-                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>cried</div>
-                      </div>
-                    )}
-                    {topFriend && (
-                      <div onClick={() => onNavigate({ view: 'friends' })} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center", cursor: "pointer" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1.15, whiteSpace: "normal", wordBreak: "break-word" }}>{topFriend[0]}</div>
-                        <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>top friend · {topFriend[1]}×</div>
-                      </div>
-                    )}
-                    {(country || bannerEditMode) && (bannerEditMode ? (
-                      <input
-                        value={country ?? ''}
-                        onChange={e => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, country: e.target.value } })}
-                        placeholder="country"
-                        style={{ width: "100%", background: "#0e0e1a", border: "1px solid #3a3560", borderRadius: 10, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, textAlign: "center", padding: "8px 2px", boxSizing: "border-box" }}
-                      />
-                    ) : (
-                      <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#8b7fb0" }}>{country}</div>
-                        <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>country</div>
-                      </div>
-                    ))}
-                  </div>
-                  {spotifyInfo?.topTrack && (
-                    <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
-                      ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
-                    </a>
-                  )}
-                </div>
-                );
-              })()}
-              {(() => {
-                const mb = (settings.artistMusicBrainzInfo || {})[selectedArtist] || null;
-                const overrides = (settings.artistInfoOverrides || {})[selectedArtist] || {};
                 const fandomName = (settings.artistFandomNames || {})[selectedArtist] || '';
-                const setOverride = (key, val) => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, [key]: val } });
+                const country = overrides.country ?? (mb?.country || null);
                 const debutYear = (overrides.debutDate ?? mb?.startDate) ? (overrides.debutDate ?? mb.startDate).slice(0, 4) : null;
                 const albumCount = overrides.albumCount ?? (mb?.albumCount ?? null);
-                const tiles = [
-                  (debutYear || bannerEditMode) && { key: 'debutYear', label: 'debuted', value: debutYear, type: 'text', readOnlyInEdit: true },
-                  (albumCount || bannerEditMode) && { key: 'albumCount', label: 'albums', value: albumCount, type: 'number' },
-                  (fandomName || bannerEditMode) && { key: 'fandom', label: 'fandom', value: fandomName, type: 'text', isFandom: true },
-                ].filter(Boolean);
-                if (tiles.length === 0) return null;
-                return (
-                  <div style={{ padding: "8px 16px 0" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 6 }}>
-                      {tiles.map(t => bannerEditMode && t.readOnlyInEdit ? (
-                        <button key={t.key} onClick={() => setArtistTab('info')} style={{ background: "#0e0e1a", border: "1px dashed #3a3560", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: "pointer" }}>
-                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: "#8b7fb0" }}>{t.value || "edit"}</div>
-                          <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textTransform: "uppercase" }}>{t.label} → Dates</div>
-                        </button>
-                      ) : bannerEditMode ? (
-                        <input
-                          key={t.key}
-                          type={t.type}
-                          value={t.value ?? ''}
-                          onChange={e => t.isFandom
-                            ? onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: e.target.value })
-                            : setOverride(t.key, t.type === 'number' ? (e.target.value ? parseInt(e.target.value) : null) : e.target.value)}
-                          placeholder={t.label}
-                          style={{ width: "100%", background: "#0e0e1a", border: "1px solid #3a3560", borderRadius: 8, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, textAlign: "center", padding: "6px 2px", boxSizing: "border-box" }}
-                        />
+                const setOverride = (key, val) => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, [key]: val } });
+
+                // Every possible tile. `row` is its default row (1 = main, 2 = thinner secondary row).
+                const allTiles = [
+                  { key: 'popularity', label: 'popularity', value: spotifyInfo?.popularity ?? null, color: '#1DB954', row: 1 },
+                  { key: 'followers', label: 'followers', value: spotifyInfo?.followers != null ? (spotifyInfo.followers >= 1000000 ? `${(spotifyInfo.followers / 1000000).toFixed(1)}M` : spotifyInfo.followers >= 1000 ? `${(spotifyInfo.followers / 1000).toFixed(0)}K` : spotifyInfo.followers) : null, color: '#a78bfa', row: 1 },
+                  { key: 'rating', label: festivalAvgRating ? 'concert rating' : 'your rating', value: avgRating !== null ? `★${avgRating}` : null, color: '#a78bfa', row: 1 },
+                  { key: 'festivalRating', label: 'festival rating', value: festivalAvgRating ? `★${festivalAvgRating}` : null, color: '#f472b6', row: 1 },
+                  { key: 'cried', label: 'cried', value: criedCount > 0 ? `💧${criedCount}` : null, color: '#3a6ea5', row: 1 },
+                  { key: 'topFriend', label: topFriend ? `top friend · ${topFriend[1]}×` : 'top friend', value: topFriend ? topFriend[0] : null, color: '#a78bfa', row: 1, onClick: () => onNavigate({ view: 'friends' }) },
+                  { key: 'country', label: 'country', value: country, color: '#8b7fb0', row: 1, editable: true, onEdit: v => setOverride('country', v) },
+                  { key: 'debutYear', label: 'debuted', value: debutYear, color: '#8b7fb0', row: 2, editable: true, editHint: 'edit in Dates', onEditClick: () => setArtistTab('info') },
+                  { key: 'albumCount', label: 'albums', value: albumCount || null, color: '#8b7fb0', row: 2, editable: true, numeric: true, onEdit: v => setOverride('albumCount', v ? parseInt(v) : null) },
+                  { key: 'fandom', label: 'fandom', value: fandomName || null, color: '#8b7fb0', row: 2, editable: true, onEdit: v => onUpdateSetting('artistFandomNames', { ...(settings.artistFandomNames || {}), [selectedArtist]: v }) },
+                ];
+
+                const config = (settings.artistTileConfig || {})[selectedArtist] || {};
+                const hidden = config.hidden || [];
+                const setConfig = patch => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...config, ...patch } });
+
+                const visible = allTiles.filter(t => (t.value !== null || bannerEditMode) && !hidden.includes(t.key));
+                const rowOf = key => config.rows?.[key] ?? allTiles.find(t => t.key === key)?.row ?? 1;
+                const orderKey = row => (config.order || []).filter(k => rowOf(k) === row && visible.some(t => t.key === k));
+                const buildRow = row => {
+                  const ordered = orderKey(row);
+                  const rest = visible.filter(t => rowOf(t.key) === row && !ordered.includes(t.key)).map(t => t.key);
+                  return [...ordered, ...rest].map(k => visible.find(t => t.key === k)).filter(Boolean);
+                };
+                const row1 = buildRow(1), row2 = buildRow(2);
+
+                const move = (key, dir) => {
+                  const row = rowOf(key);
+                  const keys = buildRow(row).map(t => t.key);
+                  const i = keys.indexOf(key);
+                  const j = i + dir;
+                  if (j < 0 || j >= keys.length) return;
+                  [keys[i], keys[j]] = [keys[j], keys[i]];
+                  const otherOrder = (config.order || []).filter(k => rowOf(k) !== row);
+                  setConfig({ order: [...otherOrder, ...keys] });
+                };
+                const toggleRow = key => setConfig({ rows: { ...(config.rows || {}), [key]: rowOf(key) === 1 ? 2 : 1 } });
+                const hide = key => setConfig({ hidden: [...hidden, key] });
+                const unhide = key => setConfig({ hidden: hidden.filter(k => k !== key) });
+
+                const renderTile = (t, i, rowArr) => {
+                  const box = (
+                    <div key={t.key} onClick={!bannerEditMode ? t.onClick : undefined} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center", cursor: t.onClick && !bannerEditMode ? "pointer" : "default", position: "relative" }}>
+                      {bannerEditMode && t.editable ? (
+                        t.onEditClick ? (
+                          <button onClick={t.onEditClick} style={{ background: "none", border: "none", width: "100%", padding: 0, cursor: "pointer" }}>
+                            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 700, color: t.color }}>{t.value || "edit"}</div>
+                            <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{t.editHint}</div>
+                          </button>
+                        ) : (
+                          <input type={t.numeric ? 'number' : 'text'} defaultValue={t.value ?? ''} onBlur={e => t.onEdit(e.target.value)} placeholder={t.label}
+                            style={{ width: "100%", background: "none", border: "none", color: t.color, fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 700, textAlign: "center", padding: 0 }} />
+                        )
                       ) : (
-                        <div key={t.key} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
-                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, fontWeight: 700, color: "#8b7fb0" }}>{t.value}</div>
-                          <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textTransform: "uppercase" }}>{t.label}</div>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: t.color, lineHeight: 1.15, wordBreak: "break-word" }}>{t.value}</div>
+                      )}
+                      <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 4, textTransform: "uppercase" }}>{t.label}</div>
+                      {bannerEditMode && (
+                        <div style={{ display: "flex", justifyContent: "center", gap: 3, marginTop: 4 }}>
+                          <button onClick={() => move(t.key, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "#2e2e4a" : "#6b6a8f", fontSize: 9, cursor: i === 0 ? "default" : "pointer", padding: 1 }}>◀</button>
+                          <button onClick={() => toggleRow(t.key)} title="Move to other row" style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 9, cursor: "pointer", padding: 1 }}>⇅</button>
+                          <button onClick={() => move(t.key, 1)} disabled={i === rowArr.length - 1} style={{ background: "none", border: "none", color: i === rowArr.length - 1 ? "#2e2e4a" : "#6b6a8f", fontSize: 9, cursor: i === rowArr.length - 1 ? "default" : "pointer", padding: 1 }}>▶</button>
+                          <button onClick={() => hide(t.key)} title="Hide" style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 9, cursor: "pointer", padding: 1 }}>✕</button>
                         </div>
-                      ))}
+                      )}
                     </div>
-                    {bannerEditMode && <div style={{ fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginTop: 5 }}>editing — fixes a wrong MusicBrainz match too</div>}
-                  </div>
+                  );
+                  return box;
+                };
+
+                return (
+                  <>
+                    {row1.length > 0 && (
+                      <div style={{ padding: "14px 16px 0" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${row1.length}, 1fr)`, gap: 6 }}>
+                          {row1.map((t, i) => renderTile(t, i, row1))}
+                        </div>
+                        {spotifyInfo?.topTrack && (
+                          <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
+                            ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {row2.length > 0 && (
+                      <div style={{ padding: "8px 16px 0" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${row2.length}, 1fr)`, gap: 6 }}>
+                          {row2.map((t, i) => renderTile(t, i, row2))}
+                        </div>
+                      </div>
+                    )}
+                    {bannerEditMode && hidden.length > 0 && (
+                      <div style={{ padding: "8px 16px 0", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {hidden.map(key => {
+                          const t = allTiles.find(x => x.key === key);
+                          if (!t) return null;
+                          return (
+                            <button key={key} onClick={() => unhide(key)} style={{ background: "none", border: "1px dashed #3a3560", borderRadius: 99, color: "#4a4870", fontSize: 10, padding: "4px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                              + {t.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {bannerEditMode && <div style={{ padding: "6px 16px 0", fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace" }}>◀▶ reorder · ⇅ move row · ✕ hide (tap the pill below to bring it back)</div>}
+                  </>
                 );
               })()}
               {spotifyInfo && (

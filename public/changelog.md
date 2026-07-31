@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Two new artist photo gallery styles: Polaroids and Pinned+strip, pick your favorite in Settings
 - Rebuilt tile customization: hold and drag a tile to reorder or switch rows, instead of the confusing button row. Hide/show tiles moved to a separate clean list. Pencil icon renamed to "Edit"/"Save edits"
 - Overview tiles are now fully customizable per artist in edit mode: reorder, move between rows, or hide any of them — remembered forever per artist
 - Songs page gets the banner treatment too — bigger album art with a gradient scrim, matching the artist page

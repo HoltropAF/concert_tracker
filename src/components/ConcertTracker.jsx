@@ -3619,6 +3619,10 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [artistPhotoUploading, setArtistPhotoUploading] = useState(false);
   const [photoImportPrompt, setPhotoImportPrompt] = useState(null);
   const [importingPhoto, setImportingPhoto] = useState(false);
+  const [dragTileKey, setDragTileKey] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
+  const [showTileManager, setShowTileManager] = useState(false);
+  const dragStartRef = useRef(null);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, [selectedArtist]);
   useEffect(() => {
@@ -3900,7 +3904,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   {artistPhotoUploading ? "···" : "↑"}
                 </label>
               )}
-              <button onClick={() => setBannerEditMode(m => !m)} title="Edit photo" style={{ background: bannerEditMode ? "#a78bfa" : "#0c0c14aa", border: "none", borderRadius: 99, color: bannerEditMode ? "#0c0c14" : "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>✎</button>
+              <button onClick={() => setBannerEditMode(m => !m)} title="Edit" style={{ background: bannerEditMode ? "#a78bfa" : "#0c0c14aa", border: "none", borderRadius: 99, color: bannerEditMode ? "#0c0c14" : "#fff", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", padding: "5px 11px", cursor: "pointer" }}>{bannerEditMode ? "Save edits" : "Edit"}</button>
             </div>
             <div style={{ position: "absolute", bottom: 14, left: 16, right: 16, zIndex: 2 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -4038,9 +4042,44 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 const hide = key => setConfig({ hidden: [...hidden, key] });
                 const unhide = key => setConfig({ hidden: hidden.filter(k => k !== key) });
 
-                const renderTile = (t, i, rowArr) => {
-                  const box = (
-                    <div key={t.key} onClick={!bannerEditMode ? t.onClick : undefined} style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center", cursor: t.onClick && !bannerEditMode ? "pointer" : "default", position: "relative" }}>
+                const startDrag = (e, key) => {
+                  if (!bannerEditMode) return;
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  dragStartRef.current = { key, x: e.clientX, y: e.clientY };
+                  setDragTileKey(key);
+                  setDragOffset({ dx: 0, dy: 0 });
+                };
+                const moveDrag = (e, key) => {
+                  if (dragStartRef.current?.key !== key) return;
+                  setDragOffset({ dx: e.clientX - dragStartRef.current.x, dy: e.clientY - dragStartRef.current.y });
+                };
+                const endDrag = (e, key) => {
+                  if (dragStartRef.current?.key !== key) return;
+                  const dx = e.clientX - dragStartRef.current.x, dy = e.clientY - dragStartRef.current.y;
+                  if (Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx)) toggleRow(key);
+                  else if (Math.abs(dx) > 32) move(key, dx > 0 ? 1 : -1);
+                  dragStartRef.current = null;
+                  setDragTileKey(null);
+                  setDragOffset({ dx: 0, dy: 0 });
+                };
+
+                const renderTile = t => {
+                  const dragging = dragTileKey === t.key;
+                  return (
+                    <div key={t.key}
+                      onClick={!bannerEditMode ? t.onClick : undefined}
+                      onPointerDown={e => startDrag(e, t.key)}
+                      onPointerMove={e => moveDrag(e, t.key)}
+                      onPointerUp={e => endDrag(e, t.key)}
+                      onPointerCancel={e => endDrag(e, t.key)}
+                      style={{
+                        background: "#0e0e1a", border: `1px solid ${dragging ? "#a78bfa" : "#1a1a2e"}`, borderRadius: 10, padding: "8px 4px", textAlign: "center",
+                        cursor: t.onClick && !bannerEditMode ? "pointer" : bannerEditMode ? "grab" : "default", position: "relative",
+                        touchAction: bannerEditMode ? "none" : "auto",
+                        transform: dragging ? `translate(${dragOffset.dx}px, ${dragOffset.dy}px) scale(1.06)` : "none",
+                        zIndex: dragging ? 5 : 1,
+                        boxShadow: dragging ? "0 6px 16px rgba(0,0,0,0.4)" : "none",
+                      }}>
                       {bannerEditMode && t.editable ? (
                         t.onEditClick ? (
                           <button onClick={t.onEditClick} style={{ background: "none", border: "none", width: "100%", padding: 0, cursor: "pointer" }}>
@@ -4055,17 +4094,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: t.color, lineHeight: 1.15, wordBreak: "break-word" }}>{t.value}</div>
                       )}
                       <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 4, textTransform: "uppercase" }}>{t.label}</div>
-                      {bannerEditMode && (
-                        <div style={{ display: "flex", justifyContent: "center", gap: 3, marginTop: 4 }}>
-                          <button onClick={() => move(t.key, -1)} disabled={i === 0} style={{ background: "none", border: "none", color: i === 0 ? "#2e2e4a" : "#6b6a8f", fontSize: 9, cursor: i === 0 ? "default" : "pointer", padding: 1 }}>◀</button>
-                          <button onClick={() => toggleRow(t.key)} title="Move to other row" style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 9, cursor: "pointer", padding: 1 }}>⇅</button>
-                          <button onClick={() => move(t.key, 1)} disabled={i === rowArr.length - 1} style={{ background: "none", border: "none", color: i === rowArr.length - 1 ? "#2e2e4a" : "#6b6a8f", fontSize: 9, cursor: i === rowArr.length - 1 ? "default" : "pointer", padding: 1 }}>▶</button>
-                          <button onClick={() => hide(t.key)} title="Hide" style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 9, cursor: "pointer", padding: 1 }}>✕</button>
-                        </div>
-                      )}
                     </div>
                   );
-                  return box;
                 };
 
                 return (
@@ -4073,7 +4103,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                     {row1.length > 0 && (
                       <div style={{ padding: "14px 16px 0" }}>
                         <div style={{ display: "grid", gridTemplateColumns: `repeat(${row1.length}, 1fr)`, gap: 6 }}>
-                          {row1.map((t, i) => renderTile(t, i, row1))}
+                          {row1.map(t => renderTile(t))}
                         </div>
                         {spotifyInfo?.topTrack && (
                           <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
@@ -4085,24 +4115,35 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                     {row2.length > 0 && (
                       <div style={{ padding: "8px 16px 0" }}>
                         <div style={{ display: "grid", gridTemplateColumns: `repeat(${row2.length}, 1fr)`, gap: 6 }}>
-                          {row2.map((t, i) => renderTile(t, i, row2))}
+                          {row2.map(t => renderTile(t))}
                         </div>
                       </div>
                     )}
-                    {bannerEditMode && hidden.length > 0 && (
-                      <div style={{ padding: "8px 16px 0", display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {hidden.map(key => {
-                          const t = allTiles.find(x => x.key === key);
-                          if (!t) return null;
-                          return (
-                            <button key={key} onClick={() => unhide(key)} style={{ background: "none", border: "1px dashed #3a3560", borderRadius: 99, color: "#4a4870", fontSize: 10, padding: "4px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
-                              + {t.label}
-                            </button>
-                          );
-                        })}
+                    {bannerEditMode && (
+                      <div style={{ padding: "8px 16px 0" }}>
+                        <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>hold and drag a tile — left/right to reorder, up/down to switch rows</div>
+                        <button onClick={() => setShowTileManager(s => !s)} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                          {showTileManager ? "Hide tile list ▾" : "Show/hide tiles ▸"}
+                        </button>
+                        {showTileManager && (
+                          <div style={{ marginTop: 8, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "6px 12px" }}>
+                            {allTiles.map(t => {
+                              const isHidden = hidden.includes(t.key);
+                              const hasValue = t.value !== null;
+                              return (
+                                <div key={t.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: "1px solid #1f1f35" }}>
+                                  <span style={{ fontSize: 12, color: hasValue ? "#c4c2f0" : "#4a4870" }}>{t.label}{!hasValue && !isHidden ? " (no data)" : ""}</span>
+                                  <button onClick={() => isHidden ? unhide(t.key) : hide(t.key)} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 99, color: isHidden ? "#4a4870" : "#a78bfa", fontSize: 10, padding: "3px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                                    {isHidden ? "Show" : "Hide"}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                            <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", paddingTop: 8 }}>Hiding never deletes the underlying info — it's still there if you show it again.</div>
+                          </div>
+                        )}
                       </div>
                     )}
-                    {bannerEditMode && <div style={{ padding: "6px 16px 0", fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace" }}>◀▶ reorder · ⇅ move row · ✕ hide (tap the pill below to bring it back)</div>}
                   </>
                 );
               })()}

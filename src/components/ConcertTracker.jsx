@@ -3617,6 +3617,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showArtistSongs, setShowArtistSongs] = useState(settings.artistSectionsDefaultOpen || false);
   const [showArtistCovers, setShowArtistCovers] = useState(settings.artistSectionsDefaultOpen || false);
   const [artistPhotoUploading, setArtistPhotoUploading] = useState(false);
+  const [photoImportPrompt, setPhotoImportPrompt] = useState(null);
+  const [importingPhoto, setImportingPhoto] = useState(false);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, [selectedArtist]);
   useEffect(() => {
@@ -3641,12 +3643,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         const info = {
           url: item.external_urls?.spotify || null,
           genres: item.genres || [],
+          image: item.images?.[0]?.url || null,
           popularity: null,
           followers: null,
           topTrack: null,
           fetchedAt: Date.now(),
         };
-        if (!cancelled) onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: info });
+        if (!cancelled) {
+          onUpdateSetting('artistSpotifyInfo', { ...(settings.artistSpotifyInfo || {}), [selectedArtist]: info });
+          const hasOwnPhoto = !!(settings.artistPhotos || {})[selectedArtist];
+          const promptSeen = (settings.artistPhotoPromptSeen || {})[selectedArtist];
+          if (info.image && !hasOwnPhoto && !promptSeen) {
+            setPhotoImportPrompt({ artist: selectedArtist, image: info.image });
+          }
+        }
       } catch { /* silent — no artist info, not critical */ }
     })();
     return () => { cancelled = true; };
@@ -3906,6 +3916,37 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   {spotifyInfo.genres[0]}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {photoImportPrompt?.artist === selectedArtist && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => { onUpdateSetting('artistPhotoPromptSeen', { ...(settings.artistPhotoPromptSeen || {}), [selectedArtist]: true }); setPhotoImportPrompt(null); }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#13131f", border: "1px solid #2e2e50", borderRadius: 14, padding: 18, maxWidth: 320, width: "100%" }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff", marginBottom: 4 }}>Use this photo?</div>
+              <div style={{ fontSize: 12, color: "#6b6a8f", marginBottom: 12 }}>Found a photo for {selectedArtist} on Spotify.</div>
+              <img src={photoImportPrompt.image} alt="" style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { onUpdateSetting('artistPhotoPromptSeen', { ...(settings.artistPhotoPromptSeen || {}), [selectedArtist]: true }); setPhotoImportPrompt(null); }}
+                  style={{ flex: 1, background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 12, padding: "9px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                  I'll set my own
+                </button>
+                <button disabled={importingPhoto} onClick={async () => {
+                    setImportingPhoto(true);
+                    try {
+                      const resp = await fetch(photoImportPrompt.image);
+                      const blob = await resp.blob();
+                      const file = new File([blob], 'artist.jpg', { type: blob.type || 'image/jpeg' });
+                      const path = await uploadArtistPhoto(selectedArtist, file);
+                      onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path });
+                    } catch { /* if this fails, they can still add their own later */ }
+                    onUpdateSetting('artistPhotoPromptSeen', { ...(settings.artistPhotoPromptSeen || {}), [selectedArtist]: true });
+                    setImportingPhoto(false);
+                    setPhotoImportPrompt(null);
+                  }}
+                  style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "9px", cursor: importingPhoto ? "default" : "pointer", fontFamily: "'DM Mono', monospace" }}>
+                  {importingPhoto ? "Saving…" : "Use this photo"}
+                </button>
+              </div>
             </div>
           </div>
         )}

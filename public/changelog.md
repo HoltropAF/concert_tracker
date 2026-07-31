@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-07-22
+- Overview merged to one auto-scaling tile row, dead popularity/followers removed entirely
+- Discography breakdown (albums/EPs/singles) added to the Dates tab
+- Shows timeline cards: date, rating, all-time fave, and notes each get their own line
 - Two new artist photo gallery styles: Polaroids and Pinned+strip, pick your favorite in Settings
 - Rebuilt tile customization: hold and drag a tile to reorder or switch rows, instead of the confusing button row. Hide/show tiles moved to a separate clean list. Pencil icon renamed to "Edit"/"Save edits"
 - Overview tiles are now fully customizable per artist in edit mode: reorder, move between rows, or hide any of them — remembered forever per artist

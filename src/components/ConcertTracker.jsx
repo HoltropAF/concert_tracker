@@ -3676,20 +3676,23 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         const sd = await sr.json();
         const artist = sd?.artists?.[0];
         if (!artist) { if (!cancelled) onUpdateSetting('artistMusicBrainzInfo', { ...(settings.artistMusicBrainzInfo || {}), [selectedArtist]: null }); return; }
-        let albumCount = null;
+        let albumCount = null, epCount = null, singleCount = null;
         try {
-          const rr = await fetch(`https://musicbrainz.org/ws/2/release-group?artist=${artist.id}&type=album&fmt=json&limit=100`);
+          const rr = await fetch(`https://musicbrainz.org/ws/2/release-group?artist=${artist.id}&fmt=json&limit=100`);
           if (rr.ok) {
             const rd = await rr.json();
-            albumCount = typeof rd['release-group-count'] === 'number' ? rd['release-group-count'] : (rd['release-groups']?.length ?? null);
+            const groups = rd['release-groups'] || [];
+            albumCount = groups.filter(g => g['primary-type'] === 'Album').length || null;
+            epCount = groups.filter(g => g['primary-type'] === 'EP').length || null;
+            singleCount = groups.filter(g => g['primary-type'] === 'Single').length || null;
           }
-        } catch { /* album count is a nice-to-have */ }
+        } catch { /* release breakdown is a nice-to-have */ }
         const info = {
           startDate: artist['life-span']?.begin || null,
           endDate: artist['life-span']?.end || null,
           type: artist.type || null, // "Group" or "Person" — the closest thing to solo/band
           country: artist.country || null,
-          albumCount,
+          albumCount, epCount, singleCount,
           fetchedAt: Date.now(),
         };
         if (!cancelled) onUpdateSetting('artistMusicBrainzInfo', { ...(settings.artistMusicBrainzInfo || {}), [selectedArtist]: info });
@@ -4374,6 +4377,29 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   )}
                 </div>
               </div>
+              {(mb?.albumCount || mb?.epCount || mb?.singleCount) && (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Discography (MusicBrainz)</div>
+                  {mb.albumCount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Albums</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.albumCount}</span>
+                    </div>
+                  )}
+                  {mb.epCount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>EPs / mini albums</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.epCount}</span>
+                    </div>
+                  )}
+                  {mb.singleCount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Singles</span>
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.singleCount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {customDates.map((d, i) => (
                 <div key={i} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
                   {bannerEditMode ? (

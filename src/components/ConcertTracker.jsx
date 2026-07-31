@@ -4182,16 +4182,60 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   costPerSong ? <>€{costPerSong.toFixed(2)} / song</> : null,
                 ]} />
               </div>
-              {photos.length > 0 && (
-                <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
-                  {photos.map(c => (
-                    <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
-                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {photos.length > 0 && (() => {
+                const galleryStyle = settings.artistGalleryStyle || 'strip';
+
+                if (galleryStyle === 'polaroid') {
+                  const rotations = [-7, 5, -3, 6, -5, 4];
+                  return (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 10px", padding: "20px 24px 8px" }}>
+                      {photos.map((c, i) => (
+                        <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", transform: `rotate(${rotations[i % rotations.length]}deg)`, position: "relative" }}>
+                          <div style={{ background: "#fff", borderRadius: 3, padding: "6px 6px 20px", boxShadow: "0 4px 10px rgba(0,0,0,0.35)" }}>
+                            <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 96, height: 108, borderRadius: 2, display: "block" }} />
+                            <div style={{ position: "absolute", bottom: 4, left: 0, right: 0, textAlign: "center", fontSize: 11, color: "#8a8578", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0, 4)}</div>
+                          </div>
+                          <div style={{ position: "absolute", top: -6, left: 34, width: 26, height: 13, background: "rgba(255,220,150,0.55)", transform: `rotate(${-rotations[i % rotations.length] / 2}deg)` }} />
+                        </button>
+                      ))}
+                    </div>
+                  );
+                }
+
+                if (galleryStyle === 'pinned') {
+                  const pinnedId = (settings.artistPinnedPhoto || {})[selectedArtist] || photos[0].id;
+                  const pinned = photos.find(c => c.id === pinnedId) || photos[0];
+                  const rest = photos.filter(c => c.id !== pinned.id);
+                  return (
+                    <div style={{ padding: "12px 16px 0" }}>
+                      <button onClick={() => onOpen(pinned)} style={{ display: "block", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
+                        <PhotoImg path={pinned.photo} pos={pinned.photoPos} style={{ width: "100%", aspectRatio: "16/10", borderRadius: 12 }} />
+                        <span style={{ position: "absolute", bottom: 8, left: 10, fontSize: 10, color: "#fff", fontFamily: "'DM Mono', monospace", background: "rgba(0,0,0,0.45)", padding: "2px 8px", borderRadius: 99 }}>{formatDate(pinned.date)}</span>
+                      </button>
+                      {rest.length > 0 && (
+                        <div style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                          {rest.map(c => (
+                            <button key={c.id} onClick={() => onUpdateSetting('artistPinnedPhoto', { ...(settings.artistPinnedPhoto || {}), [selectedArtist]: c.id })} title="Make this the pinned photo" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                              <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 60, height: 60, borderRadius: 8 }} />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
+                    {photos.map(c => (
+                      <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                        <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                        <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </>
           );
         })())}
@@ -6990,6 +7034,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
             <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); onUpdate("artistSectionsDefaultOpen", checked); }} />
           </SettingsRow>
+          <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); onUpdate("artistGalleryStyle", v); }} compact />
           <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast compact />
         </SettingsSection>
 

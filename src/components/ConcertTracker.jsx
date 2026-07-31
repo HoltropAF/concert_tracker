@@ -4615,42 +4615,49 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     const duration = formatDuration(selectedSong.durationMs);
     return (
       <div style={{ padding: '0 0 100px' }}>
-        <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <button onClick={goBackFromSong} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
-            <DetailSubtitle lines={[[selectedSong.artist, duration]]} />
-            {selectedSong.albumName && selectedSong.albumId && (
-              <a href={`https://open.spotify.com/album/${selectedSong.albumId}`} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'block', fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 4, textDecoration: 'none' }}>
-                {selectedSong.trackNumber ? `Track ${selectedSong.trackNumber} · ` : ''}{selectedSong.albumName} ↗
-              </a>
-            )}
-            {selectedSong.spotifyId && (
-              <a href={`https://open.spotify.com/track/${selectedSong.spotifyId}`} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
-                ▶ Listen on Spotify
-              </a>
-            )}
-            {selectedSong.spotifyId && !selectedSong.durationMs && (
-              <button onClick={handleRefreshSongInfo} disabled={refreshingInfo}
-                style={{ display: 'block', background: 'none', border: 'none', padding: '4px 0 0', color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: refreshingInfo ? 'default' : 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
-                {refreshingInfo ? 'fetching…' : 'fetch duration & track info'}
-              </button>
-            )}
-            {!selectedSong.spotifyId && settings.spotifyAccessToken && (
-              <button onClick={() => setSongMatcher(selectedSong)}
-                style={{ background: 'none', border: 'none', padding: '4px 0 0', color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, display: 'block' }}>
-                Link to Spotify →
-              </button>
-            )}
+        {selectedSong.albumArt ? (
+          <div style={{ height: 260, position: 'relative', overflow: 'hidden' }}>
+            <img src={selectedSong.albumArt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.85) 100%)' }} />
+            <button onClick={goBackFromSong} style={{ position: 'absolute', top: 14, left: 16, background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', zIndex: 2, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>←</button>
+            <div style={{ position: 'absolute', bottom: 14, left: 16, right: 16, zIndex: 2 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)', lineHeight: 1.1 }}>{selectedSong.name}</div>
+              <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: '#fff', opacity: 0.9, marginTop: 4, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{[selectedSong.artist, duration].filter(Boolean).join(' · ')}</div>
+              {selectedSong.albumName && selectedSong.albumId && (
+                <a href={`https://open.spotify.com/album/${selectedSong.albumId}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'block', fontSize: 10, color: '#fff', opacity: 0.85, fontFamily: "'DM Mono', monospace", marginTop: 4, textDecoration: 'none', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+                  {selectedSong.trackNumber ? `Track ${selectedSong.trackNumber} · ` : ''}{selectedSong.albumName} ↗
+                </a>
+              )}
+              {selectedSong.spotifyId && (
+                <a href={`https://open.spotify.com/track/${selectedSong.spotifyId}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, color: '#3dd968', fontSize: 10, fontFamily: "'DM Mono', monospace", textDecoration: 'none' }}>
+                  ▶ Listen on Spotify
+                </a>
+              )}
+            </div>
           </div>
-          {selectedSong.albumArt && (
-            <img src={selectedSong.albumArt} alt="" style={{ width: 130, height: 130, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
-          )}
+        ) : (
+          <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <button onClick={goBackFromSong} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
+              <DetailSubtitle lines={[[selectedSong.artist, duration]]} />
+              {selectedSong.spotifyId && !selectedSong.durationMs && (
+                <button onClick={handleRefreshSongInfo} disabled={refreshingInfo}
+                  style={{ display: 'block', background: 'none', border: 'none', padding: '4px 0 0', color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: refreshingInfo ? 'default' : 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                  {refreshingInfo ? 'fetching…' : 'fetch duration & track info'}
+                </button>
+              )}
+              {!selectedSong.spotifyId && settings.spotifyAccessToken && (
+                <button onClick={() => setSongMatcher(selectedSong)}
+                  style={{ background: 'none', border: 'none', padding: '4px 0 0', color: '#1DB954', fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2, display: 'block' }}>
+                  Link to Spotify →
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         {/* Stat tiles: times live, cried, popularity */}
         {(() => {
           const criedCount = appearances.filter(a => a.concert.criedSong === selectedSong.name).length;

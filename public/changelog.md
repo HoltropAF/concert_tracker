@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Songs page gets the banner treatment too — bigger album art with a gradient scrim, matching the artist page
+- New: the first time you open an artist, if Spotify has a photo and you haven't set your own, a popup lets you choose it or set your own instead
 - Renamed Info tab to Dates, slimmer tab pills
 - Moved "last pulled" below both tile rows; fandom name tile always shows now with a "+ add" prompt instead of vanishing when unset
 - Ult-group toggle only shows in edit mode; timeline dots are smaller

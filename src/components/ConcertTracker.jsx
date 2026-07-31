@@ -3622,6 +3622,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [dragTileKey, setDragTileKey] = useState(null);
   const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
   const [showTileManager, setShowTileManager] = useState(false);
+  const [spotifyRefetchTrigger, setSpotifyRefetchTrigger] = useState(0);
   const dragStartRef = useRef(null);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, [selectedArtist]);
@@ -3629,7 +3630,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     if (!selectedArtist) return;
     const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
     const cacheIsUseless = cached && typeof cached === 'object' && cached.genres == null;
-    if (cached !== undefined && !cacheIsUseless) return; // already cached with real data (or cached-as-not-found)
+    if (cached !== undefined && !cacheIsUseless && spotifyRefetchTrigger === 0) return; // already cached with real data (or cached-as-not-found)
     if (!settings.spotifyAccessToken) return; // Spotify not connected at all
     let cancelled = false;
     (async () => {
@@ -3664,7 +3665,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       } catch { /* silent — no artist info, not critical */ }
     })();
     return () => { cancelled = true; };
-  }, [selectedArtist]);
+  }, [selectedArtist, spotifyRefetchTrigger]);
   useEffect(() => {
     if (!selectedArtist) return;
     if ((settings.artistMusicBrainzInfo || {})[selectedArtist] !== undefined) return; // already cached
@@ -4007,8 +4008,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 const allTiles = [
                   { key: 'rating', label: festivalAvgRating ? 'concert rating' : 'your rating', value: avgRating !== null ? `★${avgRating}` : null, color: '#a78bfa' },
                   { key: 'festivalRating', label: 'festival rating', value: festivalAvgRating ? `★${festivalAvgRating}` : null, color: '#f472b6' },
-                  { key: 'cried', label: 'cried', value: criedCount > 0 ? `💧${criedCount}` : null, color: '#3a6ea5' },
-                  { key: 'topFriend', label: topFriend ? `top friend · ${topFriend[1]}×` : 'top friend', value: topFriend ? topFriend[0] : null, color: '#a78bfa', onClick: () => onNavigate({ view: 'friends' }) },
+                  { key: 'cried', label: 'cried', value: criedCount > 0 ? `💧${criedCount}` : null, color: '#3a6ea5', pinned: true },
+                  { key: 'topFriend', label: topFriend ? `top friend · ${topFriend[1]}×` : 'top friend', value: (topFriend && totalAppearances >= 3) ? topFriend[0] : null, color: '#a78bfa', onClick: () => onNavigate({ view: 'friends' }) },
                   { key: 'country', label: 'country', value: country, color: '#8b7fb0', editable: true, onEdit: v => setOverride('country', v) },
                   { key: 'debutYear', label: 'debuted', value: debutYear, color: '#8b7fb0', editable: true, editHint: 'edit in Dates', onEditClick: () => setArtistTab('info') },
                   { key: 'albumCount', label: 'albums', value: albumCount || null, color: '#8b7fb0', editable: true, numeric: true, onEdit: v => setOverride('albumCount', v ? parseInt(v) : null) },
@@ -4019,7 +4020,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 const hidden = config.hidden || [];
                 const setConfig = patch => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...config, ...patch } });
 
-                const visible = allTiles.filter(t => (t.value !== null || bannerEditMode) && !hidden.includes(t.key));
+                const visible = allTiles.filter(t => (t.value !== null || bannerEditMode) && (t.pinned || !hidden.includes(t.key)));
                 const ordered = (config.order || []).filter(k => visible.some(t => t.key === k));
                 const rest = visible.filter(t => !ordered.includes(t.key)).map(t => t.key);
                 const row1 = [...ordered, ...rest].map(k => visible.find(t => t.key === k)).filter(Boolean);
@@ -4094,7 +4095,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   <>
                     {row1.length > 0 && (
                       <div style={{ padding: "14px 16px 0" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${row1.length}, minmax(0, 1fr))`, gap: 6 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(row1.length, 4)}, minmax(0, 1fr))`, gap: 6 }}>
                           {row1.map(t => renderTile(t))}
                         </div>
                         {spotifyInfo?.topTrack && (
@@ -4118,9 +4119,13 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                               return (
                                 <div key={t.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: "1px solid #1f1f35" }}>
                                   <span style={{ fontSize: 12, color: hasValue ? "#c4c2f0" : "#4a4870" }}>{t.label}{!hasValue && !isHidden ? " (no data)" : ""}</span>
-                                  <button onClick={() => isHidden ? unhide(t.key) : hide(t.key)} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 99, color: isHidden ? "#4a4870" : "#a78bfa", fontSize: 10, padding: "3px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
-                                    {isHidden ? "Show" : "Hide"}
-                                  </button>
+                                  {t.pinned ? (
+                                    <span style={{ fontSize: 10, color: "#3a3858", fontFamily: "'DM Mono', monospace" }}>always on</span>
+                                  ) : (
+                                    <button onClick={() => isHidden ? unhide(t.key) : hide(t.key)} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 99, color: isHidden ? "#4a4870" : "#a78bfa", fontSize: 10, padding: "3px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                                      {isHidden ? "Show" : "Hide"}
+                                    </button>
+                                  )}
                                 </div>
                               );
                             })}
@@ -4133,14 +4138,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 );
               })()}
               {spotifyInfo && (
-                <div style={{ padding: "6px 16px 0", fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace" }}>
-                  last pulled {(() => {
+                <div style={{ padding: "6px 16px 0", fontSize: 8, color: "#3a3858", fontFamily: "'DM Mono', monospace", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>last pulled {(() => {
                     const days = Math.floor((Date.now() - spotifyInfo.fetchedAt) / 86400000);
                     if (days <= 0) return 'today';
                     if (days === 1) return 'yesterday';
                     if (days < 30) return `${days}d ago`;
                     return new Date(spotifyInfo.fetchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-                  })()}
+                  })()}</span>
+                  <button onClick={() => {
+                    const next = { ...(settings.artistSpotifyInfo || {}) };
+                    delete next[selectedArtist];
+                    onUpdateSetting('artistSpotifyInfo', next);
+                    setSpotifyRefetchTrigger(n => n + 1);
+                  }} style={{ background: "none", border: "none", color: "#3a6ea5", fontSize: 8, fontFamily: "'DM Mono', monospace", textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer", padding: 0 }}>refresh</button>
                 </div>
               )}
               {(bannerEditMode || isUltGroup) && (

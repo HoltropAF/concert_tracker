@@ -1145,6 +1145,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     );
   }
 
+  const hasPhotoDivider = showPhoto && concert.photo && past;
   return (
     <button
       onClick={() => onOpen(concert)}
@@ -1153,11 +1154,15 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#33397a"}`,
         borderLeft: `3px solid ${accentColor}`,
         borderRadius: 12, padding: "14px 16px", cursor: "pointer",
-        transition: "all 0.15s ease", marginBottom: 8
+        transition: "all 0.15s ease", marginBottom: 8, position: "relative"
       }}
     >
-      {showPhoto && concert.photo && past && (
-        <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", aspectRatio: "5 / 2", borderRadius: 8, marginBottom: 10 }} />
+      {hasPhotoDivider && (
+        <>
+          <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
+          <div style={{ position: "absolute", left: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
+          <div style={{ position: "absolute", right: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
+        </>
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>

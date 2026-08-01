@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-07-22
+- Fixed a real bug: adding the same festival act on a different day silently failed, forcing typo workarounds — fixed, and cleaned up the Fox Stevenson/Maduk typos it caused in your data
+- Added autocomplete when typing a festival act name
+- Fixed top friend on Artist pages: festival/support appearances weren't counted at all before; also no longer shows on a tie
+- Tile row capped at 4 per line, top friend only shows at 3+ appearances, cried can't be hidden, added a manual Spotify refresh button, polaroid photos are now repositionable in edit mode
 - Overview merged to one auto-scaling tile row, dead popularity/followers removed entirely
 - Discography breakdown (albums/EPs/singles) added to the Dates tab
 - Shows timeline cards: date, rating, all-time fave, and notes each get their own line

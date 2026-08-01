@@ -2877,7 +2877,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                   ...(spAvg !== null ? [{ label: "avg / year", value: spAvg, upcoming: 0, nav: null }] : []),
                 ].map(b => (
                   <div key={b.label} onClick={b.nav ? () => onNavigate(b.nav) : undefined} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 8, padding: "6px 4px", textAlign: "center", cursor: b.nav ? "pointer" : "default", position: "relative" }}>
-                    {b.upcoming > 0 && <div style={{ position: "absolute", top: 3, right: 4, fontSize: 8, color: "#34d399", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>+{b.upcoming}</div>}
+                    {b.upcoming > 0 && <div style={{ position: "absolute", top: 3, right: 4, fontSize: 8, color: "#818cf8", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>+{b.upcoming}</div>}
                     <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "#a78bfa", lineHeight: 1 }}>{b.value}</div>
                     <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{b.label}</div>
                   </div>
@@ -5571,13 +5571,13 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             <div style={{ marginBottom: 16 }}>
               <button onClick={() => setShowVenueUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px 8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 10, color: '#34d399', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upcoming</span>
-                  <span style={{ fontSize: 10, color: '#2e4a3a', fontFamily: "'DM Mono', monospace", background: '#0a1a12', border: '1px solid #2a4a3a', borderRadius: 99, padding: '1px 7px' }}>{v.upcoming.length}</span>
+                  <span style={{ fontSize: 10, color: '#818cf8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upcoming</span>
+                  <span style={{ fontSize: 10, color: '#3a3a70', fontFamily: "'DM Mono', monospace", background: '#12122a', border: '1px solid #33397a', borderRadius: 99, padding: '1px 7px' }}>{v.upcoming.length}</span>
                 </div>
-                <span style={{ fontSize: 11, color: '#34d399', transform: showVenueUpcoming ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+                <span style={{ fontSize: 11, color: '#818cf8', transform: showVenueUpcoming ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
               </button>
               {showVenueUpcoming && v.upcoming.sort((a,b) => a.date.localeCompare(b.date)).map(c => (
-                <button key={c.id} onClick={() => onOpen(c)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: '3px solid #34d399', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button key={c.id} onClick={() => onOpen(c)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: '3px solid #818cf8', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 500 }}>{c.artist}</div>
                     <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{formatDate(c.date)}{c.room ? ` · ${c.room}` : ''}</div>
@@ -5820,7 +5820,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             <VenueMap points={mapPoints} fitPoints={fitPoints && fitPoints.length > 0 ? fitPoints : null} onSelect={name => setSelectedVenue(name)} />
             <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap', overflowX: 'auto' }}>
               <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#a78bfa', marginRight: 3 }} />visited</span>
-              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#34d399', marginRight: 3 }} />upcoming</span>
+              <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#818cf8', marginRight: 3 }} />upcoming</span>
               <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', marginRight: 3 }} />want to go</span>
               <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#6b6a8f', marginRight: 3 }} />concert</span>
               <span style={{ flexShrink: 0 }}><span style={{ display: 'inline-block', width: 7, height: 7, background: '#6b6a8f', marginRight: 3, transform: 'rotate(45deg)' }} />festival</span>

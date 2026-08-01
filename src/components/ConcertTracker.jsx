@@ -3022,14 +3022,30 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
               weekCounts.push(count);
             }
             const colorFor = n => n === 0 ? '#161628' : n === 1 ? '#3d3564' : n === 2 ? '#6d5fa8' : 'var(--accent)';
+            const thisYear = now.getFullYear();
+            const thisYearCount = pastAll.filter(c => c.date.slice(0, 4) === String(thisYear)).length;
+            const lastYearCount = pastAll.filter(c => c.date.slice(0, 4) === String(thisYear - 1)).length;
+            const pct = lastYearCount > 0 ? Math.min(1, thisYearCount / lastYearCount) : null;
+            const circumference = 2 * Math.PI * 29;
             return (
-              <div style={{ marginBottom: 14, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Activity, last year</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(26, 1fr)", gap: 3 }}>
-                  {weekCounts.map((n, i) => (
-                    <div key={i} title={`${n} show${n !== 1 ? 's' : ''}`} style={{ aspectRatio: "1", borderRadius: 2, background: colorFor(n) }} />
-                  ))}
+              <div style={{ marginBottom: 14, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Activity, last year</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(26, 1fr)", gap: 3 }}>
+                    {weekCounts.map((n, i) => (
+                      <div key={i} title={`${n} show${n !== 1 ? 's' : ''}`} style={{ aspectRatio: "1", borderRadius: 2, background: colorFor(n) }} />
+                    ))}
+                  </div>
                 </div>
+                {pct !== null && (
+                  <div style={{ flexShrink: 0, textAlign: "center" }}>
+                    <svg width="60" height="60" viewBox="0 0 66 66">
+                      <circle cx="33" cy="33" r="29" fill="none" stroke="#1a1a2e" strokeWidth="6" />
+                      <circle cx="33" cy="33" r="29" fill="none" stroke="var(--accent)" strokeWidth="6" strokeDasharray={`${pct * circumference} ${circumference}`} strokeLinecap="round" transform="rotate(-90 33 33)" />
+                    </svg>
+                    <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>vs {thisYear - 1}</div>
+                  </div>
+                )}
               </div>
             );
           })()}

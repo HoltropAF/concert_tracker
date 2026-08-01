@@ -971,21 +971,40 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
 }
 
 
-function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showVenue = true, showGenreTags = true }) {
+function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showVenue = true, showGenreTags = true, onDelete = null }) {
   const past = isPast(concert.date) && !concert.wishlist;
   const effectiveCompact = compact || !past;
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
   const accentColor = online ? ONLINE_COLOR : isFestival ? "#f472b6" : past ? "#a78bfa" : concert.wishlist ? "#34d399" : "#818cf8";
+  const [swipeX, setSwipeX] = useState(0);
+  const swipeStart = useRef(null);
+  const REVEAL = 76;
+  const onTouchStart = e => { if (!onDelete) return; swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, base: swipeX }; };
+  const onTouchMove = e => {
+    if (!onDelete || !swipeStart.current) return;
+    const dx = e.touches[0].clientX - swipeStart.current.x;
+    const dy = e.touches[0].clientY - swipeStart.current.y;
+    if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll, don't hijack
+    const next = Math.min(0, Math.max(-REVEAL, swipeStart.current.base + dx));
+    setSwipeX(next);
+  };
+  const onTouchEnd = () => {
+    if (!onDelete || !swipeStart.current) return;
+    setSwipeX(x => (x < -REVEAL / 2 ? -REVEAL : 0));
+    swipeStart.current = null;
+  };
 
   if (effectiveCompact) {
-    return (
-      <button onClick={() => onOpen(concert)} style={{
+    const card = (
+      <button onClick={() => swipeX === 0 && onOpen(concert)} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} style={{
         width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0f1638",
         border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#33397a"}`,
         borderLeft: `3px solid ${accentColor}`,
-        borderRadius: 8, padding: "7px 12px", cursor: "pointer", marginBottom: 4,
+        borderRadius: 8, padding: "7px 12px", cursor: "pointer",
         display: "flex", alignItems: "center", gap: 10,
+        transform: `translateX(${swipeX}px)`, transition: swipeStart.current ? "none" : "transform 0.25s ease",
+        position: "relative",
       }}>
         <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#e2e0ff", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {concert.artist}
@@ -1007,6 +1026,15 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
           <span style={{ fontSize: 11, flexShrink: 0 }}>🔔</span>
         )}
       </button>
+    );
+    if (!onDelete) return <div style={{ marginBottom: 4 }}>{card}</div>;
+    return (
+      <div style={{ position: "relative", marginBottom: 4, borderRadius: 8, overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "#7f1d3a", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 14 }}>
+          <button onClick={() => { onDelete(concert); setSwipeX(0); }} style={{ background: "none", border: "none", color: "#fff", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer" }}>Remove</button>
+        </div>
+        {card}
+      </div>
     );
   }
 
@@ -8032,7 +8060,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               : statsTab === 'friends'
                 ? 'Friends'
                 : 'Stats'
-  const renderConcertList = (list, showPhoto) => {
+  const renderConcertList = (list, showPhoto, deletable = false) => {
     if (!settings.groupByYear) {
       return list.map(c => (
         <ConcertCard
@@ -8043,6 +8071,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           showPhoto={showPhoto}
           showVenue={settings.showVenueOnCards !== false}
           showGenreTags={settings.showGenreTagsOnCards !== false}
+          onDelete={deletable ? (concert => onDeleteConcert(concert.id)) : null}
         />
       ))
     }
@@ -8586,7 +8615,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                       </div>
                       <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                     </button>
-                    {showWishlist && renderConcertList(wishlist, false)}
+                    {showWishlist && renderConcertList(wishlist, false, true)}
                   </div>
                 )}
                 {(filterStatus.length === 0 || filterStatus.includes('upcoming')) && upcoming.length > 0 && (

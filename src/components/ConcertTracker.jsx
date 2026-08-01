@@ -132,6 +132,19 @@ const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart
 const isPast = (dateStr) => dateStr < todayStr;
 const isWish = c => !!c?.wishlist;
 const isOnline = c => c?.attendanceMode === 'online';
+const venueTypeIcon = (sizeOrType, isFestival) => {
+  if (isFestival) return '🎪';
+  const s = (sizeOrType || '').toLowerCase();
+  if (!s) return null;
+  if (s.includes('stadium')) return '🏟️';
+  if (s.includes('arena')) return '🏛️';
+  if (s.includes('theatre') || s.includes('theater')) return '🎭';
+  if (s.includes('club')) return '🎤';
+  if (s.includes('bar')) return '🍸';
+  if (s.includes('online') || s.includes('stream')) return '💻';
+  if (s.includes('outdoor') || s.includes('park')) return '🌳';
+  return '📍';
+};
 const ONLINE_COLOR = "#22d3ee";
 const onlineTypeLabel = c => c?.onlineType === 'fanmeeting' ? 'Fanmeeting' : 'Concert';
 const formatOnlineLocation = c => {
@@ -4309,9 +4322,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             );
           };
           const sortOptions = [['mostSeen', 'Most seen'], ['az', 'A–Z'], ...(hasAlbumData ? [['album', 'Album']] : [])];
+          const tileConfig = (settings.artistTileConfig || {})[selectedArtist] || {};
+          const totalKnown = tileConfig.totalSongsKnown || null;
+          const setTotalKnown = v => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...tileConfig, totalSongsKnown: v ? parseInt(v) : null } });
+          const setAlbumTotal = (album, v) => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...tileConfig, albumTotals: { ...(tileConfig.albumTotals || {}), [album]: v ? parseInt(v) : null } } });
+          const completionBar = (heard, total, key) => total > 0 && (
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ height: 5, background: "#1a1a2e", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{ width: `${Math.min(100, (heard / total) * 100)}%`, height: "100%", background: "#a78bfa" }} />
+              </div>
+            </div>
+          );
           return (
           <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs</span>
                 <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
@@ -4324,15 +4348,43 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 ))}
               </div>
             </div>
+            {(totalKnown || bannerEditMode) && songSort !== 'album' && (
+              <div style={{ marginBottom: 12 }}>
+                {bannerEditMode ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>
+                    <span>Total known songs:</span>
+                    <input type="number" value={totalKnown ?? ''} onChange={e => setTotalKnown(e.target.value)} placeholder="e.g. 40"
+                      style={{ width: 60, background: "#0e0e1a", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "3px 6px" }} />
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>{artistSongs.length} of {totalKnown} songs heard live</div>
+                    {completionBar(artistSongs.length, totalKnown, 'overall')}
+                  </>
+                )}
+              </div>
+            )}
             {songSort === 'album' && hasAlbumData ? (() => {
               const groups = {};
               artistSongs.forEach(([song, count]) => { const alb = artistSongAlbum[song] || 'Other'; (groups[alb] = groups[alb] || []).push([song, count]); });
-              return Object.entries(groups).map(([album, songs]) => (
+              return Object.entries(groups).map(([album, songs]) => {
+                const albumTotal = (tileConfig.albumTotals || {})[album] || null;
+                return (
                 <div key={album} style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, color: "#8b7fb0", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{album}</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, color: "#8b7fb0", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em" }}>{album}</div>
+                    {bannerEditMode ? (
+                      <input type="number" value={albumTotal ?? ''} onChange={e => setAlbumTotal(album, e.target.value)} placeholder="total tracks"
+                        style={{ width: 70, background: "#0e0e1a", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 10, padding: "2px 5px" }} />
+                    ) : albumTotal ? (
+                      <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{songs.length}/{albumTotal}</span>
+                    ) : null}
+                  </div>
+                  {!bannerEditMode && albumTotal && completionBar(songs.length, albumTotal, album)}
                   {songs.map(([song, count], i) => songRow(song, count, i, songs.length))}
                 </div>
-              ));
+                );
+              });
             })() : sortedSongs.map(([song, count], i) => songRow(song, count, i, sortedSongs.length))}
           </div>
           );
@@ -4399,6 +4451,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   const c = item.concert;
                   const online = isOnline(c);
                   const borderColor = item.role === 'headliner' ? (c.favorite ? '#facc15' : '#a78bfa') : online ? ONLINE_COLOR : dotColor(item.role);
+                  const friends = getFriends(c);
+                  const vIcon = online ? '💻' : venueTypeIcon(c.venueSize, c.type === 'festival');
                   return (
                     <div key={`${c.id}-${item.role}`} style={{ display: "flex", gap: 12 }}>
                       <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
@@ -4409,23 +4463,39 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         flex: 1, minWidth: 0, textAlign: "left", background: "#0e0e1a",
                         border: "1px solid #1f1f35", borderLeft: `3px solid ${borderColor}`,
                         borderRadius: 10, padding: "10px 14px", cursor: "pointer",
-                        marginBottom: i < timelineItems.length - 1 ? 14 : 0
+                        marginBottom: i < timelineItems.length - 1 ? 14 : 0,
+                        display: "flex", gap: 10, alignItems: "flex-start"
                       }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: item.role === 'headliner' ? "#1a1a30" : "#1a1030", color: item.role === 'headliner' ? "#a78bfa" : "#f472b6", textTransform: "uppercase" }}>{item.role}</span>
-                          <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)}</span>
+                        {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0 }} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: item.role === 'headliner' ? "#1a1a30" : "#1a1030", color: item.role === 'headliner' ? "#a78bfa" : "#f472b6", textTransform: "uppercase" }}>{item.role}</span>
+                            <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0,4)}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "#e2e0ff", display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                              {vIcon && <span style={{ flexShrink: 0 }}>{vIcon}</span>}
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{online ? formatOnlineLocation(c) : c.venue}</span>
+                            </div>
+                            {friends.length > 0 && (
+                              <div style={{ display: "flex", flexShrink: 0 }}>
+                                {friends.slice(0, 3).map((f, fi) => (
+                                  <div key={f} title={f} style={{ width: 16, height: 16, borderRadius: "50%", background: ["#a78bfa", "#f472b6", "#3a6ea5"][fi % 3], color: "#0c0c14", fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #0e0e1a", marginLeft: fi > 0 ? -6 : 0 }}>{f.charAt(0).toUpperCase()}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{formatDate(c.date)}</div>
+                          {item.role === 'headliner' && c.rating > 0 && (
+                            <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(c.rating)}</div>
+                          )}
+                          {item.role === 'headliner' && c.favorite && (
+                            <div style={{ fontSize: 11, color: "#facc15", marginTop: 3 }}>★ all-time fave</div>
+                          )}
+                          {c.notes && (
+                            <div style={{ fontSize: 11, color: "#8b89ab", marginTop: 3, fontStyle: "italic" }}>{c.notes.length > 80 ? c.notes.slice(0, 80) + "…" : c.notes}</div>
+                          )}
                         </div>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: "#e2e0ff" }}>{online ? formatOnlineLocation(c) : c.venue}</div>
-                        <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{formatDate(c.date)}</div>
-                        {item.role === 'headliner' && c.rating > 0 && (
-                          <div style={{ fontSize: 11, color: "#a78bfa", marginTop: 3 }}>{"★".repeat(c.rating)}</div>
-                        )}
-                        {item.role === 'headliner' && c.favorite && (
-                          <div style={{ fontSize: 11, color: "#facc15", marginTop: 3 }}>★ all-time fave</div>
-                        )}
-                        {c.notes && (
-                          <div style={{ fontSize: 11, color: "#8b89ab", marginTop: 3, fontStyle: "italic" }}>{c.notes.length > 80 ? c.notes.slice(0, 80) + "…" : c.notes}</div>
-                        )}
                       </button>
                     </div>
                   );

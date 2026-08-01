@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-22
+- Dates tab: award/win entries now group into a "Wins & awards" block like Members does for birthdays
+- Fixed discography (albums/EPs/singles) likely failing due to a MusicBrainz rate limit — added a delay between the two lookups, and made the numbers manually editable/overridable either way
 - Dates tab: member birthdays now group into one compact card instead of each getting its own full-size block
 - Fixed a real bug: adding the same festival act on a different day silently failed, forcing typo workarounds — fixed, and cleaned up the Fox Stevenson/Maduk typos it caused in your data
 - Added autocomplete when typing a festival act name

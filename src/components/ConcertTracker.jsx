@@ -3986,7 +3986,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           </div>
         )}
         <div style={{ display: "flex", gap: 5, padding: "10px 16px 4px" }}>
-          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Dates']].map(([id, label]) => (
+          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Info']].map(([id, label]) => (
             <button key={id} onClick={() => setArtistTab(id)} style={{
               background: artistTab === id ? "#a78bfa" : "#13131f", color: artistTab === id ? "#0c0c14" : "#6b6a8f",
               border: `1px solid ${artistTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
@@ -4282,9 +4282,10 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         {/* Songs heard live — dotted timeline style, matching Shows tab */}
         {artistSongs.length > 0 && (() => {
           const maxCount = Math.max(...artistSongs.map(([, n]) => n), 1);
-          const groupByAlbum = !!(settings.artistTileConfig || {})[selectedArtist]?.groupSongsByAlbum;
-          const toggleGroup = () => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...((settings.artistTileConfig || {})[selectedArtist] || {}), groupSongsByAlbum: !groupByAlbum } });
           const hasAlbumData = artistSongs.some(([song]) => artistSongAlbum[song]);
+          const songSort = (settings.artistTileConfig || {})[selectedArtist]?.songSort || 'mostSeen';
+          const setSongSort = v => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...((settings.artistTileConfig || {})[selectedArtist] || {}), songSort: v } });
+          const sortedSongs = songSort === 'az' ? [...artistSongs].sort((a, b) => a[0].localeCompare(b[0])) : artistSongs;
           const songRow = (song, count, i, total) => {
             const criedHere = pastShows.some(c => c.criedSong === song);
             const barColor = criedHere ? "#3a6ea5" : "#a78bfa";
@@ -4307,20 +4308,23 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               </div>
             );
           };
+          const sortOptions = [['mostSeen', 'Most seen'], ['az', 'A–Z'], ...(hasAlbumData ? [['album', 'Album']] : [])];
           return (
           <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs</span>
                 <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
               </div>
-              {bannerEditMode && hasAlbumData && (
-                <button onClick={toggleGroup} style={{ background: groupByAlbum ? "#a78bfa" : "none", border: "1px solid #3a3560", borderRadius: 99, color: groupByAlbum ? "#0c0c14" : "#6b6a8f", fontSize: 10, padding: "3px 9px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
-                  Group by album
-                </button>
-              )}
+              <div style={{ display: "flex", gap: 5 }}>
+                {sortOptions.map(([id, label]) => (
+                  <button key={id} onClick={() => setSongSort(id)} style={{ background: songSort === id ? "#a78bfa" : "#0e0e1a", border: `1px solid ${songSort === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99, color: songSort === id ? "#0c0c14" : "#6b6a8f", fontSize: 10, padding: "3px 9px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: songSort === id ? 700 : 400 }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            {groupByAlbum && hasAlbumData ? (() => {
+            {songSort === 'album' && hasAlbumData ? (() => {
               const groups = {};
               artistSongs.forEach(([song, count]) => { const alb = artistSongAlbum[song] || 'Other'; (groups[alb] = groups[alb] || []).push([song, count]); });
               return Object.entries(groups).map(([album, songs]) => (
@@ -4329,7 +4333,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   {songs.map(([song, count], i) => songRow(song, count, i, songs.length))}
                 </div>
               ));
-            })() : artistSongs.map(([song, count], i) => songRow(song, count, i, artistSongs.length))}
+            })() : sortedSongs.map(([song, count], i) => songRow(song, count, i, sortedSongs.length))}
           </div>
           );
         })()}

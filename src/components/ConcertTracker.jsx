@@ -10,6 +10,43 @@ import VenueMap from './VenueMap'
 // * does nothing everywhere else (iOS Safari, desktop), so it's always safe to call.
 const haptic = (ms = 12) => { try { navigator.vibrate?.(ms); } catch {} };
 
+const ONBOARDING_STEPS = [
+  { icon: '🎫', title: 'Track every show', body: 'Log concerts and festivals, with setlists, photos, ratings, and who you went with.' },
+  { icon: '🎤', title: 'Artist pages, your way', body: 'Customize what shows on each artist\u2019s page — stats, photo gallery style, and important dates like birthdays and anniversaries.' },
+  { icon: '🎵', title: 'Songs heard live', body: 'Every song from every setlist collects here automatically, sortable by how often you\u2019ve heard it.' },
+  { icon: '👉', title: 'Small gestures, big shortcuts', body: 'Swipe or long-press a wishlist show to quickly remove it — no need to open it first.' },
+];
+
+function OnboardingTour({ step, setStep, onDismiss }) {
+  const s = ONBOARDING_STEPS[step];
+  const isLast = step === ONBOARDING_STEPS.length - 1;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(6,6,12,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div className="tab-fade-in" style={{ background: '#13131f', border: '1px solid #272544', borderRadius: 18, padding: '28px 24px', maxWidth: 340, width: '100%', textAlign: 'center', position: 'relative' }}>
+        <button onClick={onDismiss} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', color: '#4a4870', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>{s.icon}</div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 19, fontWeight: 800, color: '#e2e0ff', marginBottom: 8 }}>{s.title}</div>
+        <div style={{ fontSize: 13, color: '#9491b8', lineHeight: 1.6, marginBottom: 22 }}>{s.body}</div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 22 }}>
+          {ONBOARDING_STEPS.map((_, i) => (
+            <div key={i} style={{ width: i === step ? 18 : 6, height: 6, borderRadius: 99, background: i === step ? 'var(--accent)' : '#2e2e4a', transition: 'width 0.25s ease' }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {step > 0 && (
+            <button onClick={() => setStep(s => s - 1)} style={{ flex: 1, background: 'none', border: '1px solid #2e2e50', borderRadius: 10, color: '#6b6a8f', padding: '11px', fontSize: 13, fontFamily: "'DM Mono', monospace", cursor: 'pointer' }}>Back</button>
+          )}
+          <button onClick={() => isLast ? onDismiss() : setStep(s => s + 1)} style={{ flex: 2, background: 'var(--accent)', border: 'none', borderRadius: 10, color: '#0c0c14', padding: '11px', fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: 'pointer' }}>
+            {isLast ? "Let's go" : 'Next'}
+          </button>
+        </div>
+        {!isLast && <button onClick={onDismiss} style={{ marginTop: 14, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer' }}>Skip tour</button>}
+      </div>
+    </div>
+  );
+}
+
+
 // * Accent presets deliberately avoid hues already carrying meaning elsewhere
 // * in the app: pink (festival), gold (favorite), green (wishlist), indigo (upcoming).
 const ACCENT_PRESETS = {
@@ -7895,6 +7932,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }, [])
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(0)
+  useEffect(() => {
+    if (!showStartupScreen && !settings.hasSeenOnboarding) setShowOnboarding(true)
+  }, [showStartupScreen])
+  const dismissOnboarding = () => { setShowOnboarding(false); onUpdateSetting('hasSeenOnboarding', true) }
   const [showConfetti, setShowConfetti] = useState(false)
   const celebratedMilestones = useRef(new Set())
   useEffect(() => {
@@ -8739,6 +8782,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
+      {showOnboarding && <OnboardingTour step={onboardingStep} setStep={setOnboardingStep} onDismiss={dismissOnboarding} />}
       <BottomNav />
 
       {/* Spotify link prompt after adding a concert with songs */}

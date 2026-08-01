@@ -8521,6 +8521,20 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   across {distinctArtists} artist{distinctArtists !== 1 ? 's' : ''}, {distinctVenues} venue{distinctVenues !== 1 ? 's' : ''}{distinctCountries > 0 ? `, ${distinctCountries} countr${distinctCountries !== 1 ? 'ies' : 'y'}` : ''}
                 </div>
               )}
+              {(() => {
+                const next = concerts.filter(c => !isWish(c) && !isPast(c.date)).sort((a, b) => a.date.localeCompare(b.date))[0];
+                if (!next) return null;
+                const days = Math.max(0, Math.ceil((new Date(next.date + 'T00:00:00') - new Date()) / 86400000));
+                return (
+                  <button onClick={() => handleOpenConcert(next)} style={{ width: '100%', textAlign: 'center', marginTop: 16, background: 'linear-gradient(160deg, #1c1c30, #15151f)', border: '1px solid #232340', borderRadius: 14, padding: '18px 16px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Next up</div>
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 30, fontWeight: 800, color: 'var(--accent)', margin: '4px 0' }}>
+                      {days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `${days} days`}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#c4c2f0' }}>{next.artist}{next.venue ? ` at ${next.venue}` : ''}</div>
+                  </button>
+                );
+              })()}
             </div>
           );
         })()}

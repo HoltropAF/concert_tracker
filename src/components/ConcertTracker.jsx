@@ -10,6 +10,34 @@ import VenueMap from './VenueMap'
 // * does nothing everywhere else (iOS Safari, desktop), so it's always safe to call.
 const haptic = (ms = 12) => { try { navigator.vibrate?.(ms); } catch {} };
 
+// * Fires a short burst of falling confetti particles, pure CSS, no library.
+// * Auto-unmounts itself after the animation finishes.
+function Confetti({ onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 1600); return () => clearTimeout(t); }, [onDone]);
+  const colors = ['#a78bfa', '#f472b6', '#facc15', '#34d399', '#818cf8'];
+  const pieces = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    delay: Math.random() * 0.3,
+    duration: 1.1 + Math.random() * 0.6,
+    color: colors[i % colors.length],
+    rotate: Math.random() * 360,
+    size: 6 + Math.random() * 5,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 500, overflow: 'hidden' }}>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position: 'absolute', top: -20, left: `${p.left}%`, width: p.size, height: p.size * 0.6,
+          background: p.color, borderRadius: 2,
+          animation: `confettiFall ${p.duration}s ease-in ${p.delay}s forwards`,
+          transform: `rotate(${p.rotate}deg)`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
 // * Animates a number counting up from 0 to its target value on mount/change.
 // * Re-triggers whenever `value` changes (e.g. switching between artists).
 function CountUp({ value, duration = 900 }) {
@@ -7825,6 +7853,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }, [])
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
+  const [showConfetti, setShowConfetti] = useState(false)
+  const celebratedMilestones = useRef(new Set())
+  useEffect(() => {
+    const pastCount = concerts.filter(c => !isWish(c) && isPast(c.date)).length
+    if (pastCount > 0 && pastCount % 50 === 0 && !celebratedMilestones.current.has(pastCount)) {
+      celebratedMilestones.current.add(pastCount)
+      setShowConfetti(true)
+      haptic(25)
+    }
+  }, [concerts])
   const [selected, setSelected] = useState(null)
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
   const [showAddAttendance, setShowAddAttendance] = useState('in_person')
@@ -8655,6 +8693,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
+      {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
       <BottomNav />
 
       {/* Spotify link prompt after adding a concert with songs */}

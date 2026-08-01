@@ -3689,6 +3689,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         if (!artist) { if (!cancelled) onUpdateSetting('artistMusicBrainzInfo', { ...(settings.artistMusicBrainzInfo || {}), [selectedArtist]: null }); return; }
         let albumCount = null, epCount = null, singleCount = null;
         try {
+          await new Promise(r => setTimeout(r, 600)); // MusicBrainz rate-limits to 1 req/sec
           const rr = await fetch(`https://musicbrainz.org/ws/2/release-group?artist=${artist.id}&fmt=json&limit=100`);
           if (rr.ok) {
             const rd = await rr.json();
@@ -4423,33 +4424,38 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   )}
                 </div>
               </div>
-              {(mb?.albumCount || mb?.epCount || mb?.singleCount) && (
-                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                  <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Discography (MusicBrainz)</div>
-                  {mb.albumCount > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Albums</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.albumCount}</span>
-                    </div>
-                  )}
-                  {mb.epCount > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>EPs / mini albums</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.epCount}</span>
-                    </div>
-                  )}
-                  {mb.singleCount > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>Singles</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{mb.singleCount}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const albums = overrides.albumCount ?? mb?.albumCount ?? null;
+                const eps = overrides.epCount ?? mb?.epCount ?? null;
+                const singles = overrides.singleCount ?? mb?.singleCount ?? null;
+                const setDiscog = (key, val) => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, [key]: val ? parseInt(val) : null } });
+                if (!bannerEditMode && !albums && !eps && !singles) return null;
+                const row = (label, key, val) => (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
+                    <span style={{ fontSize: 12, color: "#6b6a8f" }}>{label}</span>
+                    {bannerEditMode ? (
+                      <input type="number" value={val ?? ''} onChange={e => setDiscog(key, e.target.value)} placeholder="0"
+                        style={{ width: 60, background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: "4px 6px", textAlign: "right" }} />
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{val}</span>
+                    )}
+                  </div>
+                );
+                return (
+                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Discography{bannerEditMode ? " (override MusicBrainz if wrong)" : " (MusicBrainz)"}</div>
+                    {row("Albums", "albumCount", albums)}
+                    {row("EPs / mini albums", "epCount", eps)}
+                    {row("Singles", "singleCount", singles)}
+                  </div>
+                );
+              })()}
               {(() => {
                 const isBirthday = d => /birthday/i.test(d.label || '');
+                const isAward = d => /win|daesang|award|album of the year|song of the year|artist of the year|grand prize/i.test(d.label || '');
                 const birthdays = customDates.filter(d => isBirthday(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
-                const others = customDates.filter(d => !isBirthday(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const awards = customDates.filter(d => !isBirthday(d) && isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const others = customDates.filter(d => !isBirthday(d) && !isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
                 const editRow = d => (
                   <div key={d.i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
                     <input value={d.label} onChange={e => setCustomDates(customDates.map((x, xi) => xi === d.i ? { ...x, label: e.target.value } : x))} placeholder="Label (e.g. First album)"
@@ -4457,6 +4463,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                     <input type="date" value={d.date || ''} onChange={e => setCustomDates(customDates.map((x, xi) => xi === d.i ? { ...x, date: e.target.value } : x))}
                       style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "5px 6px" }} />
                     <button onClick={() => setCustomDates(customDates.filter((_, xi) => xi !== d.i))} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 14, cursor: "pointer", padding: 0 }}>×</button>
+                  </div>
+                );
+                const groupBlock = (label, list) => list.length > 0 && (
+                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 4 }}>{label}</div>
+                    {bannerEditMode
+                      ? list.map(d => editRow(d))
+                      : list.map((d, bi) => (
+                        <div key={d.i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderTop: bi > 0 ? "1px solid #1f1f35" : "none" }}>
+                          <span style={{ fontSize: 12, color: "#6b6a8f" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, '')}</span>
+                          <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                        </div>
+                      ))
+                    }
                   </div>
                 );
                 return (
@@ -4471,20 +4491,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         )}
                       </div>
                     ))}
-                    {birthdays.length > 0 && (
-                      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                        <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 4 }}>Members</div>
-                        {bannerEditMode
-                          ? birthdays.map(d => editRow(d))
-                          : birthdays.map((d, bi) => (
-                            <div key={d.i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderTop: bi > 0 ? "1px solid #1f1f35" : "none" }}>
-                              <span style={{ fontSize: 12, color: "#6b6a8f" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, '')}</span>
-                              <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
-                            </div>
-                          ))
-                        }
-                      </div>
-                    )}
+                    {groupBlock("Wins & awards", awards)}
+                    {groupBlock("Members", birthdays)}
                   </>
                 );
               })()}

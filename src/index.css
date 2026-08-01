@@ -71,6 +71,16 @@ button:active {
 .stagger-list > *:nth-child(n+9) { animation-delay: 0.25s; }
 
 
+@keyframes toastBounceIn {
+  0% { transform: translateX(-50%) translateY(20px) scale(0.9); opacity: 0; }
+  60% { transform: translateX(-50%) translateY(-4px) scale(1.02); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+.toast-bounce-in {
+  animation: toastBounceIn 0.4s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+
+
 @keyframes confettiFall {
   from { transform: translateY(0) rotate(0deg); opacity: 1; }
   to { transform: translateY(110vh) rotate(540deg); opacity: 0.4; }

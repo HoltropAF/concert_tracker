@@ -553,8 +553,8 @@ function ToastHost({ toast, onDismiss }) {
     ? { border: '#f472b6', color: '#f472b6', bg: '#1a1020' }
     : { border: '#a78bfa', color: '#a78bfa', bg: '#13131f' };
   return (
-    <div style={{
-      position: 'fixed', left: '50%', bottom: 82, transform: 'translateX(-50%)',
+    <div className="toast-bounce-in" style={{
+      position: 'fixed', left: '50%', bottom: 82,
       width: 'calc(100% - 32px)', maxWidth: 448, zIndex: 300,
       background: palette.bg, border: `1px solid ${palette.border}`, borderRadius: 10,
       boxShadow: '0 10px 28px rgba(0,0,0,0.5)', padding: '11px 12px',

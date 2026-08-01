@@ -3006,6 +3006,34 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
+          {/* Activity heatmap — last 52 weeks, GitHub-style */}
+          {pastAll.length > 0 && (() => {
+            const weekCounts = [];
+            const now = new Date();
+            for (let w = 51; w >= 0; w--) {
+              const weekStart = new Date(now);
+              weekStart.setDate(now.getDate() - w * 7 - now.getDay());
+              const weekEnd = new Date(weekStart);
+              weekEnd.setDate(weekStart.getDate() + 7);
+              const count = pastAll.filter(c => {
+                const d = new Date(c.date + 'T00:00:00');
+                return d >= weekStart && d < weekEnd;
+              }).length;
+              weekCounts.push(count);
+            }
+            const colorFor = n => n === 0 ? '#161628' : n === 1 ? '#3d3564' : n === 2 ? '#6d5fa8' : 'var(--accent)';
+            return (
+              <div style={{ marginBottom: 14, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px" }}>
+                <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Activity, last year</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(26, 1fr)", gap: 3 }}>
+                  {weekCounts.map((n, i) => (
+                    <div key={i} title={`${n} show${n !== 1 ? 's' : ''}`} style={{ aspectRatio: "1", borderRadius: 2, background: colorFor(n) }} />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Row 1: shows / festivals / countries / avg per year */}
           {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && !summaryFavOnly && (() => {
             const currentYearStr = String(new Date().getFullYear());

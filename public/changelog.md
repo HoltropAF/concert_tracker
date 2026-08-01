@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Dates tab: member birthdays now group into one compact card instead of each getting its own full-size block
 - Fixed a real bug: adding the same festival act on a different day silently failed, forcing typo workarounds — fixed, and cleaned up the Fox Stevenson/Maduk typos it caused in your data
 - Added autocomplete when typing a festival act name
 - Fixed top friend on Artist pages: festival/support appearances weren't counted at all before; also no longer shows on a tie

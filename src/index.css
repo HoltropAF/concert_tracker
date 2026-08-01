@@ -26,6 +26,22 @@ input, textarea, select, button {
   animation: slideInRight 0.5s cubic-bezier(.32,.72,0,1);
 }
 
+@keyframes tabFadeIn {
+  from { transform: scale(0.98); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.tab-fade-in {
+  animation: tabFadeIn 0.28s ease-out;
+}
+
+button {
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+button:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;

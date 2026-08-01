@@ -566,6 +566,23 @@ function ToastHost({ toast, onDismiss }) {
   );
 }
 
+// * Wraps the portion of `text` matching `query` in a highlighted span.
+// * Case-insensitive, matches the first occurrence only. Falls back to plain
+// * text if there's no query or no match, so it's always safe to use.
+function HighlightMatch({ text, query }) {
+  if (!query || !text) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span style={{ color: '#a78bfa', fontWeight: 800, background: 'rgba(167,139,250,0.18)', borderRadius: 3 }}>{text.slice(idx, idx + query.length)}</span>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
+
 function EmptyState({ title, detail, actionLabel, onAction, icon = '🎫' }) {
   return (
     <div style={{ textAlign: 'center', padding: '42px 18px', border: '1px dashed #1f1f35', borderRadius: 12, background: '#10101b', margin: '14px 0' }}>

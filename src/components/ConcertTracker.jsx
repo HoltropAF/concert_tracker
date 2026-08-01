@@ -1029,17 +1029,24 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   const accentColor = online ? ONLINE_COLOR : isFestival ? "#f472b6" : past ? "#a78bfa" : concert.wishlist ? "#34d399" : "#818cf8";
   const [swipeX, setSwipeX] = useState(0);
   const swipeStart = useRef(null);
+  const longPressTimer = useRef(null);
   const REVEAL = 76;
-  const onTouchStart = e => { if (!onDelete) return; swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, base: swipeX }; };
+  const onTouchStart = e => {
+    if (!onDelete) return;
+    swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, base: swipeX };
+    longPressTimer.current = setTimeout(() => { haptic(15); setSwipeX(-REVEAL); longPressTimer.current = null; }, 480);
+  };
   const onTouchMove = e => {
     if (!onDelete || !swipeStart.current) return;
     const dx = e.touches[0].clientX - swipeStart.current.x;
     const dy = e.touches[0].clientY - swipeStart.current.y;
+    if (longPressTimer.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
     if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll, don't hijack
     const next = Math.min(0, Math.max(-REVEAL, swipeStart.current.base + dx));
     setSwipeX(next);
   };
   const onTouchEnd = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
     if (!onDelete || !swipeStart.current) return;
     setSwipeX(x => {
       const opening = x < -REVEAL / 2;

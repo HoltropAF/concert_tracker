@@ -5286,7 +5286,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const lastVisit = past.sort((a,b) => b.date.localeCompare(a.date))[0] || null;
     const photos = past.filter(c => c.photo);
     const mapShape = shows.length > 0 && shows.every(c => c.type === 'festival') ? 'diamond' : 'pin';
-    return { name, shows, past, upcoming, pastCount: past.length, avgRating, avgTicket, city, country, lastVisit, photos, mapShape };
+    const isFest = shows.length > 0 && shows.every(c => c.type === 'festival');
+    const vIcon = venueTypeIcon(shows[0]?.venueSize, isFest);
+    return { name, shows, past, upcoming, pastCount: past.length, avgRating, avgTicket, city, country, lastVisit, photos, mapShape, vIcon };
   });
 
   // Venues you haven't logged a show at yet, but want to — kept separate from
@@ -5805,6 +5807,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.wantToVisit ? '#34d399' : v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {v.vIcon && <span style={{ fontSize: 13, flexShrink: 0 }}>{v.vIcon}</span>}
                 <div style={{ fontSize: 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
                 {v.wantToVisit && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to go</span>}
               </div>

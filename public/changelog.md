@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1 August 2026
+- Songs: setlist completion bar (overall and per-album), with an editable total since there's no outside source for full discography size
+- Shows timeline: photo thumbnails, venue-type icons, and small avatars for who you went with
+- Venue-type icons also show on the Venues tab list
 - Songs list now has a sort option always visible (Most seen / A-Z / Album), not hidden in edit mode
 - Renamed the Dates tab to Info, since it holds numbers too, not just dates
 - Fixed the update popup being too small to read — it's bigger now and shows proper bullet points instead of raw text

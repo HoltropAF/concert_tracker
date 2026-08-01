@@ -6,6 +6,10 @@ import { geocodeVenue } from '../lib/geocode'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
 
+// * Fires a short vibration where supported (mostly Android Chrome); silently
+// * does nothing everywhere else (iOS Safari, desktop), so it's always safe to call.
+const haptic = (ms = 12) => { try { navigator.vibrate?.(ms); } catch {} };
+
 // * Animates a number counting up from 0 to its target value on mount/change.
 // * Re-triggers whenever `value` changes (e.g. switching between artists).
 function CountUp({ value, duration = 900 }) {
@@ -991,7 +995,11 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   };
   const onTouchEnd = () => {
     if (!onDelete || !swipeStart.current) return;
-    setSwipeX(x => (x < -REVEAL / 2 ? -REVEAL : 0));
+    setSwipeX(x => {
+      const opening = x < -REVEAL / 2;
+      if (opening) haptic();
+      return opening ? -REVEAL : 0;
+    });
     swipeStart.current = null;
   };
 
@@ -1031,7 +1039,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     return (
       <div style={{ position: "relative", marginBottom: 4, borderRadius: 8, overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: "#7f1d3a", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 14 }}>
-          <button onClick={() => { onDelete(concert); setSwipeX(0); }} style={{ background: "none", border: "none", color: "#fff", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer" }}>Remove</button>
+          <button onClick={() => { haptic(20); onDelete(concert); setSwipeX(0); }} style={{ background: "none", border: "none", color: "#fff", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer" }}>Remove</button>
         </div>
         {card}
       </div>
@@ -6610,7 +6618,7 @@ function SettingsSection({ title, icon, children, collapsible = false, defaultOp
 function SettingsToggle({ checked, onChange }) {
   return (
     <button
-      onClick={() => onChange(!checked)}
+      onClick={() => { haptic(); onChange(!checked); }}
       style={{
         width: 44, height: 26, borderRadius: 99, border: "none", position: "relative",
         background: checked ? "#a78bfa" : "#2a2940", padding: 0, cursor: "pointer", flexShrink: 0,

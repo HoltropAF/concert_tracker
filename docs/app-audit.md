@@ -4,9 +4,15 @@ Living document. We update this as we go through every part of the app: what it 
 
 ---
 
-## Status: IN PROGRESS — pass 1 (structural/functional pass)
+## Status: pass 1 fixes applied. Pass 2 (deeper consistency) not started. Visual pass not started.
 
-Pass 1 covers: what filters/sorts/view-modes exist on each tab, and where they're inconsistent with each other. Visual audit (pass 2) hasn't started yet — see questions at the bottom before we go there.
+---
+
+## Confirmed inconsistencies (pass 1 findings)
+
+1. ~~Asc/desc sort direction only on Artists~~ — **FIXED**: now on Songs, Venues, Friends too.
+2. ~~Compact/non-compact toggle only on Shows and Artists~~ — **FIXED**: now on Songs, Venues, Friends too, each with its own compact row layout.
+3. Not yet checked: "clear filters" affordance consistency, search behavior (live vs submit), empty-state messaging consistency. This is pass 2.
 
 ---
 
@@ -26,18 +32,18 @@ Pass 1 covers: what filters/sorts/view-modes exist on each tab, and where they'r
 
 ### Songs
 - Filters: type (concert/festival), Spotify-linked-only, search
-- Sort: yes — **no asc/desc direction toggle**
-- Compact/non-compact toggle: **no**
+- Sort: yes, with asc/desc direction toggle
+- Compact/non-compact toggle: yes
 
 ### Venues
 - Filters: country, min-visited, want-to-go-only, type (concert/festival), search
-- Sort: yes — **no asc/desc direction toggle**
-- Compact/non-compact toggle: **no**
+- Sort: yes, with asc/desc direction toggle
+- Compact/non-compact toggle: yes
 
 ### Friends
 - Filters: min-times-together, has-upcoming-only, type, search
-- Sort: yes — **no asc/desc direction toggle**
-- Compact/non-compact toggle: **no**
+- Sort: yes, with asc/desc direction toggle
+- Compact/non-compact toggle: yes
 
 ---
 

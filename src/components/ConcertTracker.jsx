@@ -3854,7 +3854,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const festivalNotes = supportApps.filter(a => a.role === 'festival' && a.act?.note).map(a => ({ date: actDate(a.concert.date, a.act), festival: a.concert.artist, note: a.act.note, concert: a.concert })).sort((a,b) => b.date.localeCompare(a.date));
     const friendCount = {};
     pastShows.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
-    const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
+    supportApps.forEach(a => getFriends(a.concert).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
+    const topFriendSorted = Object.entries(friendCount).sort((a,b) => b[1]-a[1]);
+    const topFriend = (topFriendSorted.length > 0 && (topFriendSorted.length === 1 || topFriendSorted[0][1] > topFriendSorted[1][1])) ? topFriendSorted[0] : null;
     const upcomingSupportApps = (supportAppearancesMap[selectedArtist] || []).filter(a => !isPast(a.concert.date)).sort((a,b) => a.concert.date.localeCompare(b.concert.date));
     const allUpcoming = [...upcomingShows, ...upcomingSupportApps.map(a => a.concert)].sort((a,b) => a.date.localeCompare(b.date));
     const supportOnlyCount = supportApps.filter(a => a.role === 'support').length;

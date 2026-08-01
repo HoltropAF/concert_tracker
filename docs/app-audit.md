@@ -12,7 +12,13 @@ Living document. We update this as we go through every part of the app: what it 
 
 1. ~~Asc/desc sort direction only on Artists~~ — **FIXED**: now on Songs, Venues, Friends too.
 2. ~~Compact/non-compact toggle only on Shows and Artists~~ — **FIXED**: now on Songs, Venues, Friends too, each with its own compact row layout.
-3. Not yet checked: "clear filters" affordance consistency, search behavior (live vs submit), empty-state messaging consistency. This is pass 2.
+3. ~~"Clear filters" / empty-state / search consistency~~ — **CHECKED (pass 2)**:
+   - Search: consistently live (no submit button) on all 4 tabs. No gaps.
+   - "Back to default" clear-filters link: present on all 4 tabs' sort/filter panels. No gaps.
+   - Empty states: **FIXED** — Venues was using a plain unstyled div instead of the shared `EmptyState` component (which Artists/Songs/Friends all use, with a title + helpful detail line). Now consistent.
+   - Filters button label: Songs shows its filter state ("Linked"/"Unlinked") instead of a count like the others do — this is intentional, not a bug, since Songs only has one filter and the state is more useful than a count of 1.
+
+## Pass 2: done. No more functional consistency gaps found across the 5 main tabs.
 
 ---
 

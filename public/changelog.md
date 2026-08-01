@@ -1,6 +1,8 @@
 # Changelog
 
 ## 1 August 2026
+- Opening a show, artist, song, venue, or friend now slides in smoothly instead of appearing instantly
+- Fixed a few spots where "upcoming" was colored green instead of the usual indigo
 - Venues empty state ("no venues found") now matches the style used everywhere else
 - Songs, Venues, and Friends now have compact view and sort direction (A-Z/Z-A style), matching Shows and Artists
 - Songs: setlist completion bar (overall and per-album), with an editable total since there's no outside source for full discography size

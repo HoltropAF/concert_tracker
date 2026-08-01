@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1 August 2026
+- Songs, Venues, and Friends now have compact view and sort direction (A-Z/Z-A style), matching Shows and Artists
 - Songs: setlist completion bar (overall and per-album), with an editable total since there's no outside source for full discography size
 - Shows timeline: photo thumbnails, venue-type icons, and small avatars for who you went with
 - Venue-type icons also show on the Venues tab list

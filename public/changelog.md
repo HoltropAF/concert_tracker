@@ -1,112 +1,13 @@
 # Changelog
 
-## 2026-07-22
-- Songs Live: play-count bar behind each song, and a per-artist "Group by album" toggle in edit mode
-- Every Year timeline: today's date gets a distinct green glow + "TODAY" marker instead of blending into "upcoming"
-- Every Year timeline: entries that already passed this calendar year dim, staying readable but clearly distinguishable from what's still upcoming
-- Dates tab restructured: The Numbers, Milestones (one-time events), and a new Every Year timeline for recurring things (birthdays, fandom days) sorted by month/day
-- Dates tab: award/win entries now group into a "Wins & awards" block like Members does for birthdays
-- Fixed discography (albums/EPs/singles) likely failing due to a MusicBrainz rate limit — added a delay between the two lookups, and made the numbers manually editable/overridable either way
-- Dates tab: member birthdays now group into one compact card instead of each getting its own full-size block
-- Fixed a real bug: adding the same festival act on a different day silently failed, forcing typo workarounds — fixed, and cleaned up the Fox Stevenson/Maduk typos it caused in your data
-- Added autocomplete when typing a festival act name
-- Fixed top friend on Artist pages: festival/support appearances weren't counted at all before; also no longer shows on a tie
-- Tile row capped at 4 per line, top friend only shows at 3+ appearances, cried can't be hidden, added a manual Spotify refresh button, polaroid photos are now repositionable in edit mode
-- Overview merged to one auto-scaling tile row, dead popularity/followers removed entirely
-- Discography breakdown (albums/EPs/singles) added to the Dates tab
-- Shows timeline cards: date, rating, all-time fave, and notes each get their own line
-- Two new artist photo gallery styles: Polaroids and Pinned+strip, pick your favorite in Settings
-- Rebuilt tile customization: hold and drag a tile to reorder or switch rows, instead of the confusing button row. Hide/show tiles moved to a separate clean list. Pencil icon renamed to "Edit"/"Save edits"
-- Overview tiles are now fully customizable per artist in edit mode: reorder, move between rows, or hide any of them — remembered forever per artist
-- Songs page gets the banner treatment too — bigger album art with a gradient scrim, matching the artist page
-- New: the first time you open an artist, if Spotify has a photo and you haven't set your own, a popup lets you choose it or set your own instead
-- Renamed Info tab to Dates, slimmer tab pills
-- Moved "last pulled" below both tile rows; fandom name tile always shows now with a "+ add" prompt instead of vanishing when unset
-- Ult-group toggle only shows in edit mode; timeline dots are smaller
-- Overview: added the MusicBrainz/fandom tile row, moved cried count from Songs into the main rating row
-- Built the missing Info tab: formation date, group/solo type, country, album count (via MusicBrainz, unaffected by Spotify's restrictions), plus an editable fandom name field
-- Fixed stray extra dots on the Shows and Songs timelines
-- Moved festival rating and top friend into the Overview stats card alongside concert rating/popularity
-- "X× seen live" now shows once, in the banner under the artist name (smaller than the title), instead of showing twice
-- Fixed "Invalid Date" showing in the Shows timeline (a want-to-go entry was leaking in)
-- Banner is bigger, and move/upload controls are hidden until you tap the pencil icon
-- Songs Live rows are clickable — jump to that song's page, back returns you here
-- Artist popularity/followers/top-tracks: confirmed this is a Spotify Developer Mode restriction from Feb 2026, not a bug — removed the dead code chasing it
-- Artist banner photo: drag to reposition after uploading, with a live preview
-- Renamed Moments tab to Songs Live, and gave the songs list a dotted-timeline treatment
-- More robust Spotify fetch — fetches the artist directly by ID too, since search alone was coming back incomplete
-- Artist detail page: personal photo now sits right after the header, above the popularity/followers card instead of below it
-- Artists list: compact/non-compact toggle (its own setting, separate from Shows), non-compact shows your personal artist photo as a small square on the left
-- Fixed a duplicate rating tile on the Artist page that showed up alongside the new popularity/followers card
-- Artist photo is now yours to upload — no longer auto-pulled from Spotify, moved to a bigger circle above the seen-live number with an edit-pen placeholder until you add one
-- Popularity/followers/your-rating tiles all together again on the Spotify card
-- Fixed why the Spotify artist info never showed: your access token had expired and the page never tried to refresh it. Now refreshes automatically like Songs already does
-- Artist page: photo and Spotify link click through to their Spotify page, genre pill, popularity/follower tiles, "last pulled" timestamp, and a "Popular right now" track — richer version of the Spotify photo feature, rebuilt after a sandbox reset lost the original
-- Restored the Artist page sections default-open Settings toggle, also caught from that same reset
-- Shows-per-year chart added to Summary; year picker stays usable even with ATF on
-- ATF list simplified: no rank numbers or star ratings, just the shows
-- Festival act notes redesigned to match the concert setlist's pencil-icon pattern
-- Fixed festival tickets not showing on re-edit — legacy prices now migrate automatically
-- Festival act names are now clickable through to their Artist page
-- Fixed the misleading "artists" tile on festival Venue pages — now shows real lineup count
-- Removed the all-years spending chart from Summary
-- Fixed festival act notes showing the festival's start date instead of the actual day that act performed
-- Recurring-festival card on Venue pages no longer needs a tap to expand — years show directly
-- Confirmed all 5 festival venues already have their festival-specific website set correctly
-- Removed Cumulative shows chart from Summary
-- Fixed Invalid Date on Artist page festival notes
-- Redesigned the recurring-festival card on Venues: location, attendance count, avg show rating, avg spend, and avg act rating, years behind a toggle
-- Updated festival venue websites in your data to the festival's own site instead of the generic venue site (Liquicity, C2C, Central Park)
-- Fixed a data bug: two of your four Liquicity Festival entries had the festival name typed into the venue field instead of "Geestmerambacht" — now all four group together correctly
-- Moved "Festivals you keep coming back to" from Summary onto the ATF page, small and muted
-- Moved the "You've also been in..." cross-link to sit above the tags instead of after Notes
-- Removed "Festival" from the Seen as options
-- Recurring festivals: grouped by year on their Venue page, a cross-link between years on each festival's own page, and a "Festivals you keep coming back to" card on Summary
-- Removed Festival highlights from Stats (didn't like it)
-- Fixed act notes showing at the bottom of each day instead of under the actual act
-- Festivals no longer show Subgenre, Language, Ticket type, or Add-ons — just Genre and a plain ticket
-- Festival Highlights card on Summary: hearted acts across all festivals, grouped by which festival
-- Per-festival stats (acts seen / hearted / avg rating) and a rating-by-day chart on multi-day festivals
-- Artist page shows a concerts/festivals split when you've seen someone as both
-- Festival acts can now have notes, like concerts already do
-- Artist page shows festival act ratings as a separate tile from concert ratings, plus festival notes as a mini history
-- ATF card: removed the photo gallery and the ✕ buttons, added a ✎ toggle to reorder your top 5 with ▲▼ instead
-- ATF card: added a real date-scaled timeline and a photo collage, sized to fit whatever screen it's on
-- ATF card redesigned: dropped the meaningless timeline dots and year span, added a ◆ marker for ult groups right on the row
-- Fixed a duplicate avg-rating tile on the Artist page that appeared twice; removed the redundant songs-heard-live shortcut and swapped the "since [year]" tile for Cried
-- Cried-song indicator moved from a standalone line into the setlist itself, next to the actual song
-- Fixed a real data-loss risk: export/backup was missing Tags, Favorite, criedSong, and itemized tickets/merch entirely — now included in both CSV and Excel, and read back in on import too
-- Ult (group) is now set once per artist instead of needing to re-tag every single show by that group
-- ATF favorites list has a quick-remove button so swapping out a favorite is one tap
-- The song you cried to now shows on the concert's own detail page, not just the edit form
-- Onboarding wizard now points new users to the notification settings on its last step
-- Actually fixed the diverging chart's zero line — it now sits at the same height across every column
-- ATF page: year picker disabled entirely while ATF is on, redundant top stat row removed, cried-count tile instead of always-5-star avg rating
-- Artist page: avg rating and cried count are now proper stat tiles, songs heard live is clickable and jumps to Songs pre-searched
-- Songs: cried-for and top-rated songs now sort first; search no longer misses songs outside the visible top-N
-- Fixed the diverging chart's broken layout (values/labels were wrapping and staggering the grid)
-- ATF page fixes: forces All-years scope, only ATF highlights, no more stray upcoming badges or Up Next box
-- Fixed artist navigation from a show page — was landing on the general Artists list instead of the specific artist
-- Artists: every sort can now go either direction, €/song shown on the row when sorted by it, new Ult group filter
-- Cried can now be linked to a specific song from the setlist; Songs page shows a "cried X times" tile
-- Rebuilt how you log a show: type → timing → ticket status, with want-to-go entries skipping fields that don't apply yet
-- Bottom nav is now Shows / Artists / Songs / Venues / Friends; Stats moved to a header icon
-- Custom tags (Cried, Ult (group), or your own) and an all-time-favorite flag capped at 5 shows — favorites get a gold star, and a dedicated view on Stats
-- Tickets can be split into named line items that sum into one total; costs group tickets/merch under headings
-- Venues have a real map — pins, auto-geocoding, tap to open Google Maps
-- Track venues/artists you want to visit, separate from ones you've been to
-- Filters simplified across the app; Want to go/Upcoming/Past are collapsible again
-- Photo reframing shows a live preview for both the detail page and the shows list at once
-- Diverging monthly chart: shows count up, spending down
-- Light mode, and several layout/alignment fixes across Shows, Artists, Venues, Friends
-- Fixed: today's show flipping to "past" at midnight, a placeholder-date bug, and a few broken filter panels
-
-## 2026-07-15
-- Push notifications actually work now: instant alerts while the app is open, plus a daily background check via ntfy for when it's closed
-- Settings redesigned: cleaner layout, real sliders, full-width choice pills, section icons
-- Shows: pick multiple years at once, one filter open at a time, "Online" show type, Upcoming can collapse
-- Songs: pulls track duration, popularity, and track number from Spotify
-- Venues: cleaner stats, a Maps link, a spot for the venue's own website, collapsible past/upcoming
-- Costs can now be split into ticket / travel / stay / food instead of one lump sum
-- New "Year in pixels" chart — a day-by-day view of your concert activity
-- Fixed: Artists tab was missing upcoming festival lineups; want-to-go shows leaking into the wrong filters
+## 1 August 2026
+- Fixed the update popup being too small to read — it's bigger now and shows proper bullet points instead of raw text
+- Fixed the changelog date getting stuck on the same day
+- Artist pages: you can now fully customize the info cards — hide, reorder, or drag them between rows, per artist
+- New "Dates" tab per artist: important dates like debut day, awards, and member birthdays, sorted so upcoming ones stand out
+- Today's date now glows green on the birthday/anniversary list, and past ones fade out
+- Songs page: a small bar now shows how many times you've heard each song live, and you can group songs by album
+- Two new photo styles for artist pages: Polaroids and Pinned photo, pick your favorite in Settings
+- Fixed a bug where adding the same festival act on a different day wouldn't save
+- Typing an act name for a festival now suggests names you've already used, to avoid typos
+- Fixed "top friend" on artist pages not counting festival or support shows

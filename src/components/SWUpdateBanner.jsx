@@ -53,10 +53,36 @@ export default function SWUpdateBanner() {
       {showChangelog && (
         <div style={{
           marginTop: 10, paddingTop: 10, borderTop: '1px solid #2a2850',
-          fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace",
-          lineHeight: 1.7, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap'
+          maxHeight: '60vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch'
         }}>
-          {changelogText === null ? 'loading...' : changelogText.trim() || 'no release notes yet.'}
+          {changelogText === null ? (
+            <div style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Sans', sans-serif" }}>loading...</div>
+          ) : !changelogText.trim() ? (
+            <div style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Sans', sans-serif" }}>No release notes yet.</div>
+          ) : (
+            changelogText.trim().split('\n').map((line, i) => {
+              const trimmed = line.trim()
+              if (!trimmed) return null
+              if (trimmed.startsWith('# ')) return null
+              if (trimmed.startsWith('## ')) {
+                return (
+                  <div key={i} style={{
+                    fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 700, color: '#a78bfa',
+                    marginTop: i === 0 ? 0 : 14, marginBottom: 6
+                  }}>{trimmed.slice(3)}</div>
+                )
+              }
+              if (trimmed.startsWith('- ')) {
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 7, marginBottom: 6 }}>
+                    <span style={{ color: '#a78bfa', fontSize: 13, lineHeight: '19px', flexShrink: 0 }}>•</span>
+                    <span style={{ fontSize: 13, color: '#c4c2f0', fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>{trimmed.slice(2)}</span>
+                  </div>
+                )
+              }
+              return <div key={i} style={{ fontSize: 13, color: '#c4c2f0', fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, marginBottom: 6 }}>{trimmed}</div>
+            })
+          )}
         </div>
       )}
     </div>

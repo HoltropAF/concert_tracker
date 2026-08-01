@@ -4852,7 +4852,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       </div>
 
       {/* Artist list */}
-      <div style={{ padding: "0 16px" }}>
+      <div className="stagger-list" style={{ padding: "0 16px" }}>
         {sorted.map(({ name, pastCount, pastShows, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps, wantToSee }) => {
           const total = pastCount + supportCount + guestCount + festivalCount;
           const latestSupportDate = supportApps.length > 0 ? supportApps.slice().sort((a,b) => b.concert.date.localeCompare(a.concert.date))[0].concert.date : null;
@@ -8638,7 +8638,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                     {showUpcoming && renderConcertList(upcoming, settings.showListPhotos !== false)}
                   </div>
                 )}
-                {(filterStatus.length === 0 || filterStatus.includes('past')) && past.length > 0 && renderConcertList(past, settings.showListPhotos !== false)}
+                {(filterStatus.length === 0 || filterStatus.includes('past')) && past.length > 0 && (
+                  <div className="stagger-list">{renderConcertList(past, settings.showListPhotos !== false)}</div>
+                )}
               </div>
             )}
           </>

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1 August 2026
+- Long-press a wishlist show as another way to reveal the remove button (in addition to swiping)
+- New: accent color picker in Settings (Violet/Sky/Amber/Rose) for the app's primary highlight color
+- New users now get a short 4-step tour on first launch, skippable anytime
 - Toast notifications bounce in with a little spring instead of just appearing
 - Search results now highlight the matching part of the name as you type (Artists/Songs/Venues/Friends)
 - Artist banner photo has a subtle parallax drift when scrolling

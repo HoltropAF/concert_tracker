@@ -4446,24 +4446,48 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   )}
                 </div>
               )}
-              {customDates.map((d, i) => (
-                <div key={i} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                  {bannerEditMode ? (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <input value={d.label} onChange={e => setCustomDates(customDates.map((x, xi) => xi === i ? { ...x, label: e.target.value } : x))} placeholder="Label (e.g. First album)"
-                        style={{ flex: 1, background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontSize: 12, padding: "5px 8px", minWidth: 0 }} />
-                      <input type="date" value={d.date || ''} onChange={e => setCustomDates(customDates.map((x, xi) => xi === i ? { ...x, date: e.target.value } : x))}
-                        style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "5px 6px" }} />
-                      <button onClick={() => setCustomDates(customDates.filter((_, xi) => xi !== i))} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 14, cursor: "pointer", padding: 0 }}>×</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12, color: "#6b6a8f" }}>{d.label || "Untitled"}</span>
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {(() => {
+                const isBirthday = d => /birthday/i.test(d.label || '');
+                const birthdays = customDates.filter(d => isBirthday(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const others = customDates.filter(d => !isBirthday(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const editRow = d => (
+                  <div key={d.i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+                    <input value={d.label} onChange={e => setCustomDates(customDates.map((x, xi) => xi === d.i ? { ...x, label: e.target.value } : x))} placeholder="Label (e.g. First album)"
+                      style={{ flex: 1, background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Sans', sans-serif", fontSize: 12, padding: "5px 8px", minWidth: 0 }} />
+                    <input type="date" value={d.date || ''} onChange={e => setCustomDates(customDates.map((x, xi) => xi === d.i ? { ...x, date: e.target.value } : x))}
+                      style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "5px 6px" }} />
+                    <button onClick={() => setCustomDates(customDates.filter((_, xi) => xi !== d.i))} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 14, cursor: "pointer", padding: 0 }}>×</button>
+                  </div>
+                );
+                return (
+                  <>
+                    {others.map(d => (
+                      <div key={d.i} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                        {bannerEditMode ? editRow(d) : (
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: 12, color: "#6b6a8f" }}>{d.label || "Untitled"}</span>
+                            <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {birthdays.length > 0 && (
+                      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                        <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 4 }}>Members</div>
+                        {bannerEditMode
+                          ? birthdays.map(d => editRow(d))
+                          : birthdays.map((d, bi) => (
+                            <div key={d.i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderTop: bi > 0 ? "1px solid #1f1f35" : "none" }}>
+                              <span style={{ fontSize: 12, color: "#6b6a8f" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, '')}</span>
+                              <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {bannerEditMode && (
                 <button onClick={() => setCustomDates([...customDates, { label: '', date: '' }])} style={{ width: "100%", background: "none", border: "1px dashed #3a3560", borderRadius: 10, color: "#6b6a8f", fontSize: 12, padding: "10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
                   + Add a date

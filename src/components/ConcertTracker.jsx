@@ -4419,23 +4419,25 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 const singles = overrides.singleCount ?? mb?.singleCount ?? null;
                 const setDiscog = (key, val) => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, [key]: val ? parseInt(val) : null } });
                 if (!bannerEditMode && !albums && !eps && !singles) return null;
-                const row = (label, key, val) => (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: "1px solid #1f1f35" }}>
-                    <span style={{ fontSize: 12, color: "#6b6a8f" }}>{label}</span>
+                const tile = (label, key, val) => (
+                  <div style={{ background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                     {bannerEditMode ? (
                       <input type="number" value={val ?? ''} onChange={e => setDiscog(key, e.target.value)} placeholder="0"
-                        style={{ width: 60, background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: "4px 6px", textAlign: "right" }} />
+                        style={{ width: "100%", background: "none", border: "none", color: "#8b7fb0", fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, textAlign: "center", padding: 0 }} />
                     ) : (
-                      <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{val}</span>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#8b7fb0" }}>{val}</div>
                     )}
+                    <div style={{ fontSize: 7, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 4, textTransform: "uppercase" }}>{label}</div>
                   </div>
                 );
                 return (
-                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
-                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>The Numbers{bannerEditMode ? " (override MusicBrainz if wrong)" : ""}</div>
-                    {row("Albums", "albumCount", albums)}
-                    {row("EPs / mini albums", "epCount", eps)}
-                    {row("Singles", "singleCount", singles)}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>The Numbers{bannerEditMode ? " (override MusicBrainz if wrong)" : ""}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                      {tile("Albums", "albumCount", albums)}
+                      {tile("EPs", "epCount", eps)}
+                      {tile("Singles", "singleCount", singles)}
+                    </div>
                   </div>
                 );
               })()}
@@ -4468,20 +4470,20 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                     <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
                       <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 4 }}>Milestones</div>
                       {milestones.map((d, mi) => d.isDebut ? (
-                        <div key={"debut"} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: mi > 0 ? "5px 0" : "5px 0 5px", borderTop: mi > 0 ? "1px solid #1f1f35" : "none" }}>
-                          <span style={{ fontSize: 12, color: "#6b6a8f" }}>Debut</span>
+                        <div key={"debut"} style={{ padding: "7px 0", borderTop: mi > 0 ? "1px solid #1f1f35" : "none" }}>
+                          <div style={{ fontSize: 12, color: "#6b6a8f", marginBottom: 2 }}>Debut</div>
                           {bannerEditMode ? (
                             <input type="date" value={overrides.debutDate ?? mb?.startDate ?? ''}
                               onChange={e => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, debutDate: e.target.value } })}
                               style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 6px" }} />
                           ) : (
-                            <span style={{ fontSize: 12, color: debutDate ? "#c4c2f0" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>{debutDate || "—"}</span>
+                            <div style={{ fontSize: 13, color: debutDate ? "#c4c2f0" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>{debutDate || "—"}</div>
                           )}
                         </div>
                       ) : bannerEditMode ? editRow(d) : (
-                        <div key={d.i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderTop: mi > 0 ? "1px solid #1f1f35" : "none" }}>
-                          <span style={{ fontSize: 12, color: "#6b6a8f" }}>{d.label || "Untitled"}</span>
-                          <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                        <div key={d.i} style={{ padding: "7px 0", borderTop: mi > 0 ? "1px solid #1f1f35" : "none" }}>
+                          <div style={{ fontSize: 12, color: "#6b6a8f", lineHeight: 1.4, marginBottom: 2 }}>{d.label || "Untitled"}</div>
+                          <div style={{ fontSize: 13, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</div>
                         </div>
                       ))}
                     </div>

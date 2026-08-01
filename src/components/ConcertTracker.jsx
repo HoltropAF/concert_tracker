@@ -4412,18 +4412,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const setCustomDates = list => onUpdateSetting('artistCustomDates', { ...(settings.artistCustomDates || {}), [selectedArtist]: list });
           return (
             <div style={{ padding: "14px 16px" }}>
-              <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0" }}>
-                  <span style={{ fontSize: 12, color: "#6b6a8f" }}>Started performing</span>
-                  {bannerEditMode ? (
-                    <input type="date" value={overrides.debutDate ?? mb?.startDate ?? ''}
-                      onChange={e => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, debutDate: e.target.value } })}
-                      style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: "4px 6px" }} />
-                  ) : (
-                    <span style={{ fontSize: 12, color: debutDate ? "#c4c2f0" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>{debutDate || "—"}</span>
-                  )}
-                </div>
-              </div>
+              {/* The Numbers */}
               {(() => {
                 const albums = overrides.albumCount ?? mb?.albumCount ?? null;
                 const eps = overrides.epCount ?? mb?.epCount ?? null;
@@ -4442,8 +4431,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   </div>
                 );
                 return (
-                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Discography{bannerEditMode ? " (override MusicBrainz if wrong)" : " (MusicBrainz)"}</div>
+                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>The Numbers{bannerEditMode ? " (override MusicBrainz if wrong)" : ""}</div>
                     {row("Albums", "albumCount", albums)}
                     {row("EPs / mini albums", "epCount", eps)}
                     {row("Singles", "singleCount", singles)}
@@ -4453,9 +4442,17 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               {(() => {
                 const isBirthday = d => /birthday/i.test(d.label || '');
                 const isAward = d => /win|daesang|award|album of the year|song of the year|artist of the year|grand prize/i.test(d.label || '');
+                const isRecurring = d => !isAward(d) && /\bday\b|anniversary/i.test(d.label || '');
                 const birthdays = customDates.filter(d => isBirthday(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
-                const awards = customDates.filter(d => !isBirthday(d) && isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
-                const others = customDates.filter(d => !isBirthday(d) && !isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const recurringOther = customDates.filter(d => !isBirthday(d) && isRecurring(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const awards = customDates.filter(d => !isBirthday(d) && !isRecurring(d) && isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const others = customDates.filter(d => !isBirthday(d) && !isRecurring(d) && !isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
+                const everyYear = [...birthdays, ...recurringOther].sort((a, b) => (a.date || '').slice(5) < (b.date || '').slice(5) ? -1 : 1);
+                const milestones = [
+                  { label: 'Debut', date: debutDate, isDebut: true },
+                  ...others,
+                  ...awards,
+                ];
                 const editRow = d => (
                   <div key={d.i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
                     <input value={d.label} onChange={e => setCustomDates(customDates.map((x, xi) => xi === d.i ? { ...x, label: e.target.value } : x))} placeholder="Label (e.g. First album)"
@@ -4465,34 +4462,52 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                     <button onClick={() => setCustomDates(customDates.filter((_, xi) => xi !== d.i))} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 14, cursor: "pointer", padding: 0 }}>×</button>
                   </div>
                 );
-                const groupBlock = (label, list) => list.length > 0 && (
-                  <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                    <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 4 }}>{label}</div>
-                    {bannerEditMode
-                      ? list.map(d => editRow(d))
-                      : list.map((d, bi) => (
-                        <div key={d.i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderTop: bi > 0 ? "1px solid #1f1f35" : "none" }}>
-                          <span style={{ fontSize: 12, color: "#6b6a8f" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, '')}</span>
-                          <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
-                        </div>
-                      ))
-                    }
-                  </div>
-                );
                 return (
                   <>
-                    {others.map(d => (
-                      <div key={d.i} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                        {bannerEditMode ? editRow(d) : (
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ fontSize: 12, color: "#6b6a8f" }}>{d.label || "Untitled"}</span>
-                            <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                    {/* Milestones — happened once */}
+                    <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+                      <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 4 }}>Milestones</div>
+                      {milestones.map((d, mi) => d.isDebut ? (
+                        <div key={"debut"} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: mi > 0 ? "5px 0" : "5px 0 5px", borderTop: mi > 0 ? "1px solid #1f1f35" : "none" }}>
+                          <span style={{ fontSize: 12, color: "#6b6a8f" }}>Debut</span>
+                          {bannerEditMode ? (
+                            <input type="date" value={overrides.debutDate ?? mb?.startDate ?? ''}
+                              onChange={e => onUpdateSetting('artistInfoOverrides', { ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, debutDate: e.target.value } })}
+                              style={{ background: "#0c0c14", border: "1px solid #3a3560", borderRadius: 6, color: "#c4c2f0", fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 6px" }} />
+                          ) : (
+                            <span style={{ fontSize: 12, color: debutDate ? "#c4c2f0" : "#4a4870", fontFamily: "'DM Mono', monospace" }}>{debutDate || "—"}</span>
+                          )}
+                        </div>
+                      ) : bannerEditMode ? editRow(d) : (
+                        <div key={d.i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderTop: mi > 0 ? "1px solid #1f1f35" : "none" }}>
+                          <span style={{ fontSize: 12, color: "#6b6a8f" }}>{d.label || "Untitled"}</span>
+                          <span style={{ fontSize: 12, color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>{d.date || "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Every Year — recurring, sorted by month/day */}
+                    {everyYear.length > 0 && (
+                      <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+                        <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 10 }}>Every Year</div>
+                        {bannerEditMode ? everyYear.map(d => editRow(d)) : (
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <div style={{ width: 2, background: "#1f1f35", marginLeft: 4, position: "relative", flexShrink: 0 }}>
+                              {everyYear.map((d, ei) => (
+                                <div key={d.i} style={{ width: 8, height: 8, borderRadius: "50%", background: isBirthday(d) ? "#a78bfa" : "#facc15", position: "absolute", left: -4, top: ei === 0 ? 2 : `${ei * 40 + 2}px` }} />
+                              ))}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              {everyYear.map((d, ei) => (
+                                <div key={d.i} style={{ marginBottom: ei < everyYear.length - 1 ? 22 : 0 }}>
+                                  <div style={{ fontSize: 10, color: "#7691a2", fontFamily: "'DM Mono', monospace" }}>{d.date ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase() : "—"}</div>
+                                  <div style={{ fontSize: 13, color: "#e2e0ff" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, "'s birthday")}</div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
-                    ))}
-                    {groupBlock("Wins & awards", awards)}
-                    {groupBlock("Members", birthdays)}
+                    )}
                   </>
                 );
               })()}

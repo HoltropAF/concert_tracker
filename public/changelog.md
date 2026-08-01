@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1 August 2026
+- Switching between the main tabs (Shows/Stats/Songs/Artists/Venues/Settings) now fades in smoothly instead of a hard cut
 - Opening a show, artist, song, venue, or friend now slides in smoothly instead of appearing instantly
 - Fixed a few spots where "upcoming" was colored green instead of the usual indigo
 - Venues empty state ("no venues found") now matches the style used everywhere else

@@ -24,9 +24,9 @@ Living document. We update this as we go through every part of the app: what it 
 
 ## Pass 3: motion + color (visual pass, in progress)
 
-- **Transitions**: all 5 detail views (show/artist/song/venue/friend) now slide in from the right on open, 0.5s cubic-bezier ease-out. Entrance-only (no exit animation yet — that would need more state to delay unmounting).
+- **Transitions**: all 5 detail views (show/artist/song/venue/friend) now slide in from the right on open, 0.5s cubic-bezier ease-out. Tab switching (Shows/Stats/Songs/Artists/Venues/Settings) now fades+scales in, 0.28s, quicker since it's lateral movement not drilling in. Both entrance-only (no exit animation yet).
 - **Color system**: chose direction A (formalize existing meanings, don't overhaul). Fixed 3 real mismatches where "upcoming" was green instead of indigo (artist tile badge, Venues Upcoming section, map legend). Kept deliberate exceptions: green for "today," green for friend recency, green for the ticket-sale badge (all sensible on their own terms, not actually claiming to mean "wishlist").
-- Not yet done: tab-switch transition (fade+scale, discussed but not built), remaining per-page visual polish beyond Shows mockups, number count-up animations, skeleton loading states, gesture interactions (swipe/pull-to-refresh).
+- Not yet done: remaining per-page visual polish beyond Shows mockups, number count-up animations, skeleton loading states, gesture interactions (swipe/pull-to-refresh), micro-interactions on buttons/toggles.
 
 ---
 

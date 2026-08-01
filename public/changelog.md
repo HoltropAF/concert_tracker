@@ -1,6 +1,10 @@
 # Changelog
 
 ## 1 August 2026
+- Small vibration on toggle flips and swipe-to-delete (Android only, safely does nothing elsewhere)
+- Lists now fade in one row at a time on load instead of all at once
+- Empty states got a small icon instead of just text
+- Hitting a round 50/100/150... shows milestone now triggers a little confetti burst
 - Big numbers (shows/artists/songs/venues/friends totals) now count up instead of just appearing
 - Settings toggles now actually animate with a little spring bounce (they were snapping instantly before)
 - Photos show a shimmering placeholder while loading instead of a flat gray block

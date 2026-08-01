@@ -4312,6 +4312,24 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(row1.length, 4)}, minmax(0, 1fr))`, gap: 6 }}>
                           {row1.map(t => renderTile(t))}
                         </div>
+                        {(() => {
+                          const ratedShows = pastShows.filter(c => c.rating > 0).sort((a, b) => a.date.localeCompare(b.date));
+                          if (ratedShows.length < 3) return null;
+                          const w = 260, h = 30, max = 5, pad = 3;
+                          const pts = ratedShows.map((c, i) => {
+                            const x = (i / (ratedShows.length - 1)) * (w - pad * 2) + pad;
+                            const y = h - pad - ((c.rating / max) * (h - pad * 2));
+                            return `${x.toFixed(1)},${y.toFixed(1)}`;
+                          }).join(' ');
+                          return (
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, background: "#0e0e1a", border: "1px solid #1a1a2e", borderRadius: 10, padding: "8px 12px" }}>
+                              <span style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", flexShrink: 0, marginRight: 10 }}>rating trend</span>
+                              <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ flex: 1 }}>
+                                <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" />
+                              </svg>
+                            </div>
+                          );
+                        })()}
                         {spotifyInfo?.topTrack && (
                           <a href={spotifyInfo.topTrack.url || spotifyInfo.url || undefined} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textDecoration: "none" }}>
                             ♪ Popular right now: <span style={{ color: "#c4c2f0" }}>"{spotifyInfo.topTrack.name}"</span>

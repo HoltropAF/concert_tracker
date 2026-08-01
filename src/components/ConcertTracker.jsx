@@ -3703,7 +3703,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
           }}>
             {!compact && <FriendAvatar name={displayName(name)} />}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: compact ? 12 : 14, fontWeight: 700, color: "#e2e0ff", marginBottom: compact ? 0 : 3 }}>{displayName(name)}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: compact ? 12 : 14, fontWeight: 700, color: "#e2e0ff", marginBottom: compact ? 0 : 3 }}><HighlightMatch text={displayName(name)} query={search} /></div>
               {!compact && lastShow && (() => {
                 const monthsAgo = Math.floor((Date.now() - new Date(lastShow.date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24 * 30));
                 const recencyColor = monthsAgo <= 3 ? "#34d399" : monthsAgo <= 12 ? "#a78bfa" : "#4a4870";
@@ -4930,7 +4930,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
               })()}
               <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff" }}>{name}</span>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff" }}><HighlightMatch text={name} query={search} /></span>
                 {wantToSee && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to see</span>}
                 {topGenre && (
                   <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 99, background: '#1a1a30', color: '#6b6a8f', flexShrink: 0 }}>{topGenre}</span>
@@ -5288,7 +5288,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
                 : null}
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ color: '#c4c2f0', fontSize: compact ? 12 : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                  <span style={{ color: '#c4c2f0', fontSize: compact ? 12 : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><HighlightMatch text={e.name} query={search} /></span>
                   {e.spotifyId && !e.albumArt && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, flexShrink: 0, lineHeight: 1 }}>●</span>}
                 </span>
                 {!compact && <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>}
@@ -5940,7 +5940,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {v.vIcon && <span style={{ fontSize: 13, flexShrink: 0 }}>{v.vIcon}</span>}
-                <div style={{ fontSize: compact ? 12 : 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
+                <div style={{ fontSize: compact ? 12 : 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><HighlightMatch text={v.name} query={search} /></div>
                 {!compact && v.wantToVisit && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to go</span>}
               </div>
               {!compact && (

@@ -1767,7 +1767,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {concert.notes && (
             <div style={detailCard}>
               {sec("Notes")}
-              <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
+              <div style={concert.favorite
+                ? { fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, color: "#e2e0ff", lineHeight: 1.5, whiteSpace: "pre-wrap" }
+                : { color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }
+              }>{concert.notes}</div>
             </div>
           )}
 

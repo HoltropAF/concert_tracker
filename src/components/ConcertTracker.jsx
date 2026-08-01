@@ -3866,8 +3866,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const totalAppearances = pastShows.length + supportApps.length;
     const roleParts = [pastShows.length > 0 && `${pastShows.length} headliner`, supportOnlyCount > 0 && `${supportOnlyCount} support`, guestOnlyCount > 0 && `${guestOnlyCount} guest`, festivalOnlyCount > 0 && `${festivalOnlyCount} festival`].filter(Boolean);
     const artistSongCount = {};
-    pastShows.forEach(c => getSongList(c.setlist).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
-    supportApps.forEach(({ concert: c }) => getSongList((c.supportSetlists || {})[selectedArtist]).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; }));
+    const artistSongAlbum = {};
+    pastShows.forEach(c => getSongList(c.setlist).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; if (!artistSongAlbum[n] && song?.albumName) artistSongAlbum[n] = song.albumName; }));
+    supportApps.forEach(({ concert: c }) => getSongList((c.supportSetlists || {})[selectedArtist]).forEach(song => { const n = getSongName(song); artistSongCount[n] = (artistSongCount[n] || 0) + 1; if (!artistSongAlbum[n] && song?.albumName) artistSongAlbum[n] = song.albumName; }));
     const artistSongs = Object.entries(artistSongCount).sort((a,b) => b[1]-a[1]);
 
     // Songs of this artist covered by others
@@ -4279,32 +4280,59 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           </div>
         )}
         {/* Songs heard live — dotted timeline style, matching Shows tab */}
-        {artistSongs.length > 0 && (
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs</span>
-              <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
-            </div>
-            {artistSongs.map(([song, count], i) => {
-              const criedHere = pastShows.some(c => c.criedSong === song);
-              return (
-                <div key={song} style={{ display: "flex", gap: 12 }}>
-                  <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: criedHere ? "#3a6ea5" : "#a78bfa", flexShrink: 0, marginTop: 12 }} />
-                    {i < artistSongs.length - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
-                  </div>
-                  <button onClick={() => onNavigate({ view: 'songs', songSelect: { name: song, artist: selectedArtist }, fromArtist: selectedArtist })} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${criedHere ? "#3a6ea5" : "#a78bfa"}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < artistSongs.length - 1 ? 6 : 0, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {artistSongs.length > 0 && (() => {
+          const maxCount = Math.max(...artistSongs.map(([, n]) => n), 1);
+          const groupByAlbum = !!(settings.artistTileConfig || {})[selectedArtist]?.groupSongsByAlbum;
+          const toggleGroup = () => onUpdateSetting('artistTileConfig', { ...(settings.artistTileConfig || {}), [selectedArtist]: { ...((settings.artistTileConfig || {})[selectedArtist] || {}), groupSongsByAlbum: !groupByAlbum } });
+          const hasAlbumData = artistSongs.some(([song]) => artistSongAlbum[song]);
+          const songRow = (song, count, i, total) => {
+            const criedHere = pastShows.some(c => c.criedSong === song);
+            const barColor = criedHere ? "#3a6ea5" : "#a78bfa";
+            return (
+              <div key={song} style={{ display: "flex", gap: 12 }}>
+                <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: barColor, flexShrink: 0, marginTop: 12 }} />
+                  {i < total - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
+                </div>
+                <button onClick={() => onNavigate({ view: 'songs', songSelect: { name: song, artist: selectedArtist }, fromArtist: selectedArtist })} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "#0e0e1a", border: "1px solid #1f1f35", borderLeft: `3px solid ${barColor}`, borderRadius: 10, padding: "8px 12px", marginBottom: i < total - 1 ? 6 : 0, cursor: "pointer", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", inset: 0, width: `${(count / maxCount) * 100}%`, background: `linear-gradient(90deg, ${barColor}33, transparent)` }} />
+                  <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ color: "#c4c2f0", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
                       {song}
                       {criedHere && <span title="Cried to this one">💧</span>}
                     </span>
                     {count > 1 && <span style={{ color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{count}×</span>}
-                  </button>
+                  </div>
+                </button>
+              </div>
+            );
+          };
+          return (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Songs</span>
+                <span style={{ fontSize: 10, color: "#4a3d70", fontFamily: "'DM Mono', monospace", background: "#181229", border: "1px solid #2e2350", borderRadius: 99, padding: "1px 7px" }}>{artistSongs.length}</span>
+              </div>
+              {bannerEditMode && hasAlbumData && (
+                <button onClick={toggleGroup} style={{ background: groupByAlbum ? "#a78bfa" : "none", border: "1px solid #3a3560", borderRadius: 99, color: groupByAlbum ? "#0c0c14" : "#6b6a8f", fontSize: 10, padding: "3px 9px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                  Group by album
+                </button>
+              )}
+            </div>
+            {groupByAlbum && hasAlbumData ? (() => {
+              const groups = {};
+              artistSongs.forEach(([song, count]) => { const alb = artistSongAlbum[song] || 'Other'; (groups[alb] = groups[alb] || []).push([song, count]); });
+              return Object.entries(groups).map(([album, songs]) => (
+                <div key={album} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: "#8b7fb0", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{album}</div>
+                  {songs.map(([song, count], i) => songRow(song, count, i, songs.length))}
                 </div>
-              );
-            })}
+              ));
+            })() : artistSongs.map(([song, count], i) => songRow(song, count, i, artistSongs.length))}
           </div>
-        )}
+          );
+        })()}
         {coversByOthers.length > 0 && (
           <div>
             <button onClick={() => setShowArtistCovers(s => !s)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 8px" }}>

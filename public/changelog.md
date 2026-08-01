@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1 August 2026
+- Toast notifications bounce in with a little spring instead of just appearing
+- Search results now highlight the matching part of the name as you type (Artists/Songs/Venues/Friends)
+- Artist banner photo has a subtle parallax drift when scrolling
 - Small vibration on toggle flips and swipe-to-delete (Android only, safely does nothing elsewhere)
 - Lists now fade in one row at a time on load instead of all at once
 - Empty states got a small icon instead of just text

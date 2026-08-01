@@ -538,9 +538,10 @@ function ToastHost({ toast, onDismiss }) {
   );
 }
 
-function EmptyState({ title, detail, actionLabel, onAction }) {
+function EmptyState({ title, detail, actionLabel, onAction, icon = '🎫' }) {
   return (
     <div style={{ textAlign: 'center', padding: '42px 18px', border: '1px dashed #1f1f35', borderRadius: 12, background: '#10101b', margin: '14px 0' }}>
+      <div style={{ fontSize: 30, marginBottom: 10, opacity: 0.7 }}>{icon}</div>
       <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#c4c2f0', marginBottom: 8 }}>{title}</div>
       {detail && <div style={{ color: '#6b6a8f', fontSize: 12, lineHeight: 1.6, fontFamily: "'DM Mono', monospace", marginBottom: actionLabel ? 16 : 0 }}>{detail}</div>}
       {actionLabel && <button onClick={onAction} style={{ minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid #a78bfa', background: '#1a1a30', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{actionLabel}</button>}
@@ -3682,7 +3683,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
           </button>
         ))}
         {filtered.length === 0 && (
-          <EmptyState title="No friends found" detail="Try another search, or add friends to a show." />
+          <EmptyState icon="👥" title="No friends found" detail="Try another search, or add friends to a show." />
         )}
       </div>
     </div>
@@ -4919,7 +4920,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           </button>
         ); })}
         {sorted.length === 0 && (
-          <EmptyState title="No artists found" detail="Try another search or filter." />
+          <EmptyState icon="🎤" title="No artists found" detail="Try another search or filter." />
         )}
       </div>
     </div>
@@ -5218,7 +5219,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         {totalUnique === 0 ? (
           <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>log setlists on your shows to see songs here</div>
         ) : filtered.length === 0 ? (
-          <EmptyState title="No songs found" detail="Add setlists to shows and songs will collect here." />
+          <EmptyState icon="🎵" title="No songs found" detail="Add setlists to shows and songs will collect here." />
         ) : filtered.map((e, i) => (
           <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist, spotifyId: e.spotifyId || null, spotifyName: e.spotifyName || null, albumName: e.albumName || null, albumId: e.albumId || null, albumArt: e.albumArt || null, durationMs: e.durationMs || null, popularity: typeof e.popularity === 'number' ? e.popularity : null, trackNumber: e.trackNumber || null })} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
@@ -5909,7 +5910,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           </button>
         ))}
-        {sorted.length === 0 && <EmptyState title="No venues found" detail="Try another search or filter, or log a show at one." />}
+        {sorted.length === 0 && <EmptyState icon="📍" title="No venues found" detail="Try another search or filter, or log a show at one." />}
       </div>
       )}
     </div>
@@ -8376,7 +8377,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'home' && (
           <>
             {concerts.length === 0 && (
-              <EmptyState title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />
+              <EmptyState icon="🎫" title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />
             )}
         {view === 'home' && concerts.length > 0 && (() => {
           const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
@@ -8610,7 +8611,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               />
             )}
             {concerts.length > 0 && !showCalendar && filtered.length === 0 && (
-              <EmptyState title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
+              <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
             {!showCalendar && filtered.length > 0 && (
               <div style={{ marginTop: showActivity ? 10 : 2 }}>

@@ -4523,28 +4523,23 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                       return (
                       <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
                         <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: bannerEditMode ? 8 : 10 }}>Every Year</div>
-                        {bannerEditMode ? everyYear.map(d => editRow(d)) : (
-                          <div style={{ display: "flex", gap: 10 }}>
-                            <div style={{ width: 2, background: "#1f1f35", marginLeft: 4, position: "relative", flexShrink: 0 }}>
-                              {everyYear.map((d, ei) => {
-                                const passed = hasPassed(d), today = isToday(d);
-                                const baseColor = today ? "#34d399" : isBirthday(d) ? "#a78bfa" : "#facc15";
-                                return <div key={d.i} style={{ width: today ? 10 : 8, height: today ? 10 : 8, borderRadius: "50%", background: passed ? `${baseColor}55` : baseColor, position: "absolute", left: today ? -5 : -4, top: ei === 0 ? (today ? 1 : 2) : `${ei * 40 + (today ? 1 : 2)}px`, boxShadow: today ? "0 0 6px #34d399aa" : "none" }} />;
-                              })}
+                        {bannerEditMode ? everyYear.map(d => editRow(d)) : everyYear.map((d, ei) => {
+                          const passed = hasPassed(d), today = isToday(d);
+                          const baseColor = today ? "#34d399" : isBirthday(d) ? "#a78bfa" : "#facc15";
+                          const dotColor = passed ? `${baseColor}55` : baseColor;
+                          return (
+                            <div key={d.i} style={{ display: "flex", gap: 10 }}>
+                              <div style={{ width: 12, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                                <div style={{ width: today ? 10 : 8, height: today ? 10 : 8, borderRadius: "50%", background: dotColor, flexShrink: 0, marginTop: 4, boxShadow: today && !passed ? "0 0 6px #34d399aa" : "none" }} />
+                                {ei < everyYear.length - 1 && <div style={{ width: 2, flex: 1, background: "#1f1f35", marginTop: 4 }} />}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0, opacity: passed ? 0.45 : 1, paddingBottom: ei < everyYear.length - 1 ? 18 : 0 }}>
+                                <div style={{ fontSize: 10, color: today ? "#34d399" : "#7691a2", fontFamily: "'DM Mono', monospace", fontWeight: today ? 700 : 400 }}>{d.date ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase() : "—"}{today ? " · TODAY" : ""}</div>
+                                <div style={{ fontSize: 13, color: "#e2e0ff" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, "'s birthday")}</div>
+                              </div>
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              {everyYear.map((d, ei) => {
-                                const passed = hasPassed(d), today = isToday(d);
-                                return (
-                                  <div key={d.i} style={{ marginBottom: ei < everyYear.length - 1 ? 22 : 0, opacity: passed ? 0.45 : 1 }}>
-                                    <div style={{ fontSize: 10, color: today ? "#34d399" : "#7691a2", fontFamily: "'DM Mono', monospace", fontWeight: today ? 700 : 400 }}>{d.date ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase() : "—"}{today ? " · TODAY" : ""}</div>
-                                    <div style={{ fontSize: 13, color: "#e2e0ff" }}>{(d.label || "Untitled").replace(/\s*birthday\s*/i, "'s birthday")}</div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })}
                       </div>
                       );
                     })()}

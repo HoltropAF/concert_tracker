@@ -3739,6 +3739,14 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
   const [artistTab, setArtistTab] = useState('overview');
   const [reframingArtistPhoto, setReframingArtistPhoto] = useState(false);
+  const [bannerScrollY, setBannerScrollY] = useState(0);
+  useEffect(() => {
+    const el = document.getElementById('content-scroll');
+    if (!el) return;
+    const onScroll = () => setBannerScrollY(el.scrollTop);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [selectedArtist]);
   const [bannerEditMode, setBannerEditMode] = useState(false);
   const [enteredViaArtist] = useState(initialSelectedArtist);
   useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
@@ -4035,7 +4043,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           />
         ) : (
           <div style={{ height: 190, position: "relative", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
-            {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} pos={bannerPos} style={{ width: "100%", height: 190, position: "absolute", inset: 0 }} />}
+            {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} pos={bannerPos} style={{ width: "100%", height: 230, position: "absolute", top: -20, left: 0, transform: `translateY(${Math.min(bannerScrollY * 0.35, 40)}px)`, willChange: "transform" }} />}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)" }} />
             <button onClick={goBackFromArtist} style={{ position: "absolute", top: 14, left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
             <div style={{ position: "absolute", top: 12, right: 16, zIndex: 2, display: "flex", gap: 8 }}>

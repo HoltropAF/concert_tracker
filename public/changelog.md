@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Every Year timeline: entries that already passed this calendar year dim, staying readable but clearly distinguishable from what's still upcoming
 - Dates tab restructured: The Numbers, Milestones (one-time events), and a new Every Year timeline for recurring things (birthdays, fandom days) sorted by month/day
 - Dates tab: award/win entries now group into a "Wins & awards" block like Members does for birthdays
 - Fixed discography (albums/EPs/singles) likely failing due to a MusicBrainz rate limit — added a delay between the two lookups, and made the numbers manually editable/overridable either way

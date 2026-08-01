@@ -6,6 +6,27 @@ import { geocodeVenue } from '../lib/geocode'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
 
+// * Animates a number counting up from 0 to its target value on mount/change.
+// * Re-triggers whenever `value` changes (e.g. switching between artists).
+function CountUp({ value, duration = 900 }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    let raf
+    const start = performance.now()
+    const from = 0
+    const to = typeof value === 'number' ? value : 0
+    const tick = now => {
+      const p = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setDisplay(Math.round(from + (to - from) * eased))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, duration])
+  return display
+}
+
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
   useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
@@ -3500,7 +3521,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
       {!search && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{allFriends.length}</span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}><CountUp value={allFriends.length} /></span>
             <span style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>friends</span>
           </div>
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
@@ -4670,7 +4691,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       {!search && activeFilterCount === 0 && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalArtists}</span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={totalArtists} /></span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
           </div>
           {(uniqueGenres > 0 || avgShowsPerArtist) && (
@@ -5093,7 +5114,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         return (
           <div style={{ padding: '14px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalUnique}</span>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={totalUnique} /></span>
               <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
             </div>
             {(past.length > 0 || totalArtists > 0) && (
@@ -5663,7 +5684,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {!search && totalVenues > 0 && (
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{totalVenues}</span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={totalVenues} /></span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>venues visited</span>
           </div>
           {(uniqueCities > 0 || uniqueCountries > 0) && (
@@ -6563,13 +6584,17 @@ function SettingsToggle({ checked, onChange }) {
     <button
       onClick={() => onChange(!checked)}
       style={{
-        width: 44, height: 26, borderRadius: 99, border: "none",
-        background: checked ? "#a78bfa" : "#2a2940", padding: 2, cursor: "pointer", flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: checked ? "flex-end" : "flex-start",
-        transition: "background 0.15s",
+        width: 44, height: 26, borderRadius: 99, border: "none", position: "relative",
+        background: checked ? "#a78bfa" : "#2a2940", padding: 0, cursor: "pointer", flexShrink: 0,
+        transition: "background 0.2s ease",
       }}
     >
-      <span style={{ width: 22, height: 22, borderRadius: 99, background: "#fff", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
+      <span style={{
+        width: 22, height: 22, borderRadius: 99, background: "#fff", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+        position: "absolute", top: 2, left: 2,
+        transform: checked ? "translateX(18px)" : "translateX(0)",
+        transition: "transform 0.28s cubic-bezier(.34,1.56,.64,1)",
+      }} />
     </button>
   );
 }
@@ -8324,7 +8349,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           return (
             <div style={{ padding: '14px 16px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{pastAll.length}</span>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>
                 <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
               </div>
               {(distinctArtists > 0 || distinctVenues > 0 || distinctCountries > 0) && (

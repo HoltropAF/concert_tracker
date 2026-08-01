@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-07-22
+- Songs Live: play-count bar behind each song, and a per-artist "Group by album" toggle in edit mode
 - Every Year timeline: today's date gets a distinct green glow + "TODAY" marker instead of blending into "upcoming"
 - Every Year timeline: entries that already passed this calendar year dim, staying readable but clearly distinguishable from what's still upcoming
 - Dates tab restructured: The Numbers, Milestones (one-time events), and a new Every Year timeline for recurring things (birthdays, fandom days) sorted by month/day

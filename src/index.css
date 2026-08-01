@@ -12,6 +12,7 @@ html, body, #root {
   font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  --accent: #a78bfa;
 }
 
 input, textarea, select, button {

@@ -10,6 +10,15 @@ import VenueMap from './VenueMap'
 // * does nothing everywhere else (iOS Safari, desktop), so it's always safe to call.
 const haptic = (ms = 12) => { try { navigator.vibrate?.(ms); } catch {} };
 
+// * Accent presets deliberately avoid hues already carrying meaning elsewhere
+// * in the app: pink (festival), gold (favorite), green (wishlist), indigo (upcoming).
+const ACCENT_PRESETS = {
+  violet: { label: 'Violet', hex: '#a78bfa' },
+  sky: { label: 'Sky', hex: '#38bdf8' },
+  amber: { label: 'Amber', hex: '#fb923c' },
+  rose: { label: 'Rose', hex: '#fb7185' },
+};
+
 // * Fires a short burst of falling confetti particles, pure CSS, no library.
 // * Auto-unmounts itself after the animation finishes.
 function Confetti({ onDone }) {
@@ -3610,7 +3619,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
       {!search && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}><CountUp value={allFriends.length} /></span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}><CountUp value={allFriends.length} /></span>
             <span style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>friends</span>
           </div>
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
@@ -4788,7 +4797,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       {!search && activeFilterCount === 0 && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={totalArtists} /></span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalArtists} /></span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
           </div>
           {(uniqueGenres > 0 || avgShowsPerArtist) && (
@@ -5211,7 +5220,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         return (
           <div style={{ padding: '14px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={totalUnique} /></span>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalUnique} /></span>
               <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
             </div>
             {(past.length > 0 || totalArtists > 0) && (
@@ -5781,7 +5790,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {!search && totalVenues > 0 && (
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={totalVenues} /></span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalVenues} /></span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>venues visited</span>
           </div>
           {(uniqueCities > 0 || uniqueCountries > 0) && (
@@ -6682,7 +6691,7 @@ function SettingsToggle({ checked, onChange }) {
       onClick={() => { haptic(); onChange(!checked); }}
       style={{
         width: 44, height: 26, borderRadius: 99, border: "none", position: "relative",
-        background: checked ? "#a78bfa" : "#2a2940", padding: 0, cursor: "pointer", flexShrink: 0,
+        background: checked ? "var(--accent)" : "#2a2940", padding: 0, cursor: "pointer", flexShrink: 0,
         transition: "background 0.2s ease",
       }}
     >
@@ -7401,6 +7410,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); onUpdate("artistSectionsDefaultOpen", checked); }} />
           </SettingsRow>
           <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); onUpdate("artistGalleryStyle", v); }} compact />
+          <PreferenceBlock label="Accent color" sub="The app's primary highlight color" value={local.accentColor || 'violet'} options={Object.entries(ACCENT_PRESETS).map(([id, p]) => ({ id, label: p.label }))} onChange={v => { lUpdate("accentColor", v); onUpdate("accentColor", v); }} compact />
           <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast compact />
         </SettingsSection>
 
@@ -7888,6 +7898,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showConfetti, setShowConfetti] = useState(false)
   const celebratedMilestones = useRef(new Set())
   useEffect(() => {
+    document.documentElement.style.setProperty('--accent', ACCENT_PRESETS[settings.accentColor]?.hex || ACCENT_PRESETS.violet.hex)
+  }, [settings.accentColor])
+  useEffect(() => {
     const pastCount = concerts.filter(c => !isWish(c) && isPast(c.date)).length
     if (pastCount > 0 && pastCount % 50 === 0 && !celebratedMilestones.current.has(pastCount)) {
       celebratedMilestones.current.add(pastCount)
@@ -8249,11 +8262,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <button key={id} onClick={onClick} style={{
       flex: 1, background: 'none', border: 'none', cursor: 'pointer',
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-      padding: '8px 0', color: active ? '#a78bfa' : '#5a5880',
+      padding: '8px 0', color: active ? 'var(--accent)' : '#5a5880',
     }}>
       <span style={{ fontSize: 18, lineHeight: 1 }}>{icon}</span>
       <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.05em', fontWeight: active ? 700 : 400 }}>{label}</span>
-      {active && <div style={{ width: 16, height: 2, borderRadius: 1, background: '#a78bfa', marginTop: 1 }} />}
+      {active && <div style={{ width: 16, height: 2, borderRadius: 1, background: 'var(--accent)', marginTop: 1 }} />}
     </button>
   )
 
@@ -8457,7 +8470,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           return (
             <div style={{ padding: '14px 16px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>
                 <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
               </div>
               {(distinctArtists > 0 || distinctVenues > 0 || distinctCountries > 0) && (

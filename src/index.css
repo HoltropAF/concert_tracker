@@ -18,6 +18,14 @@ input, textarea, select, button {
   font-family: inherit;
 }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.slide-in-detail {
+  animation: slideInRight 0.5s cubic-bezier(.32,.72,0,1);
+}
+
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;

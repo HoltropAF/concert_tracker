@@ -3317,7 +3317,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
     const card = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
 
     return (
-      <div style={{ padding: "0 0 100px" }}>
+      <div className="slide-in-detail" key={selectedFriend} style={{ padding: "0 0 100px" }}>
         {/* Edit profile modal */}
         {editingProfile && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
@@ -3922,7 +3922,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         .finally(() => setArtistPhotoUploading(false));
     };
     return (
-      <div style={{ padding: "0 0 100px" }}>
+      <div className="slide-in-detail" key={selectedArtist} style={{ padding: "0 0 100px" }}>
         {reframingArtistPhoto && bannerPhotoPath ? (
           <ArtistBannerReframe
             path={bannerPhotoPath}
@@ -4990,7 +4990,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
     const duration = formatDuration(selectedSong.durationMs);
     return (
-      <div style={{ padding: '0 0 100px' }}>
+      <div className="slide-in-detail" key={`${selectedSong.name}\n${selectedSong.artist}`} style={{ padding: '0 0 100px' }}>
         {selectedSong.albumArt ? (
           <div style={{ height: 260, position: 'relative', overflow: 'hidden' }}>
             <img src={selectedSong.albumArt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
@@ -5355,7 +5355,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
     const rooms = [...new Set(v.past.filter(c => c.room).map(c => c.room))];
     return (
-      <div style={{ padding: '0 0 100px' }}>
+      <div className="slide-in-detail" key={selectedVenue} style={{ padding: '0 0 100px' }}>
         {/* Sticky header, matching the show detail page */}
         <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
           <button onClick={goBackFromVenue} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
@@ -8256,11 +8256,13 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   if (selected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+        <div className="slide-in-detail" key={selected.id}>
         <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
         ])].filter(Boolean).sort()} />
+        </div>
       </div>
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <BottomNav />

@@ -31,7 +31,7 @@ function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
   useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
   const objectPosition = pos ? `${pos.x ?? 50}% ${pos.y ?? 50}%` : '50% 50%'
-  if (!url) return <div style={{ ...style, background: '#13131f' }} />
+  if (!url) return <div className="skeleton" style={{ ...style }} />
   return <img src={url} alt="" loading="lazy" style={{ ...style, objectFit: 'cover', objectPosition, display: 'block' }} />
 }
 

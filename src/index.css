@@ -42,6 +42,17 @@ button:active {
   opacity: 0.85;
 }
 
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #13131f 0%, #1e1e34 50%, #13131f 100%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;

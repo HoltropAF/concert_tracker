@@ -1,6 +1,10 @@
 # Changelog
 
 ## 1 August 2026
+- Big numbers (shows/artists/songs/venues/friends totals) now count up instead of just appearing
+- Settings toggles now actually animate with a little spring bounce (they were snapping instantly before)
+- Photos show a shimmering placeholder while loading instead of a flat gray block
+- Swipe left on a wishlist show to reveal a quick Remove button
 - Switching between the main tabs (Shows/Stats/Songs/Artists/Venues/Settings) now fades in smoothly instead of a hard cut
 - Opening a show, artist, song, venue, or friend now slides in smoothly instead of appearing instantly
 - Fixed a few spots where "upcoming" was colored green instead of the usual indigo

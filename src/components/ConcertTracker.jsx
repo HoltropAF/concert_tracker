@@ -3600,7 +3600,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
   );
 }
 
-function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
+function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onSaveConcert = () => {}, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
   const [artistTab, setArtistTab] = useState('overview');
   const [reframingArtistPhoto, setReframingArtistPhoto] = useState(false);
@@ -3623,6 +3623,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
   const [showTileManager, setShowTileManager] = useState(false);
   const [spotifyRefetchTrigger, setSpotifyRefetchTrigger] = useState(0);
+  const [reframingPolaroid, setReframingPolaroid] = useState(null);
   const dragStartRef = useRef(null);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
   useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, [selectedArtist]);
@@ -3927,6 +3928,19 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </div>
           </div>
         )}
+        {reframingPolaroid && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setReframingPolaroid(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#13131f", border: "1px solid #2e2e50", borderRadius: 14, padding: 14, maxWidth: 320, width: "100%" }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#e2e0ff", marginBottom: 10 }}>Reposition photo</div>
+              <ArtistBannerReframe
+                path={reframingPolaroid.photo}
+                pos={reframingPolaroid.photoPos}
+                onChange={p => setReframingPolaroid(prev => ({ ...prev, photoPos: p }))}
+                onDone={() => { onSaveConcert(reframingPolaroid); setReframingPolaroid(null); }}
+              />
+            </div>
+          </div>
+        )}
         {photoImportPrompt?.artist === selectedArtist && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => { onUpdateSetting('artistPhotoPromptSeen', { ...(settings.artistPhotoPromptSeen || {}), [selectedArtist]: true }); setPhotoImportPrompt(null); }}>
             <div onClick={e => e.stopPropagation()} style={{ background: "#13131f", border: "1px solid #2e2e50", borderRadius: 14, padding: 18, maxWidth: 320, width: "100%" }}>
@@ -4186,12 +4200,15 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   return (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 10px", padding: "20px 24px 8px" }}>
                       {photos.map((c, i) => (
-                        <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", transform: `rotate(${rotations[i % rotations.length]}deg)`, position: "relative" }}>
+                        <button key={c.id} onClick={() => bannerEditMode ? setReframingPolaroid(c) : onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", transform: `rotate(${rotations[i % rotations.length]}deg)`, position: "relative" }}>
                           <div style={{ background: "#fff", borderRadius: 3, padding: "6px 6px 20px", boxShadow: "0 4px 10px rgba(0,0,0,0.35)" }}>
                             <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 96, height: 108, borderRadius: 2, display: "block" }} />
                             <div style={{ position: "absolute", bottom: 4, left: 0, right: 0, textAlign: "center", fontSize: 11, color: "#8a8578", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0, 4)}</div>
                           </div>
                           <div style={{ position: "absolute", top: -6, left: 34, width: 26, height: 13, background: "rgba(255,220,150,0.55)", transform: `rotate(${-rotations[i % rotations.length] / 2}deg)` }} />
+                          {bannerEditMode && (
+                            <div style={{ position: "absolute", top: 4, right: -4, background: "#a78bfa", color: "#0c0c14", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, transform: `rotate(${-rotations[i % rotations.length]}deg)` }}>↕↔</div>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -8362,7 +8379,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
-        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
+        {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
       </div>

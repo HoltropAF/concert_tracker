@@ -5852,7 +5852,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           </button>
         ))}
-        {sorted.length === 0 && <div style={{ textAlign: 'center', color: '#2e2e4a', fontSize: 13, fontFamily: "'DM Mono', monospace", marginTop: 40 }}>No venues found</div>}
+        {sorted.length === 0 && <EmptyState title="No venues found" detail="Try another search or filter, or log a show at one." />}
       </div>
       )}
     </div>

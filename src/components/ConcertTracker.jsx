@@ -527,7 +527,7 @@ function actDate(festivalStartDate, act) {
   return d.toISOString().slice(0, 10);
 }
 
-function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly = false, ratingMax = 5, onArtistClick = null }) {
+function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly = false, ratingMax = 5, onArtistClick = null, allArtists = [] }) {
   const [input, setInput] = useState('');
   const [day, setDay] = useState(1);
   const [urlInput, setUrlInput] = useState('');
@@ -539,8 +539,11 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
 
   const add = () => {
     const name = input.trim();
-    if (!name || acts.some(a => a.name.toLowerCase() === name.toLowerCase())) return;
-    onChange([...acts, { name, day: numDays > 1 ? day : null, highlight: false, rating: null }]);
+    if (!name) return;
+    const thisDay = numDays > 1 ? day : null;
+    const isDupe = acts.some(a => a.name.toLowerCase() === name.toLowerCase() && a.day === thisDay);
+    if (isDupe) { setInput(''); return; } // already added for this exact day, nothing to do
+    onChange([...acts, { name, day: thisDay, highlight: false, rating: null }]);
     setInput('');
   };
 
@@ -558,17 +561,19 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
 
       // Map each day's date to a day number using startDate
       const newActs = [...acts];
-      const seen = new Set(acts.map(a => a.name.toLowerCase()));
+      const seen = new Set(acts.map(a => `${a.name.toLowerCase()}|${a.day ?? ''}`));
       for (const { date, artists } of data.days) {
         let dayNum = null;
         if (startDate && date) {
           const diff = Math.round((new Date(date) - new Date(startDate)) / 86400000);
           if (diff >= 0) dayNum = diff + 1;
         }
+        const thisDay = numDays > 1 ? dayNum : null;
         for (const name of artists) {
-          if (!seen.has(name.toLowerCase())) {
-            seen.add(name.toLowerCase());
-            newActs.push({ name, day: numDays > 1 ? dayNum : null, highlight: false, rating: null });
+          const key = `${name.toLowerCase()}|${thisDay ?? ''}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            newActs.push({ name, day: thisDay, highlight: false, rating: null });
           }
         }
       }
@@ -677,7 +682,10 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
               {days.map(d => <option key={d} value={d}>Day {d}</option>)}
             </select>
           )}
-          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Or add artist manually…" style={{ ...inputStyle, flex: 1 }} />
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Or add artist manually…" list="festival-act-suggestions" style={{ ...inputStyle, flex: 1 }} />
+          <datalist id="festival-act-suggestions">
+            {allArtists.map(a => <option key={a} value={a} />)}
+          </datalist>
           <button onClick={add} style={{ background: 'none', border: '1px solid #2a4a3a', borderRadius: 6, color: '#a78bfa', fontSize: 11, padding: '0 12px', cursor: 'pointer', flexShrink: 0 }}>+</button>
         </div>
       )}
@@ -2055,6 +2063,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               startDate={form.date}
               endDate={form.endDate}
               ratingMax={settings.ratingSystem || 5}
+              allArtists={allArtists}
             />
           </div>
         )}
@@ -6098,7 +6107,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                   <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
               </>)}
-              {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} />, (form.acts || []).length > 0)}
+              {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} allArtists={allArtists} />, (form.acts || []).length > 0)}
               {!form.wishlist && !quickUpcoming && foldCard('Your experience', experienceContent, !!(form.rating || form.seenAs !== 'Headliner'))}
               {!form.wishlist && !quickUpcoming && foldCard('Financial', financialContent, !!((form.tickets || []).length || (form.merch || []).length))}
               {foldCard('Notes', <textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Any notes..." />, !!form.notes)}

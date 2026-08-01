@@ -3238,6 +3238,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
+  const [sortDir, setSortDir] = useState('desc');
+  const [compact, setCompact] = useState(!!settings.friendsCompactView);
+  useEffect(() => { setCompact(!!settings.friendsCompactView); }, [settings.friendsCompactView]);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showFriendFilters, setShowFriendFilters] = useState(false);
   const [filterMinTogether, setFilterMinTogether] = useState(0);
@@ -3294,9 +3297,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
     .filter(f => filterMinTogether === 0 || f.shows.length >= filterMinTogether)
     .filter(f => !filterHasUpcoming || f.upcoming.length > 0)
     .sort((a, b) => {
-      if (sortBy === 'most-shows') return b.shows.length - a.shows.length;
-      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
-      if (sortBy === 'recent') return (b.lastShow?.date || '').localeCompare(a.lastShow?.date || '');
+      const dir = sortDir === 'asc' ? -1 : 1;
+      if (sortBy === 'most-shows') return dir * (b.shows.length - a.shows.length);
+      if (sortBy === 'alpha') return -dir * a.name.localeCompare(b.name);
+      if (sortBy === 'recent') return dir * ((b.lastShow?.date || '').localeCompare(a.lastShow?.date || ''));
       return 0;
     });
 
@@ -3518,15 +3522,21 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
           <button onClick={() => { setShowFriendFilters(f => !f); setShowSortPanel(false); }} style={{ background: showFriendFilters || activeFriendFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFriendFilters || activeFriendFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFriendFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFriendFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
             {activeFriendFilterCount > 0 ? `Filters (${activeFriendFilterCount})` : 'Filters'}
           </button>
+          <button onClick={() => onUpdateSetting('friendsCompactView', !compact)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+            {compact ? '▤' : '☰'}
+          </button>
           <button onClick={() => { setAddFriendInput(''); setShowAddFriendForm(true); }} aria-label="Add a friend" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         </div>
         {showSortPanel && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             {sortBy !== 'most-shows' && <button onClick={() => setSortBy('most-shows')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[{id:'most-shows',label:'Most shows'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Most recent'}].map(s => (
                 <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
               ))}
+              <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Flip direction" style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: '#0c0c14', color: '#a78bfa', border: '1px solid #2e2e50', fontFamily: "'DM Mono', monospace" }}>
+                {sortDir === 'asc' ? '↑ asc' : '↓ desc'}
+              </button>
             </div>
           </div>
         )}
@@ -3585,19 +3595,19 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
           <button key={name} onClick={() => setSelectedFriend(name)} style={{
             width: "100%", textAlign: "left", background: "#13131f",
             border: "1px solid #1f1f35", borderLeft: "3px solid #2e2e4a",
-            borderRadius: 10, padding: "12px 14px", cursor: "pointer", marginBottom: 8,
-            display: "flex", alignItems: "center", gap: 12
+            borderRadius: compact ? 8 : 10, padding: compact ? "7px 12px" : "12px 14px", cursor: "pointer", marginBottom: compact ? 4 : 8,
+            display: "flex", alignItems: "center", gap: compact ? 8 : 12
           }}>
-            <FriendAvatar name={displayName(name)} />
+            {!compact && <FriendAvatar name={displayName(name)} />}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 700, color: "#e2e0ff", marginBottom: 3 }}>{displayName(name)}</div>
-              {lastShow && (() => {
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: compact ? 12 : 14, fontWeight: 700, color: "#e2e0ff", marginBottom: compact ? 0 : 3 }}>{displayName(name)}</div>
+              {!compact && lastShow && (() => {
                 const monthsAgo = Math.floor((Date.now() - new Date(lastShow.date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24 * 30));
                 const recencyColor = monthsAgo <= 3 ? "#34d399" : monthsAgo <= 12 ? "#a78bfa" : "#4a4870";
                 const recencyLabel = monthsAgo === 0 ? "this month" : monthsAgo === 1 ? "1 month ago" : monthsAgo < 12 ? `${monthsAgo}m ago` : monthsAgo < 24 ? "1y ago" : `${Math.floor(monthsAgo/12)}y ago`;
                 return <div style={{ fontSize: 10, color: recencyColor, fontFamily: "'DM Mono', monospace", marginBottom: topGenres.length ? 4 : 0 }}>{recencyLabel} · {lastShow.artist}</div>;
               })()}
-              {topGenres.length > 0 && (
+              {!compact && topGenres.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                   {topGenres.slice(0, 3).map(([g]) => (
                     <span key={g} style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", padding: "2px 6px", borderRadius: 99, background: "#1a1a30", color: "#6b6a8f" }}>{g}</span>
@@ -3607,10 +3617,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
             </div>
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#6b6a8f" }}>{shows.length}</span>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: compact ? 13 : 18, fontWeight: 800, color: "#6b6a8f" }}>{shows.length}</span>
                 <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginLeft: 3 }}>shows</span>
               </div>
-              {upcoming.length > 0 && <div style={{ fontSize: 9, color: "#818cf8", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>+{upcoming.length} soon</div>}
+              {!compact && upcoming.length > 0 && <div style={{ fontSize: 9, color: "#818cf8", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>+{upcoming.length} soon</div>}
             </div>
           </button>
         ))}
@@ -4864,6 +4874,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   const [search, setSearch] = useState(initialSearch || '');
   useEffect(() => { if (initialSearch) { setSearch(initialSearch); onInitialSearchConsumed(); } }, [initialSearch]);
   const [sortBy, setSortBy] = useState('count');
+  const [sortDir, setSortDir] = useState('desc');
+  const [compact, setCompact] = useState(!!settings.songsCompactView);
+  useEffect(() => { setCompact(!!settings.songsCompactView); }, [settings.songsCompactView]);
   const [topN, setTopN] = useState(settings?.topSongsRows || 5);
   const [selectedSong, setSelectedSong] = useState(null);
   const [enteredViaSong, setEnteredViaSong] = useState(null);
@@ -4949,7 +4962,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     .filter(e => (!search && topSet ? topSet.has(e) : true)
       && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase()))
       && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
-    .sort((a, b) => sortBy === 'count' ? ((rank(b) - rank(a)) || (b.count - a.count)) : (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist)));
+    .sort((a, b) => { const dir = sortDir === 'asc' ? -1 : 1; return sortBy === 'count' ? (dir * ((rank(b) - rank(a)) || (b.count - a.count))) : (-dir * (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist))); });
 
   if (selectedSong) {
     const matchSong = (s, performer) => {
@@ -5110,6 +5123,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
           {filterSpotify === 'all' ? 'Filters' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
         </button>
+        <button onClick={() => saveSettings({ ...settings, songsCompactView: !compact })} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+          {compact ? '▤' : '☰'}
+        </button>
       </div>
       {showSongSort && (
         <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
@@ -5119,6 +5135,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
             {[{id:'count',label:'Most heard'},{id:'alpha',label:'A–Z'}].map(o => (
               <button key={o.id} onClick={() => setSortBy(o.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy===o.id ? '#a78bfa' : '#0c0c14', color: sortBy===o.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy===o.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: sortBy===o.id ? 700 : 400 }}>{o.label}</button>
             ))}
+            <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Flip direction" style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: '#0c0c14', color: '#a78bfa', border: '1px solid #2e2e50', fontFamily: "'DM Mono', monospace" }}>
+              {sortDir === 'asc' ? '↑ asc' : '↓ desc'}
+            </button>
           </div>
           <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Show</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -5147,11 +5166,11 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist, spotifyId: e.spotifyId || null, spotifyName: e.spotifyName || null, albumName: e.albumName || null, albumId: e.albumId || null, albumArt: e.albumArt || null, durationMs: e.durationMs || null, popularity: typeof e.popularity === 'number' ? e.popularity : null, trackNumber: e.trackNumber || null })} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
             borderLeft: `3px solid ${e.count >= 5 ? '#a78bfa' : e.count >= 3 ? '#6d5fa8' : e.count >= 2 ? '#3d3564' : '#2e2e4a'}`,
-            borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 6,
+            borderRadius: compact ? 8 : 10, padding: compact ? '7px 12px' : '11px 14px', cursor: 'pointer', marginBottom: compact ? 4 : 6,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              {sortBy === 'count' && i < 3 ? (
+              {!compact && (sortBy === 'count' && i < 3 ? (
                 <span style={{
                   width: 18, height: 18, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   background: ['#facc15', '#cbd5e1', '#d97706'][i], color: '#0c0c14', fontSize: 10, fontWeight: 800, fontFamily: "'DM Mono', monospace",
@@ -5160,16 +5179,16 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
                 <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 20, textAlign: 'right', flexShrink: 0 }}>
                   {sortBy === 'count' ? `#${i+1}` : null}
                 </span>
-              )}
-              {e.albumArt
+              ))}
+              {!compact && e.albumArt
                 ? <img src={e.albumArt} alt="" style={{ width: 34, height: 34, borderRadius: 4, flexShrink: 0, objectFit: 'cover' }} />
                 : null}
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ color: '#c4c2f0', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                  <span style={{ color: '#c4c2f0', fontSize: compact ? 12 : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
                   {e.spotifyId && !e.albumArt && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, flexShrink: 0, lineHeight: 1 }}>●</span>}
                 </span>
-                <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>
+                {!compact && <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>}
               </span>
             </div>
             <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{e.count}×</span>
@@ -5241,6 +5260,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   };
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-visited');
+  const [sortDir, setSortDir] = useState('desc');
+  const [compact, setCompact] = useState(!!settings.venuesCompactView);
+  useEffect(() => { setCompact(!!settings.venuesCompactView); }, [settings.venuesCompactView]);
   const [showSort, setShowSort] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filterCountry, setFilterCountry] = useState('all');
@@ -5311,10 +5333,11 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     .filter(v => !filterWantToGo || v.wantToVisit)
     .filter(v => filterMinVisited === 0 || v.pastCount >= filterMinVisited)
     .sort((a, b) => {
-      if (sortBy === 'most-visited') return b.pastCount - a.pastCount || a.name.localeCompare(b.name);
-      if (sortBy === 'alpha') return a.name.localeCompare(b.name);
-      if (sortBy === 'recent') return (b.lastVisit?.date || '').localeCompare(a.lastVisit?.date || '');
-      if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0) || b.pastCount - a.pastCount;
+      const dir = sortDir === 'asc' ? -1 : 1;
+      if (sortBy === 'most-visited') return dir * (b.pastCount - a.pastCount) || a.name.localeCompare(b.name);
+      if (sortBy === 'alpha') return -dir * a.name.localeCompare(b.name);
+      if (sortBy === 'recent') return dir * ((b.lastVisit?.date || '').localeCompare(a.lastVisit?.date || ''));
+      if (sortBy === 'rating') return dir * ((b.avgRating || 0) - (a.avgRating || 0)) || b.pastCount - a.pastCount;
       return 0;
     });
 
@@ -5739,6 +5762,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         <button onClick={() => { setShowFilters(f => !f); setShowSort(false); }} style={{ background: showFilters || activeFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFilters || activeFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
           {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'}
         </button>
+        <button onClick={() => onUpdateSetting('venuesCompactView', !compact)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+          {compact ? '▤' : '☰'}
+        </button>
       </div>
       {showSort && (
         <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
@@ -5747,6 +5773,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             {[{id:'most-visited',label:'Most visited'},{id:'alpha',label:'A–Z'},{id:'recent',label:'Recently visited'},{id:'rating',label:'Best rated'}].map(s => (
               <button key={s.id} onClick={() => setSortBy(s.id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortBy === s.id ? '#a78bfa' : '#0c0c14', color: sortBy === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortBy === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
             ))}
+            <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Flip direction" style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: '#0c0c14', color: '#a78bfa', border: '1px solid #2e2e50', fontFamily: "'DM Mono', monospace" }}>
+              {sortDir === 'asc' ? '↑ asc' : '↓ desc'}
+            </button>
           </div>
         </div>
       )}
@@ -5804,20 +5833,22 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {!showVenuesMap && (
       <div style={{ padding: '0 16px' }}>
         {sorted.map(v => (
-          <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.wantToVisit ? '#34d399' : v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button key={v.name} onClick={() => setSelectedVenue(v.name)} style={{ width: '100%', textAlign: 'left', background: '#0e0e1a', border: '1px solid #1f1f35', borderLeft: `3px solid ${v.wantToVisit ? '#34d399' : v.pastCount >= 5 ? '#a78bfa' : v.pastCount >= 3 ? '#6d5fa8' : v.pastCount >= 2 ? '#3d3564' : '#2e2e4a'}`, borderRadius: compact ? 8 : 10, padding: compact ? '7px 12px' : '11px 14px', cursor: 'pointer', marginBottom: compact ? 4 : 7, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {v.vIcon && <span style={{ fontSize: 13, flexShrink: 0 }}>{v.vIcon}</span>}
-                <div style={{ fontSize: 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
-                {v.wantToVisit && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to go</span>}
+                <div style={{ fontSize: compact ? 12 : 14, color: '#e2e0ff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
+                {!compact && v.wantToVisit && <span style={{ fontSize: 9, color: '#34d399', fontFamily: "'DM Mono', monospace", border: '1px solid #1e3a2e', borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>want to go</span>}
               </div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                {v.wantToVisit ? (v.city || v.country || 'no shows logged yet') : `${v.city ? `${v.city} · ` : ''}${v.pastCount}× past${v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}`}
-              </div>
+              {!compact && (
+                <div style={{ fontSize: 11, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                  {v.wantToVisit ? (v.city || v.country || 'no shows logged yet') : `${v.city ? `${v.city} · ` : ''}${v.pastCount}× past${v.upcoming.length > 0 ? ` · ${v.upcoming.length} upcoming` : ''}`}
+                </div>
+              )}
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              {v.avgRating && <div style={{ fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>★ {v.avgRating.toFixed(1)}</div>}
-              {v.avgTicket && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>€{v.avgTicket.toFixed(0)} avg</div>}
+              {!compact && v.avgRating && <div style={{ fontSize: 11, color: '#a78bfa', fontFamily: "'DM Mono', monospace" }}>★ {v.avgRating.toFixed(1)}</div>}
+              {compact ? <span style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>{v.pastCount}×</span> : (v.avgTicket && <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace" }}>€{v.avgTicket.toFixed(0)} avg</div>)}
             </div>
           </button>
         ))}

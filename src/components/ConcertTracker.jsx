@@ -1511,6 +1511,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
   const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState(() => normalizeConcertForm(concert));
@@ -1733,7 +1734,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {/* Costs */}
           {((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div style={detailCard}>
-              {sec("Costs")}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                {sec("Costs")}
+                <button onClick={() => setShowReceipt(true)} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 99, color: "#6b6a8f", fontSize: 10, padding: "3px 9px", cursor: "pointer", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>🧾 Receipt view</button>
+              </div>
               {(() => {
                 const ticketItems = (concert.tickets && concert.tickets.length > 0)
                   ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
@@ -2370,6 +2374,50 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           onClose={() => setSpotifyMatcher(null)}
         />
       )}
+      {showReceipt && (() => {
+        const ticketItems = (concert.tickets && concert.tickets.length > 0)
+          ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
+          : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", parseFloat(concert.ticketPrice) || 0]] : [];
+        const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
+        const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
+        const moneyLines = [...ticketItems, ...merchItems, ...travelItems];
+        const total = moneyLines.reduce((s, [, v]) => s + v, 0);
+        const songCount = getSongList(concert.setlist).length;
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,12,0.9)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowReceipt(false)}>
+            <div onClick={e => e.stopPropagation()} style={{
+              background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px", fontFamily: "'DM Mono', monospace", fontSize: 12,
+              maxWidth: 320, width: "100%", maxHeight: "80vh", overflowY: "auto",
+              clipPath: "polygon(0 0,100% 0,100% 96%,95% 100%,90% 96%,85% 100%,80% 96%,75% 100%,70% 96%,65% 100%,60% 96%,55% 100%,50% 96%,45% 100%,40% 96%,35% 100%,30% 96%,25% 100%,20% 96%,15% 100%,10% 96%,5% 100%,0 96%)"
+            }}>
+              <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 4 }}>★ {concert.artist?.toUpperCase()} ★</div>
+              <div style={{ textAlign: "center", fontSize: 10, color: "#666", marginBottom: 10 }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
+              {moneyLines.length > 0 && (
+                <>
+                  <div style={{ borderTop: "1px dashed #999", paddingTop: 8 }}>
+                    {moneyLines.map(([label, amount], i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span>{label}</span><span>€{amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ borderTop: "1px dashed #999", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                    <span>TOTAL</span><span>€{total.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              <div style={{ borderTop: "1px dashed #999", marginTop: 10, paddingTop: 8 }}>
+                {songCount > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Songs performed</span><span>{songCount}</span></div>}
+                {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
+                {concert.criedSong && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Cried</span><span>💧 {concert.criedSong}</span></div>}
+                {(concert.friends || []).length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>With</span><span>{concert.friends.join(", ")}</span></div>}
+                {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
+              </div>
+              <div style={{ textAlign: "center", fontSize: 9, color: "#999", marginTop: 12 }}>· · · THANK YOU · · ·</div>
+            </div>
+          </div>
+        );
+      })()}
       {pendingTag && (
         <SaveTagPrompt
           value={pendingTag.value}

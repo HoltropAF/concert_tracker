@@ -1763,6 +1763,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             )}
           </div>
 
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            {[['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])].map(([id, label]) => (
+              <button key={id} onClick={() => setDetailTab(id)} style={{ flex: 1, background: detailTab === id ? "#1a1a30" : "none", border: `1px solid ${detailTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 8, padding: "7px 0", fontSize: 12, fontWeight: detailTab === id ? 700 : 400, color: detailTab === id ? "#a78bfa" : "#6b6a8f", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{label}</button>
+            ))}
+          </div>
+
+          {detailTab === 'general' && (
+          <>
           {/* Photo */}
           {concert.photo && (
             <div style={{ marginBottom: 14 }}>
@@ -1813,13 +1822,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 6, padding: "0 20px 12px" }}>
-          {[['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])].map(([id, label]) => (
-            <button key={id} onClick={() => setDetailTab(id)} style={{ flex: 1, background: detailTab === id ? "#1a1a30" : "none", border: `1px solid ${detailTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 8, padding: "7px 0", fontSize: 12, fontWeight: detailTab === id ? 700 : 400, color: detailTab === id ? "#a78bfa" : "#6b6a8f", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{label}</button>
-          ))}
+          </>
+          )}
         </div>
 
         <div style={{ borderTop: "1px solid #1a1a2e" }} />

@@ -1539,6 +1539,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptTab, setReceiptTab] = useState('general');
   const [headerElevated, setHeaderElevated] = useState(false);
+  const [detailTab, setDetailTab] = useState('general');
+  useEffect(() => { setDetailTab('general'); }, [concert.id]);
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
   const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState(() => normalizeConcertForm(concert));
@@ -1755,11 +1757,18 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           </div>
         </div>
 
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 6, padding: "0 20px 12px" }}>
+          {[['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])].map(([id, label]) => (
+            <button key={id} onClick={() => setDetailTab(id)} style={{ flex: 1, background: detailTab === id ? "#1a1a30" : "none", border: `1px solid ${detailTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 8, padding: "7px 0", fontSize: 12, fontWeight: detailTab === id ? 700 : 400, color: detailTab === id ? "#a78bfa" : "#6b6a8f", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{label}</button>
+          ))}
+        </div>
+
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Costs */}
-          {((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
+          {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div style={detailCard}>
               {sec("Costs")}
               {(() => {
@@ -1812,9 +1821,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               )}
             </div>
           )}
+          {detailTab === 'financial' && !((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
+            <div style={{ textAlign: "center", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", padding: "24px 0" }}>no costs logged</div>
+          )}
 
           {/* Notes */}
-          {concert.notes && (
+          {detailTab === 'general' && concert.notes && (
             <div style={detailCard}>
               {sec("Notes")}
               <div style={concert.favorite
@@ -1824,8 +1836,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             </div>
           )}
 
+          {detailTab === 'general' && !concert.notes && (
+            <div style={{ textAlign: "center", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", padding: "24px 0" }}>no notes added</div>
+          )}
+
           {/* Acts — festivals */}
-          {isFestival && (concert.acts || []).length > 0 && (
+          {detailTab === 'setlist' && isFestival && (concert.acts || []).length > 0 && (
             <div style={detailCard}>
               {sec("Acts seen")}
               {(() => {
@@ -1875,7 +1891,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           )}
 
           {/* Setlist — headliner + support + guests, all as collapsible colour-coded rows */}
-          {past && !isFestival && (() => {
+          {detailTab === 'setlist' && past && !isFestival && (() => {
             const roleConfig = {
               headliner: { color: '#a78bfa', bg: '#1a1a30' },
               support:   { color: '#818cf8', bg: '#131328' },

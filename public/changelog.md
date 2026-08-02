@@ -1,6 +1,11 @@
 # Changelog
 
 ## 1 August 2026
+- Frosted-glass sticky headers instead of flat opaque bars
+- Finished the custom icon set — no more emoji in the bottom nav
+- Headers gain a soft shadow once you scroll, instead of always or never
+- A thin glowing bar shows across the top while a show is saving
+- Closing a show/artist/song/venue/friend page now slides out to the right, mirroring how it opened
 - Removed the activity heatmap and progress ring from Stats — not everyone's thing
 - Genre/venue pie charts are bigger and less padded, so there's less empty space
 - Removed the big "Next up" countdown card from Shows home — Stats already has a compact version of this

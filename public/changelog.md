@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1 August 2026
+- Show detail page now has tabs: General, Financial, Setlist
+- Venue detail page now has tabs: Overview, Gallery, Shows — map is twice as tall, gallery is a proper grid
+- Venue Shows tab can sort by room (if the venue has multiple) or rating
 - Frosted-glass sticky headers instead of flat opaque bars
 - Finished the custom icon set — no more emoji in the bottom nav
 - Headers gain a soft shadow once you scroll, instead of always or never

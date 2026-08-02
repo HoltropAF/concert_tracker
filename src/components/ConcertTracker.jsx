@@ -1727,6 +1727,40 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     }
   };
 
+  const [exportingPlaylist, setExportingPlaylist] = useState(false);
+  const handleExportPlaylist = async (songs, performerName) => {
+    const trackIds = songs.filter(s => s?.spotifyId).map(s => `spotify:track:${s.spotifyId}`);
+    if (trackIds.length === 0) { onNotify('No Spotify-linked songs to export', 'error'); return; }
+    setExportingPlaylist(true);
+    try {
+      const token = await getValidSpotifyToken(settings, onUpdateSettings || (async () => {}));
+      if (!token) throw new Error('no token');
+      const meRes = await fetch('https://api.spotify.com/v1/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (!meRes.ok) throw new Error('me failed');
+      const me = await meRes.json();
+      const plName = `${performerName} — ${formatDate(concert.date)}`;
+      const plRes = await fetch(`https://api.spotify.com/v1/users/${me.id}/playlists`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: plName, description: `Setlist from ${performerName} at ${concert.venue || concert.city || ''}, via settracker`, public: false }),
+      });
+      if (!plRes.ok) throw new Error('playlist create failed');
+      const playlist = await plRes.json();
+      const addRes = await fetch(`https://api.spotify.com/v1/playlists/${playlist.id}/tracks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uris: trackIds }),
+      });
+      if (!addRes.ok) throw new Error('add tracks failed');
+      onNotify(`Saved "${plName}" to Spotify`);
+      if (playlist.external_urls?.spotify) window.open(playlist.external_urls.spotify, '_blank');
+    } catch {
+      onNotify('Could not create Spotify playlist — check your Spotify connection in Settings', 'error');
+    } finally {
+      setExportingPlaylist(false);
+    }
+  };
+
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
@@ -2027,7 +2061,21 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             ];
             return (
               <div style={detailCard}>
-                {sec("Setlist")}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {sec("Setlist")}
+                  {settings.spotifyAccessToken && performers.some(p => getSongList(p.songs).some(s => s?.spotifyId)) && (
+                    <button
+                      disabled={exportingPlaylist}
+                      onClick={() => {
+                        const p = performers.length === 1 ? performers[0] : performers.reduce((a, b) => getSongList(a.songs).length >= getSongList(b.songs).length ? a : b);
+                        handleExportPlaylist(getSongList(p.songs), p.name);
+                      }}
+                      style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: exportingPlaylist ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 8, opacity: exportingPlaylist ? 0.6 : 1 }}
+                    >
+                      {exportingPlaylist ? 'Saving…' : '♪ Save to Spotify'}
+                    </button>
+                  )}
+                </div>
                 {performers.length === 1 ? (
                   getSongList(performers[0].songs).length > 0
                     ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly />

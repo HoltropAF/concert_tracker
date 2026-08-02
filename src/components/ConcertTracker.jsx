@@ -263,6 +263,7 @@ const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.g
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
+const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
 const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 const formatDuration = ms => { if (!ms) return null; const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 // Deterministic colored-initials avatar for friends — same name always gets the same hue.
@@ -1282,10 +1283,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const applyCover = (idx, artist) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
-      const name = getSongName(s); const info = getSongInfo(s);
-      if (!artist) return info ? { name, info } : name;
+      const name = getSongName(s); const info = getSongInfo(s); const known = getSongKnown(s);
       const cover = artist === true ? true : artist;
-      return info ? { name, info, cover } : { name, cover };
+      const base = { name, ...(info ? { info } : {}), ...(known !== null ? { known } : {}) };
+      return artist ? { ...base, cover } : base;
     }));
     setEditCoverIdx(null);
     setCoverInput('');
@@ -1294,13 +1295,24 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const applyNote = (idx, note) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
-      const name = getSongName(s); const cover = getSongCover(s);
+      const name = getSongName(s); const cover = getSongCover(s); const known = getSongKnown(s);
       const trimmed = (note || '').trim();
-      if (!trimmed) return cover ? { name, cover } : name;
-      return cover ? { name, info: trimmed, cover } : { name, info: trimmed };
+      const base = { name, ...(cover ? { cover } : {}), ...(known !== null ? { known } : {}) };
+      return trimmed ? { ...base, info: trimmed } : base;
     }));
     setEditNoteIdx(null);
     setNoteInput('');
+  };
+
+  const applyKnown = (idx, known) => {
+    save(songs.map((s, i) => {
+      if (i !== idx) return s;
+      const name = getSongName(s); const info = getSongInfo(s); const cover = getSongCover(s);
+      const base = { name, ...(info ? { info } : {}), ...(cover ? { cover } : {}) };
+      const current = getSongKnown(s);
+      const next = current === known ? null : known; // tapping the same state again clears it
+      return next === null ? base : { ...base, known: next };
+    }));
   };
 
   const coverSuggestions = coverInput.length > 0
@@ -1345,6 +1357,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const name = getSongName(song);
             const info = getSongInfo(song);
             const cover = getSongCover(song);
+            const known = getSongKnown(song);
             const isEditingCover = editCoverIdx === i;
             const isEditingNote = editNoteIdx === i;
             return (
@@ -1359,7 +1372,16 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     </div>
                     {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
                     {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {typeof cover === 'string' ? cover : 'cover'}</div>}
+                    {settings.showKnownMarkers && known !== null && (
+                      <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
+                    )}
                   </div>
+                  {!readOnly && settings.showKnownMarkers && (
+                    <>
+                      <button onClick={() => applyKnown(i, true)} title="I already knew this one" style={{ background: 'none', border: 'none', color: known === true ? '#34d399' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✓</button>
+                      <button onClick={() => applyKnown(i, false)} title="Discovered this one live" style={{ background: 'none', border: 'none', color: known === false ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✨</button>
+                    </>
+                  )}
                   {!readOnly && (
                     <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); } }}
                       style={{ background: 'none', border: 'none', color: info || isEditingNote ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✎</button>
@@ -7545,6 +7567,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </SettingsRow>
           <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
             <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); onUpdate("artistSectionsDefaultOpen", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Setlist 'knew it' markers" sub="Mark songs you knew beforehand vs discovered live">
+            <SettingsToggle checked={local.showKnownMarkers || false} onChange={checked => { lUpdate("showKnownMarkers", checked); onUpdate("showKnownMarkers", checked); }} />
           </SettingsRow>
           <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); onUpdate("artistGalleryStyle", v); }} compact />
           <PreferenceBlock label="Accent color" sub="The app's primary highlight color" value={local.accentColor || 'violet'} options={Object.entries(ACCENT_PRESETS).map(([id, p]) => ({ id, label: p.label }))} onChange={v => { lUpdate("accentColor", v); onUpdate("accentColor", v); }} compact />

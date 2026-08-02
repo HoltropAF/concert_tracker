@@ -1831,8 +1831,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
-            <div style={detailCard}>
-              {sec("Costs")}
+            <div>
               {(() => {
                 const ticketItems = (concert.tickets && concert.tickets.length > 0)
                   ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
@@ -1973,7 +1972,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             return (
               <div style={detailCard}>
                 {sec("Setlist")}
-                {performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
+                {performers.length === 1 ? (
+                  getSongList(performers[0].songs).length > 0
+                    ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly />
+                    : <div style={{ fontSize: 12, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
+                ) : performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
                   const { color, bg } = roleConfig[role] || roleConfig.support;
                   const isOpen = expandedSupportSetlists.has(key);
                   return (

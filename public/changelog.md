@@ -1,6 +1,10 @@
 # Changelog
 
 ## 1 August 2026
+- Removed the activity heatmap and progress ring from Stats — not everyone's thing
+- Genre/venue pie charts are bigger and less padded, so there's less empty space
+- Removed the big "Next up" countdown card from Shows home — Stats already has a compact version of this
+- Memories button is now just a small camera icon instead of a full button
 - New: "On this day" card on Shows home when today matches a past show's anniversary
 - New: setlist "knew it / discovered live" markers, toggle in Settings
 - New: receipt-style summary for a show — tap 🧾 on the Costs card

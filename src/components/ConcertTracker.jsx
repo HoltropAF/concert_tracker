@@ -296,7 +296,7 @@ const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
 const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
-const getSongEncore = s => typeof s === 'string' || !s ? false : !!s.encoreStart; // true = this song starts the encore
+const getSongSectionLabel = s => typeof s === 'string' || !s ? null : (s.sectionLabel || null); // e.g. "ENCORE", "ENCORE 2" — labels just this divider, doesn't imply anything about later songs
 const getSongAlbum = s => typeof s === 'string' || !s ? null : (s.albumName || null);
 const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 const formatDuration = ms => { if (!ms) return null; const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -1351,12 +1351,16 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     }));
   };
 
-  const applyEncore = idx => {
+  const SECTION_LABEL_CYCLE = [null, 'ENCORE', 'ENCORE 2', 'ENCORE 3'];
+  const applySectionLabel = idx => {
     save(songs.map((s, i) => {
       const base = typeof s === 'string' ? { name: s } : { ...s };
       if (i === idx) {
-        if (base.encoreStart) delete base.encoreStart;
-        else base.encoreStart = true;
+        const current = getSongSectionLabel(s);
+        const nextIdx = (SECTION_LABEL_CYCLE.indexOf(current) + 1) % SECTION_LABEL_CYCLE.length;
+        const next = SECTION_LABEL_CYCLE[nextIdx];
+        if (next === null) delete base.sectionLabel;
+        else base.sectionLabel = next;
       }
       return base;
     }));
@@ -1413,7 +1417,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const info = getSongInfo(song);
             const cover = getSongCover(song);
             const known = getSongKnown(song);
-            const isEncoreStart = getSongEncore(song);
+            const sectionLabel = getSongSectionLabel(song);
             const album = getSongAlbum(song);
             const prevAlbum = i > 0 ? getSongAlbum(songs[i - 1]) : undefined;
             const showAlbumHeader = readOnly && album && album !== prevAlbum;
@@ -1424,9 +1428,9 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {showAlbumHeader && (
                   <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: i === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
                 )}
-                {isEncoreStart && (
+                {sectionLabel && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px', color: '#facc15', fontSize: 9, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <div style={{ flex: 1, height: 1, background: '#3a3010' }} />ENCORE<div style={{ flex: 1, height: 1, background: '#3a3010' }} />
+                    <div style={{ flex: 1, height: 1, background: '#3a3010' }} />{sectionLabel}<div style={{ flex: 1, height: 1, background: '#3a3010' }} />
                   </div>
                 )}
               <div style={{ marginBottom: (isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4) }}>
@@ -1451,7 +1455,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     </>
                   )}
                   {!readOnly && (
-                    <button onClick={() => applyEncore(i)} title="Mark as encore start" style={{ background: 'none', border: 'none', color: isEncoreStart ? '#facc15' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🎪</button>
+                    <button onClick={() => applySectionLabel(i)} title="Cycle: none / Encore / Encore 2 / Encore 3" style={{ background: 'none', border: 'none', color: sectionLabel ? '#facc15' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🎪</button>
                   )}
                   {!readOnly && (
                     <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); } }}

@@ -92,17 +92,32 @@ function parseSongs(html) {
   const strip = s => s.replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
   const songs = [];
 
-  // Strategy 1: match full <li class="song">...</li> blocks and extract name + info
-  const liRe = /<li[^>]+class="[^"]*\bsong\b[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  // setlist.fm marks section breaks (Encore, Encore 2, Act I, etc.) with their
+  // own <li class="setSubtitle">Encore:</li>-style entries in between songs —
+  // best-effort only, since we're scraping HTML rather than using the real API.
+  let pendingLabel = null;
+  const isLikelyLabel = text => /^(encore|act\s|surprise|intro)/i.test(text) && text.length < 30;
+
+  // Strategy 1: match full <li class="song">...</li> blocks and extract name + info,
+  // walking the raw HTML in order so we can pick up subtitle-style <li> markers too.
+  const liRe = /<li[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/li>/gi;
   let m;
   while ((m = liRe.exec(html)) !== null) {
-    const block = m[1];
-    const labelM = block.match(/class="[^"]*\bsongLabel\b[^"]*"[^>]*>([\s\S]*?)<\/a>/i);
-    const name = labelM ? strip(labelM[1]) : null;
-    if (!name) continue;
-    const infoM = block.match(/class="[^"]*\b(?:songInfo|infos)\b[^"]*"[^>]*>([\s\S]*?)<\//i);
-    const info = infoM ? strip(infoM[1]) : null;
-    songs.push(info ? { name, info } : name);
+    const [, classAttr, block] = m;
+    if (/\bsong\b/.test(classAttr)) {
+      const labelM = block.match(/class="[^"]*\bsongLabel\b[^"]*"[^>]*>([\s\S]*?)<\/a>/i);
+      const name = labelM ? strip(labelM[1]) : null;
+      if (!name) continue;
+      const infoM = block.match(/class="[^"]*\b(?:songInfo|infos)\b[^"]*"[^>]*>([\s\S]*?)<\//i);
+      const info = infoM ? strip(infoM[1]) : null;
+      const entry = { name };
+      if (info) entry.info = info;
+      if (pendingLabel) { entry.sectionLabel = pendingLabel; pendingLabel = null; }
+      songs.push(Object.keys(entry).length === 1 ? name : entry);
+    } else if (/\bsubtitle\b|\bset-name\b|\bsetlistTitle\b/i.test(classAttr)) {
+      const text = strip(block).replace(/:$/, '');
+      if (isLikelyLabel(text)) pendingLabel = text.toUpperCase();
+    }
   }
   if (songs.length) return songs;
 
@@ -117,13 +132,21 @@ function parseSongs(html) {
 
 function extractSetlist(sl) {
   const songs = (sl.sets?.set || [])
-    .flatMap(set => (set.song || []).filter(s => !s.tape).map(s => {
-      const out = { name: s.name };
-      if (s.info) out.info = s.info;
-      if (s.cover?.name) out.cover = s.cover.name;
-      return out.info || out.cover ? out : out.name;
-    }))
-    .filter(s => (typeof s === 'string' ? s : s.name));
+    .flatMap(set => {
+      const setSongs = (set.song || []).filter(s => !s.tape);
+      return setSongs.map((s, i) => {
+        const out = { name: s.name };
+        if (s.info) out.info = s.info;
+        if (s.cover?.name) out.cover = s.cover.name;
+        // setlist.fm labels a whole block (e.g. "Encore", "Encore 2") rather than
+        // one song — we attach that label to just the first song in the block,
+        // matching how the app renders it as a one-line divider before that song.
+        if (i === 0 && set.name) out.sectionLabel = set.name.toUpperCase();
+        return out;
+      });
+    })
+    .filter(s => s.name)
+    .map(s => (Object.keys(s).length === 1 ? s.name : s));
   let isoDate = null;
   if (sl.eventDate) { const [d, m, y] = sl.eventDate.split('-'); if (y) isoDate = `${y}-${m}-${d}`; }
   return {

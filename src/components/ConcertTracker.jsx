@@ -296,6 +296,8 @@ const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
 const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
+const getSongEncore = s => typeof s === 'string' || !s ? false : !!s.encoreStart; // true = this song starts the encore
+const getSongAlbum = s => typeof s === 'string' || !s ? null : (s.albumName || null);
 const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 const formatDuration = ms => { if (!ms) return null; const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 // Deterministic colored-initials avatar for friends — same name always gets the same hue.
@@ -1315,10 +1317,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const applyCover = (idx, artist) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
-      const name = getSongName(s); const info = getSongInfo(s); const known = getSongKnown(s);
-      const cover = artist === true ? true : artist;
-      const base = { name, ...(info ? { info } : {}), ...(known !== null ? { known } : {}) };
-      return artist ? { ...base, cover } : base;
+      const base = typeof s === 'string' ? { name: s } : { ...s };
+      if (artist) base.cover = artist === true ? true : artist;
+      else delete base.cover;
+      return base;
     }));
     setEditCoverIdx(null);
     setCoverInput('');
@@ -1327,10 +1329,11 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const applyNote = (idx, note) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
-      const name = getSongName(s); const cover = getSongCover(s); const known = getSongKnown(s);
+      const base = typeof s === 'string' ? { name: s } : { ...s };
       const trimmed = (note || '').trim();
-      const base = { name, ...(cover ? { cover } : {}), ...(known !== null ? { known } : {}) };
-      return trimmed ? { ...base, info: trimmed } : base;
+      if (trimmed) base.info = trimmed;
+      else delete base.info;
+      return base;
     }));
     setEditNoteIdx(null);
     setNoteInput('');
@@ -1339,11 +1342,23 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const applyKnown = (idx, known) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
-      const name = getSongName(s); const info = getSongInfo(s); const cover = getSongCover(s);
-      const base = { name, ...(info ? { info } : {}), ...(cover ? { cover } : {}) };
+      const base = typeof s === 'string' ? { name: s } : { ...s };
       const current = getSongKnown(s);
       const next = current === known ? null : known; // tapping the same state again clears it
-      return next === null ? base : { ...base, known: next };
+      if (next === null) delete base.known;
+      else base.known = next;
+      return base;
+    }));
+  };
+
+  const applyEncore = idx => {
+    save(songs.map((s, i) => {
+      const base = typeof s === 'string' ? { name: s } : { ...s };
+      if (i === idx) {
+        if (base.encoreStart) delete base.encoreStart;
+        else base.encoreStart = true;
+      }
+      return base;
     }));
   };
 
@@ -1381,19 +1396,40 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const searchUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(searchArtist)}${concert.venue ? '+' + encodeURIComponent(concert.venue) : ''}+${concert.date.slice(0, 4)}`;
   const inputStyle = { flex: 1, background: '#13131f', border: '1px solid #2a4a3a', borderRadius: 8, color: '#c4c2f0', padding: '7px 12px', fontFamily: "'DM Mono', monospace", fontSize: 13 };
 
+  const totalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+  const formatSetLength = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `~${h}h ${m}m` : `~${m}m`; };
+
   return (
     <div>
       {songs.length > 0 && (
         <div style={{ marginBottom: 12 }}>
+          {(readOnly && totalMs > 0) && (
+            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{songs.length} songs</span><span>{formatSetLength(totalMs)}</span>
+            </div>
+          )}
           {songs.map((song, i) => {
             const name = getSongName(song);
             const info = getSongInfo(song);
             const cover = getSongCover(song);
             const known = getSongKnown(song);
+            const isEncoreStart = getSongEncore(song);
+            const album = getSongAlbum(song);
+            const prevAlbum = i > 0 ? getSongAlbum(songs[i - 1]) : undefined;
+            const showAlbumHeader = readOnly && album && album !== prevAlbum;
             const isEditingCover = editCoverIdx === i;
             const isEditingNote = editNoteIdx === i;
             return (
-              <div key={`${name}-${i}`} style={{ marginBottom: (isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4) }}>
+              <div key={`${name}-${i}`}>
+                {showAlbumHeader && (
+                  <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: i === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
+                )}
+                {isEncoreStart && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px', color: '#facc15', fontSize: 9, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <div style={{ flex: 1, height: 1, background: '#3a3010' }} />ENCORE<div style={{ flex: 1, height: 1, background: '#3a3010' }} />
+                  </div>
+                )}
+              <div style={{ marginBottom: (isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4) }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
@@ -1413,6 +1449,9 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                       <button onClick={() => applyKnown(i, true)} title="I already knew this one" style={{ background: 'none', border: 'none', color: known === true ? '#34d399' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✓</button>
                       <button onClick={() => applyKnown(i, false)} title="Discovered this one live" style={{ background: 'none', border: 'none', color: known === false ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✨</button>
                     </>
+                  )}
+                  {!readOnly && (
+                    <button onClick={() => applyEncore(i)} title="Mark as encore start" style={{ background: 'none', border: 'none', color: isEncoreStart ? '#facc15' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🎪</button>
                   )}
                   {!readOnly && (
                     <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); } }}
@@ -1467,6 +1506,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     </div>
                   </div>
                 )}
+              </div>
               </div>
             );
           })}

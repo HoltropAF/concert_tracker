@@ -1,6 +1,10 @@
 # Changelog
 
 ## 1 August 2026
+- Show detail tabs moved above the photo/stats/tags, which now live inside General
+- Financial tab no longer wraps everything in a redundant card
+- Setlist shows directly for single-performer shows instead of needing a tap to expand
+- Fixed a real navigation bug: swiping back could land on the wrong page due to stranded history entries piling up over a session
 - Show detail page now has tabs: General, Financial, Setlist
 - Venue detail page now has tabs: Overview, Gallery, Shows — map is twice as tall, gallery is a proper grid
 - Venue Shows tab can sort by room (if the venue has multiple) or rating

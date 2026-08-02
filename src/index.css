@@ -23,6 +23,7 @@ input, textarea, select, button {
   background: rgba(12, 12, 20, 0.65) !important;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  transition: box-shadow 0.2s ease;
 }
 .header-elevated {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);

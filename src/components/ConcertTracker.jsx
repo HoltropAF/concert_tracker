@@ -1512,6 +1512,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [headerElevated, setHeaderElevated] = useState(false);
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
   const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState(() => normalizeConcertForm(concert));
@@ -1646,9 +1647,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       past && companions.length === 0 && { label: "With", value: "Solo", nav: null },
     ].filter(Boolean);
     return (
-      <div style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
+      <div onScroll={e => setHeaderElevated(e.currentTarget.scrollTop > 4)} style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
         {/* Header */}
-        <div className="glass-header" style={{ position: "sticky", top: 0, borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+        <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: "sticky", top: 0, borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
@@ -5540,9 +5541,17 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
     .filter(c => c.photo && isPast(c.date))
     .sort((a, b) => b.date.localeCompare(a.date));
   useBackButton(onBack, true);
+  const [headerElevated, setHeaderElevated] = useState(false);
+  useEffect(() => {
+    const el = document.getElementById('content-scroll');
+    if (!el) return;
+    const onScroll = () => setHeaderElevated(el.scrollTop > 4);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
   return (
     <div style={{ padding: "0 0 100px" }}>
-      <div className="glass-header" style={{ position: "sticky", top: 0, borderBottom: "1px solid #1f1f35", padding: "16px 16px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+      <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: "sticky", top: 0, borderBottom: "1px solid #1f1f35", padding: "16px 16px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
         <div>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>Memories</div>
@@ -5567,6 +5576,14 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
 
 function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedVenue, setSelectedVenue] = useState(initialSelectedVenue);
+  const [headerElevated, setHeaderElevated] = useState(false);
+  useEffect(() => {
+    const el = document.getElementById('content-scroll');
+    if (!el) return;
+    const onScroll = () => setHeaderElevated(el.scrollTop > 4);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [selectedVenue]);
   const [enteredViaVenue] = useState(initialSelectedVenue);
   useEffect(() => { if (initialSelectedVenue) { setSelectedVenue(initialSelectedVenue); onInitialVenueConsumed(); } }, [initialSelectedVenue]);
   const goBackFromVenue = () => {
@@ -5672,7 +5689,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     return (
       <div className="slide-in-detail" key={selectedVenue} style={{ padding: '0 0 100px' }}>
         {/* Sticky header, matching the show detail page */}
-        <div className="glass-header" style={{ position: 'sticky', top: 0, borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+        <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: 'sticky', top: 0, borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
           <button onClick={goBackFromVenue} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVenue}</div>

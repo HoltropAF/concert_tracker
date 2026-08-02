@@ -1648,7 +1648,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     return (
       <div style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
         {/* Header */}
-        <div style={{ position: "sticky", top: 0, background: "#0c0c14", borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+        <div className="glass-header" style={{ position: "sticky", top: 0, borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
@@ -1925,8 +1925,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       overflowY: "auto", zIndex: 100
     }}>
       {/* Edit mode header */}
-      <div style={{
-        position: "sticky", top: 0, background: "#0c0c14",
+      <div className="glass-header" style={{
+        position: "sticky", top: 0,
         borderBottom: "1px solid #1e3028", padding: "16px 20px",
         display: "flex", alignItems: "center", gap: 12, zIndex: 10
       }}>
@@ -5542,7 +5542,7 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
   useBackButton(onBack, true);
   return (
     <div style={{ padding: "0 0 100px" }}>
-      <div style={{ position: "sticky", top: 0, background: "#0c0c14", borderBottom: "1px solid #1f1f35", padding: "16px 16px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+      <div className="glass-header" style={{ position: "sticky", top: 0, borderBottom: "1px solid #1f1f35", padding: "16px 16px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
         <div>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>Memories</div>
@@ -5672,7 +5672,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     return (
       <div className="slide-in-detail" key={selectedVenue} style={{ padding: '0 0 100px' }}>
         {/* Sticky header, matching the show detail page */}
-        <div style={{ position: 'sticky', top: 0, background: '#0c0c14', borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+        <div className="glass-header" style={{ position: 'sticky', top: 0, borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
           <button onClick={goBackFromVenue} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVenue}</div>
@@ -8467,17 +8467,19 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </button>
   )
 
+  const ICON_SHOWS = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 0 0 5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.5a2.5 2.5 0 0 0 0-5z"/><path d="M9 7v10" strokeDasharray="2.5 2.5"/></svg>
   const ICON_ARTISTS = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
   const ICON_SONGS = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
   const ICON_VENUES = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+  const ICON_FRIENDS = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 
   const BottomNav = () => (
     <div data-bottom-nav="" style={{ flexShrink: 0, background: '#0c0c14', borderTop: '1px solid #0d1a14', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      {navBtn('shows', '♪', 'Shows', view === 'home', () => setView('home'))}
+      {navBtn('shows', ICON_SHOWS, 'Shows', view === 'home', () => setView('home'))}
       {navBtn('artists', ICON_ARTISTS, 'Artists', view === 'artists', () => setView('artists'))}
       {navBtn('songs', ICON_SONGS, 'Songs', view === 'songs', () => setView('songs'))}
       {navBtn('venues', ICON_VENUES, 'Venues', view === 'venues', () => setView('venues'))}
-      {navBtn('friends', '♥', 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
+      {navBtn('friends', ICON_FRIENDS, 'Friends', view === 'stats' && statsTab === 'friends', () => { setView('stats'); setStatsTab('friends'); })}
     </div>
   )
 

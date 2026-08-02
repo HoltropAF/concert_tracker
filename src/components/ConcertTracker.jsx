@@ -4994,6 +4994,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         <button onClick={() => onUpdateSetting('artistsCompactView', !artistsCompact)} style={{ background: artistsCompact ? '#1a1a30' : 'none', border: `1px solid ${artistsCompact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: artistsCompact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={artistsCompact ? 'Switch to expanded view' : 'Switch to compact view'}>
           {artistsCompact ? '▤' : '☰'}
         </button>
+        <button onClick={() => onUpdateSetting('artistsBubbleView', !settings.artistsBubbleView)} style={{ background: settings.artistsBubbleView ? '#1a1a30' : 'none', border: `1px solid ${settings.artistsBubbleView ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: settings.artistsBubbleView ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={settings.artistsBubbleView ? 'Switch to list view' : 'Switch to bubble view'}>
+          ●
+        </button>
         <button onClick={() => { setAddArtistInput(''); setShowAddArtistForm(true); }} aria-label="Add an artist you want to see" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
       </div>
 
@@ -5099,6 +5102,27 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       </div>
 
       {/* Artist list */}
+      {settings.artistsBubbleView ? (
+        <div style={{ padding: "10px 16px 0", display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
+          {sorted.map(({ name, pastCount, supportCount, guestCount, festivalCount }, bi) => {
+            const total = pastCount + supportCount + guestCount + festivalCount;
+            const maxTotal = Math.max(...sorted.map(a => a.pastCount + a.supportCount + a.guestCount + a.festivalCount), 1);
+            const size = 34 + Math.sqrt(total / maxTotal) * 76;
+            const bubbleColors = ['#a78bfa', '#f472b6', '#38bdf8', '#facc15', '#34d399'];
+            return (
+              <button key={name} onClick={() => setSelectedArtist(name)} style={{
+                width: size, height: size, borderRadius: "50%", border: "none", cursor: "pointer",
+                background: bubbleColors[bi % bubbleColors.length], opacity: 0.85,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                color: "#0c0c14", fontFamily: "'Syne', sans-serif", fontWeight: 800, textAlign: "center", padding: 4
+              }}>
+                <span style={{ fontSize: Math.max(9, Math.min(13, size / 8)), lineHeight: 1.1, overflow: "hidden", maxHeight: size * 0.6 }}>{name}</span>
+                <span style={{ fontSize: 9, fontWeight: 400, fontFamily: "'DM Mono', monospace", opacity: 0.75 }}>{total}×</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
       <div className="stagger-list" style={{ padding: "0 16px" }}>
         {sorted.map(({ name, pastCount, pastShows, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps, wantToSee }) => {
           const total = pastCount + supportCount + guestCount + festivalCount;
@@ -5169,6 +5193,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           <EmptyState icon="🎤" title="No artists found" detail="Try another search or filter." />
         )}
       </div>
+      )}
     </div>
   );
 }

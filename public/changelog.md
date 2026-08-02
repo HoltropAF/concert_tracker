@@ -1,6 +1,10 @@
 # Changelog
 
 ## 1 August 2026
+- New: "On this day" card on Shows home when today matches a past show's anniversary
+- New: setlist "knew it / discovered live" markers, toggle in Settings
+- New: receipt-style summary for a show — tap 🧾 on the Costs card
+- New: optional bubble-chart view for Artists, toggle next to compact/expanded
 - Show cards with a photo now have a notched "ticket stub" tear line between the photo and details
 - Notes on all-time favorite shows get a bolder display typography treatment
 - New: Memories page — every photo from every show in one grid, reachable from Shows home

@@ -107,9 +107,13 @@ function Confetti({ onDone }) {
 
 // * Animates a number counting up from 0 to its target value on mount/change.
 // * Re-triggers whenever `value` changes (e.g. switching between artists).
-function CountUp({ value, duration = 900 }) {
-  const [display, setDisplay] = useState(0)
+const countUpSeen = new Set(); // module-level: which CountUp ids have already animated this session
+function CountUp({ value, duration = 900, id }) {
+  const alreadySeen = id ? countUpSeen.has(id) : false;
+  const [display, setDisplay] = useState(alreadySeen ? value : 0)
   useEffect(() => {
+    if (id) countUpSeen.add(id);
+    if (alreadySeen) { setDisplay(value); return; }
     let raf
     const start = performance.now()
     const from = 0
@@ -3758,7 +3762,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
       {!search && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}><CountUp value={allFriends.length} /></span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}><CountUp value={allFriends.length} id="friends-total" /></span>
             <span style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>friends</span>
           </div>
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
@@ -4956,7 +4960,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       {!search && activeFilterCount === 0 && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalArtists} /></span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalArtists} id="artists-total" /></span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>artists seen</span>
           </div>
           {(uniqueGenres > 0 || avgShowsPerArtist) && (
@@ -5406,7 +5410,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         return (
           <div style={{ padding: '14px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalUnique} /></span>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalUnique} id="songs-total" /></span>
               <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
             </div>
             {(past.length > 0 || totalArtists > 0) && (
@@ -6024,7 +6028,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       {!search && totalVenues > 0 && (
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalVenues} /></span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalVenues} id="venues-total" /></span>
             <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>venues visited</span>
           </div>
           {(uniqueCities > 0 || uniqueCountries > 0) && (
@@ -8734,7 +8738,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               })}
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={pastAll.length} id="shows-total" /></span>
                   <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
                 </div>
                 {pastAll.some(c => c.photo) && (

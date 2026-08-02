@@ -5662,6 +5662,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   }, [selectedVenue]);
   const [enteredViaVenue] = useState(initialSelectedVenue);
   useEffect(() => { if (initialSelectedVenue) { setSelectedVenue(initialSelectedVenue); onInitialVenueConsumed(); } }, [initialSelectedVenue]);
+  const [venueDetailTab, setVenueDetailTab] = useState('overview');
+  useEffect(() => { setVenueDetailTab('overview'); }, [selectedVenue]);
+  const [venueShowsSort, setVenueShowsSort] = useState('date');
   const goBackFromVenue = () => {
     if (selectedVenue && selectedVenue === enteredViaVenue && onBackToOrigin) onBackToOrigin();
     else setSelectedVenue(null);
@@ -5778,8 +5781,17 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           </div>
         </div>
 
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 6, padding: '12px 16px 0' }}>
+          {[['overview', 'Overview'], ['gallery', 'Gallery'], ['shows', 'Shows']].map(([id, label]) => (
+            (id !== 'gallery' || v.photos.length > 0) && (
+              <button key={id} onClick={() => setVenueDetailTab(id)} style={{ padding: '6px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: venueDetailTab === id ? 'var(--accent)' : '#13131f', color: venueDetailTab === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${venueDetailTab === id ? 'var(--accent)' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: venueDetailTab === id ? 700 : 400 }}>{label}</button>
+            )
+          ))}
+        </div>
+
         {/* Hero: maps / website / parking / transit / edit */}
-        <div style={{ padding: '14px 16px 0' }}>
+        {venueDetailTab === 'overview' && <div style={{ padding: '14px 16px 0' }}>
           {(() => {
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
             const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
@@ -5822,7 +5834,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
               </>
             );
           })()}
-        </div>
+        </div>}
 
         {/* Edit venue modal */}
         {editingVenueInfo && (
@@ -5881,7 +5893,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </div>
           </div>
         )}
-        {!v.wantToVisit && (() => {
+        {venueDetailTab === 'overview' && !v.wantToVisit && (() => {
           const tileCount = [true, totalSpent > 0, !!v.avgRating, artists.length > 0, festivalActs.length > 0].filter(Boolean).length;
           return (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(tileCount, 4)}, 1fr)`, gap: 6, padding: '14px 16px 0' }}>
@@ -5916,7 +5928,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           </div>
           );
         })()}
-        {v.wantToVisit && (
+        {venueDetailTab === 'overview' && v.wantToVisit && (
           <div style={{ padding: '14px 16px 0' }}>
             <button onClick={() => {
               const next = (settings.wantToVisitVenues || []).filter(w => w.name.toLowerCase() !== selectedVenue.toLowerCase());
@@ -5927,7 +5939,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             </button>
           </div>
         )}
-        {(() => {
+        {venueDetailTab === 'overview' && (() => {
           const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
           const showRooms = settings.showVenueRooms !== false;
           const showTags = settings.showVenueTags !== false;
@@ -5949,13 +5961,13 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         })()}
 
         {/* Mini map */}
-        {(() => {
+        {venueDetailTab === 'overview' && (() => {
           const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
           if (typeof vInfo.lat !== 'number') return null;
           const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`;
           return (
             <div style={{ padding: '12px 16px 0', position: 'relative' }}>
-              <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, wantToVisit: v.wantToVisit }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} showZoomControl clickOpensMaps height={130} />
+              <VenueMap points={[{ name: selectedVenue, lat: vInfo.lat, lng: vInfo.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, wantToVisit: v.wantToVisit }]} focus={{ lat: vInfo.lat, lng: vInfo.lng, zoom: 14 }} interactive={false} showZoomControl clickOpensMaps height={260} />
               <a href={mapsHref} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', top: 20, right: 24, background: '#0c0c14dd', border: '1px solid #2e2e50', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#c4c2f0', fontFamily: "'DM Mono', monospace", display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
                 Open in Maps ↗
               </a>
@@ -5963,20 +5975,19 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           );
         })()}
 
-        {/* Photos */}
-        {v.photos.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px', WebkitOverflowScrolling: 'touch' }}>
+        {/* Gallery */}
+        {venueDetailTab === 'gallery' && v.photos.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, padding: '14px 16px' }}>
             {v.photos.map(c => (
-              <button key={c.id} onClick={() => onOpen(c)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
-                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: '16 / 10', borderRadius: 10 }} />
-                <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{c.date.slice(0,4)} · {c.artist}</div>
+              <button key={c.id} onClick={() => onOpen(c)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: '100%', aspectRatio: '1', borderRadius: 6 }} />
               </button>
             ))}
           </div>
         )}
 
         {/* Shows list */}
-        <div style={{ padding: '14px 16px' }}>
+        {venueDetailTab === 'shows' && <div style={{ padding: '14px 16px' }}>
           {v.upcoming.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <button onClick={() => setShowVenueUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px 8px' }}>
@@ -6059,7 +6070,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
               );
             });
           })()}
-        </div>
+        </div>}
       </div>
     );
   }

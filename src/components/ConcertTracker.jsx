@@ -8610,8 +8610,22 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;
+          const todayMD = new Date().toISOString().slice(5, 10);
+          const anniversaries = pastAll.filter(c => c.date && c.date.slice(5) === todayMD && c.date.slice(0, 4) !== new Date().getFullYear().toString());
           return (
             <div style={{ padding: '14px 16px 0' }}>
+              {anniversaries.map(c => {
+                const years = new Date().getFullYear() - parseInt(c.date.slice(0, 4));
+                return (
+                  <button key={c.id} onClick={() => handleOpenConcert(c)} style={{ width: '100%', textAlign: 'left', background: 'linear-gradient(135deg, #1a1430, #2a1a40)', border: '1px solid #3a2a5c', borderRadius: 12, padding: '12px 14px', marginBottom: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ fontSize: 24 }}>✨</div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--accent)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>On this day, {years} year{years !== 1 ? 's' : ''} ago</div>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 14, marginTop: 2, color: '#e2e0ff' }}>{c.artist} at {c.venue}</div>
+                    </div>
+                  </button>
+                );
+              })}
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                   <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>

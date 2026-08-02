@@ -37,6 +37,18 @@ input, textarea, select, button {
   animation: slideInRight 0.5s cubic-bezier(.32,.72,0,1);
 }
 
+@keyframes navLoadBar {
+  0% { width: 0%; opacity: 1; }
+  70% { width: 80%; }
+  100% { width: 95%; }
+}
+.nav-loading-bar {
+  position: fixed; top: 0; left: 0; height: 3px; z-index: 900;
+  background: var(--accent, #a78bfa);
+  animation: navLoadBar 1.4s cubic-bezier(.4,0,.2,1) forwards;
+  box-shadow: 0 0 8px var(--accent, #a78bfa);
+}
+
 @keyframes tabFadeIn {
   from { transform: scale(0.98); opacity: 0; }
   to { transform: scale(1); opacity: 1; }

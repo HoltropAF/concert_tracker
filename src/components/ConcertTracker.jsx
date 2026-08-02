@@ -8110,6 +8110,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }, [showStartupScreen])
   const dismissOnboarding = () => { setShowOnboarding(false); onUpdateSetting('hasSeenOnboarding', true) }
   const [showConfetti, setShowConfetti] = useState(false)
+  const [navLoading, setNavLoading] = useState(false)
   const celebratedMilestones = useRef(new Set())
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', ACCENT_PRESETS[settings.accentColor]?.hex || ACCENT_PRESETS.violet.hex)
@@ -8236,7 +8237,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }
 
   const handleSave = async (updated) => {
+    setNavLoading(true)
     const result = await onSaveConcert(updated)
+    setNavLoading(false)
     notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success')
     if (result?.error) return result
     setSelected(updated)
@@ -8976,6 +8979,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       </div>
 
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
+      {navLoading && <div className="nav-loading-bar" />}
       {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
       {showOnboarding && <OnboardingTour step={onboardingStep} setStep={setOnboardingStep} onDismiss={dismissOnboarding} />}
       <BottomNav />

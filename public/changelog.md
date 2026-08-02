@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1 August 2026
+- Financial tab: cost-per-song and a "worth it" quote pairing cost with rating
+- Setlist tab: set length, album grouping, an encore marker, and a "Save to Spotify" button that creates a real playlist from the setlist
+- Fixed a bug where editing a song's note or cover could silently wipe its Spotify match data
 - Show detail tabs moved above the photo/stats/tags, which now live inside General
 - Financial tab no longer wraps everything in a redundant card
 - Setlist shows directly for single-performer shows instead of needing a tap to expand

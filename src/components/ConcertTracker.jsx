@@ -8325,8 +8325,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
-  const [showActivity, setShowActivity] = useState(false)
-  const [activityChartMode, setActivityChartMode] = useState('bar')
   const [addFlowStep, setAddFlowStep] = useState(null) // null | 'type' | 'timing' | 'ticket'
   const [addFlowType, setAddFlowType] = useState(null) // 'concert' | 'festival'
   const [addFlowAttendance, setAddFlowAttendance] = useState(null) // 'in_person' | 'online'
@@ -8995,109 +8993,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </div>
         )}
 
-            {concerts.length > 0 && !showCalendar && (() => {
-              const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
-              const yearCounts = {};
-              pastAll.forEach(c => { const y = c.date.slice(0, 4); yearCounts[y] = (yearCounts[y] || 0) + 1; });
-              const years = Object.keys(yearCounts).sort();
-              const maxYearCount = Math.max(...Object.values(yearCounts), 1);
-              const midYearCount = Math.round(maxYearCount / 2);
-              const ratingScale = settings.ratingSystem || 5;
-              const ratingCounts = {}; pastAll.forEach(c => { if (c.rating) ratingCounts[c.rating] = (ratingCounts[c.rating] || 0) + 1; });
-              if (years.length === 0) return null;
-              const BAR_H = 90;
-              const Y_PAD = 24;
-              return (
-                <div style={{ marginBottom: showActivity ? 10 : 2 }}>
-                  <button onClick={() => setShowActivity(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showActivity ? '0 4px 10px' : '0 4px 2px' }}>
-                    <span style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Activity</span>
-                    <span style={{ fontSize: 11, color: '#4a4870', transform: showActivity ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
-                  </button>
-                  {showActivity && (
-                    <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px' }}>
-                      {years.length > 1 && (
-                        <ChartToggle options={[{ id: 'bar', label: 'Bar' }, { id: 'line', label: 'Line' }]} value={activityChartMode} onChange={setActivityChartMode} />
-                      )}
-                      {/* Shows per year */}
-                      {activityChartMode === 'bar' ? (
-                        <div style={{ display: 'flex', marginBottom: 14 }}>
-                          <div style={{ width: Y_PAD, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: BAR_H, paddingBottom: 18, flexShrink: 0 }}>
-                            <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right', lineHeight: 1 }}>{maxYearCount}</span>
-                            <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right', lineHeight: 1 }}>{midYearCount}</span>
-                            <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right', lineHeight: 1 }}>0</span>
-                          </div>
-                          <div style={{ flex: 1, position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: BAR_H, pointerEvents: 'none' }}>
-                              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, borderTop: '1px solid #1f1f35' }} />
-                              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px dashed #1a1a2e' }} />
-                              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTop: '1px solid #1f1f35' }} />
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: BAR_H, paddingBottom: 1 }}>
-                              {years.map(y => (
-                                <button key={y} onClick={() => setFilterYears(f => f.includes(y) ? f.filter(x => x !== y) : [...f, y])} title={`${y}: ${yearCounts[y]} shows`}
-                                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                                  <div style={{ width: '100%', borderRadius: '3px 3px 0 0', background: filterYears.includes(y) ? '#a78bfa' : '#3d3564', height: `${Math.max(2, (yearCounts[y] / maxYearCount) * (BAR_H - 2))}px` }} />
-                                </button>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 3, borderTop: '1px solid #1f1f35', paddingTop: 3 }}>
-                              {years.map(y => (
-                                <div key={y} style={{ flex: 1, textAlign: 'center' }}>
-                                  <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{y.slice(2)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ) : years.length < 2 ? (
-                        <div style={{ color: '#2e2e4a', fontSize: 11, fontFamily: "'DM Mono', monospace", marginBottom: 14 }}>Need at least 2 years of data</div>
-                      ) : (() => {
-                        const W = 260, H = BAR_H;
-                        const n = years.length;
-                        const xOf = i => (i / (n - 1)) * (W - 6) + 3;
-                        const yOf = v => H - 4 - (v / maxYearCount) * (H - 14);
-                        const path = "M " + years.map((y, i) => `${xOf(i)},${yOf(yearCounts[y])}`).join(" L ");
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 14 }}>
-                            <div style={{ width: Y_PAD, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: H + 14, paddingBottom: 14, flexShrink: 0 }}>
-                              <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right', lineHeight: 1 }}>{maxYearCount}</span>
-                              <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right', lineHeight: 1 }}>{midYearCount}</span>
-                              <span style={{ fontSize: 8, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'right', lineHeight: 1 }}>0</span>
-                            </div>
-                            <svg style={{ flex: 1 }} height={H + 14} viewBox={`0 0 ${W} ${H + 14}`} preserveAspectRatio="none">
-                              <defs><linearGradient id="showsYearGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#a78bfa" stopOpacity="0.2"/><stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/></linearGradient></defs>
-                              <line x1={0} y1={yOf(maxYearCount)} x2={W} y2={yOf(maxYearCount)} stroke="#1f1f35" strokeWidth="1" />
-                              <line x1={0} y1={yOf(midYearCount)} x2={W} y2={yOf(midYearCount)} stroke="#1a1a2e" strokeWidth="1" strokeDasharray="3,3" />
-                              <line x1={0} y1={yOf(0)} x2={W} y2={yOf(0)} stroke="#1f1f35" strokeWidth="1" />
-                              {years.map((y, i) => (
-                                <text key={y} x={xOf(i)} y={H + 11} textAnchor="middle" fill="#4a4870" fontSize="8" fontFamily="DM Mono,monospace">{y.slice(2)}</text>
-                              ))}
-                              <path d={path + ` L ${xOf(n - 1)},${yOf(0)} L ${xOf(0)},${yOf(0)} Z`} fill="url(#showsYearGrad)" />
-                              <path d={path} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              {years.map((y, i) => <circle key={y} cx={xOf(i)} cy={yOf(yearCounts[y])} r="3" fill={filterYears.includes(y) ? '#34d399' : '#a78bfa'} />)}
-                            </svg>
-                          </div>
-                        );
-                      })()}
-                      {Object.keys(ratingCounts).length > 0 && (
-                        <div>
-                          <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 6 }}>Ratings</div>
-                          {Array.from({ length: ratingScale }, (_, i) => ratingScale - i).map(n => (ratingCounts[n] || 0) > 0 && (
-                            <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                              <span style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", width: 24 }}>★{n}</span>
-                              <div style={{ flex: 1, height: 5, background: '#0c0c14', borderRadius: 3, overflow: 'hidden' }}>
-                                <div style={{ height: '100%', borderRadius: 3, background: '#a78bfa', width: `${(ratingCounts[n] / Math.max(...Object.values(ratingCounts))) * 100}%` }} />
-                              </div>
-                              <span style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", width: 14, textAlign: 'right' }}>{ratingCounts[n]}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
             {concerts.length > 0 && showCalendar && (
               <CalendarMode
                 concerts={concerts}
@@ -9112,7 +9007,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
               <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
             {!showCalendar && filtered.length > 0 && (
-              <div style={{ marginTop: showActivity ? 10 : 2 }}>
+              <div style={{ marginTop: 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
                   <div style={{ marginBottom: 6 }}>
                     <button onClick={() => setShowWishlist(w => !w)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: showWishlist ? '4px 4px 10px' : '4px 4px 2px' }}>

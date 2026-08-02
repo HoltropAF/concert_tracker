@@ -3084,50 +3084,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             );
           })()}
 
-          {/* Activity heatmap — last 52 weeks, GitHub-style */}
-          {pastAll.length > 0 && (() => {
-            const weekCounts = [];
-            const now = new Date();
-            for (let w = 51; w >= 0; w--) {
-              const weekStart = new Date(now);
-              weekStart.setDate(now.getDate() - w * 7 - now.getDay());
-              const weekEnd = new Date(weekStart);
-              weekEnd.setDate(weekStart.getDate() + 7);
-              const count = pastAll.filter(c => {
-                const d = new Date(c.date + 'T00:00:00');
-                return d >= weekStart && d < weekEnd;
-              }).length;
-              weekCounts.push(count);
-            }
-            const colorFor = n => n === 0 ? '#161628' : n === 1 ? '#3d3564' : n === 2 ? '#6d5fa8' : 'var(--accent)';
-            const thisYear = now.getFullYear();
-            const thisYearCount = pastAll.filter(c => c.date.slice(0, 4) === String(thisYear)).length;
-            const lastYearCount = pastAll.filter(c => c.date.slice(0, 4) === String(thisYear - 1)).length;
-            const pct = lastYearCount > 0 ? Math.min(1, thisYearCount / lastYearCount) : null;
-            const circumference = 2 * Math.PI * 29;
-            return (
-              <div style={{ marginBottom: 14, background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 9, color: "#3a3858", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Activity, last year</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(26, 1fr)", gap: 3 }}>
-                    {weekCounts.map((n, i) => (
-                      <div key={i} title={`${n} show${n !== 1 ? 's' : ''}`} style={{ aspectRatio: "1", borderRadius: 2, background: colorFor(n) }} />
-                    ))}
-                  </div>
-                </div>
-                {pct !== null && (
-                  <div style={{ flexShrink: 0, textAlign: "center" }}>
-                    <svg width="60" height="60" viewBox="0 0 66 66">
-                      <circle cx="33" cy="33" r="29" fill="none" stroke="#1a1a2e" strokeWidth="6" />
-                      <circle cx="33" cy="33" r="29" fill="none" stroke="var(--accent)" strokeWidth="6" strokeDasharray={`${pct * circumference} ${circumference}`} strokeLinecap="round" transform="rotate(-90 33 33)" />
-                    </svg>
-                    <div style={{ fontSize: 8, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>vs {thisYear - 1}</div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
           {/* Row 1: shows / festivals / countries / avg per year */}
           {!(settings.hiddenSummaryBlocks||[]).includes("stats1") && !summaryFavOnly && (() => {
             const currentYearStr = String(new Date().getFullYear());
@@ -3306,18 +3262,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, marginBottom: 12, display: "flex", overflow: "hidden" }}>
                 {/* Genre */}
-                <div style={{ flex: 1, padding: "12px", borderRight: "1px solid #1f1f35" }}>
+                <div style={{ flex: 1, padding: "10px 8px", borderRight: "1px solid #1f1f35" }}>
                   {topGenres.length === 0 ? (
                     <div style={placeholderStyle}>add genres to shows</div>
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={62} showLabels labelPad={0.06} centerText="Genres" segments={[
+                        <Donut size={78} showLabels labelPad={0.06} centerText="Genres" segments={[
                           ...topGenres.slice(0,3).map(([g,n],i) => ({ value: n, color: GENRE_COLORS[i] })),
                           ...(topGenres.length > 3 ? [{ value: topGenres.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 8, rowGap: 3, marginTop: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 8, rowGap: 3, marginTop: 5 }}>
                         {[...topGenres.slice(0,3), ...(topGenres.length > 3 ? [["Others"]] : [])].map(([name], i) => (
                           <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? GENRE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
@@ -3330,18 +3286,18 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 </div>
 
                 {/* Venue size */}
-                <div style={{ flex: 1, padding: "12px" }}>
+                <div style={{ flex: 1, padding: "10px 8px" }}>
                   {venueEntries.length === 0 ? (
                     <div style={placeholderStyle}>set venue size on shows</div>
                   ) : (
                     <>
                       <div style={{ display: "flex", justifyContent: "center" }}>
-                        <Donut size={62} showLabels labelPad={0.06} centerText={["VENUE", "SIZE"]} segments={[
+                        <Donut size={78} showLabels labelPad={0.06} centerText={["VENUE", "SIZE"]} segments={[
                           ...venueEntries.slice(0,3).map(([name,n],i) => ({ value: n, color: VENUE_COLORS[i] })),
                           ...(venueEntries.length > 3 ? [{ value: venueEntries.slice(3).reduce((s,[,n])=>s+n,0), color: "#4a4870" }] : [])
                         ]} />
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 8, rowGap: 3, marginTop: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 8, rowGap: 3, marginTop: 5 }}>
                         {[...venueEntries.slice(0,3), ...(venueEntries.length > 3 ? [["Others"]] : [])].map(([name], i) => (
                           <div key={name} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
                             <div style={{ width: 5, height: 5, borderRadius: 1, background: i < 3 ? VENUE_COLORS[i] : "#4a4870", flexShrink: 0 }} />
@@ -8730,8 +8686,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
                 </div>
                 {pastAll.some(c => c.photo) && (
-                  <button onClick={() => setView('photos')} style={{ background: '#17172a', border: '1px solid #1f1f35', borderRadius: 8, padding: '6px 10px', color: '#a78bfa', fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    📷 Memories
+                  <button onClick={() => setView('photos')} aria-label="Memories" title="Memories" style={{ background: 'none', border: 'none', padding: 4, color: 'var(--accent)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>
+                    📷
                   </button>
                 )}
               </div>
@@ -8740,20 +8696,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   across {distinctArtists} artist{distinctArtists !== 1 ? 's' : ''}, {distinctVenues} venue{distinctVenues !== 1 ? 's' : ''}{distinctCountries > 0 ? `, ${distinctCountries} countr${distinctCountries !== 1 ? 'ies' : 'y'}` : ''}
                 </div>
               )}
-              {(() => {
-                const next = concerts.filter(c => !isWish(c) && !isPast(c.date)).sort((a, b) => a.date.localeCompare(b.date))[0];
-                if (!next) return null;
-                const days = Math.max(0, Math.ceil((new Date(next.date + 'T00:00:00') - new Date()) / 86400000));
-                return (
-                  <button onClick={() => handleOpenConcert(next)} style={{ width: '100%', textAlign: 'center', marginTop: 16, background: 'linear-gradient(160deg, #1c1c30, #15151f)', border: '1px solid #232340', borderRadius: 14, padding: '18px 16px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.1em' }}>Next up</div>
-                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 30, fontWeight: 800, color: 'var(--accent)', margin: '4px 0' }}>
-                      {days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `${days} days`}
-                    </div>
-                    <div style={{ fontSize: 12, color: '#c4c2f0' }}>{next.artist}{next.venue ? ` at ${next.venue}` : ''}</div>
-                  </button>
-                );
-              })()}
             </div>
           );
         })()}

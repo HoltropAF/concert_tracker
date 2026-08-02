@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1 August 2026
+- Show cards with a photo now have a notched "ticket stub" tear line between the photo and details
+- Notes on all-time favorite shows get a bolder display typography treatment
+- New: Memories page — every photo from every show in one grid, reachable from Shows home
 - Long-press a wishlist show as another way to reveal the remove button (in addition to swiping)
 - New: accent color picker in Settings (Violet/Sky/Amber/Rose) for the app's primary highlight color
 - New users now get a short 4-step tour on first launch, skippable anytime

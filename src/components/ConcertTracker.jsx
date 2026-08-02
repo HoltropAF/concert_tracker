@@ -241,7 +241,13 @@ function useBackButton(onBack, enabled = true) {
     pushed.current = true;
     const handler = () => { pushed.current = false; cb.current(); };
     window.addEventListener('popstate', handler);
-    return () => window.removeEventListener('popstate', handler);
+    return () => {
+      window.removeEventListener('popstate', handler);
+      // If this closed via a button/tab-switch rather than the actual back
+      // gesture, the pushed history entry is still sitting there — pop it
+      // ourselves so the browser history stack stays in sync with app state.
+      if (pushed.current) { pushed.current = false; history.go(-1); }
+    };
   }, [enabled]);
 }
 

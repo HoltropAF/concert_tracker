@@ -5988,6 +5988,13 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 
         {/* Shows list */}
         {venueDetailTab === 'shows' && <div style={{ padding: '14px 16px' }}>
+          {(rooms.length > 1 || v.past.some(c => c.rating)) && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+              {[['date', 'Date'], ...(rooms.length > 1 ? [['room', 'Room']] : []), ...(v.past.some(c => c.rating) ? [['rating', 'Rating']] : [])].map(([id, label]) => (
+                <button key={id} onClick={() => setVenueShowsSort(id)} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: venueShowsSort === id ? 'var(--accent)' : '#13131f', color: venueShowsSort === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${venueShowsSort === id ? 'var(--accent)' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: venueShowsSort === id ? 700 : 400 }}>{label}</button>
+              ))}
+            </div>
+          )}
           {v.upcoming.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <button onClick={() => setShowVenueUpcoming(u => !u)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px 8px' }}>
@@ -6015,7 +6022,11 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
             <span style={{ fontSize: 11, color: '#4a4870', transform: showVenuePast ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
           </button>
           {showVenuePast && (() => {
-            const sorted = [...v.past].sort((a,b) => b.date.localeCompare(a.date));
+            const sorted = [...v.past].sort((a, b) => {
+              if (venueShowsSort === 'room') return (a.room || '').localeCompare(b.room || '') || b.date.localeCompare(a.date);
+              if (venueShowsSort === 'rating') return (b.rating || 0) - (a.rating || 0) || b.date.localeCompare(a.date);
+              return b.date.localeCompare(a.date);
+            });
             // Group festivals with the same name (recurring festivals) into one row
             const festGroups = {};
             sorted.forEach(c => { if (c.type === 'festival') { (festGroups[c.artist] = festGroups[c.artist] || []).push(c); } });

@@ -1886,6 +1886,16 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>€{totalCost.toFixed(2)}</span>
                 </div>
               )}
+              {totalCost > 0 && getSongList(concert.setlist).length > 0 && (
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                  ÷ {getSongList(concert.setlist).length} songs = €{(totalCost / getSongList(concert.setlist).length).toFixed(2)}/song
+                </div>
+              )}
+              {totalCost > 0 && concert.rating > 0 && (
+                <div style={{ textAlign: "center", fontStyle: "italic", color: "#8b89ab", fontSize: 12, marginTop: 12, paddingTop: 12, borderTop: "1px solid #1a1a2e" }}>
+                  "€{totalCost.toFixed(0)} for a {"★".repeat(concert.rating)} night"
+                </div>
+              )}
             </div>
           )}
           {detailTab === 'financial' && !((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (

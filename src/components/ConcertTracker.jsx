@@ -5,6 +5,7 @@ import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll 
 import { geocodeVenue } from '../lib/geocode'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
+import html2canvas from 'html2canvas'
 
 // * Fires a short vibration where supported (mostly Android Chrome); silently
 // * does nothing everywhere else (iOS Safari, desktop), so it's always safe to call.
@@ -1538,6 +1539,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [editing, setEditing] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptTab, setReceiptTab] = useState('general');
+  const receiptRef = useRef(null);
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
   useEffect(() => { setDetailTab('general'); }, [concert.id]);
@@ -1603,24 +1605,80 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   };
   const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => getSupportName(x) !== getSupportName(s)) }));
 
-  const handleShare = () => {
-    const songCount = getSongList(concert.setlist).length;
+  const handleShare = (mode = 'general') => {
+    const songs = getSongList(concert.setlist);
     const genres = getGenres(concert);
-    const lines = [
+    const ticketItems = (concert.tickets && concert.tickets.length > 0)
+      ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
+      : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", parseFloat(concert.ticketPrice) || 0]] : [];
+    const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
+    const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
+    const moneyLines = [...ticketItems, ...merchItems, ...travelItems];
+    const total = moneyLines.reduce((s, [, v]) => s + v, 0);
+
+    const header = [
       `🎤 ${concert.artist}${concert.tour ? ` — ${concert.tour}` : ''}`,
       concert.type === 'festival' ? '🎪 Festival' : null,
       `📅 ${formatDate(concert.date)}`,
       isOnline(concert)
         ? `💻 ${formatOnlineLocation(concert)}`
         : `📍 ${concert.venue}${concert.room ? ` · ${concert.room}` : ''}, ${concert.city}${concert.country ? `, ${concert.country}` : ''}`,
+    ];
+    const generalLines = [
       genres.length > 0 ? `🎵 ${genres.join(', ')}` : null,
       getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
       concert.rating ? `${'★'.repeat(concert.rating)}${'☆'.repeat((settings.ratingSystem || 5) - concert.rating)}` : null,
-      songCount > 0 ? `${songCount} song${songCount !== 1 ? 's' : ''} heard live` : null,
+      songs.length > 0 ? `${songs.length} song${songs.length !== 1 ? 's' : ''} heard live` : null,
+      concert.favorite ? '★ all-time fave' : null,
+      concert.type === 'festival' && (concert.acts || []).length > 0 ? `🎪 Lineup: ${concert.acts.map(a => a.name).filter(Boolean).join(', ')}` : null,
+    ];
+    const financialLines = [
+      moneyLines.length > 0 ? '💶 Costs:' : null,
+      ...moneyLines.map(([label, amount]) => `  ${label}: €${amount.toFixed(2)}`),
+      moneyLines.length > 0 ? `  Total: €${total.toFixed(2)}` : null,
+      concert.criedSong ? `💧 Cried: ${concert.criedSong}` : null,
       concert.notes ? `📝 ${concert.notes}` : null,
-    ].filter(Boolean).join('\n');
-    navigator.clipboard?.writeText(lines);
+    ];
+    const setlistLines = songs.length > 0 ? [
+      '🎶 Setlist:',
+      ...songs.map((s, i) => {
+        const info = getSongInfo(s), cover = getSongCover(s);
+        return `  ${i + 1}. ${getSongName(s)}${cover ? ` (${typeof cover === 'string' ? `${cover} cover` : 'cover'})` : ''}${info ? ` — ${info}` : ''}`;
+      }),
+    ] : [];
+
+    let lines;
+    if (mode === 'financial') lines = [...header, ...financialLines];
+    else if (mode === 'setlist') lines = [...header, ...setlistLines];
+    else if (mode === 'all') lines = [...header, ...generalLines, '', ...financialLines, '', ...setlistLines];
+    else lines = [...header, ...generalLines];
+
+    navigator.clipboard?.writeText(lines.filter(l => l !== null).join('\n'));
     onNotify('Copied share text');
+  };
+
+  const handleCopyImage = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { backgroundColor: '#f4f1e8', scale: 2 });
+      canvas.toBlob(async blob => {
+        if (!blob) { onNotify('Could not create image', 'error'); return; }
+        try {
+          await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+          onNotify('Copied as image');
+        } catch {
+          // Clipboard image write not supported (e.g. Firefox) — fall back to a download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `${concert.artist}-${concert.date}.png`.replace(/\s+/g, '-');
+          a.click();
+          URL.revokeObjectURL(url);
+          onNotify('Image downloaded');
+        }
+      }, 'image/png');
+    } catch {
+      onNotify('Could not create image', 'error');
+    }
   };
 
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
@@ -1955,6 +2013,97 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           })()}
 
         </div>
+
+        {/* Share / Receipt */}
+        {showReceipt && (() => {
+          const ticketItems = (concert.tickets && concert.tickets.length > 0)
+            ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
+            : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", parseFloat(concert.ticketPrice) || 0]] : [];
+          const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
+          const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
+          const moneyLines = [...ticketItems, ...merchItems, ...travelItems];
+          const total = moneyLines.reduce((s, [, v]) => s + v, 0);
+          const songs = getSongList(concert.setlist);
+          const genres = getGenres(concert);
+          const lineup = concert.type === 'festival' ? (concert.acts || []).map(a => a.name).filter(Boolean) : [];
+          const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : []), ['all', 'All']];
+          const Section = ({ children }) => <div style={{ borderTop: "1px dashed #999", paddingTop: 8, marginTop: 8 }}>{children}</div>;
+          const generalContent = (
+            <Section>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Location</span><span>{isOnline(concert) ? formatOnlineLocation(concert) : `${concert.city}${concert.country ? `, ${concert.country}` : ''}`}</span></div>
+              {genres.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Genre</span><span>{genres.join(', ')}</span></div>}
+              {(concert.friends || []).length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>With</span><span>{concert.friends.join(", ")}</span></div>}
+              {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
+              {songs.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Songs performed</span><span>{songs.length}</span></div>}
+              {lineup.length > 0 && <div style={{ marginTop: 6 }}><div style={{ marginBottom: 2 }}>Lineup:</div><div style={{ color: "#555" }}>{lineup.join(', ')}</div></div>}
+              {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
+            </Section>
+          );
+          const financialContent = (
+            <Section>
+              {moneyLines.length > 0 ? (
+                <>
+                  {moneyLines.map(([label, amount], i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                      <span>{label}</span><span>€{amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: "1px dashed #999", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                    <span>TOTAL</span><span>€{total.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : <div style={{ textAlign: "center", color: "#999", padding: "10px 0" }}>no costs logged</div>}
+              {concert.criedSong && <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}><span>Cried</span><span>💧 {concert.criedSong}</span></div>}
+              {concert.notes && <div style={{ marginTop: 8, borderTop: "1px dashed #999", paddingTop: 8, fontStyle: "italic" }}>{concert.notes}</div>}
+            </Section>
+          );
+          const setlistContent = (
+            <Section>
+              {songs.map((s, i) => {
+                const info = getSongInfo(s), cover = getSongCover(s);
+                return (
+                  <div key={i} style={{ marginBottom: 4 }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <span style={{ color: "#999", width: 16, flexShrink: 0 }}>{i + 1}.</span>
+                      <span>{getSongName(s)}{cover && <span style={{ color: "#a06a2a" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
+                    </div>
+                    {info && <div style={{ paddingLeft: 24, color: "#777", fontSize: 11 }}>{info}</div>}
+                  </div>
+                );
+              })}
+            </Section>
+          );
+          return (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,12,0.9)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowReceipt(false)}>
+              <div onClick={e => e.stopPropagation()} style={{ maxWidth: 320, width: "100%" }}>
+                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                  {tabs.map(([id, label]) => (
+                    <button key={id} onClick={() => setReceiptTab(id)} style={{ flex: 1, background: receiptTab === id ? "#f4f1e8" : "rgba(244,241,232,0.15)", color: receiptTab === id ? "#2a2a2a" : "#f4f1e8", border: "none", borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>{label}</button>
+                  ))}
+                </div>
+                <div ref={receiptRef} style={{
+                  background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px", fontFamily: "'DM Mono', monospace", fontSize: 12,
+                  width: "100%", maxHeight: "70vh", overflowY: "auto",
+                  clipPath: "polygon(0 0,100% 0,100% 96%,95% 100%,90% 96%,85% 100%,80% 96%,75% 100%,70% 96%,65% 100%,60% 96%,55% 100%,50% 96%,45% 100%,40% 96%,35% 100%,30% 96%,25% 100%,20% 96%,15% 100%,10% 96%,5% 100%,0 96%)"
+                }}>
+                  <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 4 }}>★ {concert.artist?.toUpperCase()} ★</div>
+                  <div style={{ textAlign: "center", fontSize: 10, color: "#666" }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
+
+                  {receiptTab === 'general' && generalContent}
+                  {receiptTab === 'financial' && financialContent}
+                  {receiptTab === 'setlist' && setlistContent}
+                  {receiptTab === 'all' && (<>{generalContent}{financialContent}{songs.length > 0 && setlistContent}</>)}
+
+                  <div style={{ textAlign: "center", fontSize: 9, color: "#999", marginTop: 12 }}>· · · THANK YOU · · ·</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => handleShare(receiptTab)} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
+                  <button onClick={handleCopyImage} style={{ flex: 1, background: "rgba(244,241,232,0.15)", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as image</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -2414,81 +2563,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           onClose={() => setSpotifyMatcher(null)}
         />
       )}
-      {showReceipt && (() => {
-        const ticketItems = (concert.tickets && concert.tickets.length > 0)
-          ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
-          : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", parseFloat(concert.ticketPrice) || 0]] : [];
-        const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
-        const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
-        const moneyLines = [...ticketItems, ...merchItems, ...travelItems];
-        const total = moneyLines.reduce((s, [, v]) => s + v, 0);
-        const songs = getSongList(concert.setlist);
-        const genres = getGenres(concert);
-        const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : [])];
-        return (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,12,0.9)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowReceipt(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ maxWidth: 320, width: "100%" }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                {tabs.map(([id, label]) => (
-                  <button key={id} onClick={() => setReceiptTab(id)} style={{ flex: 1, background: receiptTab === id ? "#f4f1e8" : "rgba(244,241,232,0.15)", color: receiptTab === id ? "#2a2a2a" : "#f4f1e8", border: "none", borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>{label}</button>
-                ))}
-              </div>
-              <div style={{
-                background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px", fontFamily: "'DM Mono', monospace", fontSize: 12,
-                width: "100%", maxHeight: "70vh", overflowY: "auto",
-                clipPath: "polygon(0 0,100% 0,100% 96%,95% 100%,90% 96%,85% 100%,80% 96%,75% 100%,70% 96%,65% 100%,60% 96%,55% 100%,50% 96%,45% 100%,40% 96%,35% 100%,30% 96%,25% 100%,20% 96%,15% 100%,10% 96%,5% 100%,0 96%)"
-              }}>
-                <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 4 }}>★ {concert.artist?.toUpperCase()} ★</div>
-                <div style={{ textAlign: "center", fontSize: 10, color: "#666", marginBottom: 10 }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
-
-                {receiptTab === 'general' && (
-                  <div style={{ borderTop: "1px dashed #999", paddingTop: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Location</span><span>{isOnline(concert) ? formatOnlineLocation(concert) : `${concert.city}${concert.country ? `, ${concert.country}` : ''}`}</span></div>
-                    {genres.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Genre</span><span>{genres.join(', ')}</span></div>}
-                    {(concert.friends || []).length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>With</span><span>{concert.friends.join(", ")}</span></div>}
-                    {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
-                    {songs.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Songs performed</span><span>{songs.length}</span></div>}
-                    {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
-                  </div>
-                )}
-
-                {receiptTab === 'financial' && (
-                  <div style={{ borderTop: "1px dashed #999", paddingTop: 8 }}>
-                    {moneyLines.length > 0 ? (
-                      <>
-                        {moneyLines.map(([label, amount], i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                            <span>{label}</span><span>€{amount.toFixed(2)}</span>
-                          </div>
-                        ))}
-                        <div style={{ borderTop: "1px dashed #999", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
-                          <span>TOTAL</span><span>€{total.toFixed(2)}</span>
-                        </div>
-                      </>
-                    ) : <div style={{ textAlign: "center", color: "#999", padding: "10px 0" }}>no costs logged</div>}
-                    {concert.criedSong && <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}><span>Cried</span><span>💧 {concert.criedSong}</span></div>}
-                    {concert.notes && <div style={{ marginTop: 8, borderTop: "1px dashed #999", paddingTop: 8, fontStyle: "italic" }}>{concert.notes}</div>}
-                  </div>
-                )}
-
-                {receiptTab === 'setlist' && (
-                  <div style={{ borderTop: "1px dashed #999", paddingTop: 8 }}>
-                    {songs.map((s, i) => (
-                      <div key={i} style={{ display: "flex", gap: 8, marginBottom: 3 }}>
-                        <span style={{ color: "#999", width: 16, flexShrink: 0 }}>{i + 1}.</span>
-                        <span>{getSongName(s)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ textAlign: "center", fontSize: 9, color: "#999", marginTop: 12 }}>· · · THANK YOU · · ·</div>
-              </div>
-              <button onClick={() => { handleShare(); setShowReceipt(false); }} style={{ width: "100%", marginTop: 10, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text instead</button>
-            </div>
-          </div>
-        );
-      })()}
       {pendingTag && (
         <SaveTagPrompt
           value={pendingTag.value}

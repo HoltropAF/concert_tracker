@@ -5484,6 +5484,36 @@ function ArtistShowRow({ concert, onOpen, showArtist = true }) {
   );
 }
 
+function PhotoWallView({ concerts, onOpen, onBack }) {
+  const withPhotos = concerts
+    .filter(c => c.photo && isPast(c.date))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  useBackButton(onBack, true);
+  return (
+    <div style={{ padding: "0 0 100px" }}>
+      <div style={{ position: "sticky", top: 0, background: "#0c0c14", borderBottom: "1px solid #1f1f35", padding: "16px 16px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+        <div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>Memories</div>
+          <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{withPhotos.length} photo{withPhotos.length === 1 ? "" : "s"}</div>
+        </div>
+      </div>
+      {withPhotos.length === 0 ? (
+        <EmptyState icon="📷" title="No photos yet" detail="Add a photo to a show and it'll show up here." />
+      ) : (
+        <div className="stagger-list" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, padding: "10px 10px 0" }}>
+          {withPhotos.map(c => (
+            <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
+              <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4 }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedVenue, setSelectedVenue] = useState(initialSelectedVenue);
   const [enteredViaVenue] = useState(initialSelectedVenue);
@@ -8582,9 +8612,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;
           return (
             <div style={{ padding: '14px 16px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>
-                <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={pastAll.length} /></span>
+                  <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
+                </div>
+                {pastAll.some(c => c.photo) && (
+                  <button onClick={() => setView('photos')} style={{ background: '#17172a', border: '1px solid #1f1f35', borderRadius: 8, padding: '6px 10px', color: '#a78bfa', fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    📷 Memories
+                  </button>
+                )}
               </div>
               {(distinctArtists > 0 || distinctVenues > 0 || distinctCountries > 0) && (
                 <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
@@ -8861,6 +8898,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
+        {view === 'photos' && <PhotoWallView concerts={concerts} onOpen={handleOpenConcert} onBack={() => setView(settings.defaultTab || 'stats')} />}
         </div>
       </div>
 

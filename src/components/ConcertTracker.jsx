@@ -2790,7 +2790,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     if (dx < 0 && idx < visibleChartGroups.length - 1) { const nextG = visibleChartGroups[idx + 1]; setChartGroup(nextG.id); setSelectedChart(getOrderedCharts(nextG)[0]?.id); }
     else if (dx > 0 && idx > 0) { const prevG = visibleChartGroups[idx - 1]; const prevCharts = getOrderedCharts(prevG); setChartGroup(prevG.id); setSelectedChart(prevCharts[prevCharts.length - 1]?.id); }
   };
-  const [selectedChart, setSelectedChart] = useState("shows");
+  const [selectedChart, setSelectedChart] = useState("artists");
   const [selectedSong, setSelectedSong] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -7767,7 +7767,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           );
           const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
           const ALL_CHART_GROUPS = [
-            { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: 'Artist overview' }, { id: 'shows', label: 'Shows over time' }, { id: 'genres-pie', label: 'Genres & Ratings' }, { id: 'language', label: 'Language' }] },
+            { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: 'Artist overview' }, { id: 'language', label: 'Language' }] },
             { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: 'Friends & group size' }] },
             { id: 'places', label: 'Places', charts: [{ id: 'venues', label: 'Top venues' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
             { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending per year' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }, { id: 'merch-overview', label: 'Merch' }] },
@@ -8738,8 +8738,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                   <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>shows attended</span>
                 </div>
                 {pastAll.some(c => c.photo) && (
-                  <button onClick={() => setView('photos')} aria-label="Memories" title="Memories" style={{ background: 'none', border: 'none', padding: 4, color: 'var(--accent)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>
-                    📷
+                  <button onClick={() => setView('photos')} aria-label="Memories" title="Memories" style={{ background: 'none', border: 'none', padding: 4, color: 'var(--accent)', cursor: 'pointer', lineHeight: 1, display: 'flex' }}>
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                   </button>
                 )}
               </div>

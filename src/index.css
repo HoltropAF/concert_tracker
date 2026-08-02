@@ -29,6 +29,14 @@ input, textarea, select, button {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+.slide-out-detail {
+  animation: slideOutRight 0.28s cubic-bezier(.4,0,.6,1) forwards;
+}
+
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }

@@ -10,6 +10,27 @@ import VenueMap from './VenueMap'
 // * does nothing everywhere else (iOS Safari, desktop), so it's always safe to call.
 const haptic = (ms = 12) => { try { navigator.vibrate?.(ms); } catch {} };
 
+// * Keeps returning the last truthy `value` for `duration` ms after it goes
+// * falsy, with `exiting=true` during that window — lets a component play an
+// * exit animation before actually unmounting, instead of vanishing instantly.
+function useExitingValue(value, duration = 280) {
+  const [display, setDisplay] = useState(value);
+  const [exiting, setExiting] = useState(false);
+  const prevRef = useRef(value);
+  useEffect(() => {
+    if (value) {
+      setDisplay(value);
+      setExiting(false);
+    } else if (prevRef.current) {
+      setExiting(true);
+      const t = setTimeout(() => { setDisplay(null); setExiting(false); }, duration);
+      return () => clearTimeout(t);
+    }
+    prevRef.current = value;
+  }, [value, duration]);
+  return [display, exiting];
+}
+
 const ONBOARDING_STEPS = [
   { icon: '🎫', title: 'Track every show', body: 'Log concerts and festivals, with setlists, photos, ratings, and who you went with.' },
   { icon: '🎤', title: 'Artist pages, your way', body: 'Customize what shows on each artist\u2019s page — stats, photo gallery style, and important dates like birthdays and anniversaries.' },
@@ -3541,7 +3562,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
 
   useBackButton(() => { if (selectedFriend) setSelectedFriend(null); else onBackToSummary(); }, true);
 
-  if (selectedFriend) {
+  const [displayFriend, friendExiting] = useExitingValue(selectedFriend);
+  if (displayFriend) {
+    const selectedFriend = displayFriend;
     const f = friendEntries.find(fd => fd.name === selectedFriend);
     if (!f) return null;
     const profile = getProfile(f.name);
@@ -3552,7 +3575,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
     const card = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
 
     return (
-      <div className="slide-in-detail" key={selectedFriend} style={{ padding: "0 0 100px" }}>
+      <div className={friendExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedFriend} style={{ padding: "0 0 100px" }}>
         {/* Edit profile modal */}
         {editingProfile && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
@@ -4108,7 +4131,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
   useBackButton(goBackFromArtist, selectedArtist !== null);
 
-  if (selectedArtist) {
+  const [displayArtist, artistExiting] = useExitingValue(selectedArtist);
+  if (displayArtist) {
+    const selectedArtist = displayArtist;
     const shows = (artistMap[selectedArtist] || []).sort((a,b) => b.date.localeCompare(a.date));
     const pastShows = shows.filter(c => !c.wishlist && c.date && c.date !== '9999-12-31' && isPast(c.date));
     const upcomingShows = shows.filter(c => !c.wishlist && c.date && c.date !== '9999-12-31' && !isPast(c.date));
@@ -4165,7 +4190,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         .finally(() => setArtistPhotoUploading(false));
     };
     return (
-      <div className="slide-in-detail" key={selectedArtist} style={{ padding: "0 0 100px" }}>
+      <div className={artistExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedArtist} style={{ padding: "0 0 100px" }}>
         {reframingArtistPhoto && bannerPhotoPath ? (
           <ArtistBannerReframe
             path={bannerPhotoPath}
@@ -5250,7 +5275,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
     .sort((a, b) => { const dir = sortDir === 'asc' ? -1 : 1; return sortBy === 'count' ? (dir * ((rank(b) - rank(a)) || (b.count - a.count))) : (-dir * (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist))); });
 
-  if (selectedSong) {
+  const [displaySong, songExiting] = useExitingValue(selectedSong);
+  if (displaySong) {
+    const selectedSong = displaySong;
     const matchSong = (s, performer) => {
       if (getSongName(s) !== selectedSong.name) return false;
       const cov = getSongCover(s);
@@ -5276,7 +5303,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     }).sort((a, b) => b.concert.date.localeCompare(a.concert.date));
     const duration = formatDuration(selectedSong.durationMs);
     return (
-      <div className="slide-in-detail" key={`${selectedSong.name}\n${selectedSong.artist}`} style={{ padding: '0 0 100px' }}>
+      <div className={songExiting ? "slide-out-detail" : "slide-in-detail"} key={`${selectedSong.name}\n${selectedSong.artist}`} style={{ padding: '0 0 100px' }}>
         {selectedSong.albumArt ? (
           <div style={{ height: 260, position: 'relative', overflow: 'hidden' }}>
             <img src={selectedSong.albumArt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
@@ -5673,7 +5700,9 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
       return 0;
     });
 
-  if (selectedVenue) {
+  const [displayVenue, venueExiting] = useExitingValue(selectedVenue);
+  if (displayVenue) {
+    const selectedVenue = displayVenue;
     const v = venueEntries.find(x => x.name === selectedVenue);
     if (!v) return null;
     const allShows = v.shows.sort((a,b) => b.date.localeCompare(a.date));
@@ -5687,7 +5716,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     const topFriend = Object.entries(friendCount).sort((a,b) => b[1]-a[1])[0] || null;
     const rooms = [...new Set(v.past.filter(c => c.room).map(c => c.room))];
     return (
-      <div className="slide-in-detail" key={selectedVenue} style={{ padding: '0 0 100px' }}>
+      <div className={venueExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedVenue} style={{ padding: '0 0 100px' }}>
         {/* Sticky header, matching the show detail page */}
         <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: 'sticky', top: 0, borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
           <button onClick={goBackFromVenue} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
@@ -8618,11 +8647,12 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </div>
   )
 
-  if (selected) return (
+  const [displaySelected, selectedExiting] = useExitingValue(selected);
+  if (displaySelected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        <div className="slide-in-detail" key={selected.id}>
-        <ConcertDetail concert={selected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <div className={selectedExiting ? "slide-out-detail" : "slide-in-detail"} key={displaySelected.id}>
+        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),

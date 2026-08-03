@@ -1466,6 +1466,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const feat = getSongFeat(song);
             const varies = getSongVaries(song);
             const sectionLabel = getSongSectionLabel(song);
+            const isIntroLike = sectionLabel === 'INTRO'; // e.g. SKZ Anthem — iconic, but not really "a song" in the counted sense
             const sectionCategoryOverride = getSongSectionCategory(song);
             const album = getSongAlbum(song);
             const prevAlbum = displayPos > 0 ? getSongAlbum(displayList[displayPos - 1].song) : undefined;
@@ -1493,16 +1494,16 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 ...(isLastOfSection(displayPos) ? { paddingBottom: 10, marginBottom: (editPanelIdx === i ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
+                  <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{isIntroLike ? '' : i + 1}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ color: varies ? '#ef4444' : '#c4c2f0', fontSize: 13, fontWeight: varies ? 700 : 400 }}>{name}</span>
+                      <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400 }}>{name}</span>
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {(criedSong !== undefined ? criedSong : concert.criedSong) === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
                     {info && (!readOnly || setlistView.notes) && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
                     {cover && (!readOnly || setlistView.covers) && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
-                    {feat && <div style={{ color: '#f472b6', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>👥</span>feat. {feat}</div>}
+                    {feat && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>🤝</span>with {feat}</div>}
                     {settings.showKnownMarkers && known !== null && (
                       <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
                     )}
@@ -2193,6 +2194,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             // Chronological order: openers/support play first, headliner closes the night.
             const performers = [...supportEntries, headlinerEntry];
             const allSongsFlat = performers.flatMap(p => p.songs);
+            // Excludes intro-like entries (e.g. SKZ Anthem) from the counted stats —
+            // iconic, but not really "a song" in the sense of songs played/length.
+            const isIntroSong = s => typeof s === 'object' && s?.sectionLabel === 'INTRO';
+            const countableSongsFlat = allSongsFlat.filter(s => !isIntroSong(s));
             const hasNotes = allSongsFlat.some(s => typeof s === 'object' && s?.info);
             const hasCovers = allSongsFlat.some(s => typeof s === 'object' && s?.cover);
             const hasAlbums = allSongsFlat.some(s => typeof s === 'object' && s?.albumName);
@@ -2274,17 +2279,17 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                     const ms = withDuration.reduce((s, song) => s + song.durationMs, 0);
                     return { ms, complete: list.length > 0 && withDuration.length === list.length };
                   };
-                  const totalMs = msFor(allSongsFlat);
+                  const totalMs = msFor(countableSongsFlat);
                   const tiles = performers.length > 1
                     ? [
-                        { label: 'Songs', value: allSongsFlat.length },
+                        { label: 'Songs', value: countableSongsFlat.length },
                         ...performers
-                          .map(p => ({ label: p.name, ...msFor(p.songs) }))
+                          .map(p => ({ label: p.name, ...msFor(p.songs.filter(s => !isIntroSong(s))) }))
                           .filter(p => p.ms > 0)
                           .map(p => ({ label: p.label, value: formatMs(p.ms) + (p.complete ? '' : '+') })),
                       ]
                     : [
-                        { label: 'Songs', value: allSongsFlat.length },
+                        { label: 'Songs', value: countableSongsFlat.length },
                         ...(totalMs.ms > 0 ? [{ label: 'Length', value: formatMs(totalMs.ms) + (totalMs.complete ? '' : '+') }] : []),
                       ];
                   return tiles.length > 1 ? (

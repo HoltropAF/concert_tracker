@@ -295,6 +295,8 @@ const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.g
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
+const getSongFeat = s => typeof s === 'string' || !s ? null : (s.feat || null); // guest who joined for this one song
+const getSongVaries = s => typeof s === 'string' || !s ? false : !!s.varies; // song changes every night, regardless of encore status
 const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
 const getSongSectionLabel = s => typeof s === 'string' || !s ? null : (s.sectionLabel || null); // e.g. "ENCORE", "ENCORE 2" — labels just this divider, doesn't imply anything about later songs
 // Buckets a section label into a filterable category, so "hide ments" doesn't also hide "encore".
@@ -1310,6 +1312,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const [noteInput, setNoteInput] = useState('');
   const [editLabelIdx, setEditLabelIdx] = useState(null);
   const [labelInput, setLabelInput] = useState('');
+  const [editFeatIdx, setEditFeatIdx] = useState(null);
+  const [featInput, setFeatInput] = useState('');
 
   useEffect(() => { setSongs(getSongList(sourceSongs)); }, [effectKey, overrideSongs, concert.setlist]);
 
@@ -1377,6 +1381,30 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     setLabelInput('');
   };
 
+  const applyFeat = (idx, feat) => {
+    save(songs.map((s, i) => {
+      if (i !== idx) return s;
+      const base = typeof s === 'string' ? { name: s } : { ...s };
+      const trimmed = (feat || '').trim();
+      if (trimmed) base.feat = trimmed;
+      else delete base.feat;
+      return base;
+    }));
+    setEditFeatIdx(null);
+    setFeatInput('');
+  };
+
+  const applyVaries = idx => {
+    save(songs.map((s, i) => {
+      const base = typeof s === 'string' ? { name: s } : { ...s };
+      if (i === idx) {
+        if (base.varies) delete base.varies;
+        else base.varies = true;
+      }
+      return base;
+    }));
+  };
+
   const coverSuggestions = coverInput.length > 0
     ? allArtists.filter(a => String(a || '').toLowerCase().includes(coverInput.toLowerCase())).slice(0, 5)
     : [];
@@ -1433,12 +1461,15 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const info = getSongInfo(song);
             const cover = getSongCover(song);
             const known = getSongKnown(song);
+            const feat = getSongFeat(song);
+            const varies = getSongVaries(song);
             const sectionLabel = getSongSectionLabel(song);
             const album = getSongAlbum(song);
             const prevAlbum = i > 0 ? getSongAlbum(songs[i - 1]) : undefined;
             const showAlbumHeader = readOnly && setlistView.albums && album && album !== prevAlbum;
             const isEditingCover = editCoverIdx === i;
             const isEditingNote = editNoteIdx === i;
+            const isEditingFeat = editFeatIdx === i;
             return (
               <div key={`${name}-${i}`}>
                 {showAlbumHeader && (
@@ -1464,19 +1495,21 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   );
                 })()}
               <div style={{
-                marginBottom: (isEditingCover || isEditingNote || editLabelIdx === i) ? 8 : (info || cover ? 6 : 4),
-                ...(isLastOfSection(i) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote || editLabelIdx === i) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
+                marginBottom: (isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4),
+                ...(isLastOfSection(i) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ color: '#c4c2f0', fontSize: 13 }}>{name}</span>
+                      <span style={{ color: varies ? '#f472b6' : '#c4c2f0', fontSize: 13, fontWeight: varies ? 700 : 400 }}>{name}</span>
+                      {varies && <span title="Changes every night" style={{ fontSize: 10, lineHeight: 1 }}>🔀</span>}
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
                     {info && (!readOnly || setlistView.notes) && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
                     {cover && (!readOnly || setlistView.covers) && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
+                    {feat && <div style={{ color: '#f472b6', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>👥</span>feat. {feat}</div>}
                     {settings.showKnownMarkers && known !== null && (
                       <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
                     )}
@@ -1488,15 +1521,23 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     </>
                   )}
                   {!readOnly && (
-                    <button onClick={() => { if (editLabelIdx === i) { setEditLabelIdx(null); setLabelInput(''); } else { setEditLabelIdx(i); setLabelInput(sectionLabel || ''); setEditCoverIdx(null); setEditNoteIdx(null); } }} title="Add or edit a section header (Encore, Ment, era name, etc.)" style={{ background: 'none', border: 'none', color: (sectionLabel || editLabelIdx === i) ? '#facc15' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🎪</button>
+                    <button onClick={() => { if (editLabelIdx === i) { setEditLabelIdx(null); setLabelInput(''); } else { setEditLabelIdx(i); setLabelInput(sectionLabel || ''); setEditCoverIdx(null); setEditNoteIdx(null); setEditFeatIdx(null); } }} title="Add or edit a section header (Encore, Ment, era name, etc.)" style={{ background: 'none', border: 'none', color: (sectionLabel || editLabelIdx === i) ? '#facc15' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🎪</button>
                   )}
                   {!readOnly && (
-                    <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); setEditLabelIdx(null); } }}
+                    <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); setEditLabelIdx(null); setEditFeatIdx(null); } }}
                       style={{ background: 'none', border: 'none', color: info || isEditingNote ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✎</button>
                   )}
                   {!readOnly && (
-                    <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); setEditNoteIdx(null); setEditLabelIdx(null); } }}
+                    <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); setEditNoteIdx(null); setEditLabelIdx(null); setEditFeatIdx(null); } }}
                       style={{ background: 'none', border: 'none', color: cover || isEditingCover ? '#fb923c' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>↩</button>
+                  )}
+                  {!readOnly && (
+                    <button onClick={() => { if (isEditingFeat) { setEditFeatIdx(null); setFeatInput(''); } else { setEditFeatIdx(i); setFeatInput(feat || ''); setEditCoverIdx(null); setEditNoteIdx(null); setEditLabelIdx(null); } }} title="Mark a guest featured on this one song"
+                      style={{ background: 'none', border: 'none', color: feat || isEditingFeat ? '#f472b6' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>👥</button>
+                  )}
+                  {!readOnly && (
+                    <button onClick={() => applyVaries(i)} title="Changes every night, regardless of encore status"
+                      style={{ background: 'none', border: 'none', color: varies ? '#f472b6' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🔀</button>
                   )}
                   {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
                 </div>
@@ -1560,6 +1601,21 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                       <button onMouseDown={() => applyLabel(i, labelInput)} style={{ background: 'none', border: '1px solid #facc1555', borderRadius: 6, color: '#facc15', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save header</button>
                       {sectionLabel && <button onMouseDown={() => applyLabel(i, '')} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
+                    </div>
+                  </div>
+                )}
+                {isEditingFeat && (
+                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
+                    <input
+                      autoFocus value={featInput}
+                      onChange={e => setFeatInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') applyFeat(i, featInput); if (e.key === 'Escape') { setEditFeatIdx(null); setFeatInput(''); } }}
+                      placeholder="Guest who joined for this song…"
+                      style={{ width: '100%', background: '#0c0c14', border: '1px solid #f472b644', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button onMouseDown={() => applyFeat(i, featInput)} style={{ background: 'none', border: '1px solid #f472b655', borderRadius: 6, color: '#f472b6', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+                      {feat && <button onMouseDown={() => applyFeat(i, '')} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
                     </div>
                   </div>
                 )}

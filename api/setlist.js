@@ -107,7 +107,14 @@ function parseSongs(html) {
     if (/\bsong\b/.test(classAttr)) {
       const labelM = block.match(/class="[^"]*\bsongLabel\b[^"]*"[^>]*>([\s\S]*?)<\/a>/i);
       const name = labelM ? strip(labelM[1]) : null;
-      if (!name) continue;
+      if (!name) {
+        // No songLabel link usually means this is a tape-played "song played from
+        // tape" entry, e.g. Ment (talking segment) — carry it forward as a label
+        // instead of silently dropping it.
+        const text = strip(block);
+        if (/\bment\b/i.test(text) && text.length < 20) pendingLabel = 'MENT';
+        continue;
+      }
       const infoM = block.match(/class="[^"]*\b(?:songInfo|infos)\b[^"]*"[^>]*>([\s\S]*?)<\//i);
       const info = infoM ? strip(infoM[1]) : null;
       const entry = { name };
@@ -131,22 +138,34 @@ function parseSongs(html) {
 }
 
 function extractSetlist(sl) {
-  const songs = (sl.sets?.set || [])
-    .flatMap(set => {
-      const setSongs = (set.song || []).filter(s => !s.tape);
-      return setSongs.map((s, i) => {
-        const out = { name: s.name };
-        if (s.info) out.info = s.info;
-        if (s.cover?.name) out.cover = s.cover.name;
-        // setlist.fm labels a whole block (e.g. "Encore", "Encore 2") rather than
-        // one song — we attach that label to just the first song in the block,
-        // matching how the app renders it as a one-line divider before that song.
-        if (i === 0 && set.name) out.sectionLabel = set.name.toUpperCase();
-        return out;
-      });
-    })
-    .filter(s => s.name)
-    .map(s => (Object.keys(s).length === 1 ? s.name : s));
+  // setlist.fm marks spoken/talking breaks (very common in K-pop shows — "Ment" is
+  // short for "moment", i.e. the MC segment between songs) as their own tape-played
+  // "song" entries. We don't want them as actual songs in the list, but we don't want
+  // to silently lose them either — carry them forward as a section label on the next
+  // real song, same as we do for Encore/Act I/etc.
+  const songs = [];
+  let pendingLabel = null;
+  for (const set of (sl.sets?.set || [])) {
+    let isFirstInSet = true;
+    for (const s of (set.song || [])) {
+      if (s.tape && /^ment$/i.test((s.name || '').trim())) {
+        pendingLabel = 'MENT';
+        continue;
+      }
+      if (s.tape) continue; // other tape interludes (instrumental intros etc.) — skip as before
+      if (!s.name) continue;
+      const out = { name: s.name };
+      if (s.info) out.info = s.info;
+      if (s.cover?.name) out.cover = s.cover.name;
+      // A set-level label (Encore, Act I, ...) takes priority on the first song of a
+      // set; otherwise a pending Ment label (if one occurred right before this song).
+      if (isFirstInSet && set.name) out.sectionLabel = set.name.toUpperCase();
+      else if (pendingLabel) out.sectionLabel = pendingLabel;
+      pendingLabel = null;
+      isFirstInSet = false;
+      songs.push(Object.keys(out).length === 1 ? out.name : out);
+    }
+  }
   let isoDate = null;
   if (sl.eventDate) { const [d, m, y] = sl.eventDate.split('-'); if (y) isoDate = `${y}-${m}-${d}`; }
   return {

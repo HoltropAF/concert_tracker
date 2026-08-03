@@ -1480,7 +1480,16 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {sectionLabel && sectionLabel !== SECTION_END && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
                   const cat = sectionLabelCategory(sectionLabel, sectionCategoryOverride);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                  const color = cat === 'ments' ? '#4a4870' : cat === 'surprise' ? '#b91c1c' : cat === 'encore' ? '#facc15' : '#8b7fb0';
+                  // Light mode isn't a separate palette — it's a global CSS filter
+                  // (invert + hue-rotate) over the dark theme, which does NOT preserve
+                  // colors predictably. A dark red rendered straight would come out
+                  // looking pink once the filter hits it. These are the pre-filter
+                  // source colors that resolve to the intended dark-theme color after
+                  // the filter is applied, computed directly from the filter math.
+                  const colorsByMode = settings.lightMode
+                    ? { ments: '#918fb7', surprise: '#e34646', encore: '#eabc05', other: '#5b4f80' }
+                    : { ments: '#4a4870', surprise: '#b91c1c', encore: '#facc15', other: '#8b7fb0' };
+                  const color = colorsByMode[cat] || colorsByMode.other;
                   // One consistent treatment for every kind of section header — bold
                   // word, no lines, in the display font (Syne) so it reads as a header
                   // rather than blending into the DM Sans song names below it.

@@ -1480,7 +1480,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {sectionLabel && sectionLabel !== SECTION_END && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
                   const cat = sectionLabelCategory(sectionLabel, sectionCategoryOverride);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                  const color = cat === 'ments' ? '#4a4870' : cat === 'surprise' ? '#ef4444' : cat === 'encore' ? '#facc15' : '#8b7fb0';
+                  const color = cat === 'ments' ? '#4a4870' : cat === 'surprise' ? '#b91c1c' : cat === 'encore' ? '#facc15' : '#8b7fb0';
                   // One consistent treatment for every kind of section header — bold
                   // word, no lines, in the display font (Syne) so it reads as a header
                   // rather than blending into the DM Sans song names below it.

@@ -299,8 +299,12 @@ const getSongFeat = s => typeof s === 'string' || !s ? null : (s.feat || null); 
 const getSongVaries = s => typeof s === 'string' || !s ? false : !!s.varies; // song changes every night, regardless of encore status
 const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
 const getSongSectionLabel = s => typeof s === 'string' || !s ? null : (s.sectionLabel || null); // e.g. "ENCORE", "ENCORE 2" — labels just this divider, doesn't imply anything about later songs
+const getSongSectionCategory = s => typeof s === 'string' || !s ? null : (s.sectionCategory || null); // manual override, e.g. so "Acoustic Session" can be styled as a surprise/secret moment
 // Buckets a section label into a filterable category, so "hide ments" doesn't also hide "encore".
-const sectionLabelCategory = label => {
+// An explicit sectionCategory (set via the label editor) always wins over guessing from
+// the text — e.g. "Acoustic Session" doesn't contain the word "surprise" but is one.
+const sectionLabelCategory = (label, explicitCategory) => {
+  if (explicitCategory) return explicitCategory;
   if (!label) return null;
   const l = label.toLowerCase();
   // Word-boundary matching — a plain .includes('ment') was matching "depart-MENT",
@@ -1370,13 +1374,15 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   };
 
   const LABEL_PRESETS = ['ENCORE', 'ENCORE 2', 'MENT', 'INTRO', 'INTERLUDE'];
-  const applyLabel = (idx, label) => {
+  const applyLabel = (idx, label, category) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
       const base = typeof s === 'string' ? { name: s } : { ...s };
       const trimmed = (label || '').trim();
       if (trimmed) base.sectionLabel = trimmed.toUpperCase();
       else delete base.sectionLabel;
+      if (category) base.sectionCategory = category;
+      else delete base.sectionCategory;
       return base;
     }));
     setEditLabelIdx(null);
@@ -1471,6 +1477,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const feat = getSongFeat(song);
             const varies = getSongVaries(song);
             const sectionLabel = getSongSectionLabel(song);
+            const sectionCategoryOverride = getSongSectionCategory(song);
             const album = getSongAlbum(song);
             const prevAlbum = displayPos > 0 ? getSongAlbum(displayList[displayPos - 1].song) : undefined;
             const showAlbumHeader = readOnly && setlistView.albums && album && album !== prevAlbum;
@@ -1482,30 +1489,16 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {showAlbumHeader && (
                   <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: displayPos === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
                 )}
-                {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel)] !== false) && (() => {
-                  const cat = sectionLabelCategory(sectionLabel);
+                {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
+                  const cat = sectionLabelCategory(sectionLabel, sectionCategoryOverride);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                  if (cat === 'ments') {
-                    // Ments are just "they were talking here" — bold word, no line, just breathing room.
-                    return (
-                      <div style={{ margin: '10px 0 8px', color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>
-                        {niceLabel}
-                      </div>
-                    );
-                  }
-                  if (cat === 'surprise') {
-                    // No line — dark red, bold, stands apart without extra decoration.
-                    return (
-                      <div style={{ margin: '10px 0 8px', color: '#b91c1c', fontSize: 12, fontFamily: "'Syne', sans-serif", fontWeight: 800 }}>
-                        {niceLabel}
-                      </div>
-                    );
-                  }
-                  const color = cat === 'encore' ? '#facc15' : '#8b7fb0';
+                  const color = cat === 'ments' ? '#8b89ab' : cat === 'surprise' ? '#b91c1c' : cat === 'encore' ? '#facc15' : '#8b7fb0';
+                  // One consistent treatment for every kind of section header — bold
+                  // word, no lines, in the display font (Syne) so it reads as a header
+                  // rather than blending into the DM Sans song names below it.
                   return (
-                    <div style={{ margin: '10px 0 8px' }}>
-                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, color }}>{niceLabel}</div>
-                      <div style={{ width: Math.min(90, 16 + sectionLabel.length * 5), height: 2, marginTop: 4, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+                    <div style={{ margin: '10px 0 8px', color, fontSize: 12, fontFamily: "'Syne', sans-serif", fontWeight: 800 }}>
+                      {niceLabel}
                     </div>
                   );
                 })()}
@@ -1718,8 +1711,19 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
   useEffect(() => { setDetailTab('general'); }, [concert.id]);
-  const [setlistView, setSetlistView] = useState({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true });
-  const [setlistSort, setSetlistSort] = useState('night'); // 'night' = performance order, 'album' = grouped by album
+  const [setlistView, setSetlistViewState] = useState(() => ({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(settings.setlistView || {}) }));
+  const setSetlistView = updater => setSetlistViewState(prev => {
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    if (onUpdateSettings) onUpdateSettings({ ...settings, setlistView: next });
+    else if (onUpdateSetting) onUpdateSetting('setlistView', next);
+    return next;
+  });
+  const [setlistSort, setSetlistSortState] = useState(settings.setlistSort || 'night'); // 'night' = performance order, 'album' = grouped by album
+  const setSetlistSort = mode => {
+    setSetlistSortState(mode);
+    if (onUpdateSettings) onUpdateSettings({ ...settings, setlistSort: mode });
+    else if (onUpdateSetting) onUpdateSetting('setlistSort', mode);
+  };
   const [setlistViewOpen, setSetlistViewOpen] = useState(false);
   const toggleSetlistView = key => setSetlistView(v => ({ ...v, [key]: !v[key] }));
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
@@ -2228,7 +2232,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             const hasNotes = allSongsFlat.some(s => typeof s === 'object' && s?.info);
             const hasCovers = allSongsFlat.some(s => typeof s === 'object' && s?.cover);
             const hasAlbums = allSongsFlat.some(s => typeof s === 'object' && s?.albumName);
-            const presentCategories = new Set(allSongsFlat.map(s => sectionLabelCategory(getSongSectionLabel(s))).filter(Boolean));
+            const presentCategories = new Set(allSongsFlat.map(s => sectionLabelCategory(getSongSectionLabel(s), getSongSectionCategory(s))).filter(Boolean));
             const filterRows = [
               ...(hasNotes ? [['notes', 'Notes']] : []),
               ...(presentCategories.has('ments') ? [['ments', 'Ments']] : []),
@@ -2296,17 +2300,27 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   )}
                 </div>
                 {(() => {
-                  const totalMs = allSongsFlat.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
-                  const tiles = [
-                    { label: 'Songs', value: allSongsFlat.length },
-                    ...(totalMs > 0 ? [{ label: 'Length', value: (() => { const m = Math.round(totalMs / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; })() }] : []),
-                  ];
+                  const formatMs = ms => { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; };
+                  const msFor = list => list.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+                  const totalMs = msFor(allSongsFlat);
+                  const tiles = performers.length > 1
+                    ? [
+                        { label: 'Songs', value: allSongsFlat.length },
+                        ...performers
+                          .map(p => ({ label: p.name, ms: msFor(p.songs) }))
+                          .filter(p => p.ms > 0)
+                          .map(p => ({ label: p.label, value: formatMs(p.ms) })),
+                      ]
+                    : [
+                        { label: 'Songs', value: allSongsFlat.length },
+                        ...(totalMs > 0 ? [{ label: 'Length', value: formatMs(totalMs) }] : []),
+                      ];
                   return tiles.length > 1 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
                       {tiles.map(t => (
                         <div key={t.label} style={{ background: '#0c0c14', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
                           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{t.value}</div>
-                          <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>{t.label}</div>
+                          <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.label}</div>
                         </div>
                       ))}
                     </div>

@@ -312,7 +312,7 @@ const sectionLabelCategory = (label, explicitCategory) => {
   if (/\bment\b/.test(l)) return 'ments';
   if (/\bencore\b/.test(l)) return 'encore';
   if (/\bsurprise\b|\bsecret\b/.test(l)) return 'surprise';
-  return 'other'; // era headers, intro, interlude, set 1/2, etc.
+  return 'headers'; // era headers, intro, interlude, set 1/2, etc.
 };
 const getSongAlbum = s => typeof s === 'string' || !s ? null : (s.albumName || null);
 const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
@@ -2236,8 +2236,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               ...(hasNotes ? [['notes', 'Notes']] : []),
               ...(presentCategories.has('ments') ? [['ments', 'Ments']] : []),
               ...(presentCategories.has('encore') ? [['encore', 'Encore']] : []),
-              ...(presentCategories.has('surprise') ? [['surprise', 'Secret / surprise songs']] : []),
-              ...(presentCategories.has('other') ? [['headers', 'Other headers (era, act, etc.)']] : []),
+              // Surprise/secret songs aren't offered as a togglable filter — they're
+              // the moments people most want to see, not something to hide.
+              ...(presentCategories.has('headers') ? [['headers', 'Other headers (era, act, etc.)']] : []),
               ...(hasAlbums ? [['albums', 'Album groupings']] : []),
               ...(hasCovers ? [['covers', 'Covers']] : []),
             ];

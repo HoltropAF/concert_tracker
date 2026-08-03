@@ -1492,7 +1492,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
                   const cat = sectionLabelCategory(sectionLabel, sectionCategoryOverride);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                  const color = cat === 'ments' ? '#8b89ab' : cat === 'surprise' ? '#b91c1c' : cat === 'encore' ? '#facc15' : '#8b7fb0';
+                  const color = cat === 'ments' ? '#4a4870' : cat === 'surprise' ? '#ef4444' : cat === 'encore' ? '#facc15' : '#8b7fb0';
                   // One consistent treatment for every kind of section header — bold
                   // word, no lines, in the display font (Syne) so it reads as a header
                   // rather than blending into the DM Sans song names below it.
@@ -1510,7 +1510,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ color: varies ? '#f472b6' : '#c4c2f0', fontSize: 13, fontWeight: varies ? 700 : 400 }}>{name}</span>
+                      <span style={{ color: varies ? '#ef4444' : '#c4c2f0', fontSize: 13, fontWeight: varies ? 700 : 400 }}>{name}</span>
                       {varies && <span title="Changes every night" style={{ fontSize: 10, lineHeight: 1 }}>🔀</span>}
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
@@ -1545,7 +1545,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   )}
                   {!readOnly && (
                     <button onClick={() => applyVaries(i)} title="Changes every night, regardless of encore status"
-                      style={{ background: 'none', border: 'none', color: varies ? '#f472b6' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🔀</button>
+                      style={{ background: 'none', border: 'none', color: varies ? '#ef4444' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🔀</button>
                   )}
                   {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
                 </div>
@@ -2301,19 +2301,26 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 </div>
                 {(() => {
                   const formatMs = ms => { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; };
-                  const msFor = list => list.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+                  // A partial sum (e.g. 3 of 31 songs Spotify-matched) is actively
+                  // misleading if presented as the real length — mark it as a lower
+                  // bound ("20m+") rather than showing a tiny wrong number as fact.
+                  const msFor = list => {
+                    const withDuration = list.filter(song => typeof song === 'object' && song?.durationMs);
+                    const ms = withDuration.reduce((s, song) => s + song.durationMs, 0);
+                    return { ms, complete: list.length > 0 && withDuration.length === list.length };
+                  };
                   const totalMs = msFor(allSongsFlat);
                   const tiles = performers.length > 1
                     ? [
                         { label: 'Songs', value: allSongsFlat.length },
                         ...performers
-                          .map(p => ({ label: p.name, ms: msFor(p.songs) }))
+                          .map(p => ({ label: p.name, ...msFor(p.songs) }))
                           .filter(p => p.ms > 0)
-                          .map(p => ({ label: p.label, value: formatMs(p.ms) })),
+                          .map(p => ({ label: p.label, value: formatMs(p.ms) + (p.complete ? '' : '+') })),
                       ]
                     : [
                         { label: 'Songs', value: allSongsFlat.length },
-                        ...(totalMs > 0 ? [{ label: 'Length', value: formatMs(totalMs) }] : []),
+                        ...(totalMs.ms > 0 ? [{ label: 'Length', value: formatMs(totalMs.ms) + (totalMs.complete ? '' : '+') }] : []),
                       ];
                   return tiles.length > 1 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 8, marginBottom: 14 }}>

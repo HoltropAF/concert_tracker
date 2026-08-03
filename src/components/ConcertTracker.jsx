@@ -1304,7 +1304,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
 }
 
 const DEFAULT_SETLIST_VIEW = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true };
-function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW, sortMode = 'night' }) {
+function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW, sortMode = 'night', onSetCriedSong = null, criedSong = undefined }) {
   const effectKey = concert.id + (overrideArtist || '');
   const sourceSongs = overrideSongs ?? concert.setlist;
   const [songs, setSongs] = useState(() => getSongList(sourceSongs));
@@ -1312,16 +1312,13 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const [urlInput, setUrlInput] = useState('');
   const [fetchState, setFetchState] = useState('idle');
   const [fetchError, setFetchError] = useState('');
-  const [editCoverIdx, setEditCoverIdx] = useState(null);
   const [coverInput, setCoverInput] = useState('');
-  const [editNoteIdx, setEditNoteIdx] = useState(null);
   const [noteInput, setNoteInput] = useState('');
-  const [editLabelIdx, setEditLabelIdx] = useState(null);
   const [labelInput, setLabelInput] = useState('');
-  const [editFeatIdx, setEditFeatIdx] = useState(null);
+  const [editPanelIdx, setEditPanelIdx] = useState(null);
   const [featInput, setFeatInput] = useState('');
 
-  useEffect(() => { setSongs(getSongList(sourceSongs)); }, [effectKey, overrideSongs, concert.setlist]);
+  useEffect(() => { setSongs(getSongList(sourceSongs)); setEditPanelIdx(null); }, [effectKey, overrideSongs, concert.setlist]);
 
   const save = (newSongs) => {
     const next = getSongList(newSongs);
@@ -1344,8 +1341,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
       else delete base.cover;
       return base;
     }));
-    setEditCoverIdx(null);
-    setCoverInput('');
   };
 
   const applyNote = (idx, note) => {
@@ -1357,8 +1352,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
       else delete base.info;
       return base;
     }));
-    setEditNoteIdx(null);
-    setNoteInput('');
   };
 
   const applyKnown = (idx, known) => {
@@ -1385,8 +1378,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
       else delete base.sectionCategory;
       return base;
     }));
-    setEditLabelIdx(null);
-    setLabelInput('');
   };
 
   const applyFeat = (idx, feat) => {
@@ -1398,8 +1389,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
       else delete base.feat;
       return base;
     }));
-    setEditFeatIdx(null);
-    setFeatInput('');
   };
 
   const applyVaries = idx => {
@@ -1481,9 +1470,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const album = getSongAlbum(song);
             const prevAlbum = displayPos > 0 ? getSongAlbum(displayList[displayPos - 1].song) : undefined;
             const showAlbumHeader = readOnly && setlistView.albums && album && album !== prevAlbum;
-            const isEditingCover = editCoverIdx === i;
-            const isEditingNote = editNoteIdx === i;
-            const isEditingFeat = editFeatIdx === i;
             return (
               <div key={`${name}-${i}-${displayPos}`}>
                 {showAlbumHeader && (
@@ -1503,8 +1489,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   );
                 })()}
               <div style={{
-                marginBottom: (isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4),
-                ...(isLastOfSection(displayPos) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
+                marginBottom: editPanelIdx === i ? 8 : (info || cover ? 6 : 4),
+                ...(isLastOfSection(displayPos) ? { paddingBottom: 10, marginBottom: (editPanelIdx === i ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
@@ -1512,7 +1498,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ color: varies ? '#ef4444' : '#c4c2f0', fontSize: 13, fontWeight: varies ? 700 : 400 }}>{name}</span>
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
-                      {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
+                      {(criedSong !== undefined ? criedSong : concert.criedSong) === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
                     {info && (!readOnly || setlistView.notes) && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
                     {cover && (!readOnly || setlistView.covers) && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
@@ -1521,59 +1507,49 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                       <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
                     )}
                   </div>
-                  {!readOnly && settings.showKnownMarkers && (
-                    <>
-                      <button onClick={() => applyKnown(i, true)} title="I already knew this one" style={{ background: 'none', border: 'none', color: known === true ? '#34d399' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✓</button>
-                      <button onClick={() => applyKnown(i, false)} title="Discovered this one live" style={{ background: 'none', border: 'none', color: known === false ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✨</button>
-                    </>
-                  )}
                   {!readOnly && (
-                    <button onClick={() => { if (editLabelIdx === i) { setEditLabelIdx(null); setLabelInput(''); } else { setEditLabelIdx(i); setLabelInput(sectionLabel || ''); setEditCoverIdx(null); setEditNoteIdx(null); setEditFeatIdx(null); } }} title="Add or edit a section header (Encore, Ment, era name, etc.)" style={{ background: 'none', border: 'none', color: (sectionLabel || editLabelIdx === i) ? '#facc15' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🎪</button>
-                  )}
-                  {!readOnly && (
-                    <button onClick={() => { if (isEditingNote) { setEditNoteIdx(null); setNoteInput(''); } else { setEditNoteIdx(i); setNoteInput(info || ''); setEditCoverIdx(null); setEditLabelIdx(null); setEditFeatIdx(null); } }}
-                      style={{ background: 'none', border: 'none', color: info || isEditingNote ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>✎</button>
-                  )}
-                  {!readOnly && (
-                    <button onClick={() => { if (isEditingCover) { setEditCoverIdx(null); setCoverInput(''); } else { setEditCoverIdx(i); setCoverInput(cover || ''); setEditNoteIdx(null); setEditLabelIdx(null); setEditFeatIdx(null); } }}
-                      style={{ background: 'none', border: 'none', color: cover || isEditingCover ? '#fb923c' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>↩</button>
-                  )}
-                  {!readOnly && (
-                    <button onClick={() => { if (isEditingFeat) { setEditFeatIdx(null); setFeatInput(''); } else { setEditFeatIdx(i); setFeatInput(feat || ''); setEditCoverIdx(null); setEditNoteIdx(null); setEditLabelIdx(null); } }} title="Mark a guest featured on this one song"
-                      style={{ background: 'none', border: 'none', color: feat || isEditingFeat ? '#f472b6' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>👥</button>
-                  )}
-                  {!readOnly && (
-                    <button onClick={() => applyVaries(i)} title="Changes every night, regardless of encore status"
-                      style={{ background: 'none', border: 'none', color: varies ? '#ef4444' : '#4a4870', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, paddingTop: 2 }}>🔀</button>
+                    <button
+                      onClick={() => {
+                        if (editPanelIdx === i) { setEditPanelIdx(null); }
+                        else {
+                          setEditPanelIdx(i);
+                          setNoteInput(info || ''); setCoverInput(cover || ''); setLabelInput(sectionLabel || ''); setFeatInput(feat || '');
+                        }
+                      }}
+                      style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: (info || cover || sectionLabel || feat || varies || editPanelIdx === i) ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 10, padding: '3px 8px', fontFamily: "'DM Mono', monospace" }}
+                    >{editPanelIdx === i ? 'Done' : 'Edit'}</button>
                   )}
                   {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
                 </div>
-                {isEditingNote && (
-                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
-                    <input
-                      autoFocus value={noteInput}
-                      onChange={e => setNoteInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') applyNote(i, noteInput); if (e.key === 'Escape') { setEditNoteIdx(null); setNoteInput(''); } }}
-                      placeholder="Note, e.g. switched lyrics, acoustic version…"
-                      style={{ width: '100%', background: '#0c0c14', border: '1px solid #a78bfa44', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
-                    />
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button onMouseDown={() => applyNote(i, noteInput)} style={{ background: 'none', border: '1px solid #a78bfa55', borderRadius: 6, color: '#a78bfa', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
-                        Save note
-                      </button>
-                      {info && <button onMouseDown={() => applyNote(i, '')} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
-                    </div>
-                  </div>
-                )}
-                {isEditingCover && (
-                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
-                    <div style={{ position: 'relative' }}>
+                {editPanelIdx === i && (
+                  <div style={{ marginTop: 8, padding: 12, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Note</div>
                       <input
-                        autoFocus value={coverInput}
-                        onChange={e => setCoverInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') applyCover(i, coverInput.trim() || true); if (e.key === 'Escape') { setEditCoverIdx(null); setCoverInput(''); } }}
-                        placeholder="Original artist…"
-                        style={{ width: '100%', background: '#0c0c14', border: '1px solid #fb923c44', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                        value={noteInput} onChange={e => setNoteInput(e.target.value)} onBlur={() => applyNote(i, noteInput)}
+                        placeholder="e.g. switched lyrics, acoustic version…"
+                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Section header</div>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 5 }}>
+                        {LABEL_PRESETS.map(p => (
+                          <button key={p} onClick={() => { const v = labelInput === p ? '' : p; setLabelInput(v); applyLabel(i, v); }} style={{ background: labelInput === p ? '#facc1522' : 'none', border: '1px solid #facc1555', borderRadius: 99, color: '#facc15', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{p.charAt(0) + p.slice(1).toLowerCase()}</button>
+                        ))}
+                      </div>
+                      <input
+                        value={labelInput} onChange={e => setLabelInput(e.target.value)} onBlur={() => applyLabel(i, labelInput)}
+                        placeholder="Or type a custom header, e.g. an era name…"
+                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Cover of</div>
+                      <input
+                        value={coverInput} onChange={e => setCoverInput(e.target.value)} onBlur={() => setTimeout(() => applyCover(i, coverInput.trim() || null), 150)}
+                        placeholder="Original artist, if this is a cover…"
+                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
                       />
                       {coverSuggestions.length > 0 && (
                         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 20, overflow: 'hidden', marginTop: 2 }}>
@@ -1583,46 +1559,35 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                         </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button onMouseDown={() => applyCover(i, coverInput.trim() || true)} style={{ background: 'none', border: '1px solid #fb923c55', borderRadius: 6, color: '#fb923c', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
-                        {coverInput.trim() ? 'Save cover' : 'Mark as cover'}
-                      </button>
-                      {cover && <button onMouseDown={() => applyCover(i, null)} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
+                    <div>
+                      <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Guest featured on this song</div>
+                      <input
+                        value={featInput} onChange={e => setFeatInput(e.target.value)} onBlur={() => applyFeat(i, featInput)}
+                        placeholder="Who joined for this one…"
+                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                      />
                     </div>
-                  </div>
-                )}
-                {editLabelIdx === i && (
-                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 5 }}>
-                      {LABEL_PRESETS.map(p => (
-                        <button key={p} onMouseDown={() => applyLabel(i, p)} style={{ background: sectionLabel === p ? '#facc1522' : 'none', border: '1px solid #facc1555', borderRadius: 99, color: '#facc15', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{p.charAt(0) + p.slice(1).toLowerCase()}</button>
-                      ))}
-                    </div>
-                    <input
-                      autoFocus value={labelInput}
-                      onChange={e => setLabelInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') applyLabel(i, labelInput); if (e.key === 'Escape') { setEditLabelIdx(null); setLabelInput(''); } }}
-                      placeholder="Or type a custom header, e.g. an era name…"
-                      style={{ width: '100%', background: '#0c0c14', border: '1px solid #facc1544', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
-                    />
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button onMouseDown={() => applyLabel(i, labelInput)} style={{ background: 'none', border: '1px solid #facc1555', borderRadius: 6, color: '#facc15', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save header</button>
-                      {sectionLabel && <button onMouseDown={() => applyLabel(i, '')} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
-                    </div>
-                  </div>
-                )}
-                {isEditingFeat && (
-                  <div style={{ paddingLeft: 26, marginTop: 4 }}>
-                    <input
-                      autoFocus value={featInput}
-                      onChange={e => setFeatInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') applyFeat(i, featInput); if (e.key === 'Escape') { setEditFeatIdx(null); setFeatInput(''); } }}
-                      placeholder="Guest who joined for this song…"
-                      style={{ width: '100%', background: '#0c0c14', border: '1px solid #f472b644', borderRadius: 7, color: '#c4c2f0', padding: '5px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
-                    />
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button onMouseDown={() => applyFeat(i, featInput)} style={{ background: 'none', border: '1px solid #f472b655', borderRadius: 6, color: '#f472b6', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
-                      {feat && <button onMouseDown={() => applyFeat(i, '')} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: '#4a4870', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Remove</button>}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, paddingTop: 2 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b89ab', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={(criedSong !== undefined ? criedSong : concert.criedSong) === name} onChange={e => onSetCriedSong && onSetCriedSong(e.target.checked ? name : null)} style={{ accentColor: '#ef4444' }} disabled={!onSetCriedSong} />
+                        💧 Cried here
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b89ab', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={varies} onChange={() => applyVaries(i)} style={{ accentColor: '#ef4444' }} />
+                        🔀 Changes nightly
+                      </label>
+                      {settings.showKnownMarkers && (
+                        <>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b89ab', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={known === true} onChange={() => applyKnown(i, true)} style={{ accentColor: '#34d399' }} />
+                            ✓ Knew it already
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b89ab', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={known === false} onChange={() => applyKnown(i, false)} style={{ accentColor: '#a78bfa' }} />
+                            ✨ Discovered live
+                          </label>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2971,6 +2936,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                           onSaveSetlist={save}
                           headlinerSongs={role === 'guest' && key !== '__headliner__' ? getSongList(form.setlist) : []}
                           allArtists={allArtists}
+                          onSetCriedSong={name => update('criedSong', name)}
+                          criedSong={form.criedSong}
                         />
                       </div>
                     )}

@@ -1295,7 +1295,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   );
 }
 
-const DEFAULT_SETLIST_VIEW = { notes: true, albums: true, ments: true, encore: true, surprise: true, headers: true, covers: true };
+const DEFAULT_SETLIST_VIEW = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true };
 function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW }) {
   const effectKey = concert.id + (overrideArtist || '');
   const sourceSongs = overrideSongs ?? concert.setlist;
@@ -1444,12 +1444,25 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {showAlbumHeader && (
                   <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: i === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
                 )}
-                {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel)] !== false) && (
-                  <div style={{ margin: '10px 0 8px' }}>
-                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, color: '#facc15' }}>{sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</div>
-                    <div style={{ width: Math.min(90, 16 + sectionLabel.length * 5), height: 2, marginTop: 4, background: 'linear-gradient(90deg, #facc15, transparent)' }} />
-                  </div>
-                )}
+                {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel)] !== false) && (() => {
+                  const cat = sectionLabelCategory(sectionLabel);
+                  const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                  if (cat === 'ments') {
+                    // Ments are just "they were talking here" — a small caption, not a big header.
+                    return (
+                      <div style={{ margin: '8px 0 6px', display: 'flex', alignItems: 'center', gap: 5, color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic' }}>
+                        <span>💬</span><span>{niceLabel}</span>
+                      </div>
+                    );
+                  }
+                  const color = cat === 'encore' ? '#facc15' : cat === 'surprise' ? '#f472b6' : '#8b7fb0';
+                  return (
+                    <div style={{ margin: '10px 0 8px' }}>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, color }}>{niceLabel}</div>
+                      <div style={{ width: Math.min(90, 16 + sectionLabel.length * 5), height: 2, marginTop: 4, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+                    </div>
+                  );
+                })()}
               <div style={{
                 marginBottom: (isEditingCover || isEditingNote || editLabelIdx === i) ? 8 : (info || cover ? 6 : 4),
                 ...(isLastOfSection(i) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote || editLabelIdx === i) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
@@ -1634,7 +1647,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
   useEffect(() => { setDetailTab('general'); }, [concert.id]);
-  const [setlistView, setSetlistView] = useState({ notes: true, albums: true, ments: true, encore: true, surprise: true, headers: true, covers: true });
+  const [setlistView, setSetlistView] = useState({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true });
   const [setlistViewOpen, setSetlistViewOpen] = useState(false);
   const toggleSetlistView = key => setSetlistView(v => ({ ...v, [key]: !v[key] }));
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
@@ -2032,8 +2045,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 </div>
               )}
               {totalCost > 0 && getSongList(concert.setlist).length > 0 && (
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                  ÷ {getSongList(concert.setlist).length} songs = €{(totalCost / getSongList(concert.setlist).length).toFixed(2)}/song
+                <div style={{ textAlign: "right", fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 1 }}>
+                  €{(totalCost / getSongList(concert.setlist).length).toFixed(2)} / song ({getSongList(concert.setlist).length} songs)
                 </div>
               )}
               {totalCost > 0 && concert.rating > 0 && (
@@ -2195,6 +2208,25 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                     </>
                   )}
                 </div>
+                {(() => {
+                  const totalMs = allSongsFlat.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+                  const coverCount = allSongsFlat.filter(s => typeof s === 'object' && s?.cover).length;
+                  const tiles = [
+                    { label: 'Songs', value: allSongsFlat.length },
+                    ...(totalMs > 0 ? [{ label: 'Length', value: (() => { const m = Math.round(totalMs / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; })() }] : []),
+                    ...(coverCount > 0 ? [{ label: 'Covers', value: coverCount }] : []),
+                  ];
+                  return tiles.length > 1 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
+                      {tiles.map(t => (
+                        <div key={t.label} style={{ background: '#0c0c14', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
+                          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{t.value}</div>
+                          <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>{t.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
                 {performers.length === 1 ? (
                   <>
                     {getSongList(performers[0].songs).length > 0

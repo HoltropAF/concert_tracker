@@ -1700,9 +1700,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     ];
     const setlistLines = songs.length > 0 ? [
       '🎶 Setlist:',
-      ...songs.map((s, i) => {
+      ...songs.flatMap((s, i) => {
         const info = getSongInfo(s), cover = getSongCover(s);
-        return `  ${i + 1}. ${getSongName(s)}${cover ? ` (${typeof cover === 'string' ? `${cover} cover` : 'cover'})` : ''}${info ? ` — ${info}` : ''}`;
+        const label = typeof s === 'object' ? s?.sectionLabel : null;
+        const line = `  ${i + 1}. ${getSongName(s)}${cover ? ` (${typeof cover === 'string' ? `${cover} cover` : 'cover'})` : ''}${info ? ` — ${info}` : ''}`;
+        return label ? [`  — ${label} —`, line] : [line];
       }),
     ] : [];
 
@@ -2181,17 +2183,37 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               {concert.notes && <div style={{ marginTop: 8, borderTop: "1px dashed #999", paddingTop: 8, fontStyle: "italic" }}>{concert.notes}</div>}
             </Section>
           );
+          const setlistTotalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+          const formatSetlistLength = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `~${h}h ${m}m` : `~${m}m`; };
           const setlistContent = (
             <Section>
+              {setlistTotalMs > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#999", marginBottom: 8, paddingBottom: 6, borderBottom: "1px dashed #ccc" }}>
+                  <span>{songs.length} songs</span><span>{formatSetlistLength(setlistTotalMs)}</span>
+                </div>
+              )}
               {songs.map((s, i) => {
-                const info = getSongInfo(s), cover = getSongCover(s);
+                const info = getSongInfo(s), cover = getSongCover(s), label = getSongSectionLabel ? getSongSectionLabel(s) : (typeof s === 'object' && s?.sectionLabel);
+                const album = typeof s === 'object' ? (s?.albumName || null) : null;
+                const prevAlbum = i > 0 && typeof songs[i - 1] === 'object' ? (songs[i - 1]?.albumName || null) : null;
+                const showAlbum = album && album !== prevAlbum;
                 return (
-                  <div key={i} style={{ marginBottom: 4 }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <span style={{ color: "#999", width: 16, flexShrink: 0 }}>{i + 1}.</span>
-                      <span>{getSongName(s)}{cover && <span style={{ color: "#a06a2a" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
+                  <div key={i}>
+                    {showAlbum && (
+                      <div style={{ fontSize: 9, letterSpacing: "0.08em", color: "#999", margin: i === 0 ? "0 0 4px" : "8px 0 4px", textTransform: "uppercase" }}>{album}</div>
+                    )}
+                    {label && (
+                      <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.1em", color: "#a06a2a", margin: i === 0 ? "0 0 6px" : "10px 0 6px", textTransform: "uppercase" }}>
+                        — {label.toLowerCase()} —
+                      </div>
+                    )}
+                    <div style={{ marginBottom: 4 }}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <span style={{ color: "#999", width: 16, flexShrink: 0 }}>{i + 1}.</span>
+                        <span>{getSongName(s)}{cover && <span style={{ color: "#a06a2a" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
+                      </div>
+                      {info && <div style={{ paddingLeft: 24, color: "#777", fontSize: 11, fontStyle: "italic" }}>"{info}"</div>}
                     </div>
-                    {info && <div style={{ paddingLeft: 24, color: "#777", fontSize: 11 }}>{info}</div>}
                   </div>
                 );
               })}

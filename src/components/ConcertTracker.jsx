@@ -1586,6 +1586,7 @@ function normalizeConcertForm(concert) {
     friends: Array.isArray(concert.friends) ? concert.friends : [],
     support: Array.isArray(concert.support) ? concert.support : [],
     merch: Array.isArray(concert.merch) ? concert.merch : [],
+    otherCosts: Array.isArray(concert.otherCosts) ? concert.otherCosts : [],
     ticketAddons: Array.isArray(concert.ticketAddons) ? concert.ticketAddons : [],
     acts: Array.isArray(concert.acts) ? concert.acts : [],
     tickets,
@@ -1656,6 +1657,21 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     setForm(f => ({ ...f, merch: (f.merch || []).filter((_, i) => i !== idx) }));
   };
 
+  const otherCostCategories = settings.otherCostCategories || ["Transport", "Food & drinks", "Hotel", "Parking", "Merch (other)", "Other"];
+  const addOtherCost = () => {
+    setForm(f => ({ ...f, otherCosts: [...(f.otherCosts || []), { name: otherCostCategories[0], price: "" }] }));
+  };
+  const updateOtherCost = (idx, key, val) => {
+    setForm(f => {
+      const c = [...(f.otherCosts || [])];
+      c[idx] = { ...c[idx], [key]: val };
+      return { ...f, otherCosts: c };
+    });
+  };
+  const removeOtherCost = (idx) => {
+    setForm(f => ({ ...f, otherCosts: (f.otherCosts || []).filter((_, i) => i !== idx) }));
+  };
+
   const addSupport = () => {
     const t = supportInput.trim();
     if (!t || (form.support || []).some(x => getSupportName(x) === t)) return;
@@ -1671,8 +1687,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
       : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", parseFloat(concert.ticketPrice) || 0]] : [];
     const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
+    const otherCostItems = (concert.otherCosts || []).filter(c => c.price).map(c => [c.name || "Other", parseFloat(c.price) || 0]);
     const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
-    const moneyLines = [...ticketItems, ...merchItems, ...travelItems];
+    const moneyLines = [...ticketItems, ...merchItems, ...otherCostItems, ...travelItems];
     const total = moneyLines.reduce((s, [, v]) => s + v, 0);
 
     const header = [
@@ -1797,7 +1814,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   if (!editing) {
     const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
     const merchTotal = (concert.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
-    const totalCost = ticketTotal(concert) + merchTotal;
+    const otherCostsTotal = (concert.otherCosts || []).reduce((s, c) => s + (parseFloat(c.price) || 0), 0);
+    const totalCost = ticketTotal(concert) + merchTotal + otherCostsTotal + (parseFloat(concert.travelCost) || 0);
     const companions = getFriends(concert);
     // Ticket sale block for wishlist items
     const ticketSaleBlock = concert.wishlist && concert.ticketSaleAt ? (() => {
@@ -1932,6 +1950,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
                   : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", concert.ticketPrice]] : [];
                 const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
+                const otherCostItems = (concert.otherCosts || []).filter(c => c.price).map(c => [c.name || "Other", parseFloat(c.price) || 0]);
+                const travelItems = concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : [];
                 const addons = concert.ticketAddons || [];
                 const Group = (heading, items, bold = false, extras = []) => {
                   if (items.length === 0 && extras.length === 0) return null;
@@ -1966,13 +1986,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   <>
                     {Group("Tickets", ticketItems, true, addons)}
                     {Group("Merch", merchItems)}
+                    {Group("Other", otherCostItems)}
+                    {Group("Travel", travelItems)}
                   </>
                 );
               })()}
               {totalCost > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 7 }}>
-                  <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 700 }}>Total</span>
-                  <span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>€{totalCost.toFixed(2)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingTop: 12, marginTop: 4, borderTop: "1px solid #1a1a2e" }}>
+                  <span style={{ color: "#a78bfa", fontSize: 14, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>Total</span>
+                  <span style={{ color: "#a78bfa", fontSize: 24, fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>€{totalCost.toFixed(2)}</span>
                 </div>
               )}
               {totalCost > 0 && getSongList(concert.setlist).length > 0 && (
@@ -2146,8 +2168,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
             : concert.ticketPrice ? [[concert.ticketType ? `Ticket (${concert.ticketType})` : "Ticket", parseFloat(concert.ticketPrice) || 0]] : [];
           const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
+          const otherCostItems = (concert.otherCosts || []).filter(c => c.price).map(c => [c.name || "Other", parseFloat(c.price) || 0]);
           const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
-          const moneyLines = [...ticketItems, ...merchItems, ...travelItems];
+          const moneyLines = [...ticketItems, ...merchItems, ...otherCostItems, ...travelItems];
           const total = moneyLines.reduce((s, [, v]) => s + v, 0);
           const songs = getSongList(concert.setlist);
           const genres = getGenres(concert);
@@ -2577,6 +2600,40 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 </div>
               ))}
             </div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop: 16, marginBottom: 8 }}>
+              <div style={labelStyle}>Other costs</div>
+              <button onClick={addOtherCost} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"3px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>+ Add cost</button>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {(form.otherCosts || []).map((c, i) => (
+                <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <div style={{ flex:1, position:"relative" }}>
+                    <select value={otherCostCategories.includes(c.name) ? c.name : "__custom__"} onChange={e => updateOtherCost(i, "name", e.target.value)} style={{ ...inputStyle, width:"100%", appearance:"none", paddingRight:24 }}>
+                      {otherCostCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      <option value="__custom__">Custom...</option>
+                    </select>
+                    <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", color:"#6b6a8f", fontSize:10, pointerEvents:"none" }}>▾</span>
+                  </div>
+                  {(!otherCostCategories.includes(c.name) || c.name === "") && (
+                    <input
+                      value={c.name === "__custom__" ? "" : c.name}
+                      placeholder="Custom name..."
+                      onChange={e => updateOtherCost(i, "name", e.target.value)}
+                      onBlur={e => {
+                        const v = e.target.value.trim();
+                        if (v && !otherCostCategories.some(cat => cat.toLowerCase() === v.toLowerCase())) setPendingTag({ value: v, settingsKey: 'otherCostCategories', label: 'other cost categories' });
+                      }}
+                      style={{ ...inputStyle, flex:1 }} autoFocus
+                    />
+                  )}
+                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ color:"#6b6a8f", fontSize:12 }}>€</span>
+                    <input type="number" value={c.price} placeholder="0" onChange={e => updateOtherCost(i, "price", e.target.value)} style={{ ...inputStyle, width:70 }} />
+                  </div>
+                  <button onClick={() => removeOtherCost(i)} style={{ background:"none", border:"none", color:"#4a6a5a", fontSize:16, cursor:"pointer", padding:0 }}>×</button>
+                </div>
+              ))}
+            </div>
           </> },
 
           /* ── NOTES ── */
@@ -2997,7 +3054,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Most expensive shows including merch cost
   const topExpensiveIncMerch = [...past]
     .filter(c => c.ticketPrice || c.merch?.length > 0)
-    .map(c => ({ ...c, totalCost: (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) }))
+    .map(c => ({ ...c, totalCost: (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) + (c.otherCosts || []).reduce((s,x) => s + (parseFloat(x.price)||0), 0) + (parseFloat(c.travelCost) || 0) }))
     .sort((a,b) => b.totalCost - a.totalCost)
     .slice(0, topExpensiveRows);
 

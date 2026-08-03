@@ -2242,19 +2242,27 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <div style={detailCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, position: 'relative' }}>
                   {sec("Setlist")}
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: 'center', marginBottom: 8 }}>
                     {hasAlbums && (
-                      <div style={{ display: 'flex', border: '1px solid #1f1f35', borderRadius: 6, overflow: 'hidden' }}>
-                        <button onClick={() => setSetlistSort('night')} style={{ background: setlistSort === 'night' ? '#1a1a30' : 'none', border: 'none', color: setlistSort === 'night' ? '#a78bfa' : '#6b6a8f', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Order of the night</button>
-                        <button onClick={() => setSetlistSort('album')} style={{ background: setlistSort === 'album' ? '#1a1a30' : 'none', border: 'none', borderLeft: '1px solid #1f1f35', color: setlistSort === 'album' ? '#a78bfa' : '#6b6a8f', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>By album</button>
-                      </div>
+                      <button
+                        onClick={() => setSetlistSort(s => s === 'night' ? 'album' : 'night')}
+                        aria-label={setlistSort === 'night' ? 'Sort by album' : 'Sort by order of the night'}
+                        title={setlistSort === 'night' ? 'Order of the night — tap to sort by album' : 'By album — tap to sort by order of the night'}
+                        style={{ background: 'none', border: 'none', padding: 4, color: setlistSort === 'album' ? '#a78bfa' : '#6b6a8f', cursor: 'pointer', lineHeight: 1, display: 'flex' }}
+                      >
+                        {setlistSort === 'night'
+                          ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>}
+                      </button>
                     )}
                     {filterRows.length > 0 && (
                       <button
                         onClick={() => setSetlistViewOpen(o => !o)}
-                        style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 6, color: Object.values(setlistView).some(v => !v) ? '#a78bfa' : '#6b6a8f', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
+                        aria-label="View options" title="View options"
+                        style={{ background: 'none', border: 'none', padding: 4, color: Object.values(setlistView).some(v => !v) ? '#a78bfa' : '#6b6a8f', cursor: 'pointer', lineHeight: 1, display: 'flex', position: 'relative' }}
                       >
-                        ⚙ View {Object.values(setlistView).some(v => !v) ? '•' : ''}
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        {Object.values(setlistView).some(v => !v) && <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#a78bfa' }} />}
                       </button>
                     )}
                     {settings.spotifyAccessToken && performers.some(p => getSongList(p.songs).some(s => s?.spotifyId)) && (
@@ -2264,9 +2272,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                           const p = performers.length === 1 ? performers[0] : performers.reduce((a, b) => getSongList(a.songs).length >= getSongList(b.songs).length ? a : b);
                           handleExportPlaylist(getSongList(p.songs), p.name);
                         }}
-                        style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: exportingPlaylist ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace", opacity: exportingPlaylist ? 0.6 : 1 }}
+                        aria-label="Save to Spotify" title={exportingPlaylist ? 'Saving…' : 'Save to Spotify'}
+                        style={{ background: 'none', border: 'none', padding: 4, color: '#1DB954', cursor: exportingPlaylist ? 'default' : 'pointer', lineHeight: 1, display: 'flex', opacity: exportingPlaylist ? 0.5 : 1 }}
                       >
-                        {exportingPlaylist ? 'Saving…' : '♪ Save to Spotify'}
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.32-1.319 9.719-.66 13.439 1.621.361.181.54.78.301 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
                       </button>
                     )}
                   </div>

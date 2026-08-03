@@ -2086,17 +2086,26 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               support:   { color: '#818cf8', bg: '#131328' },
               guest:     { color: '#f472b6', bg: '#1a1030' },
             };
-            const performers = [
-              { key: '__headliner__', name: concert.artist, role: 'headliner',
-                songs: getSongList(concert.setlist),
-                onSaveSetlist: (s) => onSave({ ...concert, setlist: s }) },
-              ...(concert.support || []).map(s => {
-                const name = getSupportName(s); const role = getSupportRole(s);
-                return { key: name, name, role,
-                  songs: getSongList((concert.supportSetlists || {})[name]),
-                  onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
-              }),
-            ];
+            const headlinerEntry = { key: '__headliner__', name: concert.artist, role: 'headliner',
+              songs: getSongList(concert.setlist),
+              onSaveSetlist: (s) => onSave({ ...concert, setlist: s }) };
+            const supportEntries = (concert.support || []).filter(s => getSupportRole(s) !== 'guest').map(s => {
+              const name = getSupportName(s); const role = getSupportRole(s);
+              return { key: name, name, role,
+                songs: getSongList((concert.supportSetlists || {})[name]),
+                onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
+            });
+            // Guests (brought out during someone else's set for a song or two) aren't
+            // their own timeslot — nested inside the headliner's card instead of
+            // getting equal billing as a separate card.
+            const guestEntries = (concert.support || []).filter(s => getSupportRole(s) === 'guest').map(s => {
+              const name = getSupportName(s);
+              return { key: name, name,
+                songs: getSongList((concert.supportSetlists || {})[name]),
+                onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
+            });
+            // Chronological order: openers/support play first, headliner closes the night.
+            const performers = [...supportEntries, headlinerEntry];
             return (
               <div style={detailCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -2123,9 +2132,22 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   </div>
                 </div>
                 {performers.length === 1 ? (
-                  getSongList(performers[0].songs).length > 0
-                    ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly hideNotes={!showSetlistNotes} />
-                    : <div style={{ fontSize: 12, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
+                  <>
+                    {getSongList(performers[0].songs).length > 0
+                      ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly hideNotes={!showSetlistNotes} />
+                      : <div style={{ fontSize: 12, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>}
+                    {guestEntries.map(g => (
+                      <div key={g.key} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed #2e2e50' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: g.songs.length > 0 ? 6 : 0 }}>
+                          <span style={{ fontSize: 9, color: roleConfig.guest.color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: roleConfig.guest.bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>guest</span>
+                          <span onClick={() => onNavigate({ view: 'artists', artist: g.name })} style={{ color: '#c4c2f0', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{g.name}</span>
+                        </div>
+                        {g.songs.length > 0 && (
+                          <SetlistSection concert={concert} settings={settings} overrideSongs={g.songs} overrideArtist={g.name} onSaveSetlist={g.onSaveSetlist} readOnly hideNotes={!showSetlistNotes} />
+                        )}
+                      </div>
+                    ))}
+                  </>
                 ) : performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
                   const { color, bg } = roleConfig[role] || roleConfig.support;
                   const isOpen = expandedSupportSetlists.has(key);
@@ -2161,6 +2183,17 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                               />
                             : <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
                           }
+                          {key === '__headliner__' && guestEntries.map(g => (
+                            <div key={g.key} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #2e2e50' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: g.songs.length > 0 ? 6 : 0 }}>
+                                <span style={{ fontSize: 9, color: roleConfig.guest.color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: roleConfig.guest.bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>guest</span>
+                                <span onClick={() => onNavigate({ view: 'artists', artist: g.name })} style={{ color: '#c4c2f0', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{g.name}</span>
+                              </div>
+                              {g.songs.length > 0 && (
+                                <SetlistSection concert={concert} settings={settings} overrideSongs={g.songs} overrideArtist={g.name} onSaveSetlist={g.onSaveSetlist} readOnly hideNotes={!showSetlistNotes} />
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -2681,15 +2714,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             guest:     { color: '#f472b6', bg: '#1a1030' },
           };
           const performers = [
-            { key: '__headliner__', name: concert.artist, role: 'headliner',
-              songs: getSongList(form.setlist),
-              onSaveSetlist: (s) => update('setlist', s) },
             ...(concert.support || []).map(s => {
               const name = getSupportName(s); const role = getSupportRole(s);
               return { key: name, name, role,
                 songs: getSongList((form.supportSetlists || {})[name]),
                 onSaveSetlist: (ns) => setForm(f => ({ ...f, supportSetlists: { ...(f.supportSetlists || {}), [name]: ns } })) };
             }),
+            { key: '__headliner__', name: concert.artist, role: 'headliner',
+              songs: getSongList(form.setlist),
+              onSaveSetlist: (s) => update('setlist', s) },
           ];
           return (
             <div style={{ marginBottom: 24 }}>

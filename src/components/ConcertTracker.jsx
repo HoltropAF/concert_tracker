@@ -1402,6 +1402,11 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
 
   const totalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
   const formatSetLength = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `~${h}h ${m}m` : `~${m}m`; };
+  // For each song, the nearest section label at or before it (so we know when a
+  // labeled run — e.g. 2 encore songs — actually ends and plain songs resume).
+  let runningSection = null;
+  const activeSectionAt = songs.map(s => { const l = getSongSectionLabel(s); if (l) runningSection = l; return runningSection; });
+  const isLastOfSection = i => activeSectionAt[i] && activeSectionAt[i] !== (activeSectionAt[i + 1] ?? null);
 
   return (
     <div>
@@ -1429,11 +1434,15 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: i === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
                 )}
                 {sectionLabel && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px', color: '#facc15', fontSize: 9, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <div style={{ flex: 1, height: 1, background: '#3a3010' }} />{sectionLabel}<div style={{ flex: 1, height: 1, background: '#3a3010' }} />
+                  <div style={{ margin: '10px 0 8px' }}>
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, color: '#facc15' }}>{sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</div>
+                    <div style={{ width: Math.min(90, 16 + sectionLabel.length * 5), height: 2, marginTop: 4, background: 'linear-gradient(90deg, #facc15, transparent)' }} />
                   </div>
                 )}
-              <div style={{ marginBottom: (isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4) }}>
+              <div style={{
+                marginBottom: (isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4),
+                ...(isLastOfSection(i) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
+              }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
@@ -1442,8 +1451,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
-                    {info && <div style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{info}</div>}
-                    {cover && <div style={{ color: '#fb923c', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>↩ {typeof cover === 'string' ? cover : 'cover'}</div>}
+                    {info && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
+                    {cover && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
                     {settings.showKnownMarkers && known !== null && (
                       <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
                     )}

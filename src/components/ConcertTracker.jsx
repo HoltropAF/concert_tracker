@@ -303,9 +303,11 @@ const getSongSectionLabel = s => typeof s === 'string' || !s ? null : (s.section
 const sectionLabelCategory = label => {
   if (!label) return null;
   const l = label.toLowerCase();
-  if (l.includes('ment')) return 'ments';
-  if (l.includes('encore')) return 'encore';
-  if (l.includes('surprise') || l.includes('secret')) return 'surprise';
+  // Word-boundary matching — a plain .includes('ment') was matching "depart-MENT",
+  // wrongly bucketing "The Tortured Poets Department" as a Ment.
+  if (/\bment\b/.test(l)) return 'ments';
+  if (/\bencore\b/.test(l)) return 'encore';
+  if (/\bsurprise\b|\bsecret\b/.test(l)) return 'surprise';
   return 'other'; // era headers, intro, interlude, set 1/2, etc.
 };
 const getSongAlbum = s => typeof s === 'string' || !s ? null : (s.albumName || null);
@@ -1298,7 +1300,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
 }
 
 const DEFAULT_SETLIST_VIEW = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true };
-function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW }) {
+function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW, sortMode = 'night' }) {
   const effectKey = concert.id + (overrideArtist || '');
   const sourceSongs = overrideSongs ?? concert.setlist;
   const [songs, setSongs] = useState(() => getSongList(sourceSongs));
@@ -1439,24 +1441,29 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const searchUrl = `https://www.setlist.fm/search?query=${encodeURIComponent(searchArtist)}${concert.venue ? '+' + encodeURIComponent(concert.venue) : ''}+${concert.date.slice(0, 4)}`;
   const inputStyle = { flex: 1, background: '#13131f', border: '1px solid #2a4a3a', borderRadius: 8, color: '#c4c2f0', padding: '7px 12px', fontFamily: "'DM Mono', monospace", fontSize: 13 };
 
-  const totalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
-  const formatSetLength = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `~${h}h ${m}m` : `~${m}m`; };
-  // For each song, the nearest section label at or before it (so we know when a
-  // labeled run — e.g. 2 encore songs — actually ends and plain songs resume).
+  // Display order can differ from the underlying (editable) song order when
+  // sorted by album — origIdx keeps edit callbacks pointed at the real song.
+  const displayList = (sortMode === 'album' && readOnly)
+    ? songs.map((s, i) => ({ song: s, origIdx: i }))
+        .sort((a, b) => {
+          const albA = getSongAlbum(a.song) || '\uffff'; // no-album songs sort last
+          const albB = getSongAlbum(b.song) || '\uffff';
+          if (albA !== albB) return albA < albB ? -1 : 1;
+          return a.origIdx - b.origIdx; // stable within an album
+        })
+    : songs.map((s, i) => ({ song: s, origIdx: i }));
+
+  // For each displayed song, the nearest section label at or before it (so we know
+  // when a labeled run — e.g. 2 encore songs — actually ends and plain songs resume).
   let runningSection = null;
-  const activeSectionAt = songs.map(s => { const l = getSongSectionLabel(s); if (l) runningSection = l; return runningSection; });
-  const isLastOfSection = i => activeSectionAt[i] && activeSectionAt[i] !== (activeSectionAt[i + 1] ?? null);
+  const activeSectionAt = displayList.map(({ song: s }) => { const l = getSongSectionLabel(s); if (l) runningSection = l; return runningSection; });
+  const isLastOfSection = pos => activeSectionAt[pos] && activeSectionAt[pos] !== (activeSectionAt[pos + 1] ?? null);
 
   return (
     <div>
       {songs.length > 0 && (
         <div style={{ marginBottom: 12 }}>
-          {(readOnly && totalMs > 0) && (
-            <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{songs.length} songs</span><span>{formatSetLength(totalMs)}</span>
-            </div>
-          )}
-          {songs.map((song, i) => {
+          {displayList.map(({ song, origIdx: i }, displayPos) => {
             const name = getSongName(song);
             const info = getSongInfo(song);
             const cover = getSongCover(song);
@@ -1465,28 +1472,36 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const varies = getSongVaries(song);
             const sectionLabel = getSongSectionLabel(song);
             const album = getSongAlbum(song);
-            const prevAlbum = i > 0 ? getSongAlbum(songs[i - 1]) : undefined;
+            const prevAlbum = displayPos > 0 ? getSongAlbum(displayList[displayPos - 1].song) : undefined;
             const showAlbumHeader = readOnly && setlistView.albums && album && album !== prevAlbum;
             const isEditingCover = editCoverIdx === i;
             const isEditingNote = editNoteIdx === i;
             const isEditingFeat = editFeatIdx === i;
             return (
-              <div key={`${name}-${i}`}>
+              <div key={`${name}-${i}-${displayPos}`}>
                 {showAlbumHeader && (
-                  <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: i === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
+                  <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: displayPos === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
                 )}
                 {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel)] !== false) && (() => {
                   const cat = sectionLabelCategory(sectionLabel);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
                   if (cat === 'ments') {
-                    // Ments are just "they were talking here" — a small caption, not a big header.
+                    // Ments are just "they were talking here" — bold word, no line, just breathing room.
                     return (
-                      <div style={{ margin: '8px 0 6px', display: 'flex', alignItems: 'center', gap: 5, color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic' }}>
-                        <span>💬</span><span>{niceLabel}</span>
+                      <div style={{ margin: '10px 0 8px', color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>
+                        {niceLabel}
                       </div>
                     );
                   }
-                  const color = cat === 'encore' ? '#facc15' : cat === 'surprise' ? '#f472b6' : '#8b7fb0';
+                  if (cat === 'surprise') {
+                    // No line — dark red, bold, stands apart without extra decoration.
+                    return (
+                      <div style={{ margin: '10px 0 8px', color: '#b91c1c', fontSize: 12, fontFamily: "'Syne', sans-serif", fontWeight: 800 }}>
+                        {niceLabel}
+                      </div>
+                    );
+                  }
+                  const color = cat === 'encore' ? '#facc15' : '#8b7fb0';
                   return (
                     <div style={{ margin: '10px 0 8px' }}>
                       <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 800, color }}>{niceLabel}</div>
@@ -1496,7 +1511,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 })()}
               <div style={{
                 marginBottom: (isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4),
-                ...(isLastOfSection(i) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
+                ...(isLastOfSection(displayPos) ? { paddingBottom: 10, marginBottom: ((isEditingCover || isEditingNote || editLabelIdx === i || isEditingFeat) ? 8 : (info || cover ? 6 : 4)) + 10, borderBottom: '1px solid #1a1a2e' } : {}),
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <span style={{ color: '#4a4870', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
@@ -1704,6 +1719,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [detailTab, setDetailTab] = useState('general');
   useEffect(() => { setDetailTab('general'); }, [concert.id]);
   const [setlistView, setSetlistView] = useState({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true });
+  const [setlistSort, setSetlistSort] = useState('night'); // 'night' = performance order, 'album' = grouped by album
   const [setlistViewOpen, setSetlistViewOpen] = useState(false);
   const toggleSetlistView = key => setSetlistView(v => ({ ...v, [key]: !v[key] }));
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
@@ -2228,7 +2244,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             const setlistStats = [
               allSongsFlat.length > 0 ? { label: 'Songs', value: allSongsFlat.length } : null,
               totalDurationMs > 0 ? { label: 'Length', value: formatDuration(totalDurationMs) } : null,
-              distinctAlbums > 1 ? { label: 'Albums', value: distinctAlbums } : null,
             ].filter(Boolean);
             return (
               <div style={detailCard}>
@@ -2245,6 +2260,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, position: 'relative' }}>
                   {sec("Setlist")}
                   <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    {hasAlbums && (
+                      <div style={{ display: 'flex', border: '1px solid #1f1f35', borderRadius: 6, overflow: 'hidden' }}>
+                        <button onClick={() => setSetlistSort('night')} style={{ background: setlistSort === 'night' ? '#1a1a30' : 'none', border: 'none', color: setlistSort === 'night' ? '#a78bfa' : '#6b6a8f', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Order of the night</button>
+                        <button onClick={() => setSetlistSort('album')} style={{ background: setlistSort === 'album' ? '#1a1a30' : 'none', border: 'none', borderLeft: '1px solid #1f1f35', color: setlistSort === 'album' ? '#a78bfa' : '#6b6a8f', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>By album</button>
+                      </div>
+                    )}
                     {filterRows.length > 0 && (
                       <button
                         onClick={() => setSetlistViewOpen(o => !o)}
@@ -2304,7 +2325,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 {performers.length === 1 ? (
                   <>
                     {getSongList(performers[0].songs).length > 0
-                      ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly setlistView={setlistView} />
+                      ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly setlistView={setlistView} sortMode={setlistSort} />
                       : <div style={{ fontSize: 12, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>}
                     {guestEntries.map(g => (
                       <div key={g.key} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed #2e2e50' }}>
@@ -2350,6 +2371,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                                 onSaveSetlist={save}
                                 readOnly
                                 setlistView={setlistView}
+                                sortMode={setlistSort}
                               />
                             : <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
                           }

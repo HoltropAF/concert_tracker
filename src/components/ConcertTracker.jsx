@@ -1286,7 +1286,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   );
 }
 
-function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [] }) {
+function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], hideNotes = false }) {
   const effectKey = concert.id + (overrideArtist || '');
   const sourceSongs = overrideSongs ?? concert.setlist;
   const [songs, setSongs] = useState(() => getSongList(sourceSongs));
@@ -1451,7 +1451,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
-                    {info && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
+                    {info && !hideNotes && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
                     {cover && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
                     {settings.showKnownMarkers && known !== null && (
                       <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
@@ -1603,6 +1603,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
   useEffect(() => { setDetailTab('general'); }, [concert.id]);
+  const [showSetlistNotes, setShowSetlistNotes] = useState(true);
   // { value, settingsKey, label } — a value typed fresh on this show, offered for saving to Settings.
   const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState(() => normalizeConcertForm(concert));
@@ -2098,24 +2099,32 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             ];
             return (
               <div style={detailCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                   {sec("Setlist")}
-                  {settings.spotifyAccessToken && performers.some(p => getSongList(p.songs).some(s => s?.spotifyId)) && (
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     <button
-                      disabled={exportingPlaylist}
-                      onClick={() => {
-                        const p = performers.length === 1 ? performers[0] : performers.reduce((a, b) => getSongList(a.songs).length >= getSongList(b.songs).length ? a : b);
-                        handleExportPlaylist(getSongList(p.songs), p.name);
-                      }}
-                      style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: exportingPlaylist ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 8, opacity: exportingPlaylist ? 0.6 : 1 }}
+                      onClick={() => setShowSetlistNotes(s => !s)}
+                      style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 6, color: showSetlistNotes ? '#a78bfa' : '#6b6a8f', fontSize: 10, padding: '3px 10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
                     >
-                      {exportingPlaylist ? 'Saving…' : '♪ Save to Spotify'}
+                      {showSetlistNotes ? 'Hide notes' : 'Show notes'}
                     </button>
-                  )}
+                    {settings.spotifyAccessToken && performers.some(p => getSongList(p.songs).some(s => s?.spotifyId)) && (
+                      <button
+                        disabled={exportingPlaylist}
+                        onClick={() => {
+                          const p = performers.length === 1 ? performers[0] : performers.reduce((a, b) => getSongList(a.songs).length >= getSongList(b.songs).length ? a : b);
+                          handleExportPlaylist(getSongList(p.songs), p.name);
+                        }}
+                        style={{ background: 'none', border: '1px solid #1DB95444', borderRadius: 6, color: '#1DB954', fontSize: 10, padding: '3px 10px', cursor: exportingPlaylist ? 'default' : 'pointer', fontFamily: "'DM Mono', monospace", opacity: exportingPlaylist ? 0.6 : 1 }}
+                      >
+                        {exportingPlaylist ? 'Saving…' : '♪ Save to Spotify'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {performers.length === 1 ? (
                   getSongList(performers[0].songs).length > 0
-                    ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly />
+                    ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly hideNotes={!showSetlistNotes} />
                     : <div style={{ fontSize: 12, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
                 ) : performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
                   const { color, bg } = roleConfig[role] || roleConfig.support;
@@ -2148,6 +2157,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                                 overrideArtist={key === '__headliner__' ? undefined : name}
                                 onSaveSetlist={save}
                                 readOnly
+                                hideNotes={!showSetlistNotes}
                               />
                             : <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
                           }

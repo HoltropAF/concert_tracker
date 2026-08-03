@@ -1511,7 +1511,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ color: varies ? '#ef4444' : '#c4c2f0', fontSize: 13, fontWeight: varies ? 700 : 400 }}>{name}</span>
-                      {varies && <span title="Changes every night" style={{ fontSize: 10, lineHeight: 1 }}>🔀</span>}
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {concert.criedSong === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>

@@ -1367,6 +1367,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   };
 
   const LABEL_PRESETS = ['ENCORE', 'ENCORE 2', 'MENT', 'INTRO', 'INTERLUDE'];
+  const SECTION_END = '__SECTION_END__'; // closes a running section (e.g. Acoustic Set) here, with no visible header of its own
   const applyLabel = (idx, label, category) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
@@ -1476,7 +1477,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {showAlbumHeader && (
                   <div style={{ fontSize: 9, color: '#8b7fb0', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', margin: displayPos === 0 ? '0 0 6px' : '14px 0 6px' }}>{album}</div>
                 )}
-                {sectionLabel && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
+                {sectionLabel && sectionLabel !== SECTION_END && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
                   const cat = sectionLabelCategory(sectionLabel, sectionCategoryOverride);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
                   const color = cat === 'ments' ? '#4a4870' : cat === 'surprise' ? '#ef4444' : cat === 'encore' ? '#facc15' : '#8b7fb0';
@@ -1538,11 +1539,20 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                         {LABEL_PRESETS.map(p => (
                           <button key={p} onClick={() => { const v = labelInput === p ? '' : p; setLabelInput(v); applyLabel(i, v); }} style={{ background: labelInput === p ? '#facc1522' : 'none', border: '1px solid #facc1555', borderRadius: 99, color: '#facc15', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{p.charAt(0) + p.slice(1).toLowerCase()}</button>
                         ))}
+                        {displayPos > 0 && activeSectionAt[displayPos - 1] && activeSectionAt[displayPos - 1] !== SECTION_END && (
+                          <button
+                            onClick={() => { const v = sectionLabel === SECTION_END ? '' : SECTION_END; setLabelInput(v); applyLabel(i, v); }}
+                            title="Closes the running section here with no header of its own — e.g. mark where an Acoustic Set stops and the normal set resumes"
+                            style={{ background: sectionLabel === SECTION_END ? '#6b6a8f22' : 'none', border: '1px solid #6b6a8f55', borderRadius: 99, color: '#8b89ab', fontSize: 10, padding: '3px 9px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
+                          >End "{activeSectionAt[displayPos - 1].toLowerCase()}" here</button>
+                        )}
                       </div>
                       <input
-                        value={labelInput} onChange={e => setLabelInput(e.target.value)} onBlur={() => applyLabel(i, labelInput)}
+                        value={labelInput === SECTION_END ? '(section ended here)' : labelInput}
+                        onChange={e => setLabelInput(e.target.value)} onBlur={() => { if (labelInput !== '(section ended here)') applyLabel(i, labelInput); }}
                         placeholder="Or type a custom header, e.g. an era name…"
-                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
+                        readOnly={labelInput === SECTION_END}
+                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: labelInput === SECTION_END ? '#6b6a8f' : '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box', fontStyle: labelInput === SECTION_END ? 'italic' : 'normal' }}
                       />
                     </div>
                     <div style={{ position: 'relative' }}>

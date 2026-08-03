@@ -2222,8 +2222,26 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               ...(hasAlbums ? [['albums', 'Album groupings']] : []),
               ...(hasCovers ? [['covers', 'Covers']] : []),
             ];
+            const totalDurationMs = allSongsFlat.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+            const distinctAlbums = new Set(allSongsFlat.filter(s => typeof s === 'object' && s?.albumName).map(s => s.albumName)).size;
+            const formatDuration = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m`; };
+            const setlistStats = [
+              allSongsFlat.length > 0 ? { label: 'Songs', value: allSongsFlat.length } : null,
+              totalDurationMs > 0 ? { label: 'Length', value: formatDuration(totalDurationMs) } : null,
+              distinctAlbums > 1 ? { label: 'Albums', value: distinctAlbums } : null,
+            ].filter(Boolean);
             return (
               <div style={detailCard}>
+                {setlistStats.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${setlistStats.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
+                    {setlistStats.map(({ label, value }) => (
+                      <div key={label} style={{ background: '#0e0e1a', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{value}</div>
+                        <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, position: 'relative' }}>
                   {sec("Setlist")}
                   <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>

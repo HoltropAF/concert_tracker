@@ -89,7 +89,11 @@ function parseSetlistUrl(rawUrl) {
 }
 
 function parseSongs(html) {
-  const strip = s => s.replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
+  const strip = s => s.replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0*39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(code)) // any other numeric entity, e.g. &#039;
+    .trim();
   const songs = [];
 
   // setlist.fm marks section breaks (Encore, Encore 2, Act I, etc.) with their

@@ -2271,13 +2271,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 </div>
                 {(() => {
                   const formatMs = ms => { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; };
-                  // A partial sum (e.g. 3 of 31 songs Spotify-matched) is actively
-                  // misleading if presented as the real length — mark it as a lower
-                  // bound ("20m+") rather than showing a tiny wrong number as fact.
+                  // A partial sum is only useful as a lower bound if most of the show
+                  // is actually accounted for — 2 of 30 songs Spotify-matched gives a
+                  // number ("8m+") so far off it's more misleading than no number at
+                  // all, even with the "+". Below ~60% coverage, just omit it.
                   const msFor = list => {
                     const withDuration = list.filter(song => typeof song === 'object' && song?.durationMs);
                     const ms = withDuration.reduce((s, song) => s + song.durationMs, 0);
-                    return { ms, complete: list.length > 0 && withDuration.length === list.length };
+                    const coverage = list.length > 0 ? withDuration.length / list.length : 0;
+                    return { ms, complete: coverage === 1, usable: coverage >= 0.6 };
                   };
                   const totalMs = msFor(countableSongsFlat);
                   const tiles = performers.length > 1
@@ -2285,12 +2287,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                         { label: 'Songs', value: countableSongsFlat.length },
                         ...performers
                           .map(p => ({ label: p.name, ...msFor(p.songs.filter(s => !isIntroSong(s))) }))
-                          .filter(p => p.ms > 0)
+                          .filter(p => p.ms > 0 && p.usable)
                           .map(p => ({ label: p.label, value: formatMs(p.ms) + (p.complete ? '' : '+') })),
                       ]
                     : [
                         { label: 'Songs', value: countableSongsFlat.length },
-                        ...(totalMs.ms > 0 ? [{ label: 'Length', value: formatMs(totalMs.ms) + (totalMs.complete ? '' : '+') }] : []),
+                        ...(totalMs.ms > 0 && totalMs.usable ? [{ label: 'Length', value: formatMs(totalMs.ms) + (totalMs.complete ? '' : '+') }] : []),
                       ];
                   return tiles.length > 1 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 8, marginBottom: 14 }}>

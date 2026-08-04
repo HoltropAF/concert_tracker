@@ -1560,7 +1560,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   // (light mode + accent theme both apply hue-shifting CSS filters, so a
                   // fixed hex chosen for the raw dark theme can render completely wrong).
                   const compensate = colorForDisplayFilter(settings);
-                  const targetColors = { ments: '#4a4870', surprise: '#b91c1c', encore: '#facc15', other: '#8b7fb0' };
+                  // Encore and Surprise/Acoustic-Session are the same kind of segment
+                  // conceptually — the low-key, crowd-interactive part of the show that
+                  // often contains the rotating/surprise songs — so they share one color.
+                  const targetColors = { ments: '#4a4870', surprise: '#b91c1c', encore: '#b91c1c', other: '#8b7fb0' };
                   const color = compensate(targetColors[cat] || targetColors.other);
                   // One consistent treatment for every kind of section header — bold
                   // word, no lines, in the display font (Syne) so it reads as a header

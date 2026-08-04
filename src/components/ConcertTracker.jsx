@@ -298,6 +298,81 @@ const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null)
 const getSongFeat = s => typeof s === 'string' || !s ? null : (s.feat || null); // guest who joined for this one song
 const getSongVaries = s => typeof s === 'string' || !s ? false : !!s.varies; // song changes every night, regardless of encore status
 const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
+// --- Color math for the display filter ---
+// The app's light-mode + color-theme system works by applying a CSS `filter`
+// (invert + hue-rotate combinations) over the whole dark-themed UI, rather than
+// swapping to a separate light palette. That means a color chosen to look right
+// in the raw dark theme can render completely differently once the filter hits
+// it — e.g. a dark red can come out looking pink. Rather than guessing fixed
+// replacement colors (which only happens to work for one specific light/theme
+// combination), these helpers compute the actual filter math so we can solve
+// for "what source color, after the user's current filter, looks like X".
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+}
+function rgbToHex([r, g, b]) {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+function invertRGB([r, g, b]) { return [255 - r, 255 - g, 255 - b]; }
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      default: h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+  return [h, s, l];
+}
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return [r * 255, g * 255, b * 255];
+}
+function hueRotateRGB([r, g, b], deg) {
+  const [h, s, l] = rgbToHsl(r, g, b);
+  let nh = (h + deg / 360) % 1;
+  if (nh < 0) nh += 1;
+  return hslToRgb(nh, s, l);
+}
+// Given a settings object, returns a function that maps a "target dark-theme
+// color" to the source color that will actually render as that target once
+// the user's current light-mode/theme filter is applied.
+const THEME_HUE_ROTATE = { purple: 0, blue: -50, green: -145, red: 90, orange: 130 }; // degrees; mono uses grayscale, not invertible meaningfully
+function colorForDisplayFilter(settings) {
+  const lightMode = !!settings.lightMode;
+  const themeDeg = THEME_HUE_ROTATE[settings.colorTheme] ?? 0;
+  const isMono = settings.colorTheme === 'mono';
+  return targetHex => {
+    if (isMono) return targetHex; // grayscale destroys hue info either way, nothing to pre-compensate
+    if (!lightMode && !themeDeg) return targetHex; // no filter active, no compensation needed
+    let c = hexToRgb(targetHex);
+    if (themeDeg) c = hueRotateRGB(c, -themeDeg);
+    if (lightMode) { c = hueRotateRGB(c, -180); c = invertRGB(c); }
+    return rgbToHex(c);
+  };
+}
+
 const getSongSectionLabel = s => typeof s === 'string' || !s ? null : (s.sectionLabel || null); // e.g. "ENCORE", "ENCORE 2" — labels just this divider, doesn't imply anything about later songs
 const getSongSectionCategory = s => typeof s === 'string' || !s ? null : (s.sectionCategory || null); // manual override, e.g. so "Acoustic Session" can be styled as a surprise/secret moment
 // Buckets a section label into a filterable category, so "hide ments" doesn't also hide "encore".
@@ -1480,16 +1555,14 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 {sectionLabel && sectionLabel !== SECTION_END && (!readOnly || setlistView[sectionLabelCategory(sectionLabel, sectionCategoryOverride)] !== false) && (() => {
                   const cat = sectionLabelCategory(sectionLabel, sectionCategoryOverride);
                   const niceLabel = sectionLabel.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                  // Light mode isn't a separate palette — it's a global CSS filter
-                  // (invert + hue-rotate) over the dark theme, which does NOT preserve
-                  // colors predictably. A dark red rendered straight would come out
-                  // looking pink once the filter hits it. These are the pre-filter
-                  // source colors that resolve to the intended dark-theme color after
-                  // the filter is applied, computed directly from the filter math.
-                  const colorsByMode = settings.lightMode
-                    ? { ments: '#918fb7', surprise: '#e34646', encore: '#eabc05', other: '#5b4f80' }
-                    : { ments: '#4a4870', surprise: '#b91c1c', encore: '#facc15', other: '#8b7fb0' };
-                  const color = colorsByMode[cat] || colorsByMode.other;
+                  // These are the intended colors as they should actually LOOK, regardless
+                  // of light mode or color theme — compensate() computes the real source
+                  // color needed so it renders correctly after the user's active filter
+                  // (light mode + accent theme both apply hue-shifting CSS filters, so a
+                  // fixed hex chosen for the raw dark theme can render completely wrong).
+                  const compensate = colorForDisplayFilter(settings);
+                  const targetColors = { ments: '#4a4870', surprise: '#b91c1c', encore: '#facc15', other: '#8b7fb0' };
+                  const color = compensate(targetColors[cat] || targetColors.other);
                   // One consistent treatment for every kind of section header — bold
                   // word, no lines, in the display font (Syne) so it reads as a header
                   // rather than blending into the DM Sans song names below it.

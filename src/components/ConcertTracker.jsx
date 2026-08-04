@@ -361,10 +361,9 @@ function hueRotateRGB([r, g, b], deg) {
 const THEME_HUE_ROTATE = { purple: 0, blue: -50, green: -145, red: 90, orange: 130 }; // degrees; mono uses grayscale, not invertible meaningfully
 function colorForDisplayFilter(settings) {
   const lightMode = !!settings.lightMode;
-  const themeDeg = THEME_HUE_ROTATE[settings.colorTheme] ?? 0;
   const isMono = settings.colorTheme === 'mono';
+  const themeDeg = isMono ? 0 : (THEME_HUE_ROTATE[settings.colorTheme] ?? 0); // hue is meaningless under grayscale, but lightMode's lightness-flip still needs compensating
   return targetHex => {
-    if (isMono) return targetHex; // grayscale destroys hue info either way, nothing to pre-compensate
     if (!lightMode && !themeDeg) return targetHex; // no filter active, no compensation needed
     let c = hexToRgb(targetHex);
     if (themeDeg) c = hueRotateRGB(c, -themeDeg);

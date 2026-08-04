@@ -7497,7 +7497,11 @@ function PreferenceBlock({ label, sub, value, options, onChange, isLast = false,
             border: `1.5px solid ${value === o.id ? "#a78bfa" : "#2e2e48"}`,
             fontWeight: value === o.id ? 700 : 500, fontFamily: "'DM Sans', sans-serif",
             flex: compact ? "1 1 0" : "0 0 auto", minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>{o.label}</button>
+            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}>
+            {o.color && <span style={{ width: 10, height: 10, borderRadius: "50%", background: o.color, flexShrink: 0, border: value === o.id ? "1px solid #0c0c14" : "1px solid rgba(255,255,255,0.15)" }} />}
+            {o.label}
+          </button>
         ))}
       </div>
     </div>
@@ -8305,11 +8309,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
             <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); onUpdate("artistSectionsDefaultOpen", checked); }} />
           </SettingsRow>
-          <SettingsRow label="Setlist 'knew it' markers" sub="Mark songs you knew beforehand vs discovered live">
-            <SettingsToggle checked={local.showKnownMarkers || false} onChange={checked => { lUpdate("showKnownMarkers", checked); onUpdate("showKnownMarkers", checked); }} />
-          </SettingsRow>
           <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); onUpdate("artistGalleryStyle", v); }} compact />
-          <PreferenceBlock label="Accent color" sub="The app's primary highlight color" value={local.accentColor || 'violet'} options={Object.entries(ACCENT_PRESETS).map(([id, p]) => ({ id, label: p.label }))} onChange={v => { lUpdate("accentColor", v); onUpdate("accentColor", v); }} compact />
           <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast compact />
         </SettingsSection>
 
@@ -8359,19 +8359,61 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); onUpdate("topSongsRows", v); }} isLast />
         </SettingsSection>
 
-        <SettingsSection title="App" icon="sliders">
+        <SettingsSection title="Colors" icon="sliders">
           <PreferenceBlock
-            label="Appearance" sub="Same color theme, flipped background/text"
+            label="Appearance" sub="Same colors, flipped background/text"
             value={local.lightMode ? 'light' : 'dark'}
             options={[{id:'dark',label:'Dark'},{id:'light',label:'Light'}]}
             onChange={v => { const val = v === 'light'; onUpdate('lightMode', val); lUpdate('lightMode', val); }}
           />
           <PreferenceBlock
-            label="Color theme" sub="Changes instantly, no save needed"
-            value={local.colorTheme || 'purple'}
-            options={[{id:'purple',label:'Purple'},{id:'blue',label:'Blue'},{id:'green',label:'Green'},{id:'red',label:'Red'},{id:'orange',label:'Orange'},{id:'mono',label:'Mono'}]}
-            onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
+            label="Highlight color" sub="Buttons, active tabs, and small accents only"
+            value={local.accentColor || 'violet'}
+            options={Object.entries(ACCENT_PRESETS).map(([id, p]) => ({ id, label: p.label, color: p.hex }))}
+            onChange={v => { lUpdate("accentColor", v); onUpdate("accentColor", v); }}
           />
+          <PreferenceBlock
+            label="App color mode" sub="Recolors the whole app at once — different from Highlight color above"
+            value={local.colorTheme || 'purple'}
+            options={[
+              {id:'purple',label:'Purple',color:'#a78bfa'},{id:'blue',label:'Blue',color:'#38bdf8'},{id:'green',label:'Green',color:'#34d399'},
+              {id:'red',label:'Red',color:'#f87171'},{id:'orange',label:'Orange',color:'#fb923c'},{id:'mono',label:'Mono',color:'#9ca3af'},
+            ]}
+            onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
+            isLast
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Setlist" icon="list">
+          <SettingsRow label="Known vs. discovered live" sub="✓ / ✨ markers on individual songs">
+            <SettingsToggle checked={local.showKnownMarkers || false} onChange={checked => { lUpdate("showKnownMarkers", checked); onUpdate("showKnownMarkers", checked); }} />
+          </SettingsRow>
+          <PreferenceBlock
+            label="Default sort" sub="When opening any show's Setlist tab"
+            value={local.setlistSort || 'night'}
+            options={[{ id: 'night', label: 'Order of the night' }, { id: 'album', label: 'By album' }]}
+            onChange={v => { lUpdate('setlistSort', v); onUpdate('setlistSort', v); }}
+          />
+          <div style={{ padding: "14px 2px 4px" }}>
+            <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: 2 }}>Default filters shown</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Surprise/secret songs are always shown, not offered as a filter</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {[['notes','Notes'],['ments','Ments'],['encore','Encore'],['headers','Era headers'],['albums','Albums'],['covers','Covers']].map(([key, label]) => {
+                const view = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(local.setlistView || {}) };
+                const on = view[key] !== false;
+                return (
+                  <button key={key} onClick={() => { const next = { ...view, [key]: !on }; lUpdate('setlistView', next); onUpdate('setlistView', next); }} style={{
+                    padding: "6px 12px", borderRadius: 99, fontSize: 12, cursor: "pointer",
+                    background: on ? "#a78bfa" : "transparent", color: on ? "#0c0c14" : "#c4c2f0",
+                    border: `1.5px solid ${on ? "#a78bfa" : "#2e2e48"}`, fontWeight: on ? 700 : 500, fontFamily: "'DM Sans', sans-serif",
+                  }}>{label}</button>
+                );
+              })}
+            </div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="App" icon="sliders">
           <PreferenceBlock label="Rating system" sub="Existing ratings are converted automatically" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={handleRatingSystemChange} />
           <SettingsRow label="Default country" sub="Pre-filled when adding a show">
             <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />

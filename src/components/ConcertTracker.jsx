@@ -7658,6 +7658,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [newVenueSize, setNewVenueSize] = useState("");
   const [newTicketType, setNewTicketType] = useState("");
   const [newTicketAddon, setNewTicketAddon] = useState("");
+  const [newOtherCost, setNewOtherCost] = useState("");
   const [newVenue, setNewVenue] = useState({ name: '', city: '', country: '', room: '' });
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupFriends, setNewGroupFriends] = useState([]);
@@ -7842,6 +7843,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const removeTicketType = (t) => lUpdate("ticketTypes", ticketTypes.filter(x => x !== t));
   const addTicketAddon = () => { const t = newTicketAddon.trim(); if (!t || ticketAddons.includes(t)) return; lUpdate("ticketAddons", [...ticketAddons, t]); setNewTicketAddon(""); };
   const removeTicketAddon = (t) => lUpdate("ticketAddons", ticketAddons.filter(x => x !== t));
+  const otherCostCategories = local.otherCostCategories || ["Transport", "Food & drinks", "Hotel", "Parking", "Merch (other)", "Other"];
+  const addOtherCostCategory = () => { const t = newOtherCost.trim(); if (!t || otherCostCategories.map(c=>c.toLowerCase()).includes(t.toLowerCase())) return; lUpdate("otherCostCategories", [...otherCostCategories, t]); setNewOtherCost(""); };
+  const removeOtherCostCategory = (t) => lUpdate("otherCostCategories", otherCostCategories.filter(x => x !== t));
 
   const savedVenues = local.savedVenues || [];
   const addSavedVenue = () => {
@@ -8434,7 +8438,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         { label: "Subgenres", id: "subgenres", icon: "tag", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
         { label: "Languages", id: "languages", icon: "online", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
         { label: "Venue sizes", id: "venueSizes", icon: "layout", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
-        { label: "Merch items", id: "merch", icon: "card", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        { label: "Merch categories", id: "merch", icon: "card", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
+        { label: "Other cost categories", id: "otherCosts", icon: "card", items: otherCostCategories, onRemove: removeOtherCostCategory, input: newOtherCost, onInput: setNewOtherCost, onAdd: addOtherCostCategory, placeholder: "Add cost category..." },
         { label: "Ticket types", id: "ticketTypes", icon: "list", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
         { label: "Ticket add-ons", id: "ticketAddons", icon: "list", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
       ].map(({ label, id, icon, items, ...props }) => (

@@ -4187,8 +4187,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   const [merging, setMerging] = useState(false);
   const [showHistoryShare, setShowHistoryShare] = useState(false);
   const historyShareRef = useRef(null);
+  const [friendTab, setFriendTab] = useState('overview');
   // * Everything above is scoped to whoever is open, so it all resets on the way in.
-  useEffect(() => { setHistoryFilter('all'); setMergeTarget(null); setShowHistoryShare(false); }, [selectedFriend]);
+  useEffect(() => { setHistoryFilter('all'); setMergeTarget(null); setShowHistoryShare(false); setFriendTab('overview'); }, [selectedFriend]);
 
   const friendProfiles = settings.friendProfiles || {};
   const getProfile = name => friendProfiles[name] || {};
@@ -4345,6 +4346,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
       : f.firstShow ? f.firstShow.date.slice(0,4) : '';
     const sectionLabel = { fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 };
     const card = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
+    const iconBtn = { width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", cursor: "pointer", padding: 0, flexShrink: 0 };
 
     return (
       <div className={friendExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedFriend} style={{ padding: "0 0 100px" }}>
@@ -4428,10 +4430,14 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </div>
         )}
 
-        <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px" }}>←</button>
+        {/* Text buttons here cost ~110px of a ~448px row and pushed the since-line
+            into a three-line wrap. As icons they cost ~62px, which buys the text
+            column back — so they stay on the header row rather than below it. */}
+        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1f1f35" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px", flexShrink: 0 }}>←</button>
           <FriendAvatar name={displayName(f.name)} size={44} />
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
@@ -4451,13 +4457,15 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                 spanYears >= 1 ? `${spanYears} year${spanYears !== 1 ? 's' : ''}` : null,
                 distinctVenues > 0 ? `${distinctVenues} venue${distinctVenues !== 1 ? 's' : ''}` : null,
                 distinctCountries > 1 ? `${distinctCountries} countries` : null,
-                avgR ? `★ ${avgR} avg` : null,
               ].filter(Boolean).join(' · ');
               const duoCount = f.shows.filter(c => getFriends(c).filter(n => n !== f.name).length === 0).length;
               return (
                 <DetailSubtitle lines={[
                   `${f.shows.length} show${f.shows.length !== 1 ? 's' : ''} together${duoCount > 0 ? ` · ${duoCount} just you two` : ''}`,
                   f.firstShow ? `since ${new Date(f.firstShow.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}${since ? ` · ${since}` : ''}` : yearSpan,
+                  // * Rating on its own line — appended to the since-line it was the
+                  // * thing that tipped it into wrapping.
+                  avgR ? `★ ${avgR} average together` : null,
                   profile.contact,
                   profile.note,
                 ]} />
@@ -4466,10 +4474,45 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </div>
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             {f.shows.length > 0 && (
-              <button onClick={() => setShowHistoryShare(true)} title="Share your history together" style={{ background: "none", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
+              <button onClick={() => setShowHistoryShare(true)} title="Share your history together" aria-label="Share your history together" style={iconBtn}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                  <line x1="8.6" y1="10.6" x2="15.4" y2="6.4" /><line x1="8.6" y1="13.4" x2="15.4" y2="17.6" />
+                </svg>
+              </button>
             )}
-            <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Edit</button>
+            <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} title="Edit profile" aria-label="Edit profile" style={iconBtn}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </button>
           </div>
+          </div>
+        </div>
+
+        {/* Tabs — same shape as a show's General / Financial / Setlist. Overview
+            leads because it's the summary; History is the long read. */}
+        <div style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid #1f1f35" }}>
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'history', label: 'History', count: f.sortedShows.length || null },
+            { id: 'photos', label: 'Photos', count: f.shows.filter(c => c.photo).length || null },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setFriendTab(t.id)}
+              style={{
+                flex: 1, background: "none", border: "none", cursor: "pointer",
+                padding: "10px 0 9px", marginBottom: -1,
+                borderBottom: `2px solid ${friendTab === t.id ? "var(--accent)" : "transparent"}`,
+                color: friendTab === t.id ? "var(--accent)" : "#6b6a8f",
+                fontWeight: friendTab === t.id ? 700 : 400,
+                fontSize: 11.5, fontFamily: "'DM Mono', monospace",
+              }}
+            >
+              {t.label}{t.count ? ` ${t.count}` : ''}
+            </button>
+          ))}
         </div>
 
         {/* ── Send the history ────────────────────────────────────────────
@@ -4555,9 +4598,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           );
         })()}
 
-        {/* On this day — the only thing on this page that turns up uninvited.
+        {/* On this day — lives on Overview so it's seen without choosing a tab.
             Matches on month + day, so it surfaces a handful of times a year. */}
-        {(() => {
+        {friendTab === 'overview' && (() => {
           const now = new Date();
           const mmdd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
           const hits = f.shows.filter(c => c.date.slice(5) === mmdd && c.date.slice(0, 4) !== String(now.getFullYear()));
@@ -4589,7 +4632,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             end. Replaces the old "Photos together" strip, the collapsed "All shows
             together" list and the separate "Upcoming together" block: each photo
             and each plan now sits in the night it belongs to. */}
-        {(f.sortedShows.length > 0 || f.upcoming.length > 0) && (() => {
+        {friendTab === 'history' && (f.sortedShows.length > 0 || f.upcoming.length > 0) && (() => {
           // * Built ascending, then flipped for display, so "first"/"latest"/gaps are
           // * all reasoned about in real time order regardless of which way it's shown.
           const matchesHistoryFilter = c => historyFilter === 'all'
@@ -4784,10 +4827,42 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           );
         })()}
 
+        {/* Photos tab — every night together that has a photo, as a grid. Same
+            tile treatment as the Memories wall, captioned so it isn't anonymous. */}
+        {friendTab === 'photos' && (() => {
+          const withPhotos = [...f.shows].filter(c => c.photo).sort((a, b) => b.date.localeCompare(a.date));
+          if (withPhotos.length === 0) {
+            return (
+              <EmptyState
+                icon="📷"
+                title="No photos together yet"
+                detail={`Add a photo to a show you were both at and it'll show up here.`}
+              />
+            );
+          }
+          return (
+            <div className="stagger-list" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, padding: "10px 10px 0" }}>
+              {withPhotos.map(c => (
+                <button key={c.id} onClick={() => onOpen && onOpen(c)} title={`${c.artist} · ${formatDate(c.date)}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative", display: "block" }}>
+                  <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4 }} />
+                  <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderRadius: "0 0 4px 4px", padding: "14px 6px 5px", textAlign: "left", background: "linear-gradient(to top, rgba(6,6,14,0.88), rgba(6,6,14,0))", pointerEvents: "none" }}>
+                    <div style={{ fontSize: 9, color: "#fff", fontFamily: "'DM Mono', monospace", lineHeight: 1.25 }}>
+                      {new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { month: "short" })} '{c.date.slice(2, 4)}
+                    </div>
+                    <div style={{ fontSize: 8.5, color: "rgba(255,255,255,0.62)", fontFamily: "'DM Mono', monospace", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.artist}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Nothing logged yet — a friend added by hand, or one whose only shows are
             still ahead. The stack of empty cards below would say nothing, so don't
             render it at all. */}
-        {f.shows.length === 0 && (
+        {friendTab !== 'photos' && f.shows.length === 0 && (
           <EmptyState
             icon="🎟"
             title={f.upcoming.length > 0 ? "Nothing together yet" : `No shows with ${displayName(f.name)} yet`}
@@ -4797,6 +4872,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           />
         )}
 
+        {friendTab === 'overview' && (
         <div style={{ padding: "16px 16px" }}>
           {/* Details */}
           {f.shows.length > 0 && (() => {
@@ -4804,11 +4880,21 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
             const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
             const topV = Object.entries(vCount).sort((a, b) => b[1] - a[1])[0];
+            // * Longest quiet stretch between two shows together — the same gaps the
+            // * History spine draws, reduced to the single biggest one.
+            let longestGap = null;
+            for (let i = 1; i < f.sortedShows.length; i++) {
+              const months = monthsBetween(f.sortedShows[i - 1].date, f.sortedShows[i].date);
+              if (!longestGap || months > longestGap.months) {
+                longestGap = { months, from: f.sortedShows[i - 1], to: f.sortedShows[i] };
+              }
+            }
             const rows = [
               f.firstShow && ["first together", `${formatDate(f.firstShow.date)} · ${f.firstShow.artist}`],
               f.lastShow && f.firstShow && f.lastShow.id !== f.firstShow.id && ["most recent", `${formatDate(f.lastShow.date)} · ${f.lastShow.artist}`],
               topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`],
               topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`],
+              longestGap && longestGap.months >= 6 && ["longest gap", `${formatGap(longestGap.months)} · ${longestGap.from.date.slice(0, 4)}–${longestGap.to.date.slice(0, 4)}`],
             ].filter(Boolean);
             if (rows.length === 0) return null;
             return (
@@ -4861,6 +4947,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
 
         </div>
+        )}
       </div>
     );
   }

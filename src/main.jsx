@@ -21,6 +21,8 @@ class RootErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[RootErrorBoundary] App crashed:', error, info)
+    // * The boot splash sits above #root, so it would hide this recovery screen.
+    document.getElementById('boot-splash')?.remove()
     this.setState({ errorMessage: error?.message || String(error) })
   }
 

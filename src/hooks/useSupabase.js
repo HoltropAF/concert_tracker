@@ -92,6 +92,47 @@ const normalizeSettings = (value) => {
 }
 
 // ============================================================
+// OFFLINE CACHE
+// * Concerts and settings are mirrored to localStorage per user so a returning
+// * visitor renders their real data on the first frame instead of staring at a
+// * splash until Supabase answers. The DB fetch still runs on every load and
+// * overwrites the cache — this is stale-while-revalidate, not a source of truth.
+// ============================================================
+
+const cacheKey = (name, userId) => `cache_v1:${name}:${userId}`
+
+function readCache(name, userId) {
+  if (!userId) return null
+  try {
+    const raw = localStorage.getItem(cacheKey(name, userId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function writeCache(name, userId, value) {
+  if (!userId) return
+  try {
+    localStorage.setItem(cacheKey(name, userId), JSON.stringify(value))
+  } catch {
+    // * Quota exceeded (a big library with setlists can outgrow the 5MB budget).
+    // * Drop the stale entry so we don't keep serving something we can't refresh.
+    try { localStorage.removeItem(cacheKey(name, userId)) } catch { /* nothing left to do */ }
+  }
+}
+
+// * Called on sign-out so the next account doesn't inherit anything.
+function clearCaches() {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('cache_v1:'))
+      .forEach(k => localStorage.removeItem(k))
+    localStorage.removeItem('splash_counts')
+  } catch { /* best effort */ }
+}
+
+// ============================================================
 // HOOKS
 // ============================================================
 
@@ -141,7 +182,10 @@ export function useAuth() {
     return { error }
   }
 
-  const signOut = () => isSupabaseConfigured ? supabase.auth.signOut() : Promise.resolve()
+  const signOut = () => {
+    clearCaches()
+    return isSupabaseConfigured ? supabase.auth.signOut() : Promise.resolve()
+  }
 
   return { user, loading, signIn, signOut, dbSleeping }
 }
@@ -152,8 +196,23 @@ export function useConcerts(userId) {
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) return
+    // * Paint whatever we cached last time straight away, then revalidate against
+    // * the DB in the background. Without this, every cold start blocks on a
+    // * network round-trip before a single row can be rendered.
+    const cached = readCache('concerts', userId)
+    if (Array.isArray(cached)) {
+      setConcerts(cached.map(c => normalizeConcert(c)))
+      setLoaded(true)
+    }
     loadConcerts()
   }, [userId])
+
+  // * Mirror every state change (load, optimistic save, delete, rollback) into the
+  // * cache, so one write site covers all of them.
+  useEffect(() => {
+    if (!userId || !loaded) return
+    writeCache('concerts', userId, concerts)
+  }, [userId, loaded, concerts])
 
   const loadConcerts = async () => {
     if (!isSupabaseConfigured || !userId) return
@@ -247,11 +306,24 @@ export function useConcerts(userId) {
 
 export function useSettings(userId) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  // * Distinguishes "these are still the defaults" from "these are really yours".
+  // * Deliberately NOT used to block rendering — only to defer decisions that
+  // * would be wrong under defaults, like whether to show the onboarding tour.
+  const [loaded, setLoaded] = useState(false)
   // * settingsRef keeps a sync copy for use inside callbacks without stale-closure issues
   const settingsRef = useRef(DEFAULT_SETTINGS)
 
   useEffect(() => {
     if (!userId) return
+    // * Apply cached settings first — these drive the accent colour and light mode,
+    // * so waiting for the DB means booting in the wrong theme and then flashing.
+    const cached = readCache('settings', userId)
+    if (cached) {
+      const merged = normalizeSettings(cached)
+      settingsRef.current = merged
+      setSettings(merged)
+      setLoaded(true)
+    }
     supabase
       .from('settings')
       .select('data')
@@ -262,8 +334,13 @@ export function useSettings(userId) {
           const merged = normalizeSettings(data.data)
           settingsRef.current = merged
           setSettings(merged)
+          writeCache('settings', userId, merged)
         }
+        setLoaded(true)
       })
+      // * No settings row yet (first login) is a normal outcome, not a failure —
+      // * the defaults already in state are the right answer.
+      .catch(() => setLoaded(true))
   }, [userId])
 
   const saveSettings = useCallback(async (next) => {
@@ -271,11 +348,13 @@ export function useSettings(userId) {
     const previous = settingsRef.current
     settingsRef.current = next
     setSettings(next)
+    writeCache('settings', userId, next)
     const { error } = await supabase.from('settings').upsert({ user_id: userId, data: next, updated_at: new Date().toISOString() })
     if (error) {
       console.error('Error saving settings:', error)
       settingsRef.current = previous
       setSettings(previous)
+      writeCache('settings', userId, previous)
       return { error }
     }
     return { error: null }
@@ -285,5 +364,5 @@ export function useSettings(userId) {
     return saveSettings({ ...settingsRef.current, [key]: value })
   }, [saveSettings])
 
-  return { settings, saveSetting, saveSettings }
+  return { settings, settingsLoaded: loaded, saveSetting, saveSettings }
 }

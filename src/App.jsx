@@ -11,14 +11,14 @@ const SWUpdateBanner = lazy(() =>
   import('./components/SWUpdateBanner').catch(() => ({ default: () => null }))
 )
 
-// * Reads cached concert counts from localStorage so the loading splash can show
-// * meaningful stats before the DB responds on subsequent visits.
-function readSplashCounts() {
-  try {
-    return JSON.parse(localStorage.getItem('splash_counts') || 'null')
-  } catch {
-    return null
-  }
+// * The app has exactly one loading screen and it lives in index.html, so it can
+// * paint before any JS runs. This tears it down once real UI is on screen.
+// * Idempotent — safe to call on every render pass.
+function hideBootSplash() {
+  const el = document.getElementById('boot-splash')
+  if (!el || el.classList.contains('is-hiding')) return
+  el.classList.add('is-hiding')
+  setTimeout(() => el.remove(), 320)
 }
 
 // ============================================================
@@ -39,6 +39,8 @@ class AppErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('App render error:', error, info)
+    // * The boot splash sits above #root, so it would hide this recovery screen.
+    document.getElementById('boot-splash')?.remove()
   }
 
   render() {
@@ -72,25 +74,6 @@ function InstallBanner({ onInstall, onDismiss }) {
       </div>
       <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>×</button>
       <button onClick={onInstall} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 14px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Install</button>
-    </div>
-  )
-}
-
-function LoadingSplash({ label, counts = null }) {
-  return (
-    <div style={{ minHeight: '100vh', background: '#0c0c14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', boxSizing: 'border-box' }}>
-      <div style={{ textAlign: 'center', maxWidth: 340, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ width: 112, height: 112, borderRadius: 28, background: '#13131f', border: '1px solid #272544', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 22px 50px rgba(0,0,0,0.45), 0 0 44px rgba(167,139,250,0.18), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-          <img src="/icon-192.png" alt="" style={{ width: 88, height: 88, borderRadius: 22, display: 'block' }} />
-        </div>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 29, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
-        {counts && (
-          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginBottom: 18 }}>
-            {counts.concerts} concerts · {counts.festivals} festivals · {counts.upcoming} upcoming
-          </div>
-        )}
-        <div style={{ minHeight: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', borderRadius: 99, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.22)', color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{label}</div>
-      </div>
     </div>
   )
 }
@@ -167,7 +150,6 @@ export default function App() {
   const [showBanner, setShowBanner] = useState(false)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
   const [setupBannerDismissed, setSetupBannerDismissed] = useState(false)
-  const [splashCounts, setSplashCounts] = useState(() => readSplashCounts())
   const [pendingSpotifyExchange, setPendingSpotifyExchange] = useState(null)
 
   // * All custom hooks must be declared before any useEffect that references their
@@ -176,7 +158,7 @@ export default function App() {
   const guest = useGuestMode()
   const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
   const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
-  const { settings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
+  const { settings, settingsLoaded, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
 
   // * Detect a Spotify OAuth callback (?code=…) on every fresh page load.
   // * Reads the code verifier + client ID from sessionStorage (written by startSpotifyAuth
@@ -206,8 +188,11 @@ export default function App() {
   // * Exchange the Spotify code for tokens once the user is authenticated and
   // * settings are loaded. Saves clientId + tokens together so they're always
   // * in sync (handles the case where the user hadn't saved Settings manually).
+  // ! Must gate on settingsLoaded, not on concerts being loaded: this spreads
+  // ! `settings` into a full overwrite, so running it while settings are still
+  // ! DEFAULT_SETTINGS would wipe every real preference the user has.
   useEffect(() => {
-    if (!pendingSpotifyExchange || !user || !loaded) return
+    if (!pendingSpotifyExchange || !user || !settingsLoaded) return
     const { code, verifier, clientId } = pendingSpotifyExchange
     setPendingSpotifyExchange(null)
     exchangeCodeForTokens(code, verifier, clientId)
@@ -219,7 +204,12 @@ export default function App() {
         spotifyTokenExpiry: Date.now() + data.expires_in * 1000,
       }))
       .catch(err => console.error('Spotify token exchange failed:', err))
-  }, [pendingSpotifyExchange, user, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingSpotifyExchange, user, settingsLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // * Tells the emergency fallback in index.html that React is alive. It used to
+  // * infer that from #root having children, which no longer holds: while booting
+  // * we render nothing and let the HTML splash stay up.
+  useEffect(() => { window.__appMounted = true }, [])
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }
@@ -235,7 +225,8 @@ export default function App() {
     setInstallPrompt(null); setShowBanner(false)
   }
 
-  // * Keep splash counts fresh after every load so the next visit shows current stats
+  // * Keep splash counts fresh after every load so the next visit's boot screen
+  // * (rendered from index.html, before React exists) shows current stats
   useEffect(() => {
     if (!loaded) return
     const counts = {
@@ -243,9 +234,17 @@ export default function App() {
       festivals: concerts.filter(c => c.type === 'festival' && !c.wishlist && new Date(c.date + 'T00:00:00') <= new Date()).length,
       upcoming: concerts.filter(c => !c.wishlist && new Date(c.date + 'T00:00:00') > new Date()).length,
     }
-    localStorage.setItem('splash_counts', JSON.stringify(counts))
-    setSplashCounts(counts)
+    try { localStorage.setItem('splash_counts', JSON.stringify(counts)) } catch { /* quota — counts are cosmetic */ }
   }, [loaded, concerts])
+
+  // * Everything below renders real UI, so the boot splash comes down as soon as
+  // * this flips false. Concerts are served from cache on a repeat visit, which
+  // * means `loaded` is already true and there is usually nothing to wait for.
+  const booting = !guestMode && (authLoading || (user && !loaded))
+
+  useEffect(() => {
+    if (!booting) hideBootSplash()
+  }, [booting])
 
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')
@@ -261,6 +260,9 @@ export default function App() {
   }
 
   const banner = showBanner && <InstallBanner onInstall={handleInstall} onDismiss={() => setShowBanner(false)} />
+
+  // * The boot splash in index.html is still covering the screen — nothing to render.
+  if (booting) return null
 
   if (guestMode) return (
     <>
@@ -295,6 +297,7 @@ export default function App() {
           onUpdateSettings={guest.saveSettings}
           onSignOut={exitGuest}
           userEmail="guest"
+          settingsLoaded
         />
       </AppErrorBoundary>
       {banner}
@@ -330,8 +333,6 @@ export default function App() {
     </div>
   )
 
-  if (authLoading || (user && !loaded)) return <><LoadingSplash label="loading..." counts={splashCounts} />{banner}</>
-
   if (!user) return <><AuthScreen onSignIn={signIn} onGuest={enterGuest} />{banner}</>
 
   return (
@@ -349,6 +350,7 @@ export default function App() {
           onUpdateSettings={saveSettings}
           onSignOut={signOut}
           userEmail={user.email}
+          settingsLoaded={settingsLoaded}
         />
       </AppErrorBoundary>
       {banner}

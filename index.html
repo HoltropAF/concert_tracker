@@ -12,18 +12,90 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+    <!-- Loaded non-render-blocking: as a plain stylesheet link this would gate first
+         paint on a third-party response. display=swap already handles the FOUT. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+    </noscript>
+
+    <!-- The app's one and only loading screen. Lives in the HTML so it paints on the
+         very first frame (no blank gap between the OS splash and React mounting), and
+         is torn out by hideBootSplash() in App.jsx the moment real UI is ready. -->
+    <style>
+      #boot-splash {
+        position: fixed; inset: 0; z-index: 9998;
+        background: #0c0c14;
+        display: flex; align-items: center; justify-content: center;
+        padding: 32px 24px; box-sizing: border-box;
+        transition: opacity 0.3s ease;
+      }
+      #boot-splash.is-hiding { opacity: 0; pointer-events: none; }
+      #boot-splash .bs-inner {
+        text-align: center; max-width: 340px; width: 100%;
+        display: flex; flex-direction: column; align-items: center;
+      }
+      #boot-splash .bs-tile {
+        width: 112px; height: 112px; border-radius: 28px;
+        background: #13131f; border: 1px solid #272544;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 18px;
+        box-shadow: 0 22px 50px rgba(0,0,0,0.45), 0 0 44px rgba(167,139,250,0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+        animation: bsBreathe 2.4s ease-in-out infinite;
+      }
+      #boot-splash .bs-tile img { width: 88px; height: 88px; border-radius: 22px; display: block; }
+      #boot-splash .bs-name {
+        font-family: 'Syne', sans-serif; font-size: 29px; font-weight: 800;
+        color: #e2e0ff; line-height: 1;
+      }
+      #boot-splash .bs-counts {
+        font-size: 10px; color: #5a5880; font-family: 'DM Mono', monospace;
+        margin-top: 8px; min-height: 13px;
+      }
+      @keyframes bsBreathe {
+        0%, 100% { transform: scale(1); box-shadow: 0 22px 50px rgba(0,0,0,0.45), 0 0 44px rgba(167,139,250,0.18), inset 0 1px 0 rgba(255,255,255,0.08); }
+        50% { transform: scale(1.035); box-shadow: 0 22px 50px rgba(0,0,0,0.45), 0 0 62px rgba(167,139,250,0.32), inset 0 1px 0 rgba(255,255,255,0.08); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash .bs-tile { animation: none; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-splash">
+      <div class="bs-inner">
+        <div class="bs-tile"><img src="/icon-192.png" alt="" /></div>
+        <div class="bs-name">concert tracker</div>
+        <div class="bs-counts" id="boot-counts"></div>
+      </div>
+    </div>
+    <script>
+      // Same cached stats the app writes after every load, so returning visitors see
+      // their real numbers immediately instead of an empty line.
+      try {
+        var _c = JSON.parse(localStorage.getItem('splash_counts') || 'null')
+        if (_c) {
+          document.getElementById('boot-counts').textContent =
+            _c.concerts + ' concerts · ' + _c.festivals + ' festivals · ' + _c.upcoming + ' upcoming'
+        }
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.jsx"></script>
     <!-- Emergency fallback: if JS fails to load (SW cache miss on a chunk), show a
          clear-cache button after 6 seconds so the user isn't stuck on a blank screen. -->
     <script>
       setTimeout(function () {
-        if (document.getElementById('root').children.length > 0) return
+        if (window.__appMounted || document.getElementById('root').children.length > 0) return
+        var bs = document.getElementById('boot-splash')
+        if (bs) bs.remove()
         var s = document.createElement('style')
-        s.textContent = '#_fb{position:fixed;inset:0;background:#0c0c14;display:flex;align-items:center;justify-content:center;font-family:sans-serif}#_fb div{max-width:320px;width:100%;background:#13131f;border:1px solid #f472b6;border-radius:12px;padding:24px;text-align:center}#_fb h2{color:#e2e0ff;font-size:18px;margin:0 0 10px}#_fb p{color:#6b6a8f;font-size:12px;line-height:1.6;margin:0 0 18px}#_fb button{display:block;width:100%;padding:12px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700;margin-bottom:8px}#_fb .p{background:#a78bfa;border:none;color:#0c0c14}#_fb .s{background:none;border:1px solid #2a2850;color:#6b6a8f}'
+        s.textContent = '#_fb{position:fixed;inset:0;z-index:9999;background:#0c0c14;display:flex;align-items:center;justify-content:center;font-family:sans-serif}#_fb div{max-width:320px;width:100%;background:#13131f;border:1px solid #f472b6;border-radius:12px;padding:24px;text-align:center}#_fb h2{color:#e2e0ff;font-size:18px;margin:0 0 10px}#_fb p{color:#6b6a8f;font-size:12px;line-height:1.6;margin:0 0 18px}#_fb button{display:block;width:100%;padding:12px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700;margin-bottom:8px}#_fb .p{background:#a78bfa;border:none;color:#0c0c14}#_fb .s{background:none;border:1px solid #2a2850;color:#6b6a8f}'
         document.head.appendChild(s)
         var d = document.createElement('div')
         d.id = '_fb'

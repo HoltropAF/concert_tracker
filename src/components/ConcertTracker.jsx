@@ -258,6 +258,26 @@ const formatDate = (dateStr) => {
 
 const getYear = (dateStr) => dateStr.slice(0, 4);
 
+// Whole months between two YYYY-MM-DD dates, order-independent. Counts calendar
+// months rather than dividing by an average month length, so "3 Aug → 3 Nov" is
+// exactly 3 and never 2 because of a short February.
+const monthsBetween = (a, b) => {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  let months = (by - ay) * 12 + (bm - am);
+  if (bd < ad) months -= 1;
+  return Math.abs(months);
+};
+
+// "19 months" up to two years, then "2y 7m" — a raw month count stops being
+// readable somewhere around the two-year mark.
+const formatGap = (months) => {
+  if (months < 24) return `${months} months`;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return m === 0 ? `${y} years` : `${y}y ${m}m`;
+};
+
 const today = new Date();
 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 const isPast = (dateStr) => dateStr < todayStr;
@@ -2030,14 +2050,17 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     return (
       <div onScroll={e => setHeaderElevated(e.currentTarget.scrollTop > 4)} style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
         {/* Header */}
-        <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: "sticky", top: 0, borderBottom: "1px solid #1e3028", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
+        {/* ! This panel is position:fixed inset:0, and the app runs standalone with a
+            ! translucent status bar — without the safe-area inset the Share/Edit
+            ! buttons sit underneath the clock and battery icons. */}
+        <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: "sticky", top: 0, borderBottom: "1px solid #1e3028", padding: "16px 20px", paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
+            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
-          <button onClick={() => { setReceiptTab('general'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
-          <button onClick={() => setEditing(true)} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Edit</button>
+          <button onClick={() => { setReceiptTab('general'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
+          <button onClick={() => setEditing(true)} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
         {/* Venue + tour hero */}
@@ -3117,7 +3140,7 @@ function Collapsible({ title, icon, defaultOpen = true, children, open: controll
   );
 }
 
-function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, onSaveConcert = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, hideTabs = false, fillHeight = false }) {
+function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, onSaveConcert = () => {}, onSaveConcertQuiet = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, onNotify = () => {}, hideTabs = false, fillHeight = false }) {
   const {
     topArtistsRows = 6, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -4124,19 +4147,31 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         </div>
       )}
-      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} onBackToSummary={() => setStatsTab("summary")} />}
+      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} onSaveConcertQuiet={onSaveConcertQuiet} onNotify={onNotify} onBackToSummary={() => setStatsTab("summary")} />}
       </>}
     </div>
   );
 }
 
-function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackToSummary = () => {} }) {
+// * onSaveConcertQuiet is the raw save, not ConcertTracker's handleSave wrapper —
+// * the merge writes one show at a time, and handleSave toasts and opens the concert
+// * detail on every call, which would fire once per show mid-merge.
+function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveConcertQuiet = () => {}, onNotify = () => {}, onBackToSummary = () => {} }) {
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [sortDir, setSortDir] = useState('desc');
   const [compact, setCompact] = useState(!!settings.friendsCompactView);
   useEffect(() => { setCompact(!!settings.friendsCompactView); }, [settings.friendsCompactView]);
+  // * Photo size inside a friend's shared history. Saved like friendsCompactView
+  // * so it's one preference across every friend, not per-page state.
+  const [timelineCompact, setTimelineCompact] = useState(!!settings.friendTimelineCompact);
+  useEffect(() => { setTimelineCompact(!!settings.friendTimelineCompact); }, [settings.friendTimelineCompact]);
+  // * Defaults to oldest-first: this page is a history, and a history reads forward.
+  // * The rest of the app is newest-first, so the toggle is there for anyone who
+  // * wants it to match.
+  const [newestFirst, setNewestFirst] = useState(!!settings.friendTimelineNewestFirst);
+  useEffect(() => { setNewestFirst(!!settings.friendTimelineNewestFirst); }, [settings.friendTimelineNewestFirst]);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showFriendFilters, setShowFriendFilters] = useState(false);
   const [filterMinTogether, setFilterMinTogether] = useState(0);
@@ -4145,8 +4180,15 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
   const [addFriendInput, setAddFriendInput] = useState('');
   const [editingProfile, setEditingProfile] = useState(null); // { name, nickname, contact, note }
   const [filterType, setFilterType] = useState('all');
-  const [showAllTogether, setShowAllTogether] = useState(false);
-  useEffect(() => { setShowAllTogether(false); }, [selectedFriend]);
+  // * Narrows the shared-history spine. Deliberately not persisted — a filter you
+  // * forgot you left on would silently hide history the next time you open someone.
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const [mergeTarget, setMergeTarget] = useState(null); // '' once open, then the chosen name
+  const [merging, setMerging] = useState(false);
+  const [showHistoryShare, setShowHistoryShare] = useState(false);
+  const historyShareRef = useRef(null);
+  // * Everything above is scoped to whoever is open, so it all resets on the way in.
+  useEffect(() => { setHistoryFilter('all'); setMergeTarget(null); setShowHistoryShare(false); }, [selectedFriend]);
 
   const friendProfiles = settings.friendProfiles || {};
   const getProfile = name => friendProfiles[name] || {};
@@ -4183,8 +4225,88 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
     const topArtists = Object.entries(artistCount).sort((a, b) => b[1] - a[1]);
     const concertCount = shows.filter(c => c.type === 'concert').length;
     const festivalCount = shows.filter(c => c.type === 'festival').length;
-    return { name, shows, sortedShows, firstShow, lastShow, upcoming, topGenres, topArtists, concertCount, festivalCount };
+    const byYear = {};
+    shows.forEach(c => { const y = c.date.slice(0, 4); byYear[y] = (byYear[y] || 0) + 1; });
+    return { name, shows, sortedShows, firstShow, lastShow, upcoming, topGenres, topArtists, concertCount, festivalCount, byYear };
   });
+
+  // * Shared x-axis for the crew ribbon and every per-friend bar row, so a bar in
+  // * one row sits under the same year as the bar above it. Capped at the most
+  // * recent 8 years — beyond that the bars get too thin to read on a phone.
+  const yearAxis = (() => {
+    const years = withFriends.map(c => +c.date.slice(0, 4)).filter(Boolean);
+    if (years.length === 0) return [];
+    const max = Math.max(...years);
+    const start = Math.max(Math.min(...years), max - 7);
+    return Array.from({ length: max - start + 1 }, (_, i) => String(start + i));
+  })();
+  const showsPerYear = yearAxis.map(y => withFriends.filter(c => c.date.slice(0, 4) === y).length);
+  const peakYear = Math.max(1, ...showsPerYear);
+
+  // * Folds one name into another everywhere it appears: on each affected show, and
+  // * across every settings map keyed by friend name. The surviving name's own
+  // * profile wins on conflict — merging shouldn't quietly overwrite it.
+  const mergeFriendInto = async (from, into) => {
+    if (!from || !into || from === into) return;
+    setMerging(true);
+    try {
+      const affected = concerts.filter(c => getFriends(c).includes(from));
+      for (const c of affected) {
+        const next = [...new Set(getFriends(c).map(n => (n === from ? into : n)))];
+        const result = await onSaveConcertQuiet({ ...c, friends: next });
+        if (result?.error) throw result.error;
+      }
+
+      const profiles = { ...(settings.friendProfiles || {}) };
+      if (profiles[from]) {
+        profiles[into] = { ...profiles[from], ...(profiles[into] || {}) };
+        delete profiles[from];
+        onUpdateSetting?.('friendProfiles', profiles);
+      }
+
+      const known = settings.knownFriends || [];
+      if (known.includes(from)) {
+        onUpdateSetting?.('knownFriends', known.filter(n => n !== from));
+      }
+
+      const groups = settings.friendGroups || [];
+      if (groups.some(g => (g.friends || []).includes(from))) {
+        onUpdateSetting?.('friendGroups', groups.map(g => ({
+          ...g,
+          friends: [...new Set((g.friends || []).map(n => (n === from ? into : n)))],
+        })));
+      }
+
+      setMergeTarget(null);
+      setEditingProfile(null);
+      setSelectedFriend(into);
+      onNotify(`Merged ${from} into ${into}`);
+    } catch (err) {
+      onNotify(err?.message || 'Could not merge — some shows may have been updated', 'error');
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  // * One friend's shows mapped onto yearAxis, scaled against their own busiest
+  // * year — the shape of their attendance, not their volume next to anyone else.
+  const YearBars = ({ byYear, height = 18, barWidth = 4 }) => {
+    if (yearAxis.length < 2) return null;
+    const counts = yearAxis.map(y => byYear[y] || 0);
+    const peak = Math.max(1, ...counts);
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height, flexShrink: 0 }} aria-hidden="true">
+        {counts.map((n, i) => (
+          <div key={yearAxis[i]} style={{
+            width: barWidth,
+            height: n === 0 ? 3 : Math.max(4, Math.round((n / peak) * height)),
+            borderRadius: 1,
+            background: n === 0 ? '#23223c' : 'var(--accent)',
+          }} />
+        ))}
+      </div>
+    );
+  };
 
   const activeFriendFilterCount = [filterMinTogether > 0, filterHasUpcoming].filter(Boolean).length;
   const filtered = friendEntries
@@ -4199,6 +4321,16 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
       if (sortBy === 'recent') return dir * ((b.lastShow?.date || '').localeCompare(a.lastShow?.date || ''));
       return 0;
     });
+
+  // * The podium only makes sense when the list is showing everyone in the default
+  // * order — under a search, a filter or another sort, "top 3" would be the top 3
+  // * of something the podium never explains. It also needs a real gap to be worth
+  // * the space, so it stays hidden until someone has been to 2+ shows with you.
+  const podiumEligible = !search && activeFriendFilterCount === 0 && filterType === 'all'
+    && sortBy === 'most-shows' && sortDir === 'desc'
+    && filtered.length >= 4 && (filtered[0]?.shows.length || 0) >= 2;
+  const podium = podiumEligible ? filtered.slice(0, 3) : [];
+  const listed = podiumEligible ? filtered.slice(3) : filtered;
 
   useBackButton(() => { if (selectedFriend) setSelectedFriend(null); else onBackToSummary(); }, true);
 
@@ -4243,6 +4375,55 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
                 saveProfile(f.name, editingProfile);
                 setEditingProfile(null);
               }} style={{ width: "100%", background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 14, fontWeight: 700, padding: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Save</button>
+
+              {/* Merge — the only cleanup tool in a list that's otherwise free text.
+                  "Sophie" and "Soph" are two friends today, each holding half a history. */}
+              {(() => {
+                const others = allFriends.filter(n => n !== f.name);
+                if (others.length === 0) return null;
+                if (mergeTarget === null) {
+                  return (
+                    <button onClick={() => setMergeTarget('')} style={{ width: "100%", background: "none", border: "none", color: "#4a4870", fontSize: 11, padding: "14px 0 0", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                      Same person as someone else? Merge →
+                    </button>
+                  );
+                }
+                const target = mergeTarget;
+                const affectedCount = target ? concerts.filter(c => getFriends(c).includes(f.name)).length : 0;
+                const targetTotal = target ? (friendEntries.find(e => e.name === target)?.shows.length || 0) : 0;
+                return (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #1f1f35" }}>
+                    <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>
+                      Merge "{displayName(f.name)}" into
+                    </div>
+                    <select
+                      value={target}
+                      onChange={e => setMergeTarget(e.target.value)}
+                      style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 11 }}
+                    >
+                      <option value="">Choose a friend…</option>
+                      {others.map(n => (
+                        <option key={n} value={n}>{displayName(n)}{displayName(n) !== n ? ` (${n})` : ''}</option>
+                      ))}
+                    </select>
+                    {target && (
+                      <div style={{ background: "#241a1a", border: "1px solid #4a2828", borderRadius: 8, padding: "9px 11px", fontSize: 11, color: "#f0a0a0", marginBottom: 11, lineHeight: 1.45 }}>
+                        {affectedCount} show{affectedCount !== 1 ? 's' : ''} tagged "{f.name}" will be re-tagged "{target}", who'll then have {targetTotal + affectedCount}. Notes and nicknames on "{f.name}" are kept only where "{target}" has none. This can't be undone.
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => setMergeTarget(null)} disabled={merging} style={{ flex: 1, background: "none", border: "1px solid #2e2e50", borderRadius: 10, color: "#6b6a8f", fontSize: 12, padding: "11px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Cancel</button>
+                      <button
+                        onClick={() => mergeFriendInto(f.name, target)}
+                        disabled={!target || merging}
+                        style={{ flex: 2, background: target && !merging ? "#b91c1c" : "#2a1a1a", border: "none", borderRadius: 10, color: target && !merging ? "#fff" : "#6b6a8f", fontSize: 13, fontWeight: 700, padding: "11px", cursor: target && !merging ? "pointer" : "default", fontFamily: "'DM Sans', sans-serif" }}
+                      >
+                        {merging ? "Merging…" : target ? `Merge into ${displayName(target)}` : "Merge"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -4255,44 +4436,370 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
             </div>
-            <DetailSubtitle lines={[
-              `${f.shows.length} show${f.shows.length !== 1 ? 's' : ''} together`,
-              yearSpan,
-              profile.contact,
-              profile.note,
-            ]} />
+            {/* "Since" line. This replaces the old stat-tile row: it carried the
+                same venues/countries numbers, and with the timeline owning the top
+                of the page a second summary block just pushed it below the fold. */}
+            {(() => {
+              const rated = f.shows.filter(c => c.rating);
+              const avgR = rated.length ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : null;
+              const distinctVenues = new Set(f.shows.map(c => c.venue).filter(Boolean)).size;
+              const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
+              const spanYears = f.firstShow && f.lastShow
+                ? Math.max(1, Math.round(monthsBetween(f.firstShow.date, f.lastShow.date) / 12))
+                : 0;
+              const since = [
+                spanYears >= 1 ? `${spanYears} year${spanYears !== 1 ? 's' : ''}` : null,
+                distinctVenues > 0 ? `${distinctVenues} venue${distinctVenues !== 1 ? 's' : ''}` : null,
+                distinctCountries > 1 ? `${distinctCountries} countries` : null,
+                avgR ? `★ ${avgR} avg` : null,
+              ].filter(Boolean).join(' · ');
+              const duoCount = f.shows.filter(c => getFriends(c).filter(n => n !== f.name).length === 0).length;
+              return (
+                <DetailSubtitle lines={[
+                  `${f.shows.length} show${f.shows.length !== 1 ? 's' : ''} together${duoCount > 0 ? ` · ${duoCount} just you two` : ''}`,
+                  f.firstShow ? `since ${new Date(f.firstShow.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}${since ? ` · ${since}` : ''}` : yearSpan,
+                  profile.contact,
+                  profile.note,
+                ]} />
+              );
+            })()}
           </div>
-          <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {f.shows.length > 0 && (
+              <button onClick={() => setShowHistoryShare(true)} title="Share your history together" style={{ background: "none", border: "1px solid #1f1f35", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Share</button>
+            )}
+            <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Edit</button>
+          </div>
         </div>
 
-        {/* Stat tiles */}
-        {(() => {
-          const rated = f.shows.filter(c => c.rating);
-          const avgR = rated.length ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : null;
-          const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
-          const distinctVenues = Object.keys(vCount).length;
-          const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
-          const tiles = [
-            { value: `${f.shows.length}×`, label: "together" },
-            avgR && { value: `★ ${avgR}`, label: "avg rating" },
-            distinctVenues > 0 && { value: distinctVenues, label: "venues" },
-            distinctCountries > 1 && { value: distinctCountries, label: "countries" },
-          ].filter(Boolean);
+        {/* ── Send the history ────────────────────────────────────────────
+            The shows together as one receipt, in the same style show receipts
+            already use, sized to be screenshotted and sent to the person it's
+            about. Capped, because 40 shows will not fit in a readable image. */}
+        {showHistoryShare && (() => {
+          const MAX_ROWS = 22;
+          const rows = [...f.sortedShows].reverse();
+          const shown = rows.slice(0, MAX_ROWS);
+          const overflow = rows.length - shown.length;
+          const span = f.firstShow && f.lastShow
+            ? `${f.firstShow.date.slice(0, 4)}—${f.lastShow.date.slice(0, 4)}`
+            : (f.firstShow?.date.slice(0, 4) || '');
+          const title = `${displayName(f.name).toUpperCase()} & YOU`;
+
+          const copyText = () => {
+            const lines = [
+              title,
+              `${f.shows.length} shows together · ${span}`,
+              '',
+              ...shown.map(c => `${c.date.slice(0, 4)}  ${c.artist}`),
+              overflow > 0 ? `+ ${overflow} more` : null,
+            ].filter(l => l !== null);
+            navigator.clipboard?.writeText(lines.join('\n'));
+            onNotify('Copied share text');
+          };
+
+          const copyImage = async () => {
+            if (!historyShareRef.current) return;
+            try {
+              const canvas = await html2canvas(historyShareRef.current, { backgroundColor: '#f4f1e8', scale: 2 });
+              canvas.toBlob(async blob => {
+                if (!blob) { onNotify('Could not create image', 'error'); return; }
+                try {
+                  await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+                  onNotify('Copied as image');
+                } catch {
+                  // Clipboard image write not supported (e.g. Firefox) — fall back to a download
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = `${displayName(f.name)}-and-me.png`.replace(/\s+/g, '-');
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  onNotify('Image downloaded');
+                }
+              }, 'image/png');
+            } catch {
+              onNotify('Could not create image', 'error');
+            }
+          };
+
           return (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "14px 16px 0" }}>
-              {tiles.map(({ value, label }) => (
-                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#a78bfa", lineHeight: 1 }}>{value}</div>
-                  <div style={{ fontSize: 7.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 4 }}>{label}</div>
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, overflowY: "auto" }} onClick={() => setShowHistoryShare(false)}>
+              <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 340 }}>
+                <div ref={historyShareRef} style={{ background: "#f4f1e8", color: "#2a2620", borderRadius: 5, padding: "18px 18px 20px", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "0.02em", textAlign: "center" }}>{title}</div>
+                  <div style={{ textAlign: "center", fontSize: 9, color: "#8a8578", letterSpacing: "0.08em", marginTop: 3 }}>
+                    {f.shows.length} SHOWS · {span}
+                  </div>
+                  <div style={{ borderTop: "1px dashed #cfc9b8", margin: "12px 0 10px" }} />
+                  {shown.map(c => (
+                    <div key={c.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "2.5px 0" }}>
+                      <span style={{ color: "#8a8578", width: 30, flexShrink: 0 }}>'{c.date.slice(2, 4)}</span>
+                      <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist.toUpperCase()}</span>
+                    </div>
+                  ))}
+                  {overflow > 0 && (
+                    <>
+                      <div style={{ borderTop: "1px dashed #cfc9b8", margin: "10px 0" }} />
+                      <div style={{ color: "#8a8578" }}>+ {overflow} MORE</div>
+                    </>
+                  )}
+                  <div style={{ textAlign: "center", fontSize: 8.5, color: "#8a8578", marginTop: 13, letterSpacing: "0.08em" }}>*** SEE YOU AT THE NEXT ONE ***</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button onClick={copyImage} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as image</button>
+                  <button onClick={copyText} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
+                  <button onClick={() => setShowHistoryShare(false)} style={{ background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 13px", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>×</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* On this day — the only thing on this page that turns up uninvited.
+            Matches on month + day, so it surfaces a handful of times a year. */}
+        {(() => {
+          const now = new Date();
+          const mmdd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          const hits = f.shows.filter(c => c.date.slice(5) === mmdd && c.date.slice(0, 4) !== String(now.getFullYear()));
+          if (hits.length === 0) return null;
+          return hits.slice(0, 2).map(c => {
+            const yearsAgo = now.getFullYear() - Number(c.date.slice(0, 4));
+            const place = isOnline(c) ? formatOnlineLocation(c) : c.venue;
+            const detail = [
+              c.id === f.firstShow?.id ? "Your first show together" : null,
+              c.rating > 0 ? "★".repeat(Math.min(c.rating, settings.ratingSystem || 5)) : null,
+            ].filter(Boolean).join(" · ");
+            return (
+              <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ display: "block", width: "calc(100% - 32px)", textAlign: "left", margin: "14px 16px 0", borderRadius: 12, padding: "12px 13px", border: "1px solid #3a2f66", background: "linear-gradient(135deg, #1e1838, #14101f)", cursor: "pointer" }}>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: "0.09em", textTransform: "uppercase", color: "var(--accent)" }}>
+                  {yearsAgo} year{yearsAgo !== 1 ? 's' : ''} ago today
+                </div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff", marginTop: 4, lineHeight: 1.15 }}>
+                  {c.artist}{place ? ` at ${place}` : ''}
+                </div>
+                {detail && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#6b6a8f", marginTop: 3 }}>{detail}</div>}
+              </button>
+            );
+          });
+        })()}
+
+        {/* ── Shared history ──────────────────────────────────────────────
+            Every show together on one spine — oldest first by default, both ends
+            marked, quiet stretches drawn, upcoming plans joined on at the future
+            end. Replaces the old "Photos together" strip, the collapsed "All shows
+            together" list and the separate "Upcoming together" block: each photo
+            and each plan now sits in the night it belongs to. */}
+        {(f.sortedShows.length > 0 || f.upcoming.length > 0) && (() => {
+          // * Built ascending, then flipped for display, so "first"/"latest"/gaps are
+          // * all reasoned about in real time order regardless of which way it's shown.
+          const matchesHistoryFilter = c => historyFilter === 'all'
+            || (historyFilter === 'photos' && !!c.photo)
+            || (historyFilter === 'festivals' && c.type === 'festival')
+            || (historyFilter === 'rated' && (c.rating || 0) >= 4);
+
+          // * first/latest are always the real first and latest, not the first and
+          // * latest of whatever's left after filtering.
+          const allPastAsc = [...f.sortedShows];
+          const firstId = allPastAsc[0]?.id;
+          const latestId = allPastAsc[allPastAsc.length - 1]?.id;
+
+          const pastAsc = allPastAsc.filter(matchesHistoryFilter);
+          const upcomingAsc = [...f.upcoming].sort((a, b) => a.date.localeCompare(b.date)).filter(matchesHistoryFilter);
+
+          // * Upcoming shows join the same spine at the future end, rather than
+          // * sitting in a separate block below all the history.
+          const entriesAsc = [
+            ...pastAsc.map(c => ({ c, upcoming: false })),
+            ...upcomingAsc.map(c => ({ c, upcoming: true })),
+          ];
+          const entries = newestFirst ? [...entriesAsc].reverse() : entriesAsc;
+
+          const years = [];
+          entries.forEach(e => {
+            const y = e.c.date.slice(0, 4);
+            const bucket = years[years.length - 1];
+            if (bucket && bucket[0] === y) bucket[1].push(e);
+            else years.push([y, [e]]);
+          });
+          const dayMonth = d => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const lastEntryId = entries[entries.length - 1]?.c.id;
+          const ratingMax = settings.ratingSystem || 5;
+
+          // * A quiet stretch between two shows together is the thing this page is
+          // * actually about, so it gets drawn rather than left for you to work out.
+          // * Only between two past shows — a gap before a plan isn't the same story.
+          const GAP_MONTHS = 9;
+          const gapBefore = {};
+          entries.forEach((e, i) => {
+            const prev = entries[i - 1];
+            if (!prev || e.upcoming || prev.upcoming) return;
+            const months = monthsBetween(prev.c.date, e.c.date);
+            if (months >= GAP_MONTHS) gapBefore[e.c.id] = months;
+          });
+          return (
+            <div style={{ padding: "18px 16px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ ...sectionLabel, marginBottom: 0 }}>Shared history</span>
+                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 99, padding: "1px 7px" }}>
+                    {historyFilter === 'all' ? allPastAsc.length : `${pastAsc.length} of ${allPastAsc.length}`}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => onUpdateSetting?.('friendTimelineNewestFirst', !newestFirst)}
+                    title={newestFirst ? "Show oldest first" : "Show newest first"}
+                    style={{ background: "none", border: "1px solid #1f1f35", borderRadius: 99, padding: "3px 10px", cursor: "pointer", color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}
+                  >
+                    {newestFirst ? "↓ newest" : "↑ oldest"}
+                  </button>
+                  {f.shows.some(c => c.photo) && (
+                    <button
+                      onClick={() => onUpdateSetting?.('friendTimelineCompact', !timelineCompact)}
+                      title={timelineCompact ? "Show photos large" : "Shrink photos to thumbnails"}
+                      style={{ background: timelineCompact ? "none" : "#1a1a30", border: `1px solid ${timelineCompact ? "#1f1f35" : "#a78bfa"}`, borderRadius: 99, padding: "3px 10px", cursor: "pointer", color: timelineCompact ? "#6b6a8f" : "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace" }}
+                    >
+                      {timelineCompact ? "◱ small" : "▣ large"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Filter chips — only once there's enough history for scrolling to be
+                  the problem, and only offering filters that would actually match. */}
+              {allPastAsc.length >= 6 && (() => {
+                const options = [
+                  { id: 'all', label: 'All', available: true },
+                  { id: 'photos', label: '📷 With photos', available: allPastAsc.some(c => c.photo) },
+                  { id: 'festivals', label: '🎪 Festivals', available: allPastAsc.some(c => c.type === 'festival') },
+                  { id: 'rated', label: '★ 4+', available: allPastAsc.some(c => (c.rating || 0) >= 4) },
+                ].filter(o => o.available);
+                if (options.length < 2) return null;
+                return (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
+                    {options.map(o => (
+                      <button key={o.id} onClick={() => setHistoryFilter(o.id)} style={{
+                        border: `1px solid ${historyFilter === o.id ? "var(--accent)" : "#1f1f35"}`,
+                        background: historyFilter === o.id ? "var(--accent)" : "none",
+                        color: historyFilter === o.id ? "#0c0c14" : "#6b6a8f",
+                        fontWeight: historyFilter === o.id ? 700 : 400,
+                        borderRadius: 99, padding: "3px 9px", cursor: "pointer",
+                        fontSize: 11, fontFamily: "'DM Mono', monospace",
+                      }}>{o.label}</button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {pastAsc.length === 0 && upcomingAsc.length === 0 && (
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#4a4870", padding: "14px 0" }}>
+                  Nothing matches that filter.
+                </div>
+              )}
+
+              {years.map(([year, shows]) => (
+                <div key={year}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#4a4870", margin: "12px 0 6px" }}>{year}</div>
+                  {shows.map(({ c, upcoming }) => {
+                    const isFirst = c.id === firstId;
+                    const isLatest = c.id === latestId;
+                    const isEnd = c.id === lastEntryId;
+                    const place = isOnline(c) ? formatOnlineLocation(c) : [c.venue, c.city].filter(Boolean).join(" · ");
+                    const others = getFriends(c).filter(n => n !== f.name);
+                    const gap = gapBefore[c.id];
+                    return (
+                      <div key={c.id}>
+                        {gap && (
+                          <div style={{ display: "grid", gridTemplateColumns: "13px 1fr", gap: 9 }}>
+                            <div style={{ display: "flex", justifyContent: "center" }}>
+                              <span style={{ width: 0, borderLeft: "1px dashed #2a2a44", height: 26 }} />
+                            </div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#3d3b5c", alignSelf: "center", paddingBottom: 2 }}>
+                              {formatGap(gap)} apart
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ display: "grid", gridTemplateColumns: "13px 1fr", gap: 9 }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <span style={{
+                              width: 7, height: 7, borderRadius: "50%", marginTop: 5, flexShrink: 0,
+                              background: upcoming || isFirst ? "none" : "var(--accent)",
+                              border: upcoming ? "1.5px solid var(--accent)" : isFirst ? "1.5px solid #2e2e50" : "none",
+                            }} />
+                            {/* No trailing stub past whichever show is last on screen */}
+                            <span style={{ width: upcoming ? 0 : 1, flex: 1, background: isEnd ? "none" : "#1e1e34", borderLeft: upcoming && !isEnd ? "1px dashed #2a2a44" : "none" }} />
+                          </div>
+                          <div style={{ paddingBottom: 11, minWidth: 0 }}>
+                            <button onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0, display: "block" }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12.5, color: upcoming ? "#c4c2f0" : "#e2e0ff", fontWeight: 600 }}>
+                                    {c.artist}
+                                    {upcoming && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8, color: "#818cf8", border: "1px solid #2f3570", borderRadius: 99, padding: "0 5px", marginLeft: 5 }}>upcoming</span>}
+                                    {others.length === 0 && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8, color: "#f472b6", border: "1px solid #4a2440", borderRadius: 99, padding: "0 5px", marginLeft: 5 }}>just us</span>}
+                                    {isLatest && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8, color: "#34d399", border: "1px solid #1c4a3a", borderRadius: 99, padding: "0 5px", marginLeft: 5 }}>latest</span>}
+                                    {isFirst && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8, color: "#6b6a8f", border: "1px solid #2e2e50", borderRadius: 99, padding: "0 5px", marginLeft: 5 }}>first</span>}
+                                  </div>
+                                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {dayMonth(c.date)}{place ? ` · ${place}` : ""}
+                                  </div>
+                                  {!upcoming && c.rating > 0 && (
+                                    <div style={{ fontSize: 9, color: "#a78bfa", marginTop: 2, letterSpacing: "0.5px" }}>
+                                      {"★".repeat(Math.min(c.rating, ratingMax))}
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Compact keeps the photo as a thumbnail on the row so the
+                                    whole history stays scannable; large lets it breathe. */}
+                                {c.photo && timelineCompact && (
+                                  <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 42, height: 42, borderRadius: 7, flexShrink: 0 }} />
+                                )}
+                              </div>
+                              {c.photo && !timelineCompact && (
+                                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 9, marginTop: 6 }} />
+                              )}
+                            </button>
+                            {/* Who else was there — kept outside the button above so these
+                                stay their own tap targets rather than nested buttons. */}
+                            {others.length > 0 && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                                {others.slice(0, 5).map(n => (
+                                  <button key={n} onClick={() => setSelectedFriend(n)} title={displayName(n)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}>
+                                    <FriendAvatar name={displayName(n)} size={18} />
+                                  </button>
+                                ))}
+                                {others.length > 5 && (
+                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#4a4870" }}>+{others.length - 5}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
           );
         })()}
 
+        {/* Nothing logged yet — a friend added by hand, or one whose only shows are
+            still ahead. The stack of empty cards below would say nothing, so don't
+            render it at all. */}
+        {f.shows.length === 0 && (
+          <EmptyState
+            icon="🎟"
+            title={f.upcoming.length > 0 ? "Nothing together yet" : `No shows with ${displayName(f.name)} yet`}
+            detail={f.upcoming.length > 0
+              ? "Your first show together is still coming up — it'll move into the history once the date passes."
+              : "Add them to a show you've been to and it'll appear here."}
+          />
+        )}
+
         <div style={{ padding: "16px 16px" }}>
           {/* Details */}
-          {(() => {
+          {f.shows.length > 0 && (() => {
             const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
             const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
             const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
@@ -4317,27 +4824,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
             );
           })()}
 
-          {/* Photos together */}
-          {(() => {
-            const photos = f.shows.filter(c => c.photo).sort((a, b) => b.date.localeCompare(a.date));
-            if (photos.length === 0) return null;
-            return (
-              <div style={card}>
-                <div style={sectionLabel}>Photos together</div>
-                <div style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                  {photos.map(c => (
-                    <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                      <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
-                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.artist} · {c.date.slice(0, 4)}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Taste profile */}
-          {f.topGenres.length > 0 && (
+          {/* Taste profile — needs at least a couple of genres across a few shows
+              to say anything. One bar pinned at 100% is noise, not a profile. */}
+          {f.shows.length >= 3 && f.topGenres.length >= 2 && (
             <div style={card}>
               <div style={sectionLabel}>Taste profile</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -4354,8 +4843,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
             </div>
           )}
 
-          {/* Top artists together */}
-          {f.topArtists.length > 0 && (
+          {/* Top artists — a "ranking" of artists you've each seen once is just the
+              timeline again in a different order. Needs a repeat, or enough shows
+              for the order to mean something. */}
+          {(f.shows.length >= 3 || (f.topArtists[0]?.[1] || 0) > 1) && f.topArtists.length > 0 && (
             <div style={card}>
               <div style={sectionLabel}>Top artists together</div>
               {f.topArtists.slice(0, 6).map(([artist, count], i) => (
@@ -4368,25 +4859,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
             </div>
           )}
 
-          {/* Upcoming together */}
-          {f.upcoming.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ ...sectionLabel, marginBottom: 8 }}>Upcoming together</div>
-              {[...f.upcoming].sort((a,b) => a.date.localeCompare(b.date)).map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
-            </div>
-          )}
 
-          {/* All shows */}
-          <div>
-            <button onClick={() => setShowAllTogether(s => !s)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0 8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={sectionLabel.marginBottom !== undefined ? { ...sectionLabel, marginBottom: 0 } : sectionLabel}>All shows together</span>
-                <span style={{ fontSize: 10, color: '#2e2e50', fontFamily: "'DM Mono', monospace", background: '#13131f', border: '1px solid #1f1f35', borderRadius: 99, padding: '1px 7px' }}>{f.sortedShows.length}</span>
-              </div>
-              <span style={{ fontSize: 11, color: '#4a4870', transform: showAllTogether ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
-            </button>
-            {showAllTogether && [...f.sortedShows].reverse().map(c => <ArtistShowRow key={c.id} concert={c} onOpen={onOpen} />)}
-          </div>
         </div>
       </div>
     );
@@ -4404,8 +4877,72 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
             {friendEntries.filter(f => f.shows.length > 1).length} regular{friendEntries.filter(f => f.shows.length > 1).length !== 1 ? 's' : ''}, {past.filter(c => getFriends(c).length === 0).length} solo show{past.filter(c => getFriends(c).length === 0).length !== 1 ? 's' : ''}
           </div>
+          {/* Crew ribbon — shows together per year, the same axis the per-friend rows use */}
+          {yearAxis.length > 1 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 46 }}>
+                {showsPerYear.map((n, i) => (
+                  <div key={yearAxis[i]} style={{
+                    flex: 1,
+                    height: n === 0 ? 3 : Math.max(5, Math.round((n / peakYear) * 46)),
+                    borderRadius: 2,
+                    background: n === 0 ? '#23223c' : 'var(--accent)',
+                    opacity: n === 0 ? 1 : 0.35 + 0.65 * (n / peakYear),
+                  }} title={`${yearAxis[i]}: ${n} show${n === 1 ? '' : 's'} with friends`} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                {yearAxis.map(y => (
+                  <span key={y} style={{ flex: 1, fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'center' }}>{y.slice(2)}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
+      {/* Inner circle — the three you've seen most. */}
+      {podium.length === 3 && (() => {
+        const [first, second, third] = podium;
+        const plinth = (f, rank) => {
+          const size = rank === 1 ? 58 : 44;
+          const hue = friendColor(displayName(f.name));
+          const color = rank === 1 ? 'var(--accent)' : rank === 2 ? '#818cf8' : '#f472b6';
+          return (
+            <button onClick={() => setSelectedFriend(f.name)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center', flex: rank === 1 ? 1.22 : 1, minWidth: 0 }}>
+              <div style={{
+                width: size, height: size, borderRadius: '50%', flexShrink: 0,
+                background: `hsl(${hue}, 55%, 22%)`,
+                border: rank === 1 ? `2px solid hsl(${hue}, 60%, 52%)` : `1px solid hsl(${hue}, 55%, 40%)`,
+                color: `hsl(${hue}, ${rank === 1 ? 75 : 70}%, ${rank === 1 ? 82 : 78}%)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: size * 0.36,
+                boxShadow: rank === 1 ? '0 0 22px rgba(167,139,250,0.28)' : 'none',
+              }}>{friendInitials(displayName(f.name))}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: rank === 1 ? 14 : 12.5, fontWeight: 800, color: '#e2e0ff', lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(f.name)}</div>
+              <div style={{ fontSize: 9.5, color: rank === 1 ? 'var(--accent)' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{f.shows.length} shows</div>
+              <div style={{
+                width: '100%', height: rank === 1 ? 52 : rank === 2 ? 34 : 24,
+                borderRadius: '7px 7px 0 0',
+                background: rank === 1 ? 'linear-gradient(180deg,#241d47,#141028)' : 'linear-gradient(180deg,#191830,#101020)',
+                border: `1px solid ${rank === 1 ? '#3a2f66' : '#1f1f35'}`, borderBottom: 'none',
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 5,
+                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, color,
+              }}>{rank}</div>
+            </button>
+          );
+        };
+        return (
+          <>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '16px 16px 0' }}>
+              {plinth(second, 2)}
+              {plinth(first, 1)}
+              {plinth(third, 3)}
+            </div>
+            <div style={{ height: 1, background: '#1f1f35', margin: '0 16px' }} />
+          </>
+        );
+      })()}
+
       {/* Search + sort + filters + add */}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
@@ -4489,7 +5026,12 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
 
       {/* Friend list */}
       <div style={{ padding: "0 16px" }}>
-        {filtered.map(({ name, shows, lastShow, topGenres, upcoming }) => (
+        {podium.length === 3 && (
+          <div style={{ fontSize: 9.5, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.09em', padding: '0 0 8px' }}>
+            Everyone else · {listed.length}
+          </div>
+        )}
+        {listed.map(({ name, shows, lastShow, topGenres, upcoming, byYear }) => (
           <button key={name} onClick={() => setSelectedFriend(name)} style={{
             width: "100%", textAlign: "left", background: "#13131f",
             border: "1px solid #1f1f35", borderLeft: "3px solid #2e2e4a",
@@ -4513,6 +5055,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onBackT
                 </div>
               )}
             </div>
+            {/* Expanded rows only — a compact row is one line of text and there's
+                no room for bars without crowding the name. */}
+            {!compact && shows.length > 0 && <YearBars byYear={byYear} />}
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontSize: compact ? 13 : 18, fontWeight: 800, color: "#6b6a8f" }}>{shows.length}</span>
@@ -4829,6 +5374,21 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         .catch(err => onNotify(err?.message || 'Could not upload photo', 'error'))
         .finally(() => setArtistPhotoUploading(false));
     };
+    const handleBannerRemove = () => {
+      if (!bannerPhotoPath) return;
+      if (!window.confirm(`Remove the photo for ${selectedArtist}?`)) return;
+      const nextPhotos = { ...(settings.artistPhotos || {}) };
+      const nextPos = { ...(settings.artistPhotoPos || {}) };
+      delete nextPhotos[selectedArtist];
+      delete nextPos[selectedArtist];
+      onUpdateSetting('artistPhotos', nextPhotos);
+      onUpdateSetting('artistPhotoPos', nextPos);
+      setReframingArtistPhoto(false);
+      // * Also drop the file itself — nothing else references it, and leaving it
+      // * behind would silently eat storage quota. Failure here is not worth
+      // * bothering the user about; the photo is already gone from the UI.
+      deleteArtistPhoto(bannerPhotoPath).catch(() => { /* orphaned file, harmless */ });
+    };
     return (
       <div className={artistExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedArtist} style={{ padding: "0 0 100px" }}>
         {reframingArtistPhoto && bannerPhotoPath ? (
@@ -4842,8 +5402,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           <div style={{ height: 190, position: "relative", background: bannerPhotoPath ? undefined : "linear-gradient(160deg, #3a2a5c, #7a4a9e)", overflow: "hidden" }}>
             {bannerPhotoPath && <PhotoImg path={bannerPhotoPath} pos={bannerPos} style={{ width: "100%", height: 230, position: "absolute", top: -20, left: 0, transform: `translateY(${Math.min(bannerScrollY * 0.35, 40)}px)`, willChange: "transform" }} />}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)" }} />
-            <button onClick={goBackFromArtist} style={{ position: "absolute", top: 14, left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
-            <div style={{ position: "absolute", top: 12, right: 16, zIndex: 2, display: "flex", gap: 8 }}>
+            {/* ! The app shell's header is hidden while a detail view is open, so these
+                ! controls are the topmost thing on screen — they need the safe-area
+                ! inset the shell header (36px top padding) would otherwise provide,
+                ! or they land underneath the status bar. */}
+            <button onClick={goBackFromArtist} style={{ position: "absolute", top: "calc(14px + env(safe-area-inset-top, 0px))", left: 16, background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", zIndex: 2, textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>←</button>
+            <div style={{ position: "absolute", top: "calc(12px + env(safe-area-inset-top, 0px))", right: 16, zIndex: 2, display: "flex", gap: 8 }}>
               {bannerEditMode && bannerPhotoPath && (
                 <button onClick={() => setReframingArtistPhoto(true)} title="Move photo" style={{ background: "#0c0c14aa", border: "none", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>↕↔</button>
               )}
@@ -4852,6 +5416,9 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
                   {artistPhotoUploading ? "···" : bannerPhotoPath ? "↑" : <>📷 Add photo</>}
                 </label>
+              )}
+              {bannerEditMode && bannerPhotoPath && (
+                <button onClick={handleBannerRemove} title="Remove photo" style={{ background: "#0c0c14aa", border: "none", borderRadius: 99, color: "#f87171", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>✕</button>
               )}
               <button onClick={() => setBannerEditMode(m => !m)} title="Edit" style={{ background: bannerEditMode ? "#a78bfa" : "#0c0c14aa", border: "none", borderRadius: 99, color: bannerEditMode ? "#0c0c14" : "#fff", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", padding: "5px 11px", cursor: "pointer" }}>{bannerEditMode ? "Save edits" : "Edit"}</button>
             </div>
@@ -5189,10 +5756,21 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                       </button>
                       {rest.length > 0 && (
                         <div style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                          {/* Tapping a thumbnail opens the show, matching the strip and polaroid
+                              galleries. Re-pinning lives on its own 📌 button so both actions fit. */}
                           {rest.map(c => (
-                            <button key={c.id} onClick={() => onUpdateSetting('artistPinnedPhoto', { ...(settings.artistPinnedPhoto || {}), [selectedArtist]: c.id })} title="Make this the pinned photo" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                              <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 60, height: 60, borderRadius: 8 }} />
-                            </button>
+                            <div key={c.id} style={{ position: "relative", flexShrink: 0 }}>
+                              <button onClick={() => onOpen(c)} title={`${c.artist} · ${formatDate(c.date)}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "block" }}>
+                                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 64, height: 64, borderRadius: 8 }} />
+                                <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)}</div>
+                              </button>
+                              <button
+                                onClick={() => onUpdateSetting('artistPinnedPhoto', { ...(settings.artistPinnedPhoto || {}), [selectedArtist]: c.id })}
+                                title="Make this the pinned photo"
+                                aria-label={`Pin the photo from ${formatDate(c.date)}`}
+                                style={{ position: "absolute", top: 3, right: 3, background: "rgba(12,12,20,0.72)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, cursor: "pointer", lineHeight: 1, padding: 0 }}
+                              >📌</button>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -5948,7 +6526,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           <div style={{ height: 260, position: 'relative', overflow: 'hidden' }}>
             <img src={selectedSong.albumArt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.85) 100%)' }} />
-            <button onClick={goBackFromSong} style={{ position: 'absolute', top: 14, left: 16, background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', zIndex: 2, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>←</button>
+            <button onClick={goBackFromSong} style={{ position: 'absolute', top: 'calc(14px + env(safe-area-inset-top, 0px))', left: 16, background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', zIndex: 2, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>←</button>
             <div style={{ position: 'absolute', bottom: 14, left: 16, right: 16, zIndex: 2 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)', lineHeight: 1.1 }}>{selectedSong.name}</div>
               <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: '#fff', opacity: 0.9, marginTop: 4, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{[selectedSong.artist, duration].filter(Boolean).join(' · ')}</div>
@@ -5967,7 +6545,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
             </div>
           </div>
         ) : (
-          <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ padding: '16px 16px 14px', paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))', borderBottom: '1px solid #1f1f35', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <button onClick={goBackFromSong} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: '18px' }}>←</button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', lineHeight: 1 }}>{selectedSong.name}</div>
@@ -6230,8 +6808,18 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
       ) : (
         <div className="stagger-list" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, padding: "10px 10px 0" }}>
           {withPhotos.map(c => (
-            <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
+            <button key={c.id} onClick={() => onOpen(c)} title={`${c.artist} · ${formatDate(c.date)}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative", display: "block" }}>
               <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4 }} />
+              {/* Without a caption this is an anonymous wall — you can see the photo but not
+                  which night it was. Short form ("Mar '24") so it fits a third-width tile. */}
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderRadius: "0 0 4px 4px", padding: "14px 6px 5px", textAlign: "left", background: "linear-gradient(to top, rgba(6,6,14,0.88), rgba(6,6,14,0))", pointerEvents: "none" }}>
+                <div style={{ fontSize: 9, color: "#fff", fontFamily: "'DM Mono', monospace", lineHeight: 1.25 }}>
+                  {new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { month: "short" })} '{c.date.slice(2, 4)}
+                </div>
+                <div style={{ fontSize: 8.5, color: "rgba(255,255,255,0.62)", fontFamily: "'DM Mono', monospace", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.artist}
+                </div>
+              </div>
             </button>
           ))}
         </div>
@@ -6361,7 +6949,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
     return (
       <div className={venueExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedVenue} style={{ padding: '0 0 100px' }}>
         {/* Sticky header, matching the show detail page */}
-        <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: 'sticky', top: 0, borderBottom: '1px solid #1e3028', padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
+        <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: 'sticky', top: 0, borderBottom: '1px solid #1e3028', padding: '16px 16px', paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))', display: 'flex', alignItems: 'center', gap: 12, zIndex: 10 }}>
           <button onClick={goBackFromVenue} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVenue}</div>
@@ -8829,23 +9417,23 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
   );
 }
 
-export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail }) {
+export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
   const today = new Date()
   const isPastDate = (dateStr) => dateStr < todayStr
 
   const showsGroup = ['home', 'artists', 'songs', 'venues']
-  const [showStartupScreen, setShowStartupScreen] = useState(true)
-  useEffect(() => {
-    const t = setTimeout(() => setShowStartupScreen(false), 2000)
-    return () => clearTimeout(t)
-  }, [])
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(0)
+  // * Settings arrive from cache or the DB, so wait for them to actually land
+  // * before deciding — under defaults hasSeenOnboarding is false, which would
+  // * flash the tour at a returning user. Assignment (not just set-true) so a
+  // * late-arriving "already seen" still takes it back down.
   useEffect(() => {
-    if (!showStartupScreen && !settings.hasSeenOnboarding) setShowOnboarding(true)
-  }, [showStartupScreen])
+    if (!settingsLoaded) return
+    setShowOnboarding(!settings.hasSeenOnboarding)
+  }, [settingsLoaded, settings.hasSeenOnboarding])
   const dismissOnboarding = () => { setShowOnboarding(false); onUpdateSetting('hasSeenOnboarding', true) }
   const [showConfetti, setShowConfetti] = useState(false)
   const [navLoading, setNavLoading] = useState(false)
@@ -9084,11 +9672,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         ...(filterStatus.includes('past') ? past : []),
       ]
   const allPast = concerts.filter(c => !isWish(c) && isPastDate(c.date))
-  const headerCounts = {
-    concerts: allPast.filter(c => c.type !== 'festival').length,
-    festivals: allPast.filter(c => c.type === 'festival').length,
-    upcoming: concerts.filter(c => !isWish(c) && !isPastDate(c.date)).length,
-  }
   const isSummaryHeader = view === 'stats' && statsTab === 'summary'
   const shellTitle = isSummaryHeader
     ? 'all the music'
@@ -9371,23 +9954,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </div>
   )
 
-  if (showStartupScreen) return (
-    <div data-theme-shell="" style={appShell}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', boxSizing: 'border-box' }}>
-        <div style={{ textAlign: 'center', maxWidth: 340, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: 118, height: 118, borderRadius: 30, background: '#13131f', border: '1px solid #272544', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 24px 56px rgba(0,0,0,0.48), 0 0 48px rgba(167,139,250,0.2), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-            <img src="/icon-192.png" alt="" style={{ width: 92, height: 92, borderRadius: 23, display: 'block' }} />
-          </div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 29, fontWeight: 800, color: '#e2e0ff', lineHeight: 1, marginBottom: 8 }}>concert tracker</div>
-          <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace" }}>
-            {headerCounts.concerts} concerts · {headerCounts.festivals} festivals · {headerCounts.upcoming} upcoming
-          </div>
-        </div>
-      </div>
-      <ToastHost toast={toast} onDismiss={() => setToast(null)} />
-    </div>
-  )
-
   return (
     <div data-theme-shell="" style={appShell}>
 
@@ -9603,7 +10169,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             )}
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} onSaveConcertQuiet={onSaveConcert} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} onNotify={notify} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNotify={notify} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}

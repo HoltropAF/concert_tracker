@@ -8960,17 +8960,33 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     setStorageBusy(true);
     try {
       const files = await listUserPhotos();
-      // * A file is in use if a show or an artist still points at it.
+      // * A file is in use if a show or an artist still points at it. These are the
+      // * only two things that ever write a storage path (uploadConcertPhoto and
+      // * uploadArtistPhoto), so this set is the complete picture.
       const used = new Set([
         ...concerts.map(c => c.photo).filter(Boolean),
         ...Object.values(settings.artistPhotos || {}).filter(Boolean),
       ]);
       const orphans = files.filter(f => !used.has(f.path));
+
+      // ! Two refusals, because "everything looks unused" is far more likely to mean
+      // ! we're looking at an incomplete library than that every file is junk.
+      // ! useConcerts sets loaded=true on a DB error without populating anything, so
+      // ! an empty `concerts` here can simply mean the fetch failed — and cleaning up
+      // ! against it would delete every photo the account has.
+      let unsafe = null;
+      if (concerts.length === 0) {
+        unsafe = "Can't check while no shows are loaded — reopen the app and try again.";
+      } else if (files.length > 0 && orphans.length === files.length) {
+        unsafe = "Every file looks unused, which usually means your library didn't load properly. Not offering to delete anything.";
+      }
+
       setStorageInfo({
         files,
         used: files.reduce((s, f) => s + f.size, 0),
-        orphans,
-        orphanBytes: orphans.reduce((s, f) => s + f.size, 0),
+        orphans: unsafe ? [] : orphans,
+        orphanBytes: unsafe ? 0 : orphans.reduce((s, f) => s + f.size, 0),
+        unsafe,
       });
     } catch {
       onNotify('Could not read storage', 'error');
@@ -8997,12 +9013,24 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     try {
       const files = await listUserPhotos();
       if (files.length > 0) await deletePhotos(files.map(f => f.path));
-      for (const c of concerts) await onDeleteConcert?.(c.id);
+
+      // ! Count failures rather than assuming. A half-finished delete that reports
+      // ! success is worse than one that says so — you'd think you were done.
+      let failed = 0;
+      for (const c of concerts) {
+        const result = await onDeleteConcert?.(c.id);
+        if (result?.error) failed++;
+      }
       if (onUpdateAll) await onUpdateAll({ ...DEFAULT_SETTINGS });
+
       setDeleteConfirm('');
-      onNotify('Everything deleted');
+      if (failed > 0) {
+        onNotify(`${failed} show${failed === 1 ? '' : 's'} could not be deleted — run it again`, 'error');
+      } else {
+        onNotify('Everything deleted');
+      }
     } catch (err) {
-      onNotify(err?.message || 'Could not finish deleting', 'error');
+      onNotify(err?.message || 'Could not finish deleting — run it again', 'error');
     }
     setDeleteBusy(false);
   };
@@ -10419,19 +10447,42 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             {/* Files with nothing pointing at them — photos whose show was deleted
                 before photo deletion existed, or uploads abandoned mid-edit. */}
             {storageInfo && (
-              <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>
-                    {storageInfo.orphans.length === 0 ? 'No unused photos' : `${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}`}
+              <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
+                {storageInfo.unsafe ? (
+                  <div style={{ display: "flex", gap: 9 }}>
+                    <span style={{ color: "#facc15", fontFamily: "'DM Mono', monospace", fontSize: 12, lineHeight: 1.4 }}>!</span>
+                    <div style={{ fontSize: 11.5, color: "#e0a35f", lineHeight: 1.55 }}>{storageInfo.unsafe}</div>
                   </div>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                    {storageInfo.orphans.length === 0
-                      ? 'Every file is still in use'
-                      : `${formatBytes(storageInfo.orphanBytes)} from shows you've deleted`}
-                  </div>
-                </div>
-                {storageInfo.orphans.length > 0 && (
-                  <button onClick={cleanUpOrphans} disabled={storageBusy} style={{ background: "none", border: "1px solid #4a2828", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Clean up</button>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>
+                          {storageInfo.orphans.length === 0 ? 'No unused photos' : `${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}`}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                          {storageInfo.orphans.length === 0
+                            ? `All ${storageInfo.files.length} files are still in use`
+                            : `${formatBytes(storageInfo.orphanBytes)} · ${storageInfo.files.length - storageInfo.orphans.length} of ${storageInfo.files.length} files stay`}
+                        </div>
+                      </div>
+                      {storageInfo.orphans.length > 0 && (
+                        <button onClick={cleanUpOrphans} disabled={storageBusy} style={{ background: "none", border: "1px solid #4a2828", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Clean up</button>
+                      )}
+                    </div>
+                    {/* * Name the files. A count can't be checked; a list can — if you
+                        * recognise a photo in here, something is wrong and you'll see
+                        * it before anything is deleted rather than afterwards. */}
+                    {storageInfo.orphans.length > 0 && (
+                      <div style={{ marginTop: 9, maxHeight: 132, overflowY: "auto", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "8px 10px" }}>
+                        {storageInfo.orphans.map(f => (
+                          <div key={f.path} style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#6b6a8f", lineHeight: 1.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f.name} <span style={{ color: "#3a3858" }}>· {formatBytes(f.size)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

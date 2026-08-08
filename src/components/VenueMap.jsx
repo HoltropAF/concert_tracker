@@ -133,7 +133,14 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
     return () => { markers.forEach(m => m.remove()) }
   }, [points, onSelect, focus, autoOpenName, fitPoints, clickOpensMaps])
 
-  return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden' }} />
+  // ! position + z-index are load-bearing, not cosmetic. Leaflet gives its own panes
+  // ! z-index 400 and its controls up to 1000, and those are absolutely positioned —
+  // ! so without a stacking context here they paint above anything on the page with a
+  // ! lower z-index, including fixed overlays. That is why the share sheet (z-index
+  // ! 300) appeared *underneath* the map and its buttons couldn't be tapped.
+  // ! `position: relative` + `z-index: 0` confines all of Leaflet's internal layering
+  // ! to this box, so the whole map stacks as one ordinary element among its siblings.
+  return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden', position: 'relative', zIndex: 0 }} />
 }
 
 // ! Leaflet popups take an HTML string, not JSX, so venue names and notes are

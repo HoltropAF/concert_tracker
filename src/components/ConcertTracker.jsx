@@ -4755,17 +4755,11 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </div>
         </div>
 
-        {/* Same pill tabs the artist page uses for Overview / Shows / Songs / Info,
-            rather than a second tab style two taps away from the first. */}
-        <div style={{ display: "flex", gap: 5, padding: "10px 16px 4px" }}>
-          {[['overview', 'Overview'], ['history', 'History'], ['photos', 'Photos'], ['stats', 'Stats']].map(([id, label]) => (
-            <button key={id} onClick={() => setFriendTab(id)} style={{
-              background: friendTab === id ? "#a78bfa" : "#13131f", color: friendTab === id ? "#0c0c14" : "#6b6a8f",
-              border: `1px solid ${friendTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
-              padding: "4px 11px", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer"
-            }}>{label}</button>
-          ))}
-        </div>
+        <DetailTabs
+          tabs={[['overview', 'Overview'], ['history', 'History'], ['photos', 'Photos'], ['stats', 'Stats']]}
+          active={friendTab}
+          onChange={setFriendTab}
+        />
 
         {/* ── Send the history ────────────────────────────────────────────
             The shows together as one receipt, in the same style show receipts
@@ -5393,22 +5387,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
   return (
     <div style={{ padding: "0 0 100px" }}>
-      {/* Overview */}
-      {!search && (
-        <div style={{ padding: "14px 16px 0" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}><CountUp value={allFriends.length} id="friends-total" /></span>
-            <span style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>friends</span>
-          </div>
-          <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
-            {friendEntries.filter(f => f.shows.length > 1).length} regular{friendEntries.filter(f => f.shows.length > 1).length !== 1 ? 's' : ''}, {past.filter(c => getFriends(c).length === 0).length} solo show{past.filter(c => getFriends(c).length === 0).length !== 1 ? 's' : ''}
-          </div>
-          {/* The crew ribbon (shows-with-friends per year) used to sit here. Removed —
-              the podium is the reason you open this page, and a chart delaying it was
-              the wrong thing to lead with. The per-friend year bars on each row still
-              carry the same information where it's actually about someone. */}
-        </div>
-      )}
+      {/* The big number plus a prose line used to sit above the search box, pushing
+          everything down. Same three figures now read as boxes, in the same style
+          used on shows, artists and friends, and they sit under the controls so the
+          page starts with something you can act on. */}
       {/* Inner circle — the three you've seen most. */}
       {podium.length === 3 && (() => {
         const [first, second, third] = podium;
@@ -5471,6 +5453,30 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </button>
           <button onClick={() => { setAddFriendInput(''); setShowAddFriendForm(true); }} aria-label="Add a friend" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         </div>
+
+        {/* Hidden while searching — a count of everyone is noise when you're looking
+            for one person. */}
+        {!search && (() => {
+          const regulars = friendEntries.filter(f => f.shows.length > 1).length;
+          const soloShows = past.filter(c => getFriends(c).length === 0).length;
+          const boxes = [
+            { value: allFriends.length, label: allFriends.length === 1 ? 'friend' : 'friends', id: 'friends-total' },
+            { value: regulars, label: regulars === 1 ? 'regular' : 'regulars', id: 'friends-regulars' },
+            { value: soloShows, label: soloShows === 1 ? 'solo show' : 'solo shows', id: 'friends-solo' },
+          ];
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10 }}>
+              {boxes.map(({ value, label, id }) => (
+                <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}>
+                    <CountUp value={value} id={id} />
+                  </div>
+                  <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {showSortPanel && (
           <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
             {sortBy !== 'most-shows' && <button onClick={() => setSortBy('most-shows')} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
@@ -6007,15 +6013,11 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </div>
           </div>
         )}
-        <div style={{ display: "flex", gap: 5, padding: "10px 16px 4px" }}>
-          {[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Info']].map(([id, label]) => (
-            <button key={id} onClick={() => setArtistTab(id)} style={{
-              background: artistTab === id ? "#a78bfa" : "#13131f", color: artistTab === id ? "#0c0c14" : "#6b6a8f",
-              border: `1px solid ${artistTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
-              padding: "4px 11px", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer"
-            }}>{label}</button>
-          ))}
-        </div>
+        <DetailTabs
+          tabs={[['overview', 'Overview'], ['shows', 'Shows'], ['moments', 'Songs'], ['info', 'Info']]}
+          active={artistTab}
+          onChange={setArtistTab}
+        />
         {/* Hero count + money stats — Overview tab */}
         {artistTab === 'overview' && (totalAppearances === 0 ? (
           <div style={{ padding: "14px 16px 0" }}>
@@ -8698,6 +8700,31 @@ const SETTINGS_ICONS = {
   data: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>,
   tag: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 12.6 12 21.2 2.8 12 2.8 2.8 12 2.8l8.6 8.6a2 2 0 0 1 0 2.9z"/><circle cx="7.3" cy="7.3" r="1"/></svg>,
 };
+
+// * One tab style for every detail page. The app had grown three — boxed segments on
+// * a show, filled pills on an artist, and something else again on a friend — so the
+// * same control looked different depending on which page you'd tapped through from.
+// * `tabs` is [[id, label], …].
+function DetailTabs({ tabs, active, onChange }) {
+  return (
+    <div style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid #1f1f35" }}>
+      {tabs.map(([id, label]) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          style={{
+            flex: 1, background: "none", border: "none", cursor: "pointer",
+            padding: "10px 0 9px", marginBottom: -1,
+            borderBottom: `2px solid ${active === id ? "var(--accent)" : "transparent"}`,
+            color: active === id ? "var(--accent)" : "#6b6a8f",
+            fontWeight: active === id ? 700 : 400,
+            fontSize: 11.5, fontFamily: "'DM Mono', monospace",
+          }}
+        >{label}</button>
+      ))}
+    </div>
+  );
+}
 
 function SettingsSectionIcon({ id }) {
   const svg = SETTINGS_ICONS[id];

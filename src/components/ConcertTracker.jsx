@@ -3363,7 +3363,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 // Expandable section header. Works uncontrolled (defaultOpen) or controlled — pass
 // both `open` and `onToggle` when the caller needs accordion behaviour across
 // several sections.
-function Collapsible({ title, icon, defaultOpen = true, children, open: controlledOpen, onToggle }) {
+// * `subtitle` is { label, color } and shows only while closed — so a collapsed
+// * section can still say whether it needs attention.
+function Collapsible({ title, icon, defaultOpen = true, children, open: controlledOpen, onToggle, subtitle = null }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const toggle = onToggle || (() => setInternalOpen(o => !o));
@@ -3378,7 +3380,10 @@ function Collapsible({ title, icon, defaultOpen = true, children, open: controll
           {icon && <SettingsSectionIcon id={icon} />}
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: open ? "#e2e0ff" : "#c4c2f0" }}>{title}</span>
         </span>
-        <span style={{ color: "#4a4870", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▾</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          {!open && subtitle && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: subtitle.color || "#6b6a8f" }}>{subtitle.label}</span>}
+          <span style={{ color: "#4a4870", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▾</span>
+        </span>
       </button>
       {open && <div style={{ paddingTop: 6 }}>{children}</div>}
     </div>
@@ -9053,6 +9058,49 @@ const tagStyle = { display: "flex", alignItems: "center", gap: 4, background: "#
 const tagInput = { flex: 1, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "8px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 };
 const addBtn = { background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 8, color: "#a78bfa", padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 };
 
+// * Where each tag list actually lives on a concert. The Tags page only ever knew
+// * the configured list; to say anything about use it has to read the shows too.
+// * `read` returns every value a show carries for that kind; `write` puts a rewritten
+// * set back, which is what rename and merge need.
+const TAG_FIELDS = {
+  genres: {
+    read: c => getGenres(c),
+    write: (c, vals) => ({ ...c, genre: vals.length === 0 ? null : vals.length === 1 ? vals[0] : vals }),
+  },
+  subgenres: {
+    read: c => (c.subgenre ? [c.subgenre] : []),
+    write: (c, vals) => ({ ...c, subgenre: vals[0] || null }),
+  },
+  languages: {
+    read: c => (Array.isArray(c.language) ? c.language : c.language ? [c.language] : []),
+    write: (c, vals) => ({ ...c, language: vals }),
+  },
+  venueSizes: {
+    read: c => (c.venueSize ? [c.venueSize] : []),
+    write: (c, vals) => ({ ...c, venueSize: vals[0] || null }),
+  },
+  merch: {
+    read: c => (c.merch || []).map(m => m.item).filter(Boolean),
+    write: (c, vals, from, to) => ({ ...c, merch: (c.merch || []).map(m => (m.item === from ? { ...m, item: to } : m)) }),
+  },
+  otherCosts: {
+    read: c => (c.otherCosts || []).map(x => x.name).filter(Boolean),
+    write: (c, vals, from, to) => ({ ...c, otherCosts: (c.otherCosts || []).map(x => (x.name === from ? { ...x, name: to } : x)) }),
+  },
+  ticketTypes: {
+    read: c => (c.ticketType ? [c.ticketType] : []),
+    write: (c, vals) => ({ ...c, ticketType: vals[0] || null }),
+  },
+  ticketAddons: {
+    read: c => (Array.isArray(c.ticketAddons) ? c.ticketAddons : []),
+    write: (c, vals) => ({ ...c, ticketAddons: vals }),
+  },
+};
+
+// * Case- and punctuation-insensitive key, so "k-pop", "K-Pop" and "kpop" collapse
+// * to one bucket for duplicate detection.
+const tagKey = v => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => (
     <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 4 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: items.length ? 10 : 0 }}>
@@ -9081,7 +9129,7 @@ const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => 
 // ! settings into `next` or they will wipe every unrelated preference.
 // * The XLSX library is imported lazily via loadXlsx() — it is large and most
 // * sessions never open import/export.
-function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onDeleteConcert, onSignOut, userEmail, onNotify = () => {}, onThemePreview = () => {} }) {
+function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSaveConcertQuiet = () => {}, onDeleteConcert, onSignOut, userEmail, onNotify = () => {}, onThemePreview = () => {} }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
@@ -9182,6 +9230,51 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   // * live, and Save applies only your edits on top of the current values.
   const swUpdate = useSWUpdate();
   const appInstall = useAppInstall();
+
+  const [tagDetail, setTagDetail] = useState(null);
+  const [tagRename, setTagRename] = useState('');
+  const [tagBusy, setTagBusy] = useState(false);
+
+  // * The Tags page groups lists by meaning; these are the settings keys they map to.
+  const settingsKeyFor = key => ({ merch: 'merchCategories', otherCosts: 'otherCostCategories' }[key] || key);
+
+  // ! Renames and merges rewrite the value on every show that carries it, which is
+  // ! what "rename" always implied and never did — deleting and re-adding left every
+  // ! show on the old spelling. Writes go through the quiet save so a 40-show rename
+  // ! doesn't fire 40 toasts.
+  const mergeTags = async (list, from, to) => {
+    const targets = from.filter(v => v && v !== to);
+    if (targets.length === 0 || !to) return;
+    setTagBusy(true);
+    try {
+      const field = TAG_FIELDS[list.key];
+      const affected = concerts.filter(c => field.read(c).some(v => targets.includes(v)));
+      for (const c of affected) {
+        let next = c;
+        for (const v of targets) {
+          if (!field.read(next).includes(v)) continue;
+          // * merch and otherCosts are lists of objects, so they rename in place;
+          // * the rest are plain values and get a deduped set back.
+          next = field.write(next, [...new Set(field.read(next).map(x => (x === v ? to : x)))], v, to);
+        }
+        const result = await onSaveConcertQuiet(next);
+        if (result?.error) throw result.error;
+      }
+      // * Keep the configured list in step: drop the old spellings, make sure the
+      // * surviving one is present.
+      const settingsKey = settingsKeyFor(list.key);
+      const nextList = [...new Set([...list.items.filter(v => !targets.includes(v)), to])];
+      lUpdate(settingsKey, nextList);
+      onUpdate(settingsKey, nextList);
+
+      setTagDetail(null);
+      setTagRename('');
+      onNotify(affected.length === 0 ? 'Renamed' : `Updated ${affected.length} show${affected.length === 1 ? '' : 's'}`);
+    } catch (err) {
+      onNotify(err?.message || 'Could not finish — some shows may have changed', 'error');
+    }
+    setTagBusy(false);
+  };
 
   const [exportScope, setExportScope] = useState('all');
   const [pendingImport, setPendingImport] = useState(null);
@@ -10241,81 +10334,263 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
       </>}
 
-      {activeSettingsTab === 'tags' && <>
-      {[
-        { label: "Genres", id: "genres", icon: "tag", items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: "Add genre..." },
-        { label: "Subgenres", id: "subgenres", icon: "tag", items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: "Add subgenre..." },
-        { label: "Languages", id: "languages", icon: "online", items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: "Add language..." },
-        { label: "Venue sizes", id: "venueSizes", icon: "layout", items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: "Add venue size..." },
-        { label: "Merch categories", id: "merch", icon: "card", items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: "Add category..." },
-        { label: "Other cost categories", id: "otherCosts", icon: "card", items: otherCostCategories, onRemove: removeOtherCostCategory, input: newOtherCost, onInput: setNewOtherCost, onAdd: addOtherCostCategory, placeholder: "Add cost category..." },
-        { label: "Ticket types", id: "ticketTypes", icon: "list", items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: "Add ticket type..." },
-        { label: "Ticket add-ons", id: "ticketAddons", icon: "list", items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: "Add add-on..." },
-      ].map(({ label, id, icon, items, ...props }) => (
-        <Collapsible key={id} title={`${label} (${items.length})`} icon={icon} defaultOpen={false} {...sec(id)}>
-          <div style={{ background: "#0c0c14", borderRadius: 10, padding: "12px" }}>
-            <TagManager items={items} {...props} />
-          </div>
-        </Collapsible>
-      ))}
-      </>}
+{activeSettingsTab === 'tags' && (() => {
+        // * Eight separate lists became four groups of related ones — the split was
+        // * by storage key rather than by anything you'd think about at once.
+        const GROUPS = [
+          { id: 'music', label: 'Music', icon: 'tag', lists: [
+            { key: 'genres', label: 'Genres', items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: 'Add genre...' },
+            { key: 'subgenres', label: 'Subgenres', items: subgenres, onRemove: removeSubgenre, input: newSubgenre, onInput: setNewSubgenre, onAdd: addSubgenre, placeholder: 'Add subgenre...' },
+          ] },
+          { id: 'show', label: 'The show', icon: 'layout', lists: [
+            { key: 'languages', label: 'Languages', items: languages, onRemove: removeLanguage, input: newLanguage, onInput: setNewLanguage, onAdd: addLanguage, placeholder: 'Add language...' },
+            { key: 'venueSizes', label: 'Venue sizes', items: venueSizes, onRemove: removeVenueSize, input: newVenueSize, onInput: setNewVenueSize, onAdd: addVenueSize, placeholder: 'Add venue size...' },
+          ] },
+          { id: 'tickets', label: 'Tickets', icon: 'list', lists: [
+            { key: 'ticketTypes', label: 'Ticket types', items: ticketTypes, onRemove: removeTicketType, input: newTicketType, onInput: setNewTicketType, onAdd: addTicketType, placeholder: 'Add ticket type...' },
+            { key: 'ticketAddons', label: 'Ticket add-ons', items: ticketAddons, onRemove: removeTicketAddon, input: newTicketAddon, onInput: setNewTicketAddon, onAdd: addTicketAddon, placeholder: 'Add add-on...' },
+          ] },
+          { id: 'money', label: 'Money', icon: 'card', lists: [
+            { key: 'merch', label: 'Merch categories', items: categories, onRemove: removeCategory, input: newCategory, onInput: setNewCategory, onAdd: addCategory, placeholder: 'Add category...' },
+            { key: 'otherCosts', label: 'Other cost categories', items: otherCostCategories, onRemove: removeOtherCostCategory, input: newOtherCost, onInput: setNewOtherCost, onAdd: addOtherCostCategory, placeholder: 'Add category...' },
+          ] },
+        ];
 
-      {false && activeSettingsTab === 'preferences' && (
-        <SettingsSection title="Visible sections" icon="layout">
-          <SettingsRow label="Summary scope" sub="Default time range on summary page">
-            <SettingsOptionPills
-              value={local.summaryYear || 'all'}
-              options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
-              onChange={v => { lUpdate('summaryYear', v); }}
-            />
-          </SettingsRow>
-        {(() => {
-          const hiddenBlocks = local.hiddenSummaryBlocks || [];
-          const hiddenGroups = local.hiddenChartGroups || [];
-          const hiddenChts = local.hiddenCharts || [];
-          const toggleBlock = id => { const next = hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]; lUpdate('hiddenSummaryBlocks', next); };
-          const toggleGroup = id => { const next = hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]; lUpdate('hiddenChartGroups', next); };
-          const toggleChart = id => { const next = hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]; lUpdate('hiddenCharts', next); };
-          const pill = (label, active, onClick, small = false) => (
-            <button onClick={onClick} style={{
-              padding: small ? '2px 8px' : '3px 10px', borderRadius: 99, fontSize: small ? 9 : 10, cursor: 'pointer',
-              fontFamily: "'DM Mono', monospace", border: `1px solid ${active ? '#a78bfa' : '#1f1f35'}`,
-              background: active ? '#1a1a30' : 'none', color: active ? '#a78bfa' : '#4a4870',
-            }}>{label}</button>
-          );
-          const BLOCKS = [{ id: 'stats1', label: 'Stats' }, { id: 'cumulative', label: 'Cumulative' }, { id: 'pies', label: 'Genres & Venues' }, { id: 'upnext', label: 'Up next' }];
-          const ALL_CHART_GROUPS = [
-            { id: 'activity', label: 'Activity', charts: [{ id: 'artists', label: 'Artist overview' }, { id: 'language', label: 'Language' }] },
-            { id: 'friends', label: 'Friends', charts: [{ id: 'solo', label: 'Friends & group size' }] },
-            { id: 'places', label: 'Places', charts: [{ id: 'venues', label: 'Top venues' }, { id: 'venue-loyalty', label: 'Venue loyalty' }] },
-            { id: 'financial', label: 'Financial', charts: [{ id: 'year-spend', label: 'Spending per year' }, { id: 'averages', label: 'Averages' }, { id: 'expensive', label: 'Most expensive shows' }, { id: 'merch-overview', label: 'Merch' }] },
-            { id: 'music', label: 'Music', charts: [{ id: 'songs', label: 'Top songs' }, { id: 'covers', label: 'Covers' }] },
-          ];
+        // * One pass over every show per list: how often each value is actually used,
+        // * which configured values are used by nothing, and which values exist on
+        // * shows without ever having been saved to the list.
+        const usageFor = key => {
+          const counts = {};
+          concerts.forEach(c => TAG_FIELDS[key].read(c).forEach(v => { counts[v] = (counts[v] || 0) + 1; }));
+          return counts;
+        };
+        const analysis = {};
+        GROUPS.forEach(g => g.lists.forEach(l => {
+          const counts = usageFor(l.key);
+          const configured = new Set(l.items);
+          const unsaved = Object.keys(counts).filter(v => !configured.has(v));
+          const unused = l.items.filter(v => !counts[v]);
+          // * Duplicates differ only by case or punctuation — they split your stats
+          // * the same way two spellings of a friend's name split a history.
+          const buckets = {};
+          [...l.items, ...unsaved].forEach(v => {
+            const k = tagKey(v);
+            if (!k) return;
+            (buckets[k] = buckets[k] || []).push(v);
+          });
+          const dupes = Object.values(buckets).filter(vs => vs.length > 1);
+          analysis[l.key] = { counts, unsaved, unused, dupes };
+        }));
+
+        const totals = Object.values(analysis).reduce((a, x) => ({
+          unsaved: a.unsaved + x.unsaved.length,
+          unused: a.unused + x.unused.length,
+          dupes: a.dupes + x.dupes.length,
+        }), { unsaved: 0, unused: 0, dupes: 0 });
+
+        const tagPill = (list, value, count, kind) => {
+          const styles = {
+            unsaved: { border: '1px solid #4a3a28', background: '#1a1410', color: '#e0a35f' },
+            unused: { border: '1px dashed #3a3858', background: 'none', color: '#4a4870' },
+            hot: { border: '1px solid #a78bfa', background: '#241d47', color: '#fff' },
+            warm: { border: '1px solid #3a2f66', background: '#0c0c14', color: '#c4c2f0' },
+          };
           return (
-            <div style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Summary blocks</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
-                {BLOCKS.map(b => pill(b.label, !hiddenBlocks.includes(b.id), () => toggleBlock(b.id)))}
-              </div>
-              <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Charts</div>
-              {ALL_CHART_GROUPS.map(g => (
-                <div key={g.id} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    {pill(g.label, !hiddenGroups.includes(g.id), () => toggleGroup(g.id))}
-                  </div>
-                  {!hiddenGroups.includes(g.id) && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingLeft: 10, borderLeft: '2px solid #1f1f35' }}>
-                      {g.charts.map(c => pill(c.label, !hiddenChts.includes(c.id), () => toggleChart(c.id), true))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <button
+              key={`${list.key}-${value}`}
+              onClick={() => setTagDetail({ listKey: list.key, label: list.label, value, count, unsaved: kind === 'unsaved', list })}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 99,
+                padding: '4px 10px', fontSize: 11.5, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+                ...styles[kind],
+              }}
+            >
+              {value}
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, opacity: 0.75 }}>{count}</span>
+            </button>
           );
-        })()}
-        </SettingsSection>
-      )}
+        };
 
+        return (
+          <>
+            {/* Health line — tells you whether the page needs attention before you
+                open anything, which eight closed accordions never could. */}
+            {(totals.unsaved > 0 || totals.unused > 0 || totals.dupes > 0) ? (
+              <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: '#1a1410', border: '1px solid #4a3a28', borderRadius: 10, padding: '11px 13px', marginBottom: 14 }}>
+                <span style={{ color: '#e0a35f', fontFamily: "'DM Mono', monospace", fontSize: 12, lineHeight: 1.4 }}>!</span>
+                <div style={{ fontSize: 11.5, color: '#e0a35f', lineHeight: 1.55 }}>
+                  <b>{[
+                    totals.unsaved > 0 && `${totals.unsaved} unsaved`,
+                    totals.unused > 0 && `${totals.unused} unused`,
+                    totals.dupes > 0 && `${totals.dupes} possible duplicate${totals.dupes === 1 ? '' : 's'}`,
+                  ].filter(Boolean).join(' · ')}</b>
+                  <br />Open a group below to sort them out.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 9, alignItems: 'center', background: '#101d18', border: '1px solid #1c4a3a', borderRadius: 10, padding: '11px 13px', marginBottom: 14 }}>
+                <span style={{ color: '#6cc79c', fontSize: 12 }}>·</span>
+                <div style={{ fontSize: 11.5, color: '#6cc79c' }}>Every tag is in use and nothing is missing.</div>
+              </div>
+            )}
+
+            {GROUPS.map(g => {
+              const gUnsaved = g.lists.reduce((n, l) => n + analysis[l.key].unsaved.length, 0);
+              const gUnused = g.lists.reduce((n, l) => n + analysis[l.key].unused.length, 0);
+              const gCount = g.lists.reduce((n, l) => n + l.items.length, 0);
+              const flag = gUnsaved > 0 ? { label: `${gUnsaved} unsaved`, color: '#e0a35f' }
+                : gUnused > 0 ? { label: `${gUnused} unused`, color: '#4a4870' }
+                : { label: String(gCount), color: '#6b6a8f' };
+              return (
+                <Collapsible key={g.id} title={g.label} icon={g.icon} defaultOpen={false} subtitle={flag} {...sec(g.id)}>
+                  <div style={{ background: '#0c0c14', borderRadius: 10, padding: '12px' }}>
+                    {g.lists.map((l, li) => {
+                      const a = analysis[l.key];
+                      const max = Math.max(1, ...Object.values(a.counts));
+                      return (
+                        <div key={l.key} style={{ marginBottom: li < g.lists.length - 1 ? 18 : 0 }}>
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: '#6b6a8f', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8 }}>
+                            {l.label} · {l.items.length}
+                          </div>
+
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+                            {[...l.items]
+                              .sort((x, y) => (a.counts[y] || 0) - (a.counts[x] || 0))
+                              .map(v => tagPill(l, v, a.counts[v] || 0, !a.counts[v] ? 'unused' : (a.counts[v] / max) > 0.5 ? 'hot' : 'warm'))}
+                          </div>
+
+                          {/* Used on shows, never saved to the list — so they don't get
+                              offered next time and you end up retyping or mistyping them. */}
+                          {a.unsaved.length > 0 && (
+                            <div style={{ background: '#13100c', border: '1px solid #3a2f22', borderRadius: 9, padding: '9px 10px', marginBottom: 10 }}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: '#e0a35f', marginBottom: 7, lineHeight: 1.5 }}>
+                                On your shows but not in this list — they won't be offered next time
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                                {a.unsaved.map(v => tagPill(l, v, a.counts[v], 'unsaved'))}
+                              </div>
+                              <button
+                                onClick={() => { const next = [...l.items, ...a.unsaved]; lUpdate(settingsKeyFor(l.key), next); }}
+                                style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 11, fontWeight: 700, padding: '7px 13px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                              >Add {a.unsaved.length === 1 ? 'it' : `all ${a.unsaved.length}`}</button>
+                            </div>
+                          )}
+
+                          {a.dupes.length > 0 && (
+                            <div style={{ background: '#13100c', border: '1px solid #3a2f22', borderRadius: 9, padding: '9px 10px', marginBottom: 10 }}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: '#e0a35f', marginBottom: 7 }}>
+                                These differ only by case or punctuation
+                              </div>
+                              {a.dupes.map(vs => {
+                                const keep = [...vs].sort((x, y) => (a.counts[y] || 0) - (a.counts[x] || 0))[0];
+                                const total = vs.reduce((n, v) => n + (a.counts[v] || 0), 0);
+                                return (
+                                  <div key={vs.join('|')} style={{ marginBottom: 7 }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                                      {vs.map(v => tagPill(l, v, a.counts[v] || 0, v === keep ? 'hot' : 'unsaved'))}
+                                    </div>
+                                    <button
+                                      onClick={() => mergeTags(l, vs.filter(v => v !== keep), keep)}
+                                      style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#a78bfa', fontSize: 10.5, padding: '6px 11px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
+                                    >Merge into "{keep}" · {total} show{total === 1 ? '' : 's'}</button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                              value={l.input}
+                              onChange={e => l.onInput(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && l.onAdd()}
+                              placeholder={l.placeholder}
+                              style={tagInput}
+                            />
+                            <button onClick={l.onAdd} style={addBtn}>Add</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Collapsible>
+              );
+            })}
+
+            {/* Tap any tag: what it's on, rename it everywhere, or remove it. */}
+            {tagDetail && (() => {
+              const a = analysis[tagDetail.listKey];
+              const shows = concerts
+                .filter(c => TAG_FIELDS[tagDetail.listKey].read(c).includes(tagDetail.value))
+                .sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+              return (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: '#000000cc', display: 'flex', alignItems: 'flex-end' }} onClick={() => { setTagDetail(null); setTagRename(''); }}>
+                  <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: '#13131f', borderRadius: '16px 16px 0 0', padding: '20px 20px 34px', boxSizing: 'border-box', maxHeight: '80vh', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <div>
+                        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: '#e2e0ff' }}>{tagDetail.value}</div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#6b6a8f', marginTop: 2 }}>
+                          {tagDetail.label} · {tagDetail.count} show{tagDetail.count === 1 ? '' : 's'}
+                          {tagDetail.unsaved && ' · not in your list'}
+                        </div>
+                      </div>
+                      <button onClick={() => { setTagDetail(null); setTagRename(''); }} style={{ background: 'none', border: 'none', color: '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+                    </div>
+
+                    {shows.length > 0 && (
+                      <div style={{ margin: '14px 0', maxHeight: 180, overflowY: 'auto' }}>
+                        {shows.slice(0, 40).map(c => (
+                          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderBottom: '1px solid #1a1a2e', fontSize: 12 }}>
+                            <span style={{ color: '#c4c2f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.artist}</span>
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#6b6a8f', flexShrink: 0 }}>'{(c.date || '').slice(2, 4)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ! Rename rewrites the value on every show carrying it. Deleting and
+                        ! re-adding never did that — the shows kept the old spelling. */}
+                    <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5, marginTop: 14 }}>Rename</div>
+                    <input
+                      value={tagRename}
+                      onChange={e => setTagRename(e.target.value)}
+                      placeholder={tagDetail.value}
+                      style={{ width: '100%', boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '9px 12px', fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 9 }}
+                    />
+                    {tagRename.trim() && tagRename.trim() !== tagDetail.value && (
+                      <div style={{ background: '#1a1410', border: '1px solid #4a3a28', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#e0a35f', lineHeight: 1.5, marginBottom: 9 }}>
+                        {tagDetail.count} show{tagDetail.count === 1 ? '' : 's'} will be updated to "{tagRename.trim()}".
+                      </div>
+                    )}
+                    <button
+                      onClick={() => mergeTags(tagDetail.list, [tagDetail.value], tagRename.trim())}
+                      disabled={!tagRename.trim() || tagRename.trim() === tagDetail.value || tagBusy}
+                      style={{
+                        width: '100%', borderRadius: 10, padding: '11px', fontSize: 13, fontWeight: 700, marginBottom: 9,
+                        border: 'none', fontFamily: "'DM Sans', sans-serif",
+                        background: tagRename.trim() && tagRename.trim() !== tagDetail.value && !tagBusy ? '#a78bfa' : '#1f1f35',
+                        color: tagRename.trim() && tagRename.trim() !== tagDetail.value && !tagBusy ? '#0c0c14' : '#4a4870',
+                        cursor: tagRename.trim() && tagRename.trim() !== tagDetail.value && !tagBusy ? 'pointer' : 'default',
+                      }}
+                    >{tagBusy ? 'Renaming…' : 'Rename everywhere'}</button>
+
+                    {!tagDetail.unsaved && (
+                      <button
+                        onClick={() => { tagDetail.list.onRemove(tagDetail.value); setTagDetail(null); setTagRename(''); }}
+                        style={{ width: '100%', background: 'none', border: '1px solid #2e2e50', borderRadius: 10, color: tagDetail.count > 0 ? '#6b6a8f' : '#f87171', fontSize: 12, padding: '10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}
+                      >
+                        {tagDetail.count > 0
+                          ? `Remove from the list (${tagDetail.count} show${tagDetail.count === 1 ? '' : 's'} keep it)`
+                          : 'Remove — used by nothing'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        );
+      })()}
       {activeSettingsTab === 'account' && <>
         {/* Profile */}
         <SettingsSection title="Profile" icon="person">
@@ -11657,7 +11932,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNotify={notify} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onDeleteConcert={onDeleteConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
+        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSaveConcertQuiet={onSaveConcert} onDeleteConcert={onDeleteConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
         {view === 'photos' && <PhotoWallView concerts={concerts} onOpen={handleOpenConcert} onBack={() => setView(settings.defaultTab || 'stats')} />}
         </div>
       </div>

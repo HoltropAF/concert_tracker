@@ -1,15 +1,34 @@
+// * Bulk-links one artist's setlist to Spotify tracks. Opened as a sheet from a
+// * setlist; searches every song automatically, then lets the user confirm, correct
+// * or unlink each one before a single save.
+// *
+// * Nothing is written until the user hits Save — `onSave(updatedSongs)` receives the
+// * complete rewritten song array and the caller persists it. This component never
+// * touches Supabase.
+// *
+// ! Requires an already-connected Spotify account (Settings). Without a valid token
+// ! getToken() returns null and every row silently stays in the "searching" state.
 import { useState, useEffect, useRef } from 'react'
 import { getValidSpotifyToken } from '../lib/spotify'
 
+// ! Duplicated from ConcertTracker.jsx rather than imported, to keep this component
+// ! independently lazy-loadable. If the song shape changes, both copies must change.
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '')
 const getSongSpotifyId = s => (s && typeof s === 'object' && s.spotifyId) ? s.spotifyId : null
 
+// Strips case, punctuation and curly quotes so "Don't Stop Me Now!" and
+// "Dont Stop Me Now" compare equal.
 const norm = s => s.toLowerCase()
   .replace(/[''`]/g, "'")
   .replace(/[^a-z0-9 ']/g, ' ')
   .replace(/\s+/g, ' ')
   .trim()
 
+// Decides whether a Spotify result is confident enough to pre-confirm. Prefix
+// matching (not just equality) is deliberate: Spotify titles routinely carry
+// suffixes a setlist doesn't — "Song - Live", "Song (Remastered 2011)".
+// ! It's prefix-only, so a title that differs at the start ("Live at Wembley - Song")
+// ! scores as low confidence and lands in the manual-review pile.
 const isGoodMatch = (a, b) => {
   const na = norm(a), nb = norm(b)
   if (na === nb) return true
@@ -17,6 +36,8 @@ const isGoodMatch = (a, b) => {
   return longer.startsWith(shorter)
 }
 
+// Flattens a Spotify track into the subset we store on a song. These exact keys are
+// what handleSave writes onto (and strips off) the song object.
 const extractTrack = t => ({
   id: t.id,
   name: t.name,
@@ -29,6 +50,8 @@ const extractTrack = t => ({
   trackNumber: t.track_number || null,
 })
 
+// Inline free-text Spotify search, expanded under a single song row when the
+// automatic match was wrong, low-confidence or not found.
 function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick, onCancel }) {
   return (
     <div style={{ marginTop: 8, background: '#0e0e1a', borderRadius: 8, padding: 10, border: '1px solid #1f1f35' }}>
@@ -73,6 +96,17 @@ function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick
   )
 }
 
+// * All state is keyed by a song's index in the `songs` array, not by name — the same
+// * title can legitimately appear twice in one setlist.
+// * A row's rendered state is decided by the precedence: removals → choices → results.
+// *   results[i] === null   still searching
+// *   results[i].alreadyLinked  had a spotifyId before this session
+// *   results[i].notFound   search returned nothing
+// *   results[i].id         a suggestion awaiting confirmation (high/low confidence)
+// *   choices[i]            user-confirmed track, will be written on save
+// *   removals.has(i)       existing link will be stripped on save
+// ! `songs` is read once into per-index state; the component assumes the array does
+// ! not change identity or length while it's mounted.
 export default function SpotifyMatcher({ artist, songs, settings, saveSettings, onSave, onClose }) {
   const [results, setResults] = useState(() => new Array(songs.length).fill(null))
   const [choices, setChoices] = useState({})   // index → confirmed track object
@@ -97,6 +131,9 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
     return t
   }
 
+  // * Retries once on a 429 after a flat 2s wait — enough for the light burst this
+  // * component makes. Any other failure returns [] rather than throwing, so one bad
+  // * song can't abort the run() loop partway through the setlist.
   async function searchSpotify(query, limit = 5) {
     const token = await getToken()
     if (!token) return []
@@ -117,6 +154,13 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
     } catch { return [] }
   }
 
+  // * The initial auto-match pass. Deliberately sequential with a 120ms gap rather
+  // * than Promise.all: a 30-song setlist fired in parallel reliably trips Spotify's
+  // * rate limiter. Results are published after each song so the list fills in live.
+  // * High-confidence matches are pre-confirmed into `choices`; low-confidence ones
+  // * are left as suggestions the user has to accept.
+  // * `cancelled` (set by the unmount cleanup) aborts the loop, so closing the sheet
+  // * mid-search doesn't keep calling setState on an unmounted component.
   async function run() {
     const token = await getToken()
     if (!token) return
@@ -182,6 +226,10 @@ export default function SpotifyMatcher({ artist, songs, settings, saveSettings, 
     setChoices({})
   }
 
+  // * Rewrites the whole song array in one pass and hands it to onSave.
+  // * Unlinking narrows a song back down: strip the Spotify keys, and if `name` is all
+  // * that's left, collapse the object back to a plain string so the data shape stays
+  // * as small as it was before it was ever linked.
   const handleSave = () => {
     const updated = songs.map((song, i) => {
       const choice = choices[i]

@@ -3,6 +3,10 @@
 // non-issue here since this only fires when a genuinely new venue is saved.
 // https://operations.osmfoundation.org/policies/nominatim/
 
+// * Returns { lat, lng } or null. Null covers everything — no match, a network
+// * failure, a rate-limit rejection — because the only caller (maybeGeocodeVenue in
+// * ConcertTracker) treats the whole operation as optional enrichment and must never
+// * surface an error to the user mid-save.
 export async function geocodeVenue(name, city, country) {
   const query = [name, city, country].filter(Boolean).join(', ')
   if (!query) return null

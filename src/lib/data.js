@@ -1,5 +1,21 @@
+// * Static seed/default data. No logic, no imports — everything here is either
+// * initial content or the baseline shape of the settings object.
+
+// * Optional hardcoded library, written to the DB on a user's very first login.
+// * Empty is the normal case, and useConcerts branches on that: when empty, the DB is
+// * the sole source of truth for concerts; when populated, SEED_DATA wins for base
+// * fields and the DB only wins for the user-editable ones (rating, merch, notes,
+// * friends, solo). Filling this in turns the app into a fixed, curated log.
 export const SEED_DATA = []
 
+// * Demo library loaded into localStorage on a visitor's first guest session, so the
+// * app has something to show instead of empty views. Never touches Supabase, and is
+// * wiped by clearGuest() on exit.
+// * Chosen to exercise the interesting cases: solo and group shows, a multi-day
+// * festival with an acts list, a support act, a foreign country, and a future date
+// * that renders as upcoming.
+// ! demo-10 is dated 2027 to stay in the future. It will start reading as a past show
+// ! in 2027 and should be pushed forward before then.
 export const SAMPLE_CONCERTS = [
   {
     id: 'demo-1',
@@ -108,6 +124,13 @@ export const SAMPLE_CONCERTS = [
   },
 ]
 
+// * Baseline for every user's settings object. normalizeSettings() in useSupabase.js
+// * merges the stored blob over this, so a key added here is picked up automatically
+// * by existing accounts.
+// ! Any new setting must get an entry here. A key that only exists at the call site
+// ! reads as `undefined` for every existing user, and the list-valued ones
+// ! (merchCategories, genres, subgenres, languages, venueSizes) are additionally used
+// ! as the fallback when a stored value fails validation.
 export const DEFAULT_SETTINGS = {
   topArtistsRows: 6,
   topFriendsRows: 8,
@@ -140,4 +163,6 @@ export const DEFAULT_SETTINGS = {
   defaultCountry: '',
 }
 
+// ! Dead export — nothing imports this. Friends are derived from concert.friends
+// ! strings at render time; there is no canonical friend list anywhere.
 export const FRIENDS = []

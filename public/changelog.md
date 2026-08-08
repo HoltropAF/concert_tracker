@@ -1,6 +1,26 @@
 # Changelog
 
-## 1 August 2026
+## 1.1.0 — 8 August 2026
+- Opening the app is one loading screen instead of three, and your library paints instantly from a local copy while it refreshes in the background
+- Friends: your three most-seen friends get a podium, and every row shows a bar per year so you can see when you drifted apart
+- Each friend now has their own page, with Overview, History and Photos tabs
+- Shared history: every show together on one timeline, with quiet stretches marked, ratings inline, and upcoming plans joined on the end
+- Nights that were just the two of you are marked as such
+- Tag who is actually in a photo, then filter a friend's photos down to the ones they're in
+- Merge duplicate friends, so "Sophie" and "Soph" stop splitting one history in half
+- Share your history with someone as an image or as text
+- See what you've spent together, where you've been on a map, and how many songs you've both heard live
+- Removing a photo now deletes the file, instead of only unlinking it
+- Settings saves only when you press Save, with a bar showing what's unsaved — and saving can no longer wipe preferences written in the background
+- Colours still preview instantly while you pick them
+- Update notices are one line now, and dismissing one leaves it waiting in Settings
+- Fixed Share and Edit sitting underneath the status bar on show, artist, venue and song pages
+- Fixed photos in the pinned artist gallery not opening their show
+- Fixed a crash when opening "Add a show"
+- Fixed "import friend groups from history" failing immediately
+- Fixed want-to-go shows being counted as shows you'd attended
+
+## 1.0.1 — 1 August 2026
 - Financial tab: cost-per-song and a "worth it" quote pairing cost with rating
 - Setlist tab: set length, album grouping, an encore marker, and a "Save to Spotify" button that creates a real playlist from the setlist
 - Fixed a bug where editing a song's note or cover could silently wipe its Spotify match data

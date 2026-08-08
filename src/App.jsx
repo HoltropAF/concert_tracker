@@ -1,3 +1,15 @@
+// * The app shell below the root error boundary. Its whole job is deciding *which*
+// * of five mutually exclusive screens to show, and where ConcertTracker's data
+// * comes from:
+// *
+// *   booting     → render nothing, leave the index.html splash up
+// *   guestMode   → ConcertTracker fed from localStorage (useGuestMode)
+// *   dbSleeping  → the "database is napping" recovery screen
+// *   !user       → AuthScreen
+// *   otherwise   → ConcertTracker fed from Supabase (useSupabase hooks)
+// *
+// * It also completes the Spotify OAuth redirect, since that lands on "/" and has to
+// * be handled before any view renders.
 import { Component, Suspense, lazy, useState, useEffect, useCallback } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
@@ -59,6 +71,8 @@ class AppErrorBoundary extends Component {
   }
 }
 
+// * Shown only after the browser fires `beforeinstallprompt`, so it never appears on
+// * iOS Safari (no such event) or when the PWA is already installed.
 function InstallBanner({ onInstall, onDismiss }) {
   return (
     <div style={{
@@ -85,6 +99,9 @@ function InstallBanner({ onInstall, onDismiss }) {
 // * SAMPLE_CONCERTS are loaded on first guest visit so there's something to explore.
 // ============================================================
 
+// * Mirrors the API surface of useConcerts + useSettings so ConcertTracker can be
+// * handed either one without knowing the difference. Saves are synchronous but still
+// * return { error: null } to match the async signature callers expect.
 function useGuestMode() {
   const [concerts, setConcerts] = useState(() => {
     try { return JSON.parse(localStorage.getItem('guest_concerts') || '[]') } catch { return [] }

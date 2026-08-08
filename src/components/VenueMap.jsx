@@ -1,3 +1,13 @@
+// * Leaflet map of venues, used both as a full map on the Venues tab and as a small
+// * single-venue preview on a venue's detail page. The one component covers both via
+// * `interactive`, `focus` and `clickOpensMaps`.
+// *
+// * Leaflet is imperative, so the map instance is created once in a mount-only effect
+// * and kept in a ref; a second effect tears down and re-adds all markers whenever
+// * `points` changes. Nothing here is React-rendered except the container div.
+// ! Coordinates are not fetched here. `points` must already carry lat/lng, which
+// ! ConcertTracker fills into settings.venueInfo via lib/geocode.js. Points without
+// ! numeric lat/lng are silently skipped.
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -126,6 +136,9 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
   return <div ref={containerRef} style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden' }} />
 }
 
+// ! Leaflet popups take an HTML string, not JSX, so venue names and notes are
+// ! interpolated raw. Everything user-typed that goes into bindPopup must pass
+// ! through here first.
 function escapeHtml(s) {
   const d = document.createElement('div')
   d.textContent = s

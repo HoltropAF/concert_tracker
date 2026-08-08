@@ -1,3 +1,15 @@
+// * The entire data layer. Three hooks — useAuth, useConcerts, useSettings — are the
+// * only place in the app that talks to Supabase for user data (lib/photos.js handles
+// * storage separately). App wires them up and passes plain values and callbacks down
+// * to ConcertTracker, which never imports this module.
+// *
+// * Storage model: two tables, both a thin envelope around a JSON blob —
+// *   concerts(id, user_id, data, updated_at)   one row per show
+// *   settings(user_id, data, updated_at)       one row per user
+// * There is no relational schema for artists, friends, venues or songs; those are
+// * derived at render time from strings inside the concert blobs. That's why the
+// * normalizers below matter: a blob written by an older version of the app is still
+// * a valid row, so shape has to be enforced on read rather than by the database.
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
@@ -58,6 +70,11 @@ const normalizeConcert = (value, fallbackId = '') => {
   }
 }
 
+// * Merges a stored settings blob over DEFAULT_SETTINGS, then re-validates the fields
+// * that are collections. A key that was added in a later version is simply absent
+// * from an old blob and picks up its default here — which is why new settings must
+// * always be given a sensible entry in DEFAULT_SETTINGS rather than relying on
+// * `undefined` behaving correctly at the call site.
 const normalizeSettings = (value) => {
   const settings = value && typeof value === 'object' ? value : {}
   const merged = { ...DEFAULT_SETTINGS, ...settings }
@@ -136,6 +153,12 @@ function clearCaches() {
 // HOOKS
 // ============================================================
 
+// * Magic-link (OTP) auth only — no passwords, no OAuth provider for app login.
+// * Returns { user, loading, signIn, signOut, dbSleeping }.
+// * `dbSleeping` is a third state beyond signed-in/signed-out: the project itself is
+// * unreachable, which App renders as its own screen rather than as an auth failure.
+// ! signOut clears the localStorage caches before Supabase's own sign-out, so a
+// ! second account signing in on the same device can't be served the first one's data.
 export function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -190,6 +213,15 @@ export function useAuth() {
   return { user, loading, signIn, signOut, dbSleeping }
 }
 
+// * The whole concert library for one user, held in memory. Returns
+// * { concerts, loaded, saveConcert, deleteConcert, reload }.
+// * Pass `null` as userId to disable the hook entirely — that's how App runs it in
+// * guest mode, where useGuestMode supplies the same shape from localStorage instead.
+// * saveConcert doubles as create and update (it upserts on concert.id), and both
+// * mutations are optimistic with rollback on DB error.
+// ! `loaded` means "we have something to show", not "the DB has answered" — it flips
+// ! true as soon as the localStorage cache is applied. Don't use it to decide whether
+// ! a user genuinely has zero shows.
 export function useConcerts(userId) {
   const [concerts, setConcerts] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -304,6 +336,15 @@ export function useConcerts(userId) {
   return { concerts, loaded, saveConcert, deleteConcert, reload: loadConcerts }
 }
 
+// * All user preferences as one object. Returns
+// * { settings, settingsLoaded, saveSetting, saveSettings }.
+// * This object is far more than preferences: it also carries derived-entity metadata
+// * that has nowhere else to live — venueInfo (coordinates, parking, transit),
+// * friendProfiles, per-artist page config, savedVenues, friendGroups and the Spotify
+// * tokens. Anything keyed by an artist/venue/friend *name* is in here.
+// ! saveSettings replaces the entire object. Always spread the current settings into
+// ! the argument; passing a partial silently deletes every key you left out.
+// ! saveSetting(key, value) does that spread for you and is the safer default.
 export function useSettings(userId) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   // * Distinguishes "these are still the defaults" from "these are really yours".

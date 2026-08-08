@@ -1,8 +1,32 @@
+// * The entire settracker UI lives in this one module. It is deliberately a single
+// * file: every view reads from the same `concerts` array and `settings` object
+// * passed down from App, and they share ~40 module-level helpers (date/cost/setlist
+// * accessors) that would otherwise need a barrel of tiny imports.
+// *
+// * Layout of this file, top to bottom:
+// *   1. Small shared primitives + hooks   (haptic, useExitingValue, useBackButton)
+// *   2. HELPERS block                     (date math, cost totals, song accessors,
+// *                                         friend colour hashing, colour-filter math)
+// *   3. COMPONENTS block                  (form controls, charts, cards, setlists)
+// *   4. The seven big views               ConcertDetail, StatsView, FriendsView,
+// *                                         ArtistsView, SongsView, VenuesView,
+// *                                         PhotoWallView, SettingsView, AddConcertForm
+// *   5. MAIN APP                          the exported ConcertTracker shell
+// *
+// * State model: ConcertTracker owns all navigation and filter state and passes
+// * plain props down. There is no context and no router — "navigation" is a `view`
+// * string plus a set of `pending*Select` hand-off values (see the MAIN APP section).
+// *
+// ! Persistence is never done here. Every mutation goes through the onSaveConcert /
+// ! onUpdateSetting props supplied by App, which are backed either by Supabase
+// ! (useSupabase.js) or by localStorage (guest mode).
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
 import { geocodeVenue } from '../lib/geocode'
+import { supabase } from '../lib/supabase'
+import { useSWUpdate } from '../lib/swUpdate'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
 import html2canvas from 'html2canvas'
@@ -39,6 +63,9 @@ const ONBOARDING_STEPS = [
   { icon: '👉', title: 'Small gestures, big shortcuts', body: 'Swipe or long-press a wishlist show to quickly remove it — no need to open it first.' },
 ];
 
+// * Controlled — ConcertTracker owns `step` so the tour survives a re-render, and
+// * `onDismiss` is what persists hasSeenOnboarding. Dismissing early (Skip, or the ×)
+// * counts as seen; there is no "show me again" beyond resetting that setting.
 function OnboardingTour({ step, setStep, onDismiss }) {
   const s = ONBOARDING_STEPS[step];
   const isLast = step === ONBOARDING_STEPS.length - 1;
@@ -108,6 +135,9 @@ function Confetti({ onDone }) {
 
 // * Animates a number counting up from 0 to its target value on mount/change.
 // * Re-triggers whenever `value` changes (e.g. switching between artists).
+// ! Module-level and never cleared, so it survives unmount and even sign-out.
+// ! Give each counter a stable `id` — reusing one across different stats means the
+// ! second one silently skips its animation.
 const countUpSeen = new Set(); // module-level: which CountUp ids have already animated this session
 function CountUp({ value, duration = 900, id }) {
   const alreadySeen = id ? countUpSeen.has(id) : false;
@@ -131,6 +161,11 @@ function CountUp({ value, duration = 900, id }) {
   return display
 }
 
+// * Photos live in a private Supabase bucket, so a storage path can't be used as an
+// * <img src> directly — it has to be exchanged for a signed URL first (getPhotoUrl
+// * caches those). Renders a skeleton until the URL arrives.
+// * `pos` is the saved crop focal point { x, y } as percentages, applied via
+// * object-position so one upload can be framed differently per aspect ratio.
 function PhotoImg({ path, style, pos }) {
   const [url, setUrl] = useState(null)
   useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
@@ -139,6 +174,10 @@ function PhotoImg({ path, style, pos }) {
   return <img src={url} alt="" loading="lazy" style={{ ...style, objectFit: 'cover', objectPosition, display: 'block' }} />
 }
 
+// Drag-to-reframe control for a concert photo. Nothing is re-encoded — dragging only
+// moves the CSS object-position focal point, which is stored on the concert as
+// `photoPos` and reused everywhere the photo is displayed. Shows both the 16:9 detail
+// crop and the 5:2 list crop, since one focal point has to work for both.
 function PhotoAdjust({ path, pos, onChange }) {
   const [url, setUrl] = useState(null)
   const boxRef = useRef(null)
@@ -177,6 +216,9 @@ function PhotoAdjust({ path, pos, onChange }) {
   )
 }
 
+// Same focal-point drag as PhotoAdjust, but for an artist's page banner: one fixed
+// 190px-tall crop and an explicit Done button, because it edits in place over the
+// real banner rather than in a settings panel.
 function ArtistBannerReframe({ path, pos, onChange, onDone }) {
   const [url, setUrl] = useState(null)
   const boxRef = useRef(null)
@@ -217,8 +259,41 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // HELPERS
 // ============================================================
 
-const APP_VERSION = '1.0.1'
-// TODO: bump APP_VERSION in every release and update public/changelog.md before going public
+// ! Bump this and add a matching "## <version> — <date>" heading to
+// ! public/changelog.md in every release. The two are read together: What's new
+// ! shows the releases listed above whichever version you last opened, so a
+// ! mismatch between them means either nothing is shown or everything is.
+const APP_VERSION = '1.1.0'
+const LAST_SEEN_VERSION_KEY = 'last_seen_version'
+
+// * Splits changelog.md into { version, date, entries } by its "## " headings.
+// * Anything before the first heading (the title) is ignored.
+function parseChangelog(text) {
+  const releases = []
+  for (const raw of (text || '').split('\n')) {
+    const line = raw.trim()
+    if (line.startsWith('## ')) {
+      const heading = line.slice(3)
+      const [version, date] = heading.split('—').map(s => s.trim())
+      releases.push({ version, date: date || '', entries: [] })
+    } else if (line.startsWith('- ') && releases.length > 0) {
+      releases[releases.length - 1].entries.push(line.slice(2))
+    }
+  }
+  return releases
+}
+
+// * Compares dotted versions numerically, so 1.10.0 sorts above 1.9.0 rather than
+// * below it the way a string comparison would.
+function versionIsNewer(a, b) {
+  const pa = String(a).split('.').map(Number)
+  const pb = String(b).split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0
+    if (x !== y) return x > y
+  }
+  return false
+}
 
 const CHART_GROUP_IDS = [
   { id: "activity",  label: "Activity"  },
@@ -228,6 +303,12 @@ const CHART_GROUP_IDS = [
   { id: "music",     label: "Music"     },
 ];
 
+// * Makes the phone's back gesture close an overlay instead of leaving the PWA.
+// * Pushes a dummy history entry while `enabled`, and calls `onBack` when the user
+// * pops it. Mount this in any component that behaves like a modal or detail page.
+// ! Every simultaneously-open overlay pushes its own entry, so mounting order and
+// ! unmount order must be strictly nested — two siblings both calling this will
+// ! fight over the same history stack.
 function useBackButton(onBack, enabled = true) {
   const cb = useRef(onBack);
   const pushed = useRef(false);
@@ -251,6 +332,10 @@ function useBackButton(onBack, enabled = true) {
   }, [enabled]);
 }
 
+// * Dates are stored as bare "YYYY-MM-DD" strings throughout the app, never as Date
+// * objects. The "T00:00:00" suffix forces local-time parsing — without it the
+// * browser reads a bare date as UTC and a show can display one day early west of
+// * Greenwich. Any new date helper here must keep that suffix.
 const formatDate = (dateStr) => {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -278,11 +363,21 @@ const formatGap = (months) => {
   return m === 0 ? `${y} years` : `${y}y ${m}m`;
 };
 
+// * "Past" is a plain string comparison against today, which works because every
+// * date is zero-padded YYYY-MM-DD. Cheaper than Date maths and used in hot filter
+// * loops over the whole library.
+// ! todayStr is computed once at module load. A session left open across midnight
+// ! keeps yesterday's boundary until the page is reloaded.
 const today = new Date();
 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 const isPast = (dateStr) => dateStr < todayStr;
+// * The three show states are mutually exclusive in the UI but not in the data:
+// * a wishlist entry also has a date, so isWish() must be checked *before* isPast().
 const isWish = c => !!c?.wishlist;
 const isOnline = c => c?.attendanceMode === 'online';
+// * Best-effort icon from a free-text venue size/type, since users can type their
+// * own sizes in Settings rather than picking from a fixed list. Returns null for
+// * an empty input so callers can distinguish "no size set" from "unrecognised".
 const venueTypeIcon = (sizeOrType, isFestival) => {
   if (isFestival) return '🎪';
   const s = (sizeOrType || '').toLowerCase();
@@ -304,9 +399,14 @@ const formatOnlineLocation = c => {
   return bits.join(' · ');
 };
 
+// * Same widening story as songs below: a support act used to be a bare string and
+// * is now { name, role }, where role is 'support' or 'guest'. Old rows still hold
+// * strings, so read them through these two accessors, never as s.name.
 const getSupportName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSupportRole = s => typeof s === 'string' ? 'support' : (s?.role || 'support');
 const getFriends = c => Array.isArray(c?.friends) ? c.friends : [];
+// * `genre` widened from a single string to an array. Normalises both shapes to an
+// * array so callers can always .map/.includes without a type check.
 const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.genre ? [c.genre] : []);
 
 // * Songs are stored as a plain string OR { name, info?, cover?, spotifyId? }.
@@ -409,9 +509,14 @@ const sectionLabelCategory = (label, explicitCategory) => {
   return 'headers'; // era headers, intro, interlude, set 1/2, etc.
 };
 const getSongAlbum = s => typeof s === 'string' || !s ? null : (s.albumName || null);
+// * Guards every setlist read: a setlist may be undefined (never entered) and may
+// * contain nulls left behind by deletions, both of which crash a bare .map.
 const getSongList = songs => Array.isArray(songs) ? songs.filter(Boolean) : [];
 const formatDuration = ms => { if (!ms) return null; const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 // Deterministic colored-initials avatar for friends — same name always gets the same hue.
+// * Friends have no stored ID, only their name, so the colour has to be derived from
+// * the name itself for it to stay stable across sessions and devices.
+// ! Renaming a friend changes their colour, and two friends can collide on one hue.
 const FRIEND_HUES = [265, 210, 340, 25, 165, 45, 190, 300];
 const friendColor = name => {
   let hash = 0;
@@ -457,11 +562,12 @@ function FriendAvatar({ name, size = 36 }) {
     }}>{friendInitials(name)}</div>
   );
 }
-// Extra costs beyond ticket price: travel, stay (accommodation), food, other misc.
-// Falls back to the legacy single `otherCost` number for shows saved before this breakdown existed.
 // Sum of a concert's ticket line-items (name + price each, so add-ons/fan-club
 // fees/etc. can be itemized) — falls back to the legacy single ticketPrice
 // number for older entries that predate this.
+// ! Not every cost read goes through here. StatsView's financial charts (totalSpent,
+// ! yearTicketSum, totalTickets, most-expensive) still read c.ticketPrice directly,
+// ! so a show saved with only itemized `tickets` counts as €0 in those stats.
 const ticketTotal = c => {
   if (c && Array.isArray(c.tickets) && c.tickets.length > 0) {
     return c.tickets.reduce((s, t) => s + (parseFloat(t.price) || 0), 0);
@@ -483,6 +589,9 @@ const loadXlsx = () => import('xlsx');
 // COMPONENTS
 // ============================================================
 
+// * Tapping the currently selected star clears the rating (onChange(null)) — there
+// * is no separate "unrate" control, and 1 star has to stay distinguishable from
+// * "not rated yet". Callers pass `max` from settings.ratingSystem (5 or 10).
 function StarRating({ value, onChange, max = 5 }) {
   return (
     <div style={{ display: "flex", gap: max === 10 ? 3 : 6 }}>
@@ -501,6 +610,12 @@ function StarRating({ value, onChange, max = 5 }) {
   );
 }
 
+// Single- or multi-select dropdown used for the tag-style fields (genre, language,
+// venue size…).
+// * `selected` accepts a string or an array; `onToggle(option)` is called with the
+// * option that was tapped and the caller decides whether that means set or toggle.
+// * Passing `onAddNew` appends an inline "+ Add new…" row, so a value that isn't in
+// * Settings yet can be created without leaving the form.
 function DropdownSelect({ options, selected, onToggle, multi = false, placeholder = "Select...", accentColor = "#a78bfa", onAddNew = null }) {
   const [open, setOpen] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
@@ -601,9 +716,13 @@ function TicketsFields({ value, onChange, labelStyle, inputStyle }) {
   );
 }
 
-// Small confirmation popup: "Add 'X' to your saved [tags]?" — used when someone types
-// a brand-new custom value (merch category, genre, etc.) directly on a show, so they
-// can optionally promote it to a permanent, reusable option without going to Settings.
+// Ring chart used by every "breakdown" stat (genres, venues, spend). Segments are
+// drawn as stroked arcs rather than filled wedges, so the hole size is just the
+// stroke width and no masking is needed.
+// - centerText: `undefined` draws the default big `label`; `null` draws nothing;
+//   a string or array of strings draws those lines instead.
+// - showLabels places each segment's % (or labelTexts[i]) outside the ring, and
+//   pads the viewBox so those labels aren't clipped.
 function Donut({ segments, size = 120, label = "total", showLabels = false, labelTexts = null, centerText = undefined, labelPad = 0.18 }) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   if (total === 0) return null;
@@ -672,6 +791,10 @@ function ChartToggle({ options, value, onChange, color = "#a78bfa" }) {
 );
   }
 
+// Small confirmation popup: "Save 'X' to your [tags]?" — shown when someone types
+// a brand-new custom value (merch category, genre, etc.) directly on a show, so they
+// can optionally promote it to a permanent, reusable option without going to Settings.
+// Renders nothing for an empty `value`, so callers can mount it unconditionally.
 function SaveTagPrompt({ value, label, onConfirm, onDismiss }) {
   if (!value || !value.trim()) return null;
   return (
@@ -786,6 +909,9 @@ function EmptyState({ title, detail, actionLabel, onAction, icon = '🎫' }) {
   );
 }
 
+// Inclusive day count for a festival: 18–20 Aug is 3 days, not 2. Returns 1 for a
+// missing or non-later endDate, so single-day festivals and half-filled entries
+// both behave sensibly.
 function festivalDays(startDate, endDate) {
   if (!startDate) return 1;
   if (!endDate || endDate <= startDate) return 1;
@@ -1213,6 +1339,15 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
 }
 
 
+// The one row component used by every list of shows in the app (Shows, calendar
+// day list, wishlist). Its left border colour is the app's status language and is
+// used consistently elsewhere: cyan = online, pink = festival, violet = been,
+// green = want to go, indigo = upcoming.
+// * Passing `onDelete` turns on swipe-left and long-press to reveal a delete
+// * action. Only the wishlist does this — deleting a show you actually attended
+// * should require opening it, not a stray gesture.
+// * `compact` is forced on for any not-yet-happened show: there is no photo,
+// * rating or setlist to show yet, so the full card would be mostly empty.
 function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showVenue = true, showGenreTags = true, onDelete = null }) {
   const past = isPast(concert.date) && !concert.wishlist;
   const effectiveCompact = compact || !past;
@@ -1397,7 +1532,20 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   );
 }
 
+// Which optional parts of a setlist are visible. Toggled per-user in Settings and
+// threaded down as `setlistView`; every key defaults to shown except album names.
 const DEFAULT_SETLIST_VIEW = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true };
+// The setlist editor + reader, used once for the headliner and once per support act
+// on the same concert.
+// * `overrideSongs` / `overrideArtist` are how support acts reuse this component:
+// * when set, it edits concert.supportSetlists[overrideArtist] instead of
+// * concert.setlist, and `onSaveSetlist` is expected to route the write accordingly.
+// * `headlinerSongs` is passed to a support act's list purely to warn about songs
+// * that appear in both — not to edit them.
+// ! Songs are held in local state seeded from props and re-synced by an effect keyed
+// ! on concert.id + overrideArtist. A save that doesn't change that key will not
+// ! re-seed, which is intentional (avoids clobbering an in-progress edit) but means
+// ! external mutations to the same setlist are not picked up while it's open.
 function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW, sortMode = 'night', onSetCriedSong = null, criedSong = undefined }) {
   const effectKey = concert.id + (overrideArtist || '');
   const sourceSongs = overrideSongs ?? concert.setlist;
@@ -1762,6 +1910,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   );
 }
 
+// Fills in the array fields the edit form expects to be able to .map over, and
+// migrates legacy shapes forward. Call this before seeding form state from a
+// stored concert — the DB normalizer in useSupabase.js covers reads, this covers
+// the extra fields only the form touches.
 function normalizeConcertForm(concert) {
   // Shows logged before the itemized-tickets feature existed only have the old
   // single `ticketPrice` field. Without this, the edit form's Tickets list looks
@@ -1780,6 +1932,15 @@ function normalizeConcertForm(concert) {
   };
 }
 
+// Full-screen page for one show: read view, inline edit form, setlists, photo,
+// merch/ticket costs, and the shareable "receipt" image.
+// * Read and edit are the same component, flipped by the `editing` flag, so the
+// * two can never drift out of sync about which fields exist.
+// * `concerts` (the whole library) is needed as well as `concert` because the page
+// * shows cross-references — other nights of the same tour, other times you saw
+// * this artist — which can't be computed from one row.
+// * `onNavigate` / `onOpenOther` hand control back up to ConcertTracker so tapping
+// * an artist, venue or friend here can switch tabs; this component never routes.
 function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {}, onOpenOther = null }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
@@ -1811,6 +1972,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   useEffect(() => { setForm(normalizeConcertForm(concert)); setEditing(false); }, [concert.id]);
   const photoInputRef = useRef(null);
   const [photoBusy, setPhotoBusy] = useState(false);
+  // * Files to remove from storage once the edit is actually saved. Deleting on tap
+  // * would leave the show pointing at a missing file if you then backed out, so the
+  // * removal is queued here and only flushed after onSave succeeds — and dropped
+  // * entirely if you cancel. Replacing a photo needs no entry: uploads use the same
+  // * deterministic path (userId/concertId.jpg) with upsert, so the old file is
+  // * overwritten rather than orphaned.
+  const pendingPhotoDeletes = useRef([]);
   const [friendInput, setFriendInput] = useState('');
   const [supportInput, setSupportInput] = useState('');
   const [supportRole, setSupportRole] = useState('support');
@@ -2623,7 +2791,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         borderBottom: "1px solid #1e3028", padding: "16px 20px",
         display: "flex", alignItems: "center", gap: 12, zIndex: 10
       }}>
-        <button onClick={() => setEditing(false)} style={{
+        <button onClick={() => { pendingPhotoDeletes.current = []; setEditing(false); }} style={{
           background: "none", border: "none", color: "#a78bfa",
           fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1
         }}>←</button>
@@ -2631,7 +2799,17 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff" }}>{concert.artist}</div>
           <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)} · {concert.city}</div>
         </div>
-        <button onClick={async () => { const result = await onSave(form); if (!result?.error) setEditing(false); }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
+        <button onClick={async () => {
+          const result = await onSave(form);
+          if (result?.error) return;
+          // * Only now is the show definitely no longer referencing these files.
+          // * A failure here leaves an unreferenced file behind, which is untidy but
+          // * harmless — never worth blocking the save or alarming the user over.
+          const toDelete = pendingPhotoDeletes.current;
+          pendingPhotoDeletes.current = [];
+          toDelete.forEach(path => deleteConcertPhoto(path).catch(() => { /* orphaned file */ }));
+          setEditing(false);
+        }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
       </div>
 
       <div style={{ padding: "20px" }}>
@@ -2646,8 +2824,36 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 6 }}>Drag the image to choose which part shows in the rectangle. Applies to the show page and list banner.</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ flex: 1, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#a78bfa', fontSize: 12, padding: '8px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{photoBusy ? 'Uploading…' : '📷 Replace photo'}</button>
-                <button onClick={() => { if (window.confirm('Remove this photo?')) setForm(f => ({ ...f, photo: null, photoPos: null })); }} disabled={photoBusy} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#f87171', fontSize: 12, padding: '8px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>✕ Remove</button>
+                <button onClick={() => {
+                  if (!window.confirm('Remove this photo? The file is deleted when you save.')) return;
+                  setForm(f => {
+                    if (f.photo) pendingPhotoDeletes.current.push(f.photo);
+                    return { ...f, photo: null, photoPos: null, photoTags: [] };
+                  });
+                }} disabled={photoBusy} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#f87171', fontSize: 12, padding: '8px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>✕ Remove</button>
               </div>
+              {/* Who's actually in the picture, as opposed to who was at the show.
+                  Only offers the people already tagged on this show, so it's a
+                  couple of taps rather than another name to type. */}
+              {getFriends(form).length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={labelStyle}>Who's in this photo?</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {getFriends(form).map(n => {
+                      const tagged = (form.photoTags || []).includes(n);
+                      return (
+                        <button
+                          key={n}
+                          onClick={() => update('photoTags', tagged ? (form.photoTags || []).filter(x => x !== n) : [...(form.photoTags || []), n])}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 4px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: tagged ? '#a78bfa' : '#0c0c14', color: tagged ? '#0c0c14' : '#6b6a8f', border: `1px solid ${tagged ? '#a78bfa' : '#2e2e50'}`, fontWeight: tagged ? 700 : 400 }}
+                        >
+                          <FriendAvatar name={n} size={20} />{n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </> : (
               <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy} style={{ width: '100%', aspectRatio: '16 / 5', background: 'none', border: '1px dashed #2e2e50', borderRadius: 12, color: '#4a4870', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{photoBusy ? 'Uploading…' : '📷 Add a photo'}</button>
             )}
@@ -3118,6 +3324,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   );
 }
 
+// Expandable section header. Works uncontrolled (defaultOpen) or controlled — pass
+// both `open` and `onToggle` when the caller needs accordion behaviour across
+// several sections.
 function Collapsible({ title, icon, defaultOpen = true, children, open: controlledOpen, onToggle }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -3140,7 +3349,20 @@ function Collapsible({ title, icon, defaultOpen = true, children, open: controll
   );
 }
 
-function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, onSaveConcert = () => {}, onSaveConcertQuiet = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, onNotify = () => {}, hideTabs = false, fillHeight = false }) {
+// The Stats tab. Three sub-tabs live under it — "summary" (headline numbers and
+// highlight blocks), "charts" (grouped by CHART_GROUP_IDS), and "friends", which
+// simply delegates to FriendsView.
+// * Every figure is derived on each render from the raw `concerts` array; nothing
+// * is precomputed or cached. That keeps stats trivially correct after any edit,
+// * at the cost of recomputing the whole library on each keystroke elsewhere.
+// * `statsTab` / `chartGroup` are lifted into ConcertTracker rather than held here
+// * so returning to the tab restores where you were.
+// * Users can hide individual charts, whole chart groups and summary blocks; those
+// * live in settings.hiddenCharts / hiddenChartGroups / hiddenSummaryBlocks.
+// ! Financial figures here read c.ticketPrice directly rather than ticketTotal(c),
+// ! so shows entered with only itemized `tickets` are counted as free. See the
+// ! note on ticketTotal in the HELPERS block.
+function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSetting = () => {}, onSaveConcert = () => {}, onSaveConcertQuiet = () => {}, statsTab, setStatsTab, chartGroup, setChartGroup, onOpen = () => {}, onNotify = () => {}, initialSelectedFriend = null, onInitialFriendConsumed = () => {}, onRememberFriend = () => {}, hideTabs = false, fillHeight = false }) {
   const {
     topArtistsRows = 6, topFriendsRows = 8,
     topVenuesRows = 5, topExpensiveRows = 10,
@@ -3206,7 +3428,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => getSongList(songs).forEach(song => tally(song, artistName)));
   });
   const topSongsRows = settings.topSongsRows || 10;
-  const topSongs = Object.values(songCount).sort((a,b) => b.count - a.count).slice(0, topSongsRows);
 
   // All covers witnessed
   const coversList = [];
@@ -3222,19 +3443,16 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Friends frequency
   const friendCount = {};
   past.forEach(c => getFriends(c).forEach(f => { friendCount[f] = (friendCount[f] || 0) + 1; }));
-  const topFriends = Object.entries(friendCount).sort((a,b) => b[1]-a[1]).slice(0, topFriendsRows);
 
   // Venues
   const venueCount = {};
   past.forEach(c => { venueCount[c.venue] = (venueCount[c.venue] || 0) + 1; });
-  const topVenues = Object.entries(venueCount).sort((a,b) => b[1]-a[1]).slice(0, topVenuesRows);
 
   const venueRoomCount = {};
   past.forEach(c => {
     const key = c.room ? `${c.venue} · ${c.room}` : c.venue;
     venueRoomCount[key] = (venueRoomCount[key] || 0) + 1;
   });
-  const topVenuesByRoom = Object.entries(venueRoomCount).sort((a,b) => b[1]-a[1]).slice(0, topVenuesRows);
 
   // Countries
   const countryCount = {};
@@ -3263,7 +3481,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     allYearCount[y] = (allYearCount[y] || 0) + 1;
     if (!isPast(c.date)) upcomingYearCount[y] = (upcomingYearCount[y] || 0) + 1;
   });
-  const allYears = Object.keys(allYearCount).sort();
 
   // Month counts including upcoming — respects chartType filter via concertsT
   const allYearMonthCount = {};
@@ -3286,13 +3503,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   // Merch per year
   const yearMerchSpend = {};
   const yearOtherSpend = {};
-  const totalMerch = past.reduce((sum, c) => {
-    const m = (c.merch || []).reduce((s,x) => s + (parseFloat(x.price)||0), 0);
-    const y = getYear(c.date);
-    yearMerchSpend[y] = (yearMerchSpend[y] || 0) + m;
-    if (extraCostTotal(c)) yearOtherSpend[y] = (yearOtherSpend[y] || 0) + extraCostTotal(c);
-    return sum + m;
-  }, 0);
   const totalTickets = past.reduce((sum,c) => sum + (c.ticketPrice||0), 0);
 
 
@@ -3307,11 +3517,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     yearMonthCount[y][m] = (yearMonthCount[y][m] || 0) + 1;
   });
 
-  // Top 10 most expensive
-  const topExpensive = [...past]
-    .filter(c => c.ticketPrice)
-    .sort((a,b) => b.ticketPrice - a.ticketPrice)
-    .slice(0, topExpensiveRows);
 
   // Cumulative shows over time
   const sortedPast = [...past].sort((a,b) => a.date.localeCompare(b.date));
@@ -3325,8 +3530,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   });
   const venueEntries = Object.entries(venueSizeCount).sort((a,b) => b[1]-a[1]);
 
-  // Avg shows per year
-  const avgPerYear = years.length ? (past.length / years.length).toFixed(1) : null;
 
   // Genre breakdown
   const genreCount = {};
@@ -3334,7 +3537,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]);
   const subgenreCount = {};
   past.forEach(c => { if (c.subgenre) subgenreCount[c.subgenre] = (subgenreCount[c.subgenre] || 0) + 1; });
-  const topSubgenres = Object.entries(subgenreCount).sort((a,b) => b[1]-a[1]);
 
   // Ratings
   const rated = past.filter(c => c.rating);
@@ -3344,7 +3546,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   // Merch stats
   const allMerchItems = past.flatMap(c => (c.merch || []).map(m => ({ ...m, artist: c.artist, date: c.date })));
-  const totalMerchSpend = allMerchItems.reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
 
   // Item type frequency (normalize to lowercase)
   const itemTypeCount = {};
@@ -3353,13 +3554,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     const key = m.item.toLowerCase().trim();
     itemTypeCount[key] = (itemTypeCount[key] || 0) + 1;
   });
-  const topMerchTypes = Object.entries(itemTypeCount).sort((a,b) => b[1]-a[1]).slice(0, 10);
 
-  // Top 3 most expensive individual items
-  const topMerchItems = [...allMerchItems]
-    .filter(m => parseFloat(m.price) > 0)
-    .sort((a,b) => parseFloat(b.price) - parseFloat(a.price))
-    .slice(0, 3);
 
   // Merch spend per artist
   const artistMerchSpend = {};
@@ -3367,9 +3562,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     const spend = (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0);
     if (spend > 0) artistMerchSpend[c.artist] = (artistMerchSpend[c.artist] || 0) + spend;
   });
-  const topArtistMerch = Object.entries(artistMerchSpend).sort((a,b) => b[1]-a[1]).slice(0, 8);
-  const maxYearSpend = Math.max(...Object.values(yearSpend), 1);
-  const maxMonth = Math.max(...Object.values(monthCount), 1);
 
   // Friends group-size distribution
   const groupSizeDist = {};
@@ -3388,52 +3580,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     ratingByYear[y].count++;
   });
 
-  // Most expensive shows including merch cost
-  const topExpensiveIncMerch = [...past]
-    .filter(c => c.ticketPrice || c.merch?.length > 0)
-    .map(c => ({ ...c, totalCost: (c.ticketPrice || 0) + (c.merch || []).reduce((s,m) => s + (parseFloat(m.price)||0), 0) + (c.otherCosts || []).reduce((s,x) => s + (parseFloat(x.price)||0), 0) + (parseFloat(c.travelCost) || 0) }))
-    .sort((a,b) => b.totalCost - a.totalCost)
-    .slice(0, topExpensiveRows);
-
-
-  const StatBox = ({ label, value, sub }) => (
-    <div style={{ background: "#13131f", border: "1px solid #1e3028", borderRadius: 12, padding: "16px", textAlign: "center" }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: "#a78bfa" }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>{label}</div>
-      {sub && <div style={{ fontSize: 10, color: "#4a4870", marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-
-  const BarRow = ({ label, value, max, color = "#a78bfa", suffix = "", prefix = "" }) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-      <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 38, flexShrink: 0 }}>{label}</span>
-      <div style={{ flex: 1, height: 8, background: "#13131f", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, background: color, width: `${Math.max(2, (value/max)*100)}%`, transition: "width 0.6s ease" }} />
-      </div>
-      <span style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 48, textAlign: "right", flexShrink: 0 }}>{prefix}{typeof value === "number" && value % 1 !== 0 ? value.toFixed(0) : value}{suffix}</span>
-    </div>
-  );
-
-  const ListStat = ({ title, items, suffix = "" }) => (
-    <div style={{ marginBottom: 4 }}>
-      {items.map(([name, count], i) => (
-        <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", width: 18 }}>#{i+1}</span>
-            <span style={{ color: "#c4c2f0", fontSize: 13 }}>{name}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ height: 4, borderRadius: 2, background: "#a78bfa", width: Math.max(16, (count / items[0][1]) * 80) }} />
-            <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", width: 28, textAlign: "right" }}>{count}{suffix}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  // Donut chart (SVG)
-  // labelTexts: array of strings to show on arcs instead of %; null = show %
-  // centerText: string to show in center; null = hide center; undefined = show total count
 
   // Financial and Year-in-pixels have been retired: Financial's most useful
   // piece (spending over time) is now an always-visible monthly chart embedded
@@ -3442,17 +3588,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   useBackButton(() => setStatsTab("summary"), statsTab === "charts");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
-  const handleSwipeStart = (e) => { swipeTouchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; };
-  const handleSwipeEnd = (e) => {
-    if (!chartGroup) return;
-    const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x;
-    const dy = e.changedTouches[0].clientY - swipeTouchStart.current.y;
-    const dt = Date.now() - swipeTouchStart.current.t;
-    const idx = visibleChartGroups.findIndex(g => g.id === chartGroup);
-    if (idx < 0 || Math.abs(dx) < 12 || Math.abs(dy) > Math.abs(dx) * 2) return;
-    if (dx < 0 && idx < visibleChartGroups.length - 1) { const nextG = visibleChartGroups[idx + 1]; setChartGroup(nextG.id); setSelectedChart(getOrderedCharts(nextG)[0]?.id); }
-    else if (dx > 0 && idx > 0) { const prevG = visibleChartGroups[idx - 1]; const prevCharts = getOrderedCharts(prevG); setChartGroup(prevG.id); setSelectedChart(prevCharts[prevCharts.length - 1]?.id); }
-  };
   const [selectedChart, setSelectedChart] = useState("artists");
   const [selectedSong, setSelectedSong] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
@@ -3549,7 +3684,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
   };
-  const chartOpt = (id, def) => chartOptions[id] ?? def;
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
   const [summaryFavOnly, setSummaryFavOnly] = useState(false);
@@ -3603,7 +3737,6 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
     .filter(g => g.charts.length > 0);
   const activeGroup = visibleChartGroups.find(g => g.id === chartGroup) || visibleChartGroups[0] || null;
   const activeGroupCharts = activeGroup ? getOrderedCharts(activeGroup) : [];
-  const activeChart = activeGroupCharts.find(c => c.id === selectedChart) || activeGroupCharts[0];
 
   // Chart-groups system (Financial/Year-in-pixels) was retired — see CHART_GROUPS above.
 
@@ -4147,17 +4280,24 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
         </div>
       )}
-      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} onSaveConcertQuiet={onSaveConcertQuiet} onNotify={onNotify} onBackToSummary={() => setStatsTab("summary")} />}
+      {statsTab === "friends" && <FriendsView concerts={concerts} onOpen={onOpen} settings={settings} onUpdateSetting={onUpdateSetting} onSaveConcertQuiet={onSaveConcertQuiet} onNotify={onNotify} onBackToSummary={() => setStatsTab("summary")} initialSelectedFriend={initialSelectedFriend} onInitialFriendConsumed={onInitialFriendConsumed} onRememberFriend={onRememberFriend} />}
       </>}
     </div>
   );
 }
 
+// The Friends page, reachable as a sub-tab of Stats. Two levels: a searchable,
+// sortable list of everyone who appears in any show's `friends` array, and a
+// per-friend page with Overview / History / Photos tabs.
+// * Friends are not entities — there is no friends table. A friend exists purely
+// * because their name string appears on at least one concert. Everything else
+// * (nickname, contact, note) is keyed by that name in settings.friendProfiles,
+// * which is why renaming has to be done as an explicit merge (see mergeTarget).
 // * onSaveConcertQuiet is the raw save, not ConcertTracker's handleSave wrapper —
 // * the merge writes one show at a time, and handleSave toasts and opens the concert
 // * detail on every call, which would fire once per show mid-merge.
-function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveConcertQuiet = () => {}, onNotify = () => {}, onBackToSummary = () => {} }) {
-  const [selectedFriend, setSelectedFriend] = useState(null);
+function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveConcertQuiet = () => {}, onNotify = () => {}, onBackToSummary = () => {}, initialSelectedFriend = null, onInitialFriendConsumed = () => {}, onRememberFriend = () => {} }) {
+  const [selectedFriend, setSelectedFriend] = useState(initialSelectedFriend?.name || null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [sortDir, setSortDir] = useState('desc');
@@ -4183,13 +4323,44 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   // * Narrows the shared-history spine. Deliberately not persisted — a filter you
   // * forgot you left on would silently hide history the next time you open someone.
   const [historyFilter, setHistoryFilter] = useState('all');
+  const [photosOnlyTagged, setPhotosOnlyTagged] = useState(false);
+  const [taggingPhotos, setTaggingPhotos] = useState(false);
+
+  // * Adds or removes one friend from one show's photo tags. Saved immediately and
+  // * quietly — tagging is a run of taps, not something you'd want to confirm each time.
+  const togglePhotoTag = async (concert, name) => {
+    const current = Array.isArray(concert.photoTags) ? concert.photoTags : [];
+    const next = current.includes(name) ? current.filter(n => n !== name) : [...current, name];
+    const result = await onSaveConcertQuiet({ ...concert, photoTags: next });
+    if (result?.error) onNotify('Could not save the tag', 'error');
+  };
   const [mergeTarget, setMergeTarget] = useState(null); // '' once open, then the chosen name
   const [merging, setMerging] = useState(false);
   const [showHistoryShare, setShowHistoryShare] = useState(false);
   const historyShareRef = useRef(null);
-  const [friendTab, setFriendTab] = useState('overview');
-  // * Everything above is scoped to whoever is open, so it all resets on the way in.
-  useEffect(() => { setHistoryFilter('all'); setMergeTarget(null); setShowHistoryShare(false); setFriendTab('overview'); }, [selectedFriend]);
+  const [friendTab, setFriendTab] = useState(initialSelectedFriend?.tab || 'overview');
+  const [yearMetric, setYearMetric] = useState('shows');
+
+  // * Opening a show unmounts this whole view (ConcertTracker early-returns the
+  // * concert detail), which used to drop you back on the friends list when you
+  // * closed it. The parent holds onto who was open and hands it back here —
+  // * the same pattern Artists and Venues already use.
+  const openShow = (c) => { onRememberFriend(selectedFriend, friendTab); onOpen && onOpen(c); };
+  useEffect(() => {
+    if (!initialSelectedFriend) return;
+    setSelectedFriend(initialSelectedFriend.name);
+    setFriendTab(initialSelectedFriend.tab || 'overview');
+    onInitialFriendConsumed();
+  }, [initialSelectedFriend]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // * Per-friend state resets when you move between friends — but not on mount,
+  // * or it would clobber the tab restored from initialSelectedFriend above.
+  const mountedFriend = useRef(false);
+  useEffect(() => {
+    if (!mountedFriend.current) { mountedFriend.current = true; return; }
+    setHistoryFilter('all'); setPhotosOnlyTagged(false); setTaggingPhotos(false);
+    setMergeTarget(null); setShowHistoryShare(false); setFriendTab('overview'); setYearMetric('shows');
+  }, [selectedFriend]);
 
   const friendProfiles = settings.friendProfiles || {};
   const getProfile = name => friendProfiles[name] || {};
@@ -4199,7 +4370,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   };
   const displayName = name => getProfile(name).nickname || name;
 
-  const past = concerts.filter(c => isPast(c.date));
+  // ! Must exclude wishlist entries, not just future dates. A want-to-go show whose
+  // ! sale date has passed is still `isPast`, and counting it here inflated show
+  // ! totals, first/last together, the year bars and the spend figures.
+  const past = concerts.filter(c => !isWish(c) && isPast(c.date));
   const knownFriends = (settings.knownFriends || []).filter(n => n && n.trim());
   const allFriends = [...new Set([...past.flatMap(c => getFriends(c)), ...knownFriends])].sort();
 
@@ -4345,8 +4519,95 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
       ? `${f.firstShow.date.slice(0,4)} – ${f.lastShow.date.slice(0,4)}`
       : f.firstShow ? f.firstShow.date.slice(0,4) : '';
     const sectionLabel = { fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 };
+    // * Overview is unboxed: sections are separated by a hairline and space rather
+    // * than each sitting in its own bordered card. `card` is kept only for the few
+    // * places that genuinely are objects (the share receipt, the edit sheet).
     const card = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 };
-    const iconBtn = { width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", cursor: "pointer", padding: 0, flexShrink: 0 };
+    const section = { padding: "0 16px" };
+    const hair = <div style={{ height: 1, background: "#1f1f35", margin: "16px 16px" }} />;
+    const labelBtn = { display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", cursor: "pointer", padding: "5px 9px", flexShrink: 0, fontSize: 10.5, fontFamily: "'DM Mono', monospace", lineHeight: 1 };
+    // * Every control on this page is a labelled chip — no bare icons, and nothing
+    // * important hidden behind one. Active state is colour plus weight.
+    const chip = (active) => ({
+      border: `1px solid ${active ? "var(--accent)" : "#1f1f35"}`,
+      background: active ? "var(--accent)" : "none",
+      color: active ? "#0c0c14" : "#6b6a8f",
+      fontWeight: active ? 700 : 400,
+      borderRadius: 99, padding: "4px 11px", cursor: "pointer",
+      fontSize: 11, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", flexShrink: 0,
+    });
+
+    const ratedShows = f.shows.filter(c => c.rating);
+    const avgRating = ratedShows.length ? (ratedShows.reduce((a, c) => a + c.rating, 0) / ratedShows.length).toFixed(1) : null;
+    const distinctVenues = new Set(f.shows.map(c => c.venue).filter(Boolean)).size;
+    const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
+    const duoCount = f.shows.filter(c => getFriends(c).filter(n => n !== f.name).length === 0).length;
+    const spanYears = f.firstShow && f.lastShow
+      ? Math.max(1, Math.round(monthsBetween(f.firstShow.date, f.lastShow.date) / 12))
+      : 0;
+
+    // * This friend's own year range, unlike the list's shared axis — here there's
+    // * no neighbouring row to line up with, so empty leading years are just noise.
+    const friendYears = (() => {
+      const ys = f.shows.map(c => +c.date.slice(0, 4)).filter(Boolean);
+      if (ys.length === 0) return [];
+      const min = Math.min(...ys), max = Math.max(...ys);
+      return Array.from({ length: max - min + 1 }, (_, i) => String(min + i));
+    })();
+
+    // * Same total the stats page uses: tickets + merch + other costs + travel.
+    const showCost = c => ticketTotal(c)
+      + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0)
+      + (c.otherCosts || []).reduce((s, x) => s + (parseFloat(x.price) || 0), 0)
+      + (parseFloat(c.travelCost) || 0);
+
+    const spend = {
+      tickets: f.shows.reduce((s, c) => s + ticketTotal(c), 0),
+      merch: f.shows.reduce((s, c) => s + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0),
+      other: f.shows.reduce((s, c) => s + (c.otherCosts || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0),
+      travel: f.shows.reduce((s, c) => s + (parseFloat(c.travelCost) || 0), 0),
+    };
+    spend.total = spend.tickets + spend.merch + spend.other + spend.travel;
+
+    // * Every song on a show you were both at is a song you both heard live.
+    // * Counts the headliner's setlist and every support act's, deduped by name.
+    const songPlays = {};
+    f.shows.forEach(c => {
+      const all = [...getSongList(c.setlist), ...Object.values(c.supportSetlists || {}).flatMap(getSongList)];
+      all.forEach(s => {
+        const n = getSongName(s);
+        if (n) songPlays[n] = (songPlays[n] || 0) + 1;
+      });
+    });
+    const songNames = Object.keys(songPlays);
+    const songsRepeated = songNames.filter(n => songPlays[n] > 1).length;
+
+    // * "Where you stood" already exists as ticketType (GA / seated / …).
+    const standCounts = {};
+    f.shows.forEach(c => { if (c.ticketType) standCounts[c.ticketType] = (standCounts[c.ticketType] || 0) + 1; });
+    const topStand = Object.entries(standCounts).sort((a, b) => b[1] - a[1])[0];
+
+    const bestRated = f.shows.filter(c => c.rating).sort((a, b) => b.rating - a.rating)[0] || null;
+    const favouriteShow = f.shows.find(c => c.favorite) || null;
+    const criedShow = f.shows.find(c => c.criedSong) || null;
+
+    // * Two honest numbers rather than one invented score: how much of your gig
+    // * life they were actually at, and how much of your taste you share.
+    const yourGenres = new Set(past.flatMap(c => getGenres(c)));
+    const sharedGenres = new Set(f.shows.flatMap(c => getGenres(c)).filter(g => yourGenres.has(g)));
+    const shareOfShows = past.length > 0 ? Math.round((f.shows.length / past.length) * 100) : 0;
+
+    const friendMapPoints = (() => {
+      const byVenue = {};
+      f.shows.forEach(c => {
+        if (!c.venue) return;
+        const info = (settings.venueInfo || {})[c.venue] || {};
+        if (typeof info.lat !== 'number') return;
+        if (!byVenue[c.venue]) byVenue[c.venue] = { name: c.venue, lat: info.lat, lng: info.lng, pastCount: 0, upcomingCount: 0, shape: c.type === 'festival' ? 'diamond' : 'pin' };
+        byVenue[c.venue].pastCount += 1;
+      });
+      return Object.values(byVenue);
+    })();
 
     return (
       <div className={friendExiting ? "slide-out-detail" : "slide-in-detail"} key={selectedFriend} style={{ padding: "0 0 100px" }}>
@@ -4442,49 +4703,33 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
             </div>
-            {/* "Since" line. This replaces the old stat-tile row: it carried the
-                same venues/countries numbers, and with the timeline owning the top
-                of the page a second summary block just pushed it below the fold. */}
-            {(() => {
-              const rated = f.shows.filter(c => c.rating);
-              const avgR = rated.length ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : null;
-              const distinctVenues = new Set(f.shows.map(c => c.venue).filter(Boolean)).size;
-              const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
-              const spanYears = f.firstShow && f.lastShow
-                ? Math.max(1, Math.round(monthsBetween(f.firstShow.date, f.lastShow.date) / 12))
-                : 0;
-              const since = [
-                spanYears >= 1 ? `${spanYears} year${spanYears !== 1 ? 's' : ''}` : null,
-                distinctVenues > 0 ? `${distinctVenues} venue${distinctVenues !== 1 ? 's' : ''}` : null,
-                distinctCountries > 1 ? `${distinctCountries} countries` : null,
-              ].filter(Boolean).join(' · ');
-              const duoCount = f.shows.filter(c => getFriends(c).filter(n => n !== f.name).length === 0).length;
-              return (
-                <DetailSubtitle lines={[
-                  `${f.shows.length} show${f.shows.length !== 1 ? 's' : ''} together${duoCount > 0 ? ` · ${duoCount} just you two` : ''}`,
-                  f.firstShow ? `since ${new Date(f.firstShow.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}${since ? ` · ${since}` : ''}` : yearSpan,
-                  // * Rating on its own line — appended to the since-line it was the
-                  // * thing that tipped it into wrapping.
-                  avgR ? `★ ${avgR} average together` : null,
-                  profile.contact,
-                  profile.note,
-                ]} />
-              );
-            })()}
+            {/* Header carries identity and the span only — the countable stats moved
+                down into boxes on Overview, where numbers read faster than prose. */}
+            <DetailSubtitle lines={[
+              f.firstShow
+                ? `since ${new Date(f.firstShow.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}${spanYears >= 1 ? ` · ${spanYears} year${spanYears !== 1 ? 's' : ''}` : ''}`
+                : yearSpan,
+              profile.contact,
+              profile.note,
+            ]} />
           </div>
+          {/* Labelled, not icon-only. An unlabelled share glyph is the most
+              ambiguous control on the page, and tooltips don't exist on touch. */}
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             {f.shows.length > 0 && (
-              <button onClick={() => setShowHistoryShare(true)} title="Share your history together" aria-label="Share your history together" style={iconBtn}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <button onClick={() => setShowHistoryShare(true)} style={labelBtn}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
                   <line x1="8.6" y1="10.6" x2="15.4" y2="6.4" /><line x1="8.6" y1="13.4" x2="15.4" y2="17.6" />
                 </svg>
+                Share
               </button>
             )}
-            <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} title="Edit profile" aria-label="Edit profile" style={iconBtn}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button onClick={() => setEditingProfile({ nickname: profile.nickname || "", contact: profile.contact || "", note: profile.note || "" })} style={labelBtn}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
               </svg>
+              Edit
             </button>
           </div>
           </div>
@@ -4493,10 +4738,11 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
         {/* Tabs — same shape as a show's General / Financial / Setlist. Overview
             leads because it's the summary; History is the long read. */}
         <div style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid #1f1f35" }}>
+          {/* No counts — the boxes below already carry them. */}
           {[
             { id: 'overview', label: 'Overview' },
-            { id: 'history', label: 'History', count: f.sortedShows.length || null },
-            { id: 'photos', label: 'Photos', count: f.shows.filter(c => c.photo).length || null },
+            { id: 'history', label: 'History' },
+            { id: 'photos', label: 'Photos' },
           ].map(t => (
             <button
               key={t.id}
@@ -4510,7 +4756,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                 fontSize: 11.5, fontFamily: "'DM Mono', monospace",
               }}
             >
-              {t.label}{t.count ? ` ${t.count}` : ''}
+              {t.label}
             </button>
           ))}
         </div>
@@ -4598,6 +4844,125 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           );
         })()}
 
+        {/* ── "The numbers" ───────────────────────────────────────────────
+            Boxes plus the per-year graph, grouped under one heading so the tab
+            reads as two ideas rather than four loose cards. Boxes that lead
+            somewhere carry a chevron; the rest are plain. */}
+        {friendTab === 'overview' && f.shows.length > 0 && (() => {
+          const boxes = [
+            { value: f.shows.length, label: 'shows', go: () => setFriendTab('history') },
+            songNames.length > 0 && { value: songNames.length, label: 'songs', sub: songsRepeated > 0 ? `${songsRepeated} twice+` : null },
+            spend.total > 0 && { value: `€${Math.round(spend.total)}`, label: 'spent' },
+            distinctVenues > 0 && { value: distinctVenues, label: distinctVenues === 1 ? 'venue' : 'venues' },
+            avgRating && { value: `★ ${avgRating}`, label: 'avg' },
+            distinctCountries > 1 && { value: distinctCountries, label: 'countries' },
+          ].filter(Boolean);
+          return (
+            <div style={{ padding: "16px 16px 0" }}>
+              <div style={{ ...sectionLabel, marginBottom: 8 }}>The numbers</div>
+
+              {/* Share of your gig life — a real proportion, not an invented score.
+                  Genre overlap sits underneath as the second honest number. */}
+              {past.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
+                    <span style={{ fontSize: 12, color: "#c4c2f0" }}>Share of your shows</span>
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{shareOfShows}%</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: "#16162a", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, shareOfShows)}%`, background: "linear-gradient(90deg, #7c5cf0, var(--accent))", borderRadius: 4 }} />
+                  </div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f", marginTop: 6 }}>
+                    {f.shows.length} of your {past.length} shows
+                    {yourGenres.size > 0 && ` · ${sharedGenres.size} of your ${yourGenres.size} genres shared`}
+                  </div>
+                </div>
+              )}
+
+              {/* Horizontal rail rather than a fixed grid — it can carry more numbers
+                  than a row of three without making the page any longer. */}
+              <div style={{ display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
+                {boxes.map(({ value, label, sub, go }) => (
+                  <button
+                    key={label}
+                    onClick={go}
+                    disabled={!go}
+                    style={{ flex: "1 0 auto", minWidth: 84, background: "#13131f", border: "none", borderRadius: 10, padding: "10px 10px", textAlign: "center", cursor: go ? "pointer" : "default", fontFamily: "inherit" }}
+                  >
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "var(--accent)", lineHeight: 1, whiteSpace: "nowrap" }}>
+                      {value}{go && <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span>}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>
+                    {sub && <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2, whiteSpace: "nowrap" }}>{sub}</div>}
+                  </button>
+                ))}
+              </div>
+              {friendYears.length > 1 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
+                    <span style={{ ...sectionLabel, marginBottom: 0 }}>Per year</span>
+                    {/* Micro segmented control — symbols, not words, so it fits on the
+                        card's own header line and costs no vertical space. */}
+                    <div style={{ display: "inline-flex", gap: 2, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: 2 }}>
+                      {[
+                        { id: 'shows', label: 'shows' },
+                        { id: 'rating', label: '★' },
+                        { id: 'spend', label: '€' },
+                      ].map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => setYearMetric(m.id)}
+                          title={m.id === 'shows' ? 'Shows per year' : m.id === 'rating' ? 'Average rating per year' : 'Spent per year'}
+                          style={{
+                            border: "none", cursor: "pointer", borderRadius: 99, padding: "2px 8px",
+                            fontFamily: "'DM Mono', monospace", fontSize: 9,
+                            background: yearMetric === m.id ? "var(--accent)" : "transparent",
+                            color: yearMetric === m.id ? "#0c0c14" : "#4a4870",
+                            fontWeight: yearMetric === m.id ? 700 : 400,
+                          }}
+                        >{m.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {(() => {
+                    // * Each metric is scaled against its own peak — the bars show shape
+                    // * across years, not a value you could read off an axis.
+                    const values = friendYears.map(y => {
+                      const inYear = f.shows.filter(c => c.date.slice(0, 4) === y);
+                      if (yearMetric === 'shows') return inYear.length;
+                      if (yearMetric === 'rating') {
+                        const rated = inYear.filter(c => c.rating);
+                        return rated.length ? rated.reduce((a, c) => a + c.rating, 0) / rated.length : 0;
+                      }
+                      return inYear.reduce((a, c) => a + showCost(c), 0);
+                    });
+                    const peak = Math.max(1, ...values);
+                    const colour = yearMetric === 'rating' ? '#facc15' : yearMetric === 'spend' ? '#34d399' : 'var(--accent)';
+                    return (
+                      <>
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 44 }}>
+                          {values.map((n, i) => (
+                            <div key={friendYears[i]} title={`${friendYears[i]}: ${yearMetric === 'spend' ? `€${Math.round(n)}` : yearMetric === 'rating' ? (n ? `★ ${n.toFixed(1)}` : 'unrated') : `${n} show${n === 1 ? '' : 's'}`}`} style={{
+                              flex: 1, borderRadius: 2,
+                              height: n === 0 ? 4 : Math.max(6, Math.round((n / peak) * 44)),
+                              background: n === 0 ? '#23223c' : colour,
+                            }} />
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
+                          {friendYears.map(y => (
+                            <span key={y} style={{ flex: 1, textAlign: "center", fontFamily: "'DM Mono', monospace", fontSize: 8.5, color: "#4a4870" }}>{y.slice(2)}</span>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* On this day — lives on Overview so it's seen without choosing a tab.
             Matches on month + day, so it surfaces a handful of times a year. */}
         {friendTab === 'overview' && (() => {
@@ -4613,7 +4978,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
               c.rating > 0 ? "★".repeat(Math.min(c.rating, settings.ratingSystem || 5)) : null,
             ].filter(Boolean).join(" · ");
             return (
-              <button key={c.id} onClick={() => onOpen && onOpen(c)} style={{ display: "block", width: "calc(100% - 32px)", textAlign: "left", margin: "14px 16px 0", borderRadius: 12, padding: "12px 13px", border: "1px solid #3a2f66", background: "linear-gradient(135deg, #1e1838, #14101f)", cursor: "pointer" }}>
+              <button key={c.id} onClick={() => openShow(c)} style={{ display: "block", width: "calc(100% - 32px)", textAlign: "left", margin: "14px 16px 0", borderRadius: 12, padding: "12px 13px", border: "1px solid #3a2f66", background: "linear-gradient(135deg, #1e1838, #14101f)", cursor: "pointer" }}>
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: "0.09em", textTransform: "uppercase", color: "var(--accent)" }}>
                   {yearsAgo} year{yearsAgo !== 1 ? 's' : ''} ago today
                 </div>
@@ -4635,6 +5000,13 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
         {friendTab === 'history' && (f.sortedShows.length > 0 || f.upcoming.length > 0) && (() => {
           // * Built ascending, then flipped for display, so "first"/"latest"/gaps are
           // * all reasoned about in real time order regardless of which way it's shown.
+          const historyFilterOptions = [
+            { id: 'all', label: 'All', available: true },
+            { id: 'photos', label: '📷 With photos', available: f.sortedShows.some(c => c.photo) },
+            { id: 'festivals', label: '🎪 Festivals', available: f.sortedShows.some(c => c.type === 'festival') },
+            { id: 'rated', label: '★ 4+', available: f.sortedShows.some(c => (c.rating || 0) >= 4) },
+          ].filter(o => o.available);
+
           const matchesHistoryFilter = c => historyFilter === 'all'
             || (historyFilter === 'photos' && !!c.photo)
             || (historyFilter === 'festivals' && c.type === 'festival')
@@ -4680,59 +5052,30 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             if (months >= GAP_MONTHS) gapBefore[e.c.id] = months;
           });
           return (
-            <div style={{ padding: "18px 16px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ ...sectionLabel, marginBottom: 0 }}>Shared history</span>
-                  <span style={{ fontSize: 10, color: "#2e2e50", fontFamily: "'DM Mono', monospace", background: "#13131f", border: "1px solid #1f1f35", borderRadius: 99, padding: "1px 7px" }}>
-                    {historyFilter === 'all' ? allPastAsc.length : `${pastAsc.length} of ${allPastAsc.length}`}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    onClick={() => onUpdateSetting?.('friendTimelineNewestFirst', !newestFirst)}
-                    title={newestFirst ? "Show oldest first" : "Show newest first"}
-                    style={{ background: "none", border: "1px solid #1f1f35", borderRadius: 99, padding: "3px 10px", cursor: "pointer", color: "#6b6a8f", fontSize: 11, fontFamily: "'DM Mono', monospace" }}
-                  >
-                    {newestFirst ? "↓ newest" : "↑ oldest"}
+            <div style={{ padding: "12px 0 0" }}>
+              {/* One scrollable row of labelled chips — filters first, then sort and
+                  photo size. Nothing behind an icon, nothing behind a second tap. */}
+              <div style={{ display: "flex", gap: 5, overflowX: "auto", WebkitOverflowScrolling: "touch", padding: "0 16px 2px" }}>
+                {historyFilterOptions.map(o => (
+                  <button key={o.id} onClick={() => setHistoryFilter(o.id)} style={chip(historyFilter === o.id)}>
+                    {o.label} {o.id === 'all' ? allPastAsc.length : allPastAsc.filter(c => (
+                      o.id === 'photos' ? !!c.photo : o.id === 'festivals' ? c.type === 'festival' : (c.rating || 0) >= 4
+                    )).length}
                   </button>
-                  {f.shows.some(c => c.photo) && (
-                    <button
-                      onClick={() => onUpdateSetting?.('friendTimelineCompact', !timelineCompact)}
-                      title={timelineCompact ? "Show photos large" : "Shrink photos to thumbnails"}
-                      style={{ background: timelineCompact ? "none" : "#1a1a30", border: `1px solid ${timelineCompact ? "#1f1f35" : "#a78bfa"}`, borderRadius: 99, padding: "3px 10px", cursor: "pointer", color: timelineCompact ? "#6b6a8f" : "#a78bfa", fontSize: 11, fontFamily: "'DM Mono', monospace" }}
-                    >
-                      {timelineCompact ? "◱ small" : "▣ large"}
-                    </button>
-                  )}
-                </div>
+                ))}
+                {historyFilterOptions.length > 1 && <span style={{ width: 1, background: "#1f1f35", flexShrink: 0, margin: "2px 4px" }} />}
+                <button onClick={() => onUpdateSetting?.('friendTimelineNewestFirst', !newestFirst)} style={chip(false)}>
+                  {newestFirst ? "Newest first" : "Oldest first"}
+                </button>
+                {f.shows.some(c => c.photo) && (
+                  <button onClick={() => onUpdateSetting?.('friendTimelineCompact', !timelineCompact)} style={chip(false)}>
+                    {timelineCompact ? "Small photos" : "Large photos"}
+                  </button>
+                )}
               </div>
 
-              {/* Filter chips — only once there's enough history for scrolling to be
-                  the problem, and only offering filters that would actually match. */}
-              {allPastAsc.length >= 6 && (() => {
-                const options = [
-                  { id: 'all', label: 'All', available: true },
-                  { id: 'photos', label: '📷 With photos', available: allPastAsc.some(c => c.photo) },
-                  { id: 'festivals', label: '🎪 Festivals', available: allPastAsc.some(c => c.type === 'festival') },
-                  { id: 'rated', label: '★ 4+', available: allPastAsc.some(c => (c.rating || 0) >= 4) },
-                ].filter(o => o.available);
-                if (options.length < 2) return null;
-                return (
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
-                    {options.map(o => (
-                      <button key={o.id} onClick={() => setHistoryFilter(o.id)} style={{
-                        border: `1px solid ${historyFilter === o.id ? "var(--accent)" : "#1f1f35"}`,
-                        background: historyFilter === o.id ? "var(--accent)" : "none",
-                        color: historyFilter === o.id ? "#0c0c14" : "#6b6a8f",
-                        fontWeight: historyFilter === o.id ? 700 : 400,
-                        borderRadius: 99, padding: "3px 9px", cursor: "pointer",
-                        fontSize: 11, fontFamily: "'DM Mono', monospace",
-                      }}>{o.label}</button>
-                    ))}
-                  </div>
-                );
-              })()}
+              <div style={{ height: 1, background: "#1f1f35", margin: "12px 16px 0" }} />
+              <div style={{ padding: "0 16px" }}>
 
               {pastAsc.length === 0 && upcomingAsc.length === 0 && (
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#4a4870", padding: "14px 0" }}>
@@ -4773,7 +5116,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                             <span style={{ width: upcoming ? 0 : 1, flex: 1, background: isEnd ? "none" : "#1e1e34", borderLeft: upcoming && !isEnd ? "1px dashed #2a2a44" : "none" }} />
                           </div>
                           <div style={{ paddingBottom: 11, minWidth: 0 }}>
-                            <button onClick={() => onOpen && onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0, display: "block" }}>
+                            <button onClick={() => openShow(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0, display: "block" }}>
                               <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontSize: 12.5, color: upcoming ? "#c4c2f0" : "#e2e0ff", fontWeight: 600 }}>
@@ -4802,20 +5145,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                                 <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 9, marginTop: 6 }} />
                               )}
                             </button>
-                            {/* Who else was there — kept outside the button above so these
-                                stay their own tap targets rather than nested buttons. */}
-                            {others.length > 0 && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                                {others.slice(0, 5).map(n => (
-                                  <button key={n} onClick={() => setSelectedFriend(n)} title={displayName(n)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}>
-                                    <FriendAvatar name={displayName(n)} size={18} />
-                                  </button>
-                                ))}
-                                {others.length > 5 && (
-                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#4a4870" }}>+{others.length - 5}</span>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -4823,6 +5152,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                   })}
                 </div>
               ))}
+              </div>
             </div>
           );
         })()}
@@ -4830,8 +5160,14 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
         {/* Photos tab — every night together that has a photo, as a grid. Same
             tile treatment as the Memories wall, captioned so it isn't anonymous. */}
         {friendTab === 'photos' && (() => {
-          const withPhotos = [...f.shows].filter(c => c.photo).sort((a, b) => b.date.localeCompare(a.date));
-          if (withPhotos.length === 0) {
+          const allWithPhotos = [...f.shows].filter(c => c.photo).sort((a, b) => b.date.localeCompare(a.date));
+          // * A photo from a show they attended isn't the same as a photo they're in.
+          // * The toggle only appears once at least one photo has actually been tagged,
+          // * so it stays invisible until tagging is something you've started doing.
+          const inPhoto = allWithPhotos.filter(c => (c.photoTags || []).includes(f.name));
+          const canFilter = inPhoto.length > 0 && inPhoto.length < allWithPhotos.length;
+          const withPhotos = photosOnlyTagged && canFilter ? inPhoto : allWithPhotos;
+          if (allWithPhotos.length === 0) {
             return (
               <EmptyState
                 icon="📷"
@@ -4841,21 +5177,53 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             );
           }
           return (
-            <div className="stagger-list" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, padding: "10px 10px 0" }}>
-              {withPhotos.map(c => (
-                <button key={c.id} onClick={() => onOpen && onOpen(c)} title={`${c.artist} · ${formatDate(c.date)}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative", display: "block" }}>
-                  <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4 }} />
-                  <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderRadius: "0 0 4px 4px", padding: "14px 6px 5px", textAlign: "left", background: "linear-gradient(to top, rgba(6,6,14,0.88), rgba(6,6,14,0))", pointerEvents: "none" }}>
-                    <div style={{ fontSize: 9, color: "#fff", fontFamily: "'DM Mono', monospace", lineHeight: 1.25 }}>
-                      {new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { month: "short" })} '{c.date.slice(2, 4)}
-                    </div>
-                    <div style={{ fontSize: 8.5, color: "rgba(255,255,255,0.62)", fontFamily: "'DM Mono', monospace", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {c.artist}
-                    </div>
-                  </div>
-                </button>
+            <>
+            {/* Tagging lives here, where the photos are — not four taps deep inside
+                a show's edit form, which is where nobody would ever find it. */}
+            <div style={{ display: "flex", gap: 5, overflowX: "auto", WebkitOverflowScrolling: "touch", padding: "12px 12px 0" }}>
+              {canFilter && [
+                { id: false, label: `All ${allWithPhotos.length}` },
+                { id: true, label: `${displayName(f.name)} is in ${inPhoto.length}` },
+              ].map(o => (
+                <button key={String(o.id)} onClick={() => setPhotosOnlyTagged(o.id)} style={chip(photosOnlyTagged === o.id)}>{o.label}</button>
               ))}
+              <button onClick={() => setTaggingPhotos(t => !t)} style={chip(taggingPhotos)}>
+                {taggingPhotos ? "Done tagging" : `Tag who's in these`}
+              </button>
             </div>
+            {taggingPhotos && (
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#6b6a8f", padding: "8px 12px 0", lineHeight: 1.5 }}>
+                Tap a photo to mark whether {displayName(f.name)} is in it.
+              </div>
+            )}
+            <div className="stagger-list" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, padding: "10px 10px 0" }}>
+              {/* No caption — just the picture. The artist and date stay in the
+                  tooltip and aria-label so the tile is still identifiable. */}
+              {withPhotos.map(c => {
+                const isIn = (c.photoTags || []).includes(f.name);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => taggingPhotos ? togglePhotoTag(c, f.name) : openShow(c)}
+                    title={`${c.artist} · ${formatDate(c.date)}`}
+                    aria-label={taggingPhotos ? `${isIn ? 'Remove' : 'Add'} ${displayName(f.name)} from the photo at ${c.artist}, ${formatDate(c.date)}` : `${c.artist}, ${formatDate(c.date)}`}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "block", position: "relative" }}
+                  >
+                    <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4, opacity: taggingPhotos && !isIn ? 0.45 : 1 }} />
+                    {taggingPhotos && (
+                      <span style={{
+                        position: "absolute", top: 5, right: 5, width: 19, height: 19, borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, lineHeight: 1,
+                        background: isIn ? "var(--accent)" : "rgba(12,12,20,0.7)",
+                        border: `1.5px solid ${isIn ? "var(--accent)" : "rgba(255,255,255,0.55)"}`,
+                        color: "#0c0c14", fontWeight: 700,
+                      }}>{isIn ? "✓" : ""}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            </>
           );
         })()}
 
@@ -4874,31 +5242,24 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
         {friendTab === 'overview' && (
         <div style={{ padding: "16px 16px" }}>
+          {f.shows.length > 0 && <div style={{ ...sectionLabel, marginBottom: 8 }}>The story</div>}
           {/* Details */}
           {f.shows.length > 0 && (() => {
             const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
             const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
             const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
             const topV = Object.entries(vCount).sort((a, b) => b[1] - a[1])[0];
-            // * Longest quiet stretch between two shows together — the same gaps the
-            // * History spine draws, reduced to the single biggest one.
-            let longestGap = null;
-            for (let i = 1; i < f.sortedShows.length; i++) {
-              const months = monthsBetween(f.sortedShows[i - 1].date, f.sortedShows[i].date);
-              if (!longestGap || months > longestGap.months) {
-                longestGap = { months, from: f.sortedShows[i - 1], to: f.sortedShows[i] };
-              }
-            }
+            // * "first together" and "most recent" are badged on the History spine and
+            // * the boxes carry the counts, so neither is repeated here.
             const rows = [
-              f.firstShow && ["first together", `${formatDate(f.firstShow.date)} · ${f.firstShow.artist}`],
-              f.lastShow && f.firstShow && f.lastShow.id !== f.firstShow.id && ["most recent", `${formatDate(f.lastShow.date)} · ${f.lastShow.artist}`],
               topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`],
               topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`],
-              longestGap && longestGap.months >= 6 && ["longest gap", `${formatGap(longestGap.months)} · ${longestGap.from.date.slice(0, 4)}–${longestGap.to.date.slice(0, 4)}`],
+              // * "Where you stood" was already being collected as ticketType.
+              topStand && ["usually", `${topStand[0]} (${topStand[1]}×)`],
             ].filter(Boolean);
             if (rows.length === 0) return null;
             return (
-              <div style={card}>
+              <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
                 <div style={sectionLabel}>Details</div>
                 {rows.map(([l, v]) => (
                   <div key={l} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
@@ -4910,10 +5271,76 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             );
           })()}
 
+          {/* The ones with feeling in them. favorite and criedSong are the most
+              personal fields in the app and had never surfaced on a friend page. */}
+          {(favouriteShow || criedShow || bestRated) && (
+            <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
+              <div style={sectionLabel}>The big ones</div>
+              {favouriteShow && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>favourite</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>{favouriteShow.artist} · {favouriteShow.date.slice(0, 4)}</span>
+                </div>
+              )}
+              {bestRated && bestRated.id !== favouriteShow?.id && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>best rated</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>{bestRated.artist} · {"★".repeat(Math.min(bestRated.rating, settings.ratingSystem || 5))}</span>
+                </div>
+              )}
+              {criedShow && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0" }}>
+                  <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>cried at</span>
+                  <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>"{criedShow.criedSong}" · {criedShow.artist}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Spend breakdown. Every part of this was already itemised per show and
+              never added up across a friendship. */}
+          {spend.total > 0 && (
+            <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
+              <div style={sectionLabel}>Spent together</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}>€{spend.total.toFixed(2)}</div>
+              <div style={{ display: "flex", height: 8, borderRadius: 4, background: "#16162a", overflow: "hidden", marginTop: 10 }}>
+                {[
+                  { k: 'tickets', v: spend.tickets, c: '#a78bfa' },
+                  { k: 'travel', v: spend.travel, c: '#818cf8' },
+                  { k: 'merch', v: spend.merch, c: '#f472b6' },
+                  { k: 'other', v: spend.other, c: '#34d399' },
+                ].filter(p => p.v > 0).map(p => (
+                  <div key={p.k} style={{ width: `${(p.v / spend.total) * 100}%`, background: p.c }} />
+                ))}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", marginTop: 8, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f" }}>
+                {[
+                  { k: 'tickets', v: spend.tickets, c: '#a78bfa' },
+                  { k: 'travel', v: spend.travel, c: '#818cf8' },
+                  { k: 'merch', v: spend.merch, c: '#f472b6' },
+                  { k: 'other', v: spend.other, c: '#34d399' },
+                ].filter(p => p.v > 0).map(p => (
+                  <span key={p.k}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: p.c, marginRight: 4 }} />{p.k} €{Math.round(p.v)}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Map — reuses VenueMap and the coordinates already saved per venue. */}
+          {friendMapPoints.length > 1 && (
+            <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
+              <div style={sectionLabel}>Where you go</div>
+              <VenueMap points={friendMapPoints} height={170} interactive={false} clickOpensMaps />
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f", marginTop: 7 }}>
+                {friendMapPoints.length} venues{distinctCountries > 1 ? ` · ${distinctCountries} countries` : ''}
+              </div>
+            </div>
+          )}
+
           {/* Taste profile — needs at least a couple of genres across a few shows
               to say anything. One bar pinned at 100% is noise, not a profile. */}
           {f.shows.length >= 3 && f.topGenres.length >= 2 && (
-            <div style={card}>
+            <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Taste profile</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {f.topGenres.map(([genre, count]) => (
@@ -4933,7 +5360,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
               timeline again in a different order. Needs a repeat, or enough shows
               for the order to mean something. */}
           {(f.shows.length >= 3 || (f.topArtists[0]?.[1] || 0) > 1) && f.topArtists.length > 0 && (
-            <div style={card}>
+            <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Top artists together</div>
               {f.topArtists.slice(0, 6).map(([artist, count], i) => (
                 <div key={artist} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < Math.min(f.topArtists.length, 6) - 1 ? 8 : 0 }}>
@@ -5162,6 +5589,21 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   );
 }
 
+// The Artists tab: a list of every artist name found in the library, plus a
+// per-artist page with a photo banner, stats, gallery and show history.
+// * Like friends, artists are derived from name strings, not stored records. An
+// * artist appears here if they headlined a show, played support, or were logged
+// * as a festival act — so `concerts` has to be scanned three ways to build the list.
+// * Per-artist customisation is stored in settings keyed by artist name, not on the
+// * concerts: settings.artistPhotos[name] holds the banner's storage path, and
+// * settings.artistInfoOverrides[name] holds manual info (debut date, discography
+// * counts, key dates) plus that artist's page layout choices.
+// ! Both are keyed by the raw display name, so renaming an artist orphans their
+// ! banner and overrides.
+// * `initialSelectedArtist` + `onInitialArtistConsumed` are the deep-link handshake:
+// * ConcertTracker sets the name, this view opens it and then reports back so the
+// * pending value is cleared and doesn't re-trigger. `onBackToOrigin` sends the user
+// * back where they came from instead of to the artist list.
 function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onSaveConcert = () => {}, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null, onNotify = () => {} }) {
   const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
   const [artistTab, setArtistTab] = useState('overview');
@@ -5436,7 +5878,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
     // Songs of this artist covered by others
     const coversByOthers = [];
-    concerts.filter(c => isPast(c.date)).forEach(c => {
+    concerts.filter(c => !isWish(c) && isPast(c.date)).forEach(c => {
       const checkSongs = (songList, performingArtist) => {
         if (performingArtist === selectedArtist) return;
         getSongList(songList).forEach(song => {
@@ -6485,8 +6927,19 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   );
 }
 
+// The Songs tab: every song from every setlist, aggregated across the library and
+// ranked by how often it was heard live, plus a per-song page.
+// * Nothing is stored per song. The whole index is rebuilt on each render by walking
+// * concert.setlist and concert.supportSetlists, so a song "exists" only while it
+// * appears in some setlist. Songs are keyed by name+artist, meaning a typo in one
+// * setlist silently splits a song into two entries.
+// * Only past shows are counted — a setlist on a future date would be a guess.
+// * `onLinkSong` writes a Spotify match back to every concert containing that song
+// * (see handleLinkSongSpotify in MAIN APP), not just the one being viewed.
 function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDetailChange = () => {}, initialSearch = null, onInitialSearchConsumed = () => {}, initialSongSelect = null, onInitialSongSelectConsumed = () => {}, onBackToOrigin = null }) {
-  const past = concerts.filter(c => isPast(c.date));
+  // ! Wishlist entries are excluded — a want-to-go show you didn't attend shouldn't
+  // ! contribute songs to "heard live" counts.
+  const past = concerts.filter(c => !isWish(c) && isPast(c.date));
   const [search, setSearch] = useState(initialSearch || '');
   useEffect(() => { if (initialSearch) { setSearch(initialSearch); onInitialSearchConsumed(); } }, [initialSearch]);
   const [sortBy, setSortBy] = useState('count');
@@ -6834,6 +7287,9 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   );
 }
 
+// Denser alternative to ConcertCard, used inside detail pages (artist, venue, song,
+// friend) where the surrounding page already supplies the context. `showArtist` is
+// false on an artist's own page, where repeating the name on every row is noise.
 function ArtistShowRow({ concert, onOpen, showArtist = true }) {
   const past = isPast(concert.date);
   const isFestival = concert.type === "festival";
@@ -6868,9 +7324,11 @@ function ArtistShowRow({ concert, onOpen, showArtist = true }) {
   );
 }
 
+// "Memories": a three-column grid of every past show that has a photo, newest
+// first. Read-only — tapping a tile opens that show's ConcertDetail.
 function PhotoWallView({ concerts, onOpen, onBack }) {
   const withPhotos = concerts
-    .filter(c => c.photo && isPast(c.date))
+    .filter(c => c.photo && !isWish(c) && isPast(c.date))
     .sort((a, b) => b.date.localeCompare(a.date));
   useBackButton(onBack, true);
   const [headerElevated, setHeaderElevated] = useState(false);
@@ -6916,6 +7374,14 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
 }
 
 
+// The Venues tab: every venue name in the library, plus a per-venue page with a
+// Leaflet map, visit history and practical notes (parking, transit).
+// * Venues are name-derived like artists and friends. Extra per-venue data —
+// * lat/lng, parking, transit, want-to-visit — lives in settings.venueInfo keyed
+// * by venue name, and coordinates are filled in lazily by maybeGeocodeVenue in
+// * MAIN APP the first time a show at that venue is saved.
+// * settings.savedVenues is a separate list: venues the user pre-registered for
+// * autocomplete, which may not have any shows attached yet.
 function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedVenue, setSelectedVenue] = useState(initialSelectedVenue);
   const [headerElevated, setHeaderElevated] = useState(false);
@@ -7557,6 +8023,17 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   );
 }
 
+// The sheet for logging a new show. Which fields appear depends on the three
+// initial* props, which the caller has already collected via the add-flow chooser
+// (type → timing → ticket) in MAIN APP: a festival gets an acts list instead of
+// support acts, an online show swaps venue/city for platform, and a wishlist entry
+// hides everything retrospective (rating, setlist, photo).
+// * `friends` / `allArtists` / `recentFriends` are autocomplete sources derived from
+// * the existing library — typing a new value is always allowed, which is what
+// * creates new artists and friends in the first place.
+// * `onUpdateSetting` is threaded down so a brand-new tag typed here can be promoted
+// * to a permanent option via SaveTagPrompt without leaving the form.
+// * Builds the concert object and hands it to `onSave`; it never writes directly.
 function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', initialAttendanceMode = 'in_person', initialWishlist = false, concerts = [] }) {
   useBackButton(onClose);
   const [pendingTag, setPendingTag] = useState(null);
@@ -8319,7 +8796,18 @@ const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => 
   );
 
 
-function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail, onNotify = () => {} }) {
+// The Settings tab. Beyond preferences it also hosts the app's admin surface:
+// tag lists (genres, merch categories, venue sizes…), saved venues and friend
+// groups, Spotify connection, notification permission, XLSX import/export, and
+// sign-out.
+// * Two save paths, deliberately: `onUpdate(key, value)` for a single preference,
+// * `onUpdateAll(next)` for anything that has to change several keys atomically
+// * (import, Spotify token exchange, bulk tag edits).
+// ! onUpdateAll replaces the whole settings object. Callers must spread the current
+// ! settings into `next` or they will wipe every unrelated preference.
+// * The XLSX library is imported lazily via loadXlsx() — it is large and most
+// * sessions never open import/export.
+function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail, onNotify = () => {}, onThemePreview = () => {} }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
@@ -8374,16 +8862,23 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     setNotifyPermState(result);
   };
   const handleSetupNtfyTopic = () => {
-    const topic = `settracker-${crypto.randomUUID().slice(0, 8)}`;
+    // ! An ntfy topic is a shared secret and anyone who knows it can both read your
+    // ! alerts and publish to them. 8 hex chars is only ~32 bits — use the full UUID.
+    const topic = `settracker-${crypto.randomUUID().replace(/-/g, '')}`;
     onUpdate('ntfyTopic', topic);
   };
   const handleSendNtfyTest = async () => {
     if (!settings.ntfyTopic) return;
     setNtfyTestStatus('sending');
     try {
+      // * /api/notify now requires a signed-in caller, so pass the access token.
+      const { data: { session } } = await supabase.auth.getSession();
       const r = await fetch('/api/notify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ topic: settings.ntfyTopic, title: '🔔 Test notification', body: 'If you see this, background notifications are working!', tags: ['bell'] }),
       });
       setNtfyTestStatus(r.ok ? 'sent' : 'error');
@@ -8393,7 +8888,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
   const [local, setLocal] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
-  const [touched, setTouched] = useState(false);
   const [openSection, setOpenSection] = useState(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState(null);
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
@@ -8403,7 +8897,50 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [editingInitials, setEditingInitials] = useState(false);
   const [initialsInput, setInitialsInput] = useState('');
 
-  useEffect(() => { if (!touched) setLocal({ ...settings }); }, [settings]);
+  // ! Settings is one JSON blob, and saving used to replace the whole thing with
+  // ! `local` — a snapshot taken when the panel opened, which stopped resyncing the
+  // ! moment you touched a control. Meanwhile artist Spotify lookups, venue geocoding
+  // ! and rating changes write into that same blob in the background. Anything they
+  // ! wrote after your first edit was silently reverted on Save, up to and including
+  // ! the Spotify refresh token.
+  //
+  // * So track which keys you actually edited. Everything else follows `settings`
+  // * live, and Save applies only your edits on top of the current values.
+  const swUpdate = useSWUpdate();
+
+  // * "What's new" used to render the whole changelog every time, which is why it
+  // * never felt like news. It now shows only the releases above the version you
+  // * last opened, and goes quiet once you've read them.
+  const [releases, setReleases] = useState(null);
+  const [lastSeenVersion, setLastSeenVersion] = useState(() => {
+    try { return localStorage.getItem(LAST_SEEN_VERSION_KEY) } catch { return null }
+  });
+  const [showAllReleases, setShowAllReleases] = useState(false);
+  useEffect(() => {
+    fetch(`/changelog.md?v=${APP_VERSION}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.text() : '')
+      .then(t => setReleases(parseChangelog(t)))
+      .catch(() => setReleases([]));
+  }, []);
+  // * Version is per-installed-build, so it belongs on the device rather than in the
+  // * synced settings blob — reading release notes on your phone shouldn't mark them
+  // * read on your laptop, which is running a different build.
+  const markReleasesSeen = () => {
+    try { localStorage.setItem(LAST_SEEN_VERSION_KEY, APP_VERSION) } catch { /* private mode */ }
+    setLastSeenVersion(APP_VERSION);
+  };
+  const unseenReleases = (releases || []).filter(
+    r => !lastSeenVersion || versionIsNewer(r.version, lastSeenVersion)
+  );
+
+  const dirtyKeys = useRef(new Set());
+  useEffect(() => {
+    setLocal(prev => {
+      const next = { ...settings };
+      for (const k of dirtyKeys.current) next[k] = prev[k];
+      return next;
+    });
+  }, [settings]);
 
   // * Picks up the Spotify Client ID written by the setup wizard (setup.html).
   // * The wizard stores it in localStorage as 'pending_spotify_client_id' so it
@@ -8416,8 +8953,19 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasChanges = JSON.stringify(local) !== JSON.stringify(settings);
-  const lUpdate = (key, value) => { setTouched(true); setLocal(prev => ({ ...prev, [key]: value })); setSaved(false); };
+  // * Only your own edits count as unsaved changes. Comparing the whole blob meant a
+  // * background write (an artist photo cached, a venue geocoded) lit up the Save
+  // * button as though you had changed something.
+  const changedKeys = [...dirtyKeys.current].filter(
+    k => JSON.stringify(local[k]) !== JSON.stringify(settings[k])
+  );
+  const hasChanges = changedKeys.length > 0;
+  const dirtyCount = changedKeys.length;
+  const lUpdate = (key, value) => {
+    dirtyKeys.current.add(key);
+    setLocal(prev => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
   const defaultViewOptions = [{ id: "stats", label: "Stats" }, { id: "home", label: "Shows" }, { id: "artists", label: "Artists" }, { id: "songs", label: "Songs" }, { id: "venues", label: "Venues" }];
   const defaultSortOptions = [{ id: "newest", label: "Date" }, { id: "oldest", label: "Oldest" }, { id: "alpha", label: "A-Z" }, { id: "price", label: "Price" }, { id: "rating", label: "Rating" }];
   // Monochrome icons in the app's accent color, so they hue-shift automatically
@@ -8455,18 +9003,49 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     return options[(idx + 1) % options.length].id;
   };
   const optionLabel = (options, current) => options.find(o => o.id === current)?.label || options[0]?.label || "";
+  // * Appearance previews live, everything else waits for Save. Picking an accent
+  // * colour that doesn't change anything until you commit is a bad way to pick a
+  // * colour, so these three report their draft value up to the shell.
+  useEffect(() => {
+    onThemePreview({
+      accentColor: local.accentColor,
+      lightMode: local.lightMode,
+      colorTheme: local.colorTheme,
+    });
+  }, [local.accentColor, local.lightMode, local.colorTheme]); // eslint-disable-line react-hooks/exhaustive-deps
+  // * Separate effect with an empty dep array: the preview must be dropped when you
+  // * leave Settings, but not re-created between individual colour changes.
+  useEffect(() => () => onThemePreview(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // * Throw away every pending edit and snap back to what's stored. Same effect as
+  // * navigating away, but explicit — and it doesn't cost you your place on the page.
+  const handleSettingsDiscard = () => {
+    dirtyKeys.current = new Set();
+    setLocal({ ...settings });
+    setSaved(false);
+  };
+
   const handleSettingsSave = async () => {
+    const edited = [...dirtyKeys.current];
+    if (edited.length === 0) return;
+    // ! Build from `settings`, not from `local` — `settings` is the freshest copy and
+    // ! carries anything written in the background while this panel was open. Only the
+    // ! keys you actually edited are taken from `local`. Nothing else is touched, so
+    // ! no existing preference can be dropped by saving.
+    const next = { ...settings };
+    for (const k of edited) next[k] = local[k];
+
     const result = onUpdateAll
-      ? await onUpdateAll(local)
-      : await Object.entries(local).reduce(
-          (chain, [k, v]) => chain.then(() => onUpdate(k, v)),
+      ? await onUpdateAll(next)
+      : await edited.reduce(
+          (chain, k) => chain.then(() => onUpdate(k, local[k])),
           Promise.resolve()
         );
     if (result?.error) {
       onNotify('Could not save settings', 'error');
       return;
     }
-    setTouched(false);
+    dirtyKeys.current = new Set();
     setSaved(true);
     onNotify('Settings saved');
     setTimeout(() => setSaved(false), 2000);
@@ -8528,10 +9107,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     if (!v.name || !v.city || !v.country) return;
     if (savedVenues.some(x => x.name.toLowerCase() === v.name.toLowerCase() && x.city.toLowerCase() === v.city.toLowerCase())) return;
     const nextV = [...savedVenues, v];
-    lUpdate("savedVenues", nextV); onUpdate("savedVenues", nextV);
+    lUpdate("savedVenues", nextV);
     setNewVenue({ name: '', city: '', country: '', room: '' });
   };
-  const removeSavedVenue = (i) => { const nextV = savedVenues.filter((_, j) => j !== i); lUpdate("savedVenues", nextV); onUpdate("savedVenues", nextV); };
+  const removeSavedVenue = (i) => { const nextV = savedVenues.filter((_, j) => j !== i); lUpdate("savedVenues", nextV); };
   const importVenuesFromHistory = () => {
     const known = new Set(savedVenues.map(v => v.name.toLowerCase()));
     const found = {};
@@ -8541,7 +9120,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const adds = Object.values(found);
     if (adds.length === 0) { onNotify('All venues from your shows are already saved'); return; }
     const nextV = [...savedVenues, ...adds];
-    lUpdate("savedVenues", nextV); onUpdate("savedVenues", nextV);
+    lUpdate("savedVenues", nextV);
     onNotify(`Added ${adds.length} venue${adds.length === 1 ? '' : 's'} from your history`);
   };
 
@@ -8552,10 +9131,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     if (!name || newGroupFriends.length === 0) return;
     if (friendGroups.some(g => g.name.toLowerCase() === name.toLowerCase())) return;
     const next = [...friendGroups, { name, friends: newGroupFriends }];
-    lUpdate("friendGroups", next); onUpdate("friendGroups", next);
+    lUpdate("friendGroups", next);
     setNewGroupName(''); setNewGroupFriends([]);
   };
-  const removeFriendGroup = (i) => { const next = friendGroups.filter((_, j) => j !== i); lUpdate("friendGroups", next); onUpdate("friendGroups", next); };
+  const removeFriendGroup = (i) => { const next = friendGroups.filter((_, j) => j !== i); lUpdate("friendGroups", next); };
   const importFriendGroupsFromHistory = () => {
     const existing = new Set(friendGroups.map(g => [...g.friends].sort().join('|')));
     const pairCount = {};
@@ -8569,8 +9148,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       .sort((a, b) => b[1] - a[1])
       .map(([key, count]) => ({ friends: key.split('|'), count, suggested: key.split('|').join(' & ') }));
     if (queue.length === 0) { onNotify('No new groups found (need 3+ shows together)'); return; }
-    setImportQueue(queue);
-    setImportNameInput(queue[0].suggested);
+    // ! This used to call setImportQueue/setImportNameInput, neither of which was ever
+    // ! declared — the button threw a ReferenceError and crashed into the error
+    // ! boundary. Adds every suggestion straight away instead of stepping through a
+    // ! naming queue; you can rename or remove them from the list below.
+    const next = [...friendGroups, ...queue.map(q => ({ name: q.suggested, friends: q.friends }))];
+    lUpdate("friendGroups", next);
+    onNotify(`Added ${queue.length} group${queue.length === 1 ? '' : 's'}`);
   };
   const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
 
@@ -8906,17 +9490,113 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   return (
     <div style={{ padding: "16px 10px 100px", width: "min(100%, 430px)", margin: "0 auto" }}>
       <div style={{ minHeight: 30, marginBottom: 14 }} />
+      {/* * Nothing on this page reaches the database until this is pressed, so it has
+          * to be impossible to miss and easy to reach. It sits above the bottom nav
+          * rather than in the top-right corner, which is the worst spot for a thumb,
+          * and it names how many changes are pending so "unsaved" is never a guess.
+          * Leaving the page unmounts this view and drops `local` — that is the
+          * discard path, and it is deliberate. */}
       {(hasChanges || saved) && (
-        <button onClick={handleSettingsSave} style={{
-          position: "fixed", top: "calc(12px + env(safe-area-inset-top, 0px))", right: 14, zIndex: 300,
-          background: saved ? "#a78bfa" : "#1a1a30",
-          border: `1px solid ${saved ? "#a78bfa" : "#a78bfa"}`,
-          color: saved ? "#0c0c14" : "#a78bfa",
-          borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700,
-          cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.5)"
-        }}>{saved ? "Saved ✓" : "Save"}</button>
+        <div style={{
+          position: "fixed", left: "50%", transform: "translateX(-50%)",
+          bottom: "calc(58px + env(safe-area-inset-bottom, 0px))",
+          width: "calc(100% - 24px)", maxWidth: 430, zIndex: 300,
+          display: "flex", alignItems: "center", gap: 10,
+          background: "#13131f", border: `1px solid ${saved ? "#34d399" : "#a78bfa"}`,
+          borderRadius: 12, padding: "10px 12px",
+          boxShadow: "0 8px 28px rgba(0,0,0,0.6)", transition: "border-color 0.15s",
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: saved ? "#34d399" : "#e2e0ff", fontWeight: 600 }}>
+              {saved ? "Saved" : `${dirtyCount} unsaved change${dirtyCount === 1 ? "" : "s"}`}
+            </div>
+            {!saved && (
+              <div style={{ fontSize: 9.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 1 }}>
+                Leaving this page discards them
+              </div>
+            )}
+          </div>
+          {!saved && (
+            <button onClick={handleSettingsDiscard} style={{
+              background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f",
+              fontSize: 11, padding: "7px 12px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0,
+            }}>Discard</button>
+          )}
+          <button onClick={handleSettingsSave} disabled={saved} style={{
+            background: saved ? "#34d399" : "#a78bfa", border: "none",
+            color: "#0c0c14", borderRadius: 8, padding: "8px 18px",
+            fontSize: 12.5, fontWeight: 700, cursor: saved ? "default" : "pointer",
+            fontFamily: "'DM Sans', sans-serif", flexShrink: 0,
+          }}>{saved ? "✓" : "Save"}</button>
+        </div>
       )}
+
+      {/* * Dismissing the update banner means "later", not "never" — so the offer
+          * lives here permanently until it's taken. Sits above the tabs so it's the
+          * first thing on the page, on whichever tab you land on. */}
+      {swUpdate.pending && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          background: "#1a1a30", border: "1px solid #f87171", borderRadius: 10, padding: "11px 13px",
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>New version available</div>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Reloads the app — nothing is lost</div>
+          </div>
+          <button
+            onClick={() => swUpdate.apply?.()}
+            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
+          >Update</button>
+        </div>
+      )}
+
+      {/* * What's new — only the releases above the version you last opened. Once
+          * you've read them it collapses to a quiet "you're up to date" line, and
+          * the full history stays one tap away. */}
+      {releases !== null && (() => {
+        const shown = showAllReleases ? releases : unseenReleases;
+        if (releases.length === 0) return null;
+        if (unseenReleases.length === 0 && !showAllReleases) {
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 2px" }}>
+              <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
+                Up to date · v{APP_VERSION}
+              </span>
+              <button onClick={() => setShowAllReleases(true)} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace", padding: 0 }}>
+                What's new
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div style={{ marginBottom: 14, background: "#13131f", border: "1px solid #2e2e50", borderRadius: 10, padding: "13px 14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
+                {showAllReleases ? "All changes" : "What's new"}
+              </div>
+              <button onClick={() => { markReleasesSeen(); setShowAllReleases(false); }} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 10, padding: "4px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                {showAllReleases ? "Close" : "Got it"}
+              </button>
+            </div>
+            <div style={{ maxHeight: "46vh", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+              {shown.map(r => (
+                <div key={r.version} style={{ marginBottom: 12 }}>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
+                    v{r.version}{r.date ? ` · ${r.date}` : ''}
+                  </div>
+                  {r.entries.map((e, i) => (
+                    <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
+                      <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
+                      <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
         {[
@@ -8977,48 +9657,48 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       {activeSettingsTab === 'preferences' && <>
         <SettingsSection title="Opening defaults" icon="eye">
           <SettingsRow label="Show past concerts" sub="On by default when opening app">
-            <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); onUpdate("defaultShowPast", v); }} />
+            <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); }} />
           </SettingsRow>
           <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
-            <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); onUpdate("defaultShowWishlist", v); }} />
+            <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); }} />
           </SettingsRow>
           <SettingsRow label="Show upcoming" sub="On by default when opening app">
-            <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); onUpdate("defaultShowUpcoming", v); }} />
+            <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); }} />
           </SettingsRow>
           <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
-            <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); onUpdate("artistSectionsDefaultOpen", checked); }} />
+            <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); }} />
           </SettingsRow>
-          <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); onUpdate("artistGalleryStyle", v); }} compact />
-          <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); onUpdate("defaultTab", v); }} isLast compact />
+          <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); }} compact />
+          <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); }} isLast compact />
         </SettingsSection>
 
         <SettingsSection title="Concert cards" icon="card">
           <SettingsRow label="Show venue" sub="Display venue name on cards">
-            <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); onUpdate("showVenueOnCards", checked); }} />
+            <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); }} />
           </SettingsRow>
           <SettingsRow label="Show genre tags" sub="Tags visible on concert cards">
-            <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); onUpdate("showGenreTagsOnCards", checked); }} />
+            <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); }} />
           </SettingsRow>
         </SettingsSection>
 
         <SettingsSection title="Concert list" icon="list">
           <SettingsRow label="Group by year" sub="Year headers in concert list">
-            <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); onUpdate("groupByYear", checked); }} />
+            <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); }} />
           </SettingsRow>
         </SettingsSection>
 
         <SettingsSection title="Venue details" icon="layout">
           <SettingsRow label="Parking" sub="Show the parking link on venue pages">
-            <SettingsToggle checked={local.showVenueParking !== false} onChange={checked => { lUpdate("showVenueParking", checked); onUpdate("showVenueParking", checked); }} />
+            <SettingsToggle checked={local.showVenueParking !== false} onChange={checked => { lUpdate("showVenueParking", checked); }} />
           </SettingsRow>
           <SettingsRow label="Public transport" sub="Show the transit link on venue pages">
-            <SettingsToggle checked={local.showVenueTransit !== false} onChange={checked => { lUpdate("showVenueTransit", checked); onUpdate("showVenueTransit", checked); }} />
+            <SettingsToggle checked={local.showVenueTransit !== false} onChange={checked => { lUpdate("showVenueTransit", checked); }} />
           </SettingsRow>
           <SettingsRow label="Rooms / stages" sub="Show saved rooms on venue pages">
-            <SettingsToggle checked={local.showVenueRooms !== false} onChange={checked => { lUpdate("showVenueRooms", checked); onUpdate("showVenueRooms", checked); }} />
+            <SettingsToggle checked={local.showVenueRooms !== false} onChange={checked => { lUpdate("showVenueRooms", checked); }} />
           </SettingsRow>
           <SettingsRow label="Tags" sub='Show venue tags (e.g. "big venue")'>
-            <SettingsToggle checked={local.showVenueTags !== false} onChange={checked => { lUpdate("showVenueTags", checked); onUpdate("showVenueTags", checked); }} />
+            <SettingsToggle checked={local.showVenueTags !== false} onChange={checked => { lUpdate("showVenueTags", checked); }} />
           </SettingsRow>
         </SettingsSection>
 
@@ -9027,15 +9707,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             label="Summary scope" sub="Default time range on summary page"
             value={local.summaryYear || 'all'}
             options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
-            onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
+            onChange={v => { lUpdate('summaryYear', v); }}
           />
           <SettingsRow label="Top artists" sub="Rows shown in charts">
-            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); onUpdate("topArtistsRows", v); }} max={6} />
+            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); }} max={6} />
           </SettingsRow>
-          <SettingsSliderRow label="Top friends" sub="Rows shown in charts" value={local.topFriendsRows} min={3} max={20} onChange={v => { lUpdate("topFriendsRows", v); onUpdate("topFriendsRows", v); }} />
-          <SettingsSliderRow label="Top venues" sub="Rows shown in charts" value={local.topVenuesRows} min={3} max={20} onChange={v => { lUpdate("topVenuesRows", v); onUpdate("topVenuesRows", v); }} />
-          <SettingsSliderRow label="Most expensive" sub="Rows shown in list" value={local.topExpensiveRows} min={3} max={20} onChange={v => { lUpdate("topExpensiveRows", v); onUpdate("topExpensiveRows", v); }} />
-          <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); onUpdate("topSongsRows", v); }} isLast />
+          <SettingsSliderRow label="Top friends" sub="Rows shown in charts" value={local.topFriendsRows} min={3} max={20} onChange={v => { lUpdate("topFriendsRows", v); }} />
+          <SettingsSliderRow label="Top venues" sub="Rows shown in charts" value={local.topVenuesRows} min={3} max={20} onChange={v => { lUpdate("topVenuesRows", v); }} />
+          <SettingsSliderRow label="Most expensive" sub="Rows shown in list" value={local.topExpensiveRows} min={3} max={20} onChange={v => { lUpdate("topExpensiveRows", v); }} />
+          <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); }} isLast />
         </SettingsSection>
 
         <SettingsSection title="Colors" icon="sliders">
@@ -9043,13 +9723,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             label="Appearance" sub="Same colors, flipped background/text"
             value={local.lightMode ? 'light' : 'dark'}
             options={[{id:'dark',label:'Dark'},{id:'light',label:'Light'}]}
-            onChange={v => { const val = v === 'light'; onUpdate('lightMode', val); lUpdate('lightMode', val); }}
+            onChange={v => { const val = v === 'light'; lUpdate('lightMode', val); }}
           />
           <PreferenceBlock
             label="Highlight color" sub="Buttons, active tabs, and small accents only"
             value={local.accentColor || 'violet'}
             options={Object.entries(ACCENT_PRESETS).map(([id, p]) => ({ id, label: p.label, color: p.hex }))}
-            onChange={v => { lUpdate("accentColor", v); onUpdate("accentColor", v); }}
+            onChange={v => { lUpdate("accentColor", v); }}
           />
           <PreferenceBlock
             label="App color mode" sub="Recolors the whole app at once — different from Highlight color above"
@@ -9058,20 +9738,20 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               {id:'purple',label:'Purple',color:'#a78bfa'},{id:'blue',label:'Blue',color:'#38bdf8'},{id:'green',label:'Green',color:'#34d399'},
               {id:'red',label:'Red',color:'#f87171'},{id:'orange',label:'Orange',color:'#fb923c'},{id:'mono',label:'Mono',color:'#9ca3af'},
             ]}
-            onChange={v => { onUpdate('colorTheme', v); lUpdate('colorTheme', v); }}
+            onChange={v => { lUpdate('colorTheme', v); }}
             isLast
           />
         </SettingsSection>
 
         <SettingsSection title="Setlist" icon="list">
           <SettingsRow label="Known vs. discovered live" sub="✓ / ✨ markers on individual songs">
-            <SettingsToggle checked={local.showKnownMarkers || false} onChange={checked => { lUpdate("showKnownMarkers", checked); onUpdate("showKnownMarkers", checked); }} />
+            <SettingsToggle checked={local.showKnownMarkers || false} onChange={checked => { lUpdate("showKnownMarkers", checked); }} />
           </SettingsRow>
           <PreferenceBlock
             label="Default sort" sub="When opening any show's Setlist tab"
             value={local.setlistSort || 'night'}
             options={[{ id: 'night', label: 'Order of the night' }, { id: 'album', label: 'By album' }]}
-            onChange={v => { lUpdate('setlistSort', v); onUpdate('setlistSort', v); }}
+            onChange={v => { lUpdate('setlistSort', v); }}
           />
           <div style={{ padding: "14px 2px 4px" }}>
             <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: 2 }}>Default filters shown</div>
@@ -9081,7 +9761,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 const view = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(local.setlistView || {}) };
                 const on = view[key] !== false;
                 return (
-                  <button key={key} onClick={() => { const next = { ...view, [key]: !on }; lUpdate('setlistView', next); onUpdate('setlistView', next); }} style={{
+                  <button key={key} onClick={() => { const next = { ...view, [key]: !on }; lUpdate('setlistView', next); }} style={{
                     padding: "6px 12px", borderRadius: 99, fontSize: 12, cursor: "pointer",
                     background: on ? "#a78bfa" : "transparent", color: on ? "#0c0c14" : "#c4c2f0",
                     border: `1.5px solid ${on ? "#a78bfa" : "#2e2e48"}`, fontWeight: on ? 700 : 500, fontFamily: "'DM Sans', sans-serif",
@@ -9101,7 +9781,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             label="Default map view" sub={local.defaultCountry ? `Where the venues map opens` : 'Set a default country above to enable'}
             value={local.mapDefaultRegion === 'country' && local.defaultCountry ? 'country' : 'all'}
             options={[{ id: 'all', label: 'All venues' }, { id: 'country', label: local.defaultCountry || 'My country' }]}
-            onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); onUpdate('mapDefaultRegion', v); }}
+            onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); }}
             isLast
           />
         </SettingsSection>
@@ -9132,16 +9812,16 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <SettingsOptionPills
               value={local.summaryYear || 'all'}
               options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
-              onChange={v => { onUpdate('summaryYear', v); lUpdate('summaryYear', v); }}
+              onChange={v => { lUpdate('summaryYear', v); }}
             />
           </SettingsRow>
         {(() => {
           const hiddenBlocks = local.hiddenSummaryBlocks || [];
           const hiddenGroups = local.hiddenChartGroups || [];
           const hiddenChts = local.hiddenCharts || [];
-          const toggleBlock = id => { const next = hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]; onUpdate('hiddenSummaryBlocks', next); lUpdate('hiddenSummaryBlocks', next); };
-          const toggleGroup = id => { const next = hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]; onUpdate('hiddenChartGroups', next); lUpdate('hiddenChartGroups', next); };
-          const toggleChart = id => { const next = hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]; onUpdate('hiddenCharts', next); lUpdate('hiddenCharts', next); };
+          const toggleBlock = id => { const next = hiddenBlocks.includes(id) ? hiddenBlocks.filter(x => x !== id) : [...hiddenBlocks, id]; lUpdate('hiddenSummaryBlocks', next); };
+          const toggleGroup = id => { const next = hiddenGroups.includes(id) ? hiddenGroups.filter(x => x !== id) : [...hiddenGroups, id]; lUpdate('hiddenChartGroups', next); };
+          const toggleChart = id => { const next = hiddenChts.includes(id) ? hiddenChts.filter(x => x !== id) : [...hiddenChts, id]; lUpdate('hiddenCharts', next); };
           const pill = (label, active, onClick, small = false) => (
             <button onClick={onClick} style={{
               padding: small ? '2px 8px' : '3px 10px', borderRadius: 99, fontSize: small ? 9 : 10, cursor: 'pointer',
@@ -9245,8 +9925,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               <button onClick={() => {
                 const val = initialsInput.trim().slice(0, 3);
                 lUpdate("userInitials", val);
-                onUpdate("userInitials", val);
-                onUpdate("userName", local.userName || "");
+                lUpdate("userName", local.userName || "");
                 setEditingInitials(false);
               }} style={{ width: "100%", background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 14, fontWeight: 700, padding: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Save</button>
             </div>
@@ -9488,6 +10167,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 // * search/filter state, toast host, and back-button wiring.
 // ============================================================
 
+// One accordion row in the Shows filter panel. Openness is controlled by the shared
+// `openId` so only one filter category can be expanded at a time; `activeLabel`
+// shows the current selection as a pill when the group is collapsed.
 function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
   const open = openId === id;
   return (
@@ -9504,10 +10186,22 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
   );
 }
 
+// The app shell and the only export. Owns navigation, the Shows list's search /
+// filter / sort state, the add-show flow, toasts and the theme filter, and renders
+// one of the big views into a single scroll container (#content-scroll).
+//
+// * Fully controlled: it holds no concert or settings data of its own. `concerts`
+// * and `settings` come from App (Supabase-backed or localStorage in guest mode),
+// * and every mutation goes back out through onSaveConcert / onDeleteConcert /
+// * onUpdateSetting / onUpdateSettings.
+// * `settingsLoaded` distinguishes "still defaults" from "really yours" and gates
+// * anything that would be wrong under defaults — currently the onboarding tour.
 export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
   const today = new Date()
   const isPastDate = (dateStr) => dateStr < todayStr
 
+  // * There is no router. `view` is the current tab; the four "shows-like" tabs are
+  // * grouped so switching away and back restores the last one via `showsTab`.
   const showsGroup = ['home', 'artists', 'songs', 'venues']
   const [view, setView] = useState(settings.defaultTab || 'stats')
   const [showsTab, setShowsTab] = useState(showsGroup.includes(settings.defaultTab) ? settings.defaultTab : 'home')
@@ -9524,10 +10218,24 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const dismissOnboarding = () => { setShowOnboarding(false); onUpdateSetting('hasSeenOnboarding', true) }
   const [showConfetti, setShowConfetti] = useState(false)
   const [navLoading, setNavLoading] = useState(false)
+  // * Every 50th show fires confetti. Tracked in a ref, not state, so the celebration
+  // * doesn't repeat when the count dips below and back over the threshold (delete,
+  // * re-add) within the same session.
   const celebratedMilestones = useRef(new Set())
+
+  // * Everything on the Settings page is deferred until you press Save — except that
+  // * picking a colour with no visible effect is a bad way to pick a colour. So the
+  // * three appearance settings report an unsaved value up here and the shell renders
+  // * that instead, without persisting anything. Cleared when Settings unmounts, which
+  // * is why leaving the page still discards the change.
+  const [themePreview, setThemePreview] = useState(null)
+  const themed = themePreview ? { ...settings, ...themePreview } : settings
+
+  // * The accent colour is published as a CSS custom property rather than threaded
+  // * through props, because it's read from stylesheet rules as well as inline styles.
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', ACCENT_PRESETS[settings.accentColor]?.hex || ACCENT_PRESETS.violet.hex)
-  }, [settings.accentColor])
+    document.documentElement.style.setProperty('--accent', ACCENT_PRESETS[themed.accentColor]?.hex || ACCENT_PRESETS.violet.hex)
+  }, [themed.accentColor])
   useEffect(() => {
     const pastCount = concerts.filter(c => !isWish(c) && isPast(c.date)).length
     if (pastCount > 0 && pastCount % 50 === 0 && !celebratedMilestones.current.has(pastCount)) {
@@ -9536,12 +10244,20 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
       haptic(25)
     }
   }, [concerts])
+  // * `selected` is the concert whose ConcertDetail is open, and doubles as the
+  // * "is a detail page covering the list" flag. Holds the concert object, not an id,
+  // * so it can go stale after a save — handleSave re-sets it with the new object.
   const [selected, setSelected] = useState(null)
+  // * showAdd* are the answers collected by the add-flow chooser below; they become
+  // * AddConcertForm's initial* props once the flow completes.
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
   const [showAddAttendance, setShowAddAttendance] = useState('in_person')
   const [showAddWishlist, setShowAddWishlist] = useState(false)
+  // * Lifted out of StatsView so the sub-tab and chart group survive tab switches.
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
   const [chartGroup, setChartGroup] = useState('activity')
+  // --- Shows list search / filter / sort. All of it applies to `filtered` below,
+  // --- and only to the Shows tab; the other views do their own filtering.
   const [search, setSearch] = useState('')
   const [filterYears, setFilterYears] = useState([])
   const [filterType, setFilterType] = useState('all')
@@ -9564,13 +10280,29 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
+  // * The three questions asked before AddConcertForm opens. Kept here rather than
+  // * inside the form so answering them can be skipped when the entry point already
+  // * implies the answer (e.g. "+ add" from the wishlist section).
   const [addFlowStep, setAddFlowStep] = useState(null) // null | 'type' | 'timing' | 'ticket'
   const [addFlowType, setAddFlowType] = useState(null) // 'concert' | 'festival'
   const [addFlowAttendance, setAddFlowAttendance] = useState(null) // 'in_person' | 'online'
+  // --- Cross-view navigation. With no router, jumping from one view into another's
+  // --- detail page is a two-part handshake:
+  // ---   pending*Select     — the target the destination view should open on mount.
+  // ---                        The view calls onInitial*Consumed once it has, which
+  // ---                        clears this so it can't re-trigger on the next render.
+  // ---   *ReturnConcert /   — where to send the user when they press back, so a
+  // ---   *ReturnArtist        detail page opened from elsewhere returns there
+  // ---                        instead of dumping them on its own list.
+  // ---   *DetailOpen        — whether that view currently has a detail page open,
+  // ---                        reported upwards so the shell can hide its own header.
   const [venueDetailOpen, setVenueDetailOpen] = useState(false)
   const [pendingVenueSelect, setPendingVenueSelect] = useState(null)
   const [venueReturnConcert, setVenueReturnConcert] = useState(null)
   const [pendingArtistSelect, setPendingArtistSelect] = useState(null)
+  // * Who was open on the Friends tab when a show was opened from it, so closing
+  // * the show puts you back on that friend's page rather than the friends list.
+  const [pendingFriendSelect, setPendingFriendSelect] = useState(null)
   const [artistReturnConcert, setArtistReturnConcert] = useState(null)
   const [pendingSongsSearch, setPendingSongsSearch] = useState(null)
   const [pendingSongSelect, setPendingSongSelect] = useState(null)
@@ -9586,6 +10318,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [spotifyPrompt, setSpotifyPrompt] = useState(null) // concert awaiting Spotify link prompt
   const [spotifyMatcherConcert, setSpotifyMatcherConcert] = useState(null) // open SpotifyMatcher for this concert
 
+  // * Single-slot toast: a new message replaces the current one rather than queueing.
+  // * `notify` is passed down to every view, which is why it's memoised — it lands in
+  // * a lot of dependency arrays.
   const notify = useCallback((message, type = 'success') => {
     setToast({ message, type })
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -9607,7 +10342,15 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
 
   const allFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
 
+  // * Opening a show unmounts the list, so the browser loses its scroll position and
+  // * closing the show would drop the user back at the top. Capture it on the way in
+  // * and restore it after the list has painted again.
   const savedScrollPos = useRef(0)
+  // ! Must stay up here with the other hooks. It used to sit ~400 lines further down,
+  // ! below `if (addFlowStep)` and `if (showAdd) return` — so opening the add flow
+  // ! rendered four fewer hooks than the previous pass and React threw "Rendered
+  // ! fewer hooks than expected", crashing into the error boundary.
+  const [displaySelected, selectedExiting] = useExitingValue(selected);
   const handleOpenConcert = (concert) => {
     savedScrollPos.current = document.getElementById('content-scroll')?.scrollTop || 0
     setSelected(concert)
@@ -9622,14 +10365,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }, [selected])
 
   const THEME_FILTER = { purple:'', blue:'hue-rotate(-50deg)', green:'hue-rotate(-145deg)', red:'hue-rotate(90deg)', orange:'hue-rotate(130deg)', mono:'grayscale(1)' };
-  const themeFilter = THEME_FILTER[settings.colorTheme] ?? '';
+  const themeFilter = THEME_FILTER[themed.colorTheme] ?? '';
   // Light mode reuses the same filter trick as color themes, rather than a
   // ground-up light palette: invert(1) + hue-rotate(180deg) flips dark<->light
   // while roughly preserving hue (the same technique "force dark mode" browser
   // extensions use in reverse). It's self-inverse, so combining it with a
   // color theme is just a matter of chaining the two filters.
   const LIGHT_FILTER = 'invert(1) hue-rotate(180deg)';
-  const lightMode = !!settings.lightMode;
+  const lightMode = !!themed.lightMode;
   const combinedFilter = [lightMode ? LIGHT_FILTER : '', themeFilter].filter(Boolean).join(' ');
 
   // Best-effort: if this concert's venue doesn't have map coordinates yet,
@@ -10024,7 +10767,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </div>
   )
 
-  const [displaySelected, selectedExiting] = useExitingValue(selected);
   if (displaySelected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
@@ -10256,11 +10998,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             )}
           </>
         )}
-        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} onSaveConcertQuiet={onSaveConcert} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} onNotify={notify} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
+        {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} onSaveConcertQuiet={onSaveConcert} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} onNotify={notify} initialSelectedFriend={pendingFriendSelect} onInitialFriendConsumed={() => setPendingFriendSelect(null)} onRememberFriend={(name, tab) => setPendingFriendSelect(name ? { name, tab } : null)} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNotify={notify} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} />}
+        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
         {view === 'photos' && <PhotoWallView concerts={concerts} onOpen={handleOpenConcert} onBack={() => setView(settings.defaultTab || 'stats')} />}
         </div>
       </div>

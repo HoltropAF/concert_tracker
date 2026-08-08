@@ -1,3 +1,15 @@
+// * Supabase Storage wrapper for the two kinds of user photo: one per concert and one
+// * per artist. Both live in a single private `photos` bucket, namespaced by user id.
+// *
+// * Paths are deterministic, not random, and are the only thing persisted (on the
+// * concert as `photo`, or in settings for an artist):
+// *   {userId}/{concertId}.jpg
+// *   {userId}/artist-{slug}.jpg
+// * That makes re-uploading an implicit replace, but also means renaming an artist
+// * orphans their photo — the slug no longer matches.
+// !
+// ! The bucket is private, so a stored path is not directly usable as an <img src>.
+// ! Always resolve it through getPhotoUrl().
 import { supabase } from './supabase'
 
 const MAX_DIM = 1280
@@ -77,6 +89,9 @@ export async function deleteArtistPhoto(path) {
 
 // * Signed URLs are valid for 60 min but cached for only 50 min to avoid
 // * serving an expired URL in the last window before the signature expires.
+// ! The cache is module-level and never cleared on sign-out. Entries are per-path and
+// ! paths are namespaced by user id, so this can't leak one account's photo to
+// ! another within a session, but the map does grow for the life of the page.
 const urlCache = new Map()
 export async function getPhotoUrl(path) {
   if (!supabase || !path) return null

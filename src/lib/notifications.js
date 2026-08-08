@@ -1,6 +1,15 @@
 // * Ticket sale notification helpers — schedules browser Notification API alerts
 // * for wishlist concerts that have a ticketSaleAt datetime set.
+// !
+// ! These are plain setTimeout calls in the page, NOT service-worker push. They only
+// ! fire while the tab is open and are lost on reload or close. That makes them a
+// ! convenience for someone who leaves the app open, not a reliable alarm — an
+// ! on-sale time that passes while the app is closed produces no notification at all
+// ! unless the user happens to reopen within 30 minutes of it (see scheduleTicketAlarm).
 
+// * Returns 'granted' | 'denied' | 'default' | 'unsupported'. Safe to call when
+// * permission was already decided — it short-circuits rather than re-prompting,
+// * since browsers permanently ignore repeat requests after a denial.
 export async function requestPermission() {
   if (!('Notification' in window)) return 'unsupported'
   if (Notification.permission === 'granted') return 'granted'

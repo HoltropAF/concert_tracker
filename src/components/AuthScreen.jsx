@@ -1,5 +1,12 @@
 import { useState } from 'react'
 
+// * The signed-out landing page. Email-only: `onSignIn(email)` sends a magic link and
+// * is expected to resolve to { error }, never to throw. There is no sign-up path
+// * because the first magic link for an address creates the account.
+// * `onGuest` is optional — when omitted the "explore it first" link is hidden, so the
+// * same screen works in a deployment where guest mode isn't offered.
+// ! Purely presentational: it does not know whether the user is authenticated. App
+// ! decides whether to render this or ConcertTracker.
 export default function AuthScreen({ onSignIn, onGuest }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)

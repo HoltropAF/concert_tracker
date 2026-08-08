@@ -4377,6 +4377,11 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   const [merging, setMerging] = useState(false);
   const [showHistoryShare, setShowHistoryShare] = useState(false);
   const historyShareRef = useRef(null);
+  const [shareTab, setShareTab] = useState('shows');
+  const [shareYear, setShareYear] = useState(null);
+  // * null means "the default most-recent 22"; an array means you've chosen.
+  const [sharePicked, setSharePicked] = useState(null);
+  const [sharePicking, setSharePicking] = useState(false);
   const [friendTab, setFriendTab] = useState(initialSelectedFriend?.tab || 'overview');
   const [yearMetric, setYearMetric] = useState('shows');
 
@@ -4399,6 +4404,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
     if (!mountedFriend.current) { mountedFriend.current = true; return; }
     setHistoryFilter('all'); setHistorySearch(''); setHistorySortOpen(false); setHistoryFiltersOpen(false);
     setPhotosOnlyTagged(false); setTaggingPhotos(false);
+    setShareTab('shows'); setShareYear(null); setSharePicked(null); setSharePicking(false);
     setMergeTarget(null); setShowHistoryShare(false); setFriendTab('overview'); setYearMetric('shows');
   }, [selectedFriend]);
 
@@ -4612,6 +4618,19 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
     f.shows.forEach(c => { if (c.ticketType) standCounts[c.ticketType] = (standCounts[c.ticketType] || 0) + 1; });
     const topStand = Object.entries(standCounts).sort((a, b) => b[1] - a[1])[0];
 
+    // * Also used by the share receipts, so computed once up here rather than inside
+    // * the Details card where they started out.
+    const topArtistShare = (() => {
+      const n = {}; f.shows.forEach(c => { if (c.type !== 'festival') n[c.artist] = (n[c.artist] || 0) + 1; });
+      const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
+      return top && top[1] > 1 ? top : null;
+    })();
+    const topVenueShare = (() => {
+      const n = {}; f.shows.forEach(c => { if (c.venue) n[c.venue] = (n[c.venue] || 0) + 1; });
+      const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
+      return top && top[1] > 1 ? top : null;
+    })();
+
     const bestRated = f.shows.filter(c => c.rating).sort((a, b) => b.rating - a.rating)[0] || null;
     const favouriteShow = f.shows.find(c => c.favorite) || null;
     const criedShow = f.shows.find(c => c.criedSong) || null;
@@ -4765,32 +4784,96 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             The shows together as one receipt, in the same style show receipts
             already use, sized to be screenshotted and sent to the person it's
             about. Capped, because 40 shows will not fit in a readable image. */}
+        {/* ── Share ───────────────────────────────────────────────────────
+            Same shape as a show's receipt — tabs across the top, Copy as image /
+            Copy as text underneath — because it's the same idea aimed at a person
+            rather than a night. Five cards: the show list, the numbers, a single
+            year, a story-shaped one, and everything at once. */}
         {showHistoryShare && (() => {
-          const MAX_ROWS = 22;
-          const rows = [...f.sortedShows].reverse();
-          const shown = rows.slice(0, MAX_ROWS);
-          const overflow = rows.length - shown.length;
+          const newestFirstRows = [...f.sortedShows].reverse();
+          const title = `${displayName(f.name).toUpperCase()} & YOU`;
           const span = f.firstShow && f.lastShow
             ? `${f.firstShow.date.slice(0, 4)}—${f.lastShow.date.slice(0, 4)}`
             : (f.firstShow?.date.slice(0, 4) || '');
-          const title = `${displayName(f.name).toUpperCase()} & YOU`;
+
+          // * A receipt taller than ~22 rows stops being readable as an image, so a
+          // * long history has to be trimmed. Rather than silently keeping the most
+          // * recent, you pick — `sharePicked` null means "the default 22".
+          const CAP = 22;
+          const picked = sharePicked
+            ? newestFirstRows.filter(c => sharePicked.includes(c.id))
+            : newestFirstRows.slice(0, CAP);
+          const overflow = sharePicked ? 0 : newestFirstRows.length - picked.length;
+          const overCap = picked.length > CAP;
+
+          const shareYears = [...new Set(f.sortedShows.map(c => c.date.slice(0, 4)))].reverse();
+          const year = shareYear || shareYears[0];
+          const yearRows = [...f.sortedShows].filter(c => c.date.slice(0, 4) === year);
+          const yearRated = yearRows.filter(c => c.rating);
+          const yearBest = [...yearRated].sort((a, b) => b.rating - a.rating)[0];
+
+          const paper = { background: "#f4f1e8", color: "#2a2620", borderRadius: 5, padding: "18px 18px 20px", fontFamily: "'DM Mono', monospace", fontSize: 11 };
+          const dash = { borderTop: "1px dashed #cfc9b8", margin: "12px 0 10px" };
+          const head = { fontFamily: "'Syne', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "0.02em", textAlign: "center" };
+          const sub = { textAlign: "center", fontSize: 9, color: "#8a8578", letterSpacing: "0.08em", marginTop: 3 };
+          const foot = { textAlign: "center", fontSize: 8.5, color: "#8a8578", marginTop: 13, letterSpacing: "0.08em" };
+          const kv = { display: "flex", justifyContent: "space-between", gap: 8, padding: "2px 0" };
+          const showRow = c => (
+            <div key={c.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "2.5px 0" }}>
+              <span style={{ color: "#8a8578", width: 30, flexShrink: 0 }}>'{c.date.slice(2, 4)}</span>
+              <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist.toUpperCase()}</span>
+            </div>
+          );
+
+          const yearBars = (small) => {
+            if (friendYears.length < 2) return null;
+            const counts = friendYears.map(y => f.shows.filter(c => c.date.slice(0, 4) === y).length);
+            const peak = Math.max(1, ...counts);
+            const H = small ? 26 : 38;
+            return (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: H }}>
+                  {counts.map((n, i) => (
+                    <div key={friendYears[i]} style={{ flex: 1, borderRadius: 2, background: "#2a2620", opacity: n === 0 ? 0.16 : 0.75, height: n === 0 ? 4 : Math.max(5, Math.round((n / peak) * H)) }} />
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
+                  {friendYears.map(y => <span key={y} style={{ flex: 1, textAlign: "center", fontSize: 7, color: "#8a8578" }}>'{y.slice(2)}</span>)}
+                </div>
+              </>
+            );
+          };
+
+          const numbersRows = [
+            ["SHOWS TOGETHER", String(f.shows.length)],
+            songNames.length > 0 && ["SONGS HEARD", String(songNames.length)],
+            distinctVenues > 0 && ["VENUES", String(distinctVenues)],
+            distinctCountries > 1 && ["COUNTRIES", String(distinctCountries)],
+            duoCount > 0 && ["JUST US TWO", String(duoCount)],
+          ].filter(Boolean);
+          const numbersExtra = [
+            topArtistShare && ["MOST SEEN", `${topArtistShare[0].toUpperCase()} ×${topArtistShare[1]}`],
+            topVenueShare && ["USUAL SPOT", `${topVenueShare[0].toUpperCase()} ×${topVenueShare[1]}`],
+            topStand && ["USUALLY", String(topStand[0]).toUpperCase()],
+          ].filter(Boolean);
 
           const copyText = () => {
-            const lines = [
-              title,
-              `${f.shows.length} shows together · ${span}`,
-              '',
-              ...shown.map(c => `${c.date.slice(0, 4)}  ${c.artist}`),
-              overflow > 0 ? `+ ${overflow} more` : null,
-            ].filter(l => l !== null);
-            navigator.clipboard?.writeText(lines.join('\n'));
+            let lines;
+            if (shareTab === 'numbers') {
+              lines = [title, 'BY THE NUMBERS', '', ...numbersRows.map(([k, v]) => `${k}: ${v}`), ...numbersExtra.map(([k, v]) => `${k}: ${v}`), avgRating ? `AVG RATING: ★ ${avgRating}` : null];
+            } else if (shareTab === 'year') {
+              lines = [`${year} WITH ${displayName(f.name).toUpperCase()}`, `${yearRows.length} shows together`, '', ...yearRows.map(c => `${new Date(c.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}  ${c.artist}`)];
+            } else {
+              lines = [title, `${f.shows.length} shows together · ${span}`, '', ...picked.map(c => `${c.date.slice(0, 4)}  ${c.artist}`), overflow > 0 ? `+ ${overflow} more` : null];
+            }
+            navigator.clipboard?.writeText(lines.filter(l => l !== null).join('\n'));
             onNotify('Copied share text');
           };
 
           const copyImage = async () => {
             if (!historyShareRef.current) return;
             try {
-              const canvas = await html2canvas(historyShareRef.current, { backgroundColor: '#f4f1e8', scale: 2 });
+              const canvas = await html2canvas(historyShareRef.current, { backgroundColor: shareTab === 'story' ? '#140f24' : '#f4f1e8', scale: 2 });
               canvas.toBlob(async blob => {
                 if (!blob) { onNotify('Could not create image', 'error'); return; }
                 try {
@@ -4811,32 +4894,198 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             }
           };
 
+          const showsCard = (
+            <>
+              <div style={head}>{title}</div>
+              <div style={sub}>{f.shows.length} SHOWS · {span}</div>
+              <div style={dash} />
+              {picked.map(showRow)}
+              {overflow > 0 && (
+                <>
+                  <div style={{ borderTop: "1px dashed #cfc9b8", margin: "10px 0" }} />
+                  <div style={{ color: "#8a8578" }}>+ {overflow} MORE</div>
+                </>
+              )}
+              <div style={foot}>*** SEE YOU AT THE NEXT ONE ***</div>
+            </>
+          );
+
+          const numbersCard = (
+            <>
+              <div style={head}>{title}</div>
+              <div style={sub}>BY THE NUMBERS</div>
+              <div style={dash} />
+              {numbersRows.map(([k, v]) => <div key={k} style={kv}><span>{k}</span><b>{v}</b></div>)}
+              {numbersExtra.length > 0 && <div style={dash} />}
+              {numbersExtra.map(([k, v]) => <div key={k} style={kv}><span>{k}</span><b>{v}</b></div>)}
+              {avgRating && (
+                <>
+                  <div style={dash} />
+                  <div style={{ ...kv, fontSize: 12 }}><b>AVG RATING</b><b>★ {avgRating}</b></div>
+                </>
+              )}
+              <div style={foot}>*** {shareOfShows}% OF EVERYTHING I'VE SEEN ***</div>
+            </>
+          );
+
+          const yearCard = (
+            <>
+              <div style={head}>{year} WITH {displayName(f.name).toUpperCase()}</div>
+              <div style={sub}>{yearRows.length} SHOW{yearRows.length === 1 ? '' : 'S'} TOGETHER</div>
+              <div style={dash} />
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, textAlign: "center", lineHeight: 1, margin: "4px 0 2px" }}>{yearRows.length}</div>
+              <div style={{ textAlign: "center", fontSize: 8, color: "#8a8578", letterSpacing: "0.08em" }}>SHOWS TOGETHER</div>
+              <div style={dash} />
+              {yearRows.map(c => (
+                <div key={c.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "2.5px 0" }}>
+                  <span style={{ color: "#8a8578", width: 30, flexShrink: 0 }}>{new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { month: "short" }).toUpperCase()}</span>
+                  <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist.toUpperCase()}</span>
+                </div>
+              ))}
+              {yearBest && (
+                <>
+                  <div style={dash} />
+                  <div style={kv}><span>BEST NIGHT</span><b>{yearBest.artist.toUpperCase()}</b></div>
+                </>
+              )}
+              <div style={foot}>*** {year} ***</div>
+            </>
+          );
+
+          const allCard = (
+            <>
+              <div style={head}>{title}</div>
+              <div style={sub}>THE WHOLE THING · {span}</div>
+              <div style={dash} />
+              {numbersRows.slice(0, 3).map(([k, v]) => <div key={k} style={kv}><span>{k}</span><b>{v}</b></div>)}
+              {avgRating && <div style={kv}><span>AVG</span><b>★ {avgRating}</b></div>}
+              {friendYears.length > 1 && (
+                <>
+                  <div style={dash} />
+                  {yearBars(true)}
+                </>
+              )}
+              <div style={dash} />
+              {picked.slice(0, 12).map(showRow)}
+              {newestFirstRows.length > 12 && (
+                <div style={{ color: "#8a8578", marginTop: 4 }}>+ {newestFirstRows.length - 12} MORE</div>
+              )}
+              <div style={foot}>*** SEE YOU AT THE NEXT ONE ***</div>
+            </>
+          );
+
+          // * 9:16 and dark, because this one is aimed at a story rather than a chat —
+          // * a cream receipt cropped to portrait looks like a mistake.
+          const storyCard = (
+            <div style={{ aspectRatio: "9 / 16", background: "linear-gradient(165deg, #241d47, #100c1f)", padding: "26px 22px", display: "flex", flexDirection: "column", borderRadius: 5 }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a78bfa" }}>{displayName(f.name)} &amp; me</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 27, fontWeight: 800, color: "#fff", lineHeight: 1.05, marginTop: 7 }}>
+                {spanYears >= 1 ? `${spanYears} year${spanYears === 1 ? '' : 's'}` : 'A year'}<br />of shows
+              </div>
+              <div style={{ marginTop: "auto" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 52, fontWeight: 800, color: "#a78bfa", lineHeight: 0.95 }}>{f.shows.length}</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "rgba(255,255,255,0.7)", marginTop: 6, letterSpacing: "0.06em" }}>SHOWS TOGETHER</div>
+                {songNames.length > 0 && (
+                  <>
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 30, fontWeight: 800, color: "#a78bfa", lineHeight: 1, marginTop: 18 }}>{songNames.length}</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "rgba(255,255,255,0.7)", marginTop: 5, letterSpacing: "0.06em" }}>SONGS HEARD LIVE</div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+
+          const tabs = [
+            ['shows', 'Shows'],
+            ['numbers', 'Numbers'],
+            shareYears.length > 0 && ['year', 'Year'],
+            ['story', 'Story'],
+            ['all', 'All'],
+          ].filter(Boolean);
+
           return (
             <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, overflowY: "auto" }} onClick={() => setShowHistoryShare(false)}>
-              <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 340 }}>
-                <div ref={historyShareRef} style={{ background: "#f4f1e8", color: "#2a2620", borderRadius: 5, padding: "18px 18px 20px", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: "0.02em", textAlign: "center" }}>{title}</div>
-                  <div style={{ textAlign: "center", fontSize: 9, color: "#8a8578", letterSpacing: "0.08em", marginTop: 3 }}>
-                    {f.shows.length} SHOWS · {span}
-                  </div>
-                  <div style={{ borderTop: "1px dashed #cfc9b8", margin: "12px 0 10px" }} />
-                  {shown.map(c => (
-                    <div key={c.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "2.5px 0" }}>
-                      <span style={{ color: "#8a8578", width: 30, flexShrink: 0 }}>'{c.date.slice(2, 4)}</span>
-                      <span style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist.toUpperCase()}</span>
-                    </div>
+              <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, margin: "auto" }}>
+
+                <div style={{ display: "flex", gap: 5, marginBottom: 11 }}>
+                  {tabs.map(([id, label]) => (
+                    <button key={id} onClick={() => setShareTab(id)} style={{
+                      flex: 1, border: "none", borderRadius: 8, padding: "7px 0", cursor: "pointer",
+                      fontSize: 10, fontWeight: 700, fontFamily: "'DM Mono', monospace",
+                      background: shareTab === id ? "#f4f1e8" : "rgba(244,241,232,0.15)",
+                      color: shareTab === id ? "#2a2a2a" : "#f4f1e8",
+                    }}>{label}</button>
                   ))}
-                  {overflow > 0 && (
-                    <>
-                      <div style={{ borderTop: "1px dashed #cfc9b8", margin: "10px 0" }} />
-                      <div style={{ color: "#8a8578" }}>+ {overflow} MORE</div>
-                    </>
-                  )}
-                  <div style={{ textAlign: "center", fontSize: 8.5, color: "#8a8578", marginTop: 13, letterSpacing: "0.08em" }}>*** SEE YOU AT THE NEXT ONE ***</div>
                 </div>
+
+                {shareTab === 'year' && shareYears.length > 1 && (
+                  <div style={{ display: "flex", gap: 5, marginBottom: 11, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    {shareYears.map(y => (
+                      <button key={y} onClick={() => setShareYear(y)} style={{
+                        border: `1px solid ${year === y ? "#f4f1e8" : "rgba(244,241,232,0.3)"}`,
+                        background: year === y ? "#f4f1e8" : "none",
+                        color: year === y ? "#2a2a2a" : "#f4f1e8",
+                        borderRadius: 99, padding: "4px 11px", cursor: "pointer", flexShrink: 0,
+                        fontSize: 10.5, fontFamily: "'DM Mono', monospace", fontWeight: year === y ? 700 : 400,
+                      }}>{y}</button>
+                    ))}
+                  </div>
+                )}
+
+                <div ref={historyShareRef} style={shareTab === 'story' ? {} : paper}>
+                  {shareTab === 'shows' && showsCard}
+                  {shareTab === 'numbers' && numbersCard}
+                  {shareTab === 'year' && yearCard}
+                  {shareTab === 'story' && storyCard}
+                  {shareTab === 'all' && allCard}
+                </div>
+
+                {/* Pick which shows make the cut. Only offered where it matters — a
+                    history that already fits needs no editing. */}
+                {(shareTab === 'shows' || shareTab === 'all') && newestFirstRows.length > CAP && (
+                  <>
+                    <button onClick={() => setSharePicking(p => !p)} style={{ width: "100%", marginTop: 9, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 10.5, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>
+                      {sharePicking ? "Done choosing" : `Choose which shows (${picked.length} of ${newestFirstRows.length})`}
+                    </button>
+                    {sharePicking && (
+                      <div style={{ marginTop: 8, maxHeight: 190, overflowY: "auto", background: "rgba(244,241,232,0.06)", border: "1px solid rgba(244,241,232,0.2)", borderRadius: 8, padding: "8px 10px" }}>
+                        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                          <button onClick={() => setSharePicked(newestFirstRows.slice(0, CAP).map(c => c.id))} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.25)", color: "#f4f1e8", borderRadius: 6, padding: "5px 0", fontSize: 9.5, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Latest {CAP}</button>
+                          <button onClick={() => setSharePicked([])} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.25)", color: "#f4f1e8", borderRadius: 6, padding: "5px 0", fontSize: 9.5, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>None</button>
+                        </div>
+                        {newestFirstRows.map(c => {
+                          const on = sharePicked ? sharePicked.includes(c.id) : newestFirstRows.slice(0, CAP).some(x => x.id === c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                const base = sharePicked || newestFirstRows.slice(0, CAP).map(x => x.id);
+                                setSharePicked(on ? base.filter(id => id !== c.id) : [...base, c.id]);
+                              }}
+                              style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "4px 0", cursor: "pointer", textAlign: "left" }}
+                            >
+                              <span style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${on ? "#f4f1e8" : "rgba(244,241,232,0.35)"}`, background: on ? "#f4f1e8" : "none", color: "#2a2620", fontSize: 10, lineHeight: "11px", textAlign: "center", fontWeight: 700 }}>{on ? "✓" : ""}</span>
+                              <span style={{ flex: 1, minWidth: 0, fontSize: 10.5, fontFamily: "'DM Mono', monospace", color: on ? "#f4f1e8" : "rgba(244,241,232,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                '{c.date.slice(2, 4)} {c.artist}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {overCap && (
+                      <div style={{ marginTop: 7, fontSize: 9.5, color: "#e0a35f", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+                        {picked.length} shows is a tall image — around {CAP} stays readable.
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                   <button onClick={copyImage} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as image</button>
-                  <button onClick={copyText} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
+                  {shareTab !== 'story' && (
+                    <button onClick={copyText} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
+                  )}
                   <button onClick={() => setShowHistoryShare(false)} style={{ background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 13px", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>×</button>
                 </div>
               </div>

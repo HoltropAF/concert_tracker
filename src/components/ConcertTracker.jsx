@@ -4323,6 +4323,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   // * Narrows the shared-history spine. Deliberately not persisted — a filter you
   // * forgot you left on would silently hide history the next time you open someone.
   const [historyFilter, setHistoryFilter] = useState('all');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historySortOpen, setHistorySortOpen] = useState(false);
+  const [historyFiltersOpen, setHistoryFiltersOpen] = useState(false);
   const [photosOnlyTagged, setPhotosOnlyTagged] = useState(false);
   const [taggingPhotos, setTaggingPhotos] = useState(false);
 
@@ -4358,7 +4361,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   const mountedFriend = useRef(false);
   useEffect(() => {
     if (!mountedFriend.current) { mountedFriend.current = true; return; }
-    setHistoryFilter('all'); setPhotosOnlyTagged(false); setTaggingPhotos(false);
+    setHistoryFilter('all'); setHistorySearch(''); setHistorySortOpen(false); setHistoryFiltersOpen(false);
+    setPhotosOnlyTagged(false); setTaggingPhotos(false);
     setMergeTarget(null); setShowHistoryShare(false); setFriendTab('overview'); setYearMetric('shows');
   }, [selectedFriend]);
 
@@ -4743,6 +4747,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             { id: 'overview', label: 'Overview' },
             { id: 'history', label: 'History' },
             { id: 'photos', label: 'Photos' },
+            { id: 'stats', label: 'Stats' },
           ].map(t => (
             <button
               key={t.id}
@@ -4844,27 +4849,64 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           );
         })()}
 
-        {/* ── "The numbers" ───────────────────────────────────────────────
-            Boxes plus the per-year graph, grouped under one heading so the tab
-            reads as two ideas rather than four loose cards. Boxes that lead
-            somewhere carry a chevron; the rest are plain. */}
+        {/* Overview keeps three numbers, no horizontal scrolling — one row that
+            fits, rather than a rail you have to swipe. Spend isn't here because it
+            has its own block on Stats. */}
         {friendTab === 'overview' && f.shows.length > 0 && (() => {
           const boxes = [
             { value: f.shows.length, label: 'shows', go: () => setFriendTab('history') },
-            songNames.length > 0 && { value: songNames.length, label: 'songs', sub: songsRepeated > 0 ? `${songsRepeated} twice+` : null },
-            spend.total > 0 && { value: `€${Math.round(spend.total)}`, label: 'spent' },
             distinctVenues > 0 && { value: distinctVenues, label: distinctVenues === 1 ? 'venue' : 'venues' },
             avgRating && { value: `★ ${avgRating}`, label: 'avg' },
             distinctCountries > 1 && { value: distinctCountries, label: 'countries' },
-          ].filter(Boolean);
+          ].filter(Boolean).slice(0, 3);
           return (
             <div style={{ padding: "16px 16px 0" }}>
-              <div style={{ ...sectionLabel, marginBottom: 8 }}>The numbers</div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${boxes.length}, 1fr)`, gap: 6 }}>
+                {boxes.map(({ value, label, go }) => (
+                  <button
+                    key={label}
+                    onClick={go}
+                    disabled={!go}
+                    style={{ background: "#13131f", border: "none", borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: go ? "pointer" : "default", fontFamily: "inherit" }}
+                  >
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "var(--accent)", lineHeight: 1, whiteSpace: "nowrap" }}>
+                      {value}{go && <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span>}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Stats tab ───────────────────────────────────────────────────
+            Everything countable lives here now, so Overview can be the short
+            answer: where you went, and the few facts worth remembering. */}
+        {friendTab === 'stats' && f.shows.length > 0 && (() => {
+          const boxes = [
+            { value: songNames.length, label: 'songs', sub: songsRepeated > 0 ? `${songsRepeated} twice+` : null, when: songNames.length > 0 },
+            { value: `€${Math.round(spend.total)}`, label: 'spent', when: spend.total > 0 },
+            { value: `${shareOfShows}%`, label: 'of your shows', when: past.length > 0 },
+          ].filter(b => b.when);
+          return (
+            <div style={{ padding: "16px 16px 0" }}>
+              {boxes.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${boxes.length}, 1fr)`, gap: 6, marginBottom: 16 }}>
+                  {boxes.map(({ value, label, sub }) => (
+                    <div key={label} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "var(--accent)", lineHeight: 1, whiteSpace: "nowrap" }}>{value}</div>
+                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>
+                      {sub && <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2, whiteSpace: "nowrap" }}>{sub}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Share of your gig life — a real proportion, not an invented score.
                   Genre overlap sits underneath as the second honest number. */}
               {past.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
                     <span style={{ fontSize: 12, color: "#c4c2f0" }}>Share of your shows</span>
                     <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{shareOfShows}%</span>
@@ -4878,25 +4920,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                   </div>
                 </div>
               )}
-
-              {/* Horizontal rail rather than a fixed grid — it can carry more numbers
-                  than a row of three without making the page any longer. */}
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
-                {boxes.map(({ value, label, sub, go }) => (
-                  <button
-                    key={label}
-                    onClick={go}
-                    disabled={!go}
-                    style={{ flex: "1 0 auto", minWidth: 84, background: "#13131f", border: "none", borderRadius: 10, padding: "10px 10px", textAlign: "center", cursor: go ? "pointer" : "default", fontFamily: "inherit" }}
-                  >
-                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "var(--accent)", lineHeight: 1, whiteSpace: "nowrap" }}>
-                      {value}{go && <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span>}
-                    </div>
-                    <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>
-                    {sub && <div style={{ fontSize: 8, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2, whiteSpace: "nowrap" }}>{sub}</div>}
-                  </button>
-                ))}
-              </div>
               {friendYears.length > 1 && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
@@ -5007,10 +5030,13 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             { id: 'rated', label: '★ 4+', available: f.sortedShows.some(c => (c.rating || 0) >= 4) },
           ].filter(o => o.available);
 
-          const matchesHistoryFilter = c => historyFilter === 'all'
+          const q = historySearch.trim().toLowerCase();
+          const matchesHistoryFilter = c => (
+            historyFilter === 'all'
             || (historyFilter === 'photos' && !!c.photo)
             || (historyFilter === 'festivals' && c.type === 'festival')
-            || (historyFilter === 'rated' && (c.rating || 0) >= 4);
+            || (historyFilter === 'rated' && (c.rating || 0) >= 4)
+          ) && (!q || [c.artist, c.venue, c.city, c.tour].some(v => (v || '').toLowerCase().includes(q)));
 
           // * first/latest are always the real first and latest, not the first and
           // * latest of whatever's left after filtering.
@@ -5053,28 +5079,54 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           });
           return (
             <div style={{ padding: "12px 0 0" }}>
-              {/* One scrollable row of labelled chips — filters first, then sort and
-                  photo size. Nothing behind an icon, nothing behind a second tap. */}
-              <div style={{ display: "flex", gap: 5, overflowX: "auto", WebkitOverflowScrolling: "touch", padding: "0 16px 2px" }}>
-                {historyFilterOptions.map(o => (
-                  <button key={o.id} onClick={() => setHistoryFilter(o.id)} style={chip(historyFilter === o.id)}>
-                    {o.label} {o.id === 'all' ? allPastAsc.length : allPastAsc.filter(c => (
-                      o.id === 'photos' ? !!c.photo : o.id === 'festivals' ? c.type === 'festival' : (c.rating || 0) >= 4
-                    )).length}
-                  </button>
-                ))}
-                {historyFilterOptions.length > 1 && <span style={{ width: 1, background: "#1f1f35", flexShrink: 0, margin: "2px 4px" }} />}
-                <button onClick={() => onUpdateSetting?.('friendTimelineNewestFirst', !newestFirst)} style={chip(false)}>
-                  {newestFirst ? "Newest first" : "Oldest first"}
+              {/* Same control row the Shows page uses — search, Sort, Filters — so
+                  there's one pattern to learn rather than a bespoke set of chips. */}
+              <div style={{ padding: "0 16px 10px", display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  value={historySearch} onChange={e => setHistorySearch(e.target.value)}
+                  placeholder="Search shows..."
+                  style={{ flex: 1, minWidth: 0, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "7px 11px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }}
+                />
+                <button onClick={() => { setHistorySortOpen(s => !s); setHistoryFiltersOpen(false); }} style={{ background: historySortOpen || newestFirst ? "#1a1a30" : "none", border: `1px solid ${historySortOpen || newestFirst ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99, padding: "5px 11px", cursor: "pointer", color: newestFirst ? "#a78bfa" : "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: newestFirst ? 700 : 400, flexShrink: 0 }}>
+                  Sort{newestFirst ? " ↕" : ""}
                 </button>
-                {f.shows.some(c => c.photo) && (
-                  <button onClick={() => onUpdateSetting?.('friendTimelineCompact', !timelineCompact)} style={chip(false)}>
-                    {timelineCompact ? "Small photos" : "Large photos"}
-                  </button>
-                )}
+                <button onClick={() => { setHistoryFiltersOpen(f2 => !f2); setHistorySortOpen(false); }} style={{ background: historyFiltersOpen || historyFilter !== 'all' ? "#1a1a30" : "none", border: `1px solid ${historyFiltersOpen || historyFilter !== 'all' ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99, padding: "5px 11px", cursor: "pointer", color: historyFilter !== 'all' ? "#a78bfa" : "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: historyFilter !== 'all' ? 700 : 400, flexShrink: 0 }}>
+                  {historyFilter !== 'all' ? "Filters (1)" : "Filters"}
+                </button>
               </div>
 
-              <div style={{ height: 1, background: "#1f1f35", margin: "12px 16px 0" }} />
+              {historySortOpen && (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", margin: "0 16px 10px" }}>
+                  {newestFirst && <button onClick={() => onUpdateSetting?.('friendTimelineNewestFirst', false)} style={{ marginBottom: 10, background: "none", border: "none", color: "#4a4870", fontSize: 11, cursor: "pointer", fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {[{ id: false, label: 'Oldest first' }, { id: true, label: 'Newest first' }].map(s => (
+                      <button key={String(s.id)} onClick={() => onUpdateSetting?.('friendTimelineNewestFirst', s.id)} style={{ padding: "5px 11px", borderRadius: 99, fontSize: 11, cursor: "pointer", background: newestFirst === s.id ? "#a78bfa" : "#0c0c14", color: newestFirst === s.id ? "#0c0c14" : "#6b6a8f", border: `1px solid ${newestFirst === s.id ? "#a78bfa" : "#1f1f35"}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {historyFiltersOpen && (
+                <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", margin: "0 16px 10px" }}>
+                  {historyFilter !== 'all' && <button onClick={() => setHistoryFilter('all')} style={{ marginBottom: 10, background: "none", border: "none", color: "#4a4870", fontSize: 11, cursor: "pointer", fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: historyFilterOptions.length > 1 ? 12 : 0 }}>
+                    {historyFilterOptions.map(o => (
+                      <button key={o.id} onClick={() => setHistoryFilter(o.id)} style={{ padding: "5px 11px", borderRadius: 99, fontSize: 11, cursor: "pointer", background: historyFilter === o.id ? "#a78bfa" : "#0c0c14", color: historyFilter === o.id ? "#0c0c14" : "#6b6a8f", border: `1px solid ${historyFilter === o.id ? "#a78bfa" : "#1f1f35"}`, fontFamily: "'DM Mono', monospace" }}>{o.label}</button>
+                    ))}
+                  </div>
+                  {f.shows.some(c => c.photo) && (
+                    <>
+                      <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Photo size</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {[{ id: false, label: 'Large' }, { id: true, label: 'Small' }].map(o => (
+                          <button key={String(o.id)} onClick={() => onUpdateSetting?.('friendTimelineCompact', o.id)} style={{ padding: "5px 11px", borderRadius: 99, fontSize: 11, cursor: "pointer", background: timelineCompact === o.id ? "#a78bfa" : "#0c0c14", color: timelineCompact === o.id ? "#0c0c14" : "#6b6a8f", border: `1px solid ${timelineCompact === o.id ? "#a78bfa" : "#1f1f35"}`, fontFamily: "'DM Mono', monospace" }}>{o.label}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div style={{ padding: "0 16px" }}>
 
               {pastAsc.length === 0 && upcomingAsc.length === 0 && (
@@ -5240,11 +5292,13 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           />
         )}
 
-        {friendTab === 'overview' && (
+        {/* Shared container for Overview and Stats — each section below declares
+            which tab it belongs to, so the split is visible in one place rather
+            than duplicated across two nearly-identical blocks. */}
+        {(friendTab === 'overview' || friendTab === 'stats') && (
         <div style={{ padding: "16px 16px" }}>
-          {f.shows.length > 0 && <div style={{ ...sectionLabel, marginBottom: 8 }}>The story</div>}
-          {/* Details */}
-          {f.shows.length > 0 && (() => {
+          {/* Details — stays on Overview: it's the short answer, not a statistic. */}
+          {friendTab === 'overview' && f.shows.length > 0 && (() => {
             const aCount = {}; f.shows.forEach(c => { if (c.type !== 'festival') aCount[c.artist] = (aCount[c.artist] || 0) + 1; });
             const topA = Object.entries(aCount).sort((a, b) => b[1] - a[1])[0];
             const vCount = {}; f.shows.forEach(c => { if (c.venue) vCount[c.venue] = (vCount[c.venue] || 0) + 1; });
@@ -5273,7 +5327,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
           {/* The ones with feeling in them. favorite and criedSong are the most
               personal fields in the app and had never surfaced on a friend page. */}
-          {(favouriteShow || criedShow || bestRated) && (
+          {friendTab === 'stats' && (favouriteShow || criedShow || bestRated) && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>The big ones</div>
               {favouriteShow && (
@@ -5299,7 +5353,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
           {/* Spend breakdown. Every part of this was already itemised per show and
               never added up across a friendship. */}
-          {spend.total > 0 && (
+          {friendTab === 'stats' && spend.total > 0 && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Spent together</div>
               <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}>€{spend.total.toFixed(2)}</div>
@@ -5327,7 +5381,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           )}
 
           {/* Map — reuses VenueMap and the coordinates already saved per venue. */}
-          {friendMapPoints.length > 1 && (
+          {friendTab === 'overview' && friendMapPoints.length > 1 && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Where you go</div>
               <VenueMap points={friendMapPoints} height={170} interactive={false} clickOpensMaps />
@@ -5339,7 +5393,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
           {/* Taste profile — needs at least a couple of genres across a few shows
               to say anything. One bar pinned at 100% is noise, not a profile. */}
-          {f.shows.length >= 3 && f.topGenres.length >= 2 && (
+          {friendTab === 'stats' && f.shows.length >= 3 && f.topGenres.length >= 2 && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Taste profile</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -5359,7 +5413,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           {/* Top artists — a "ranking" of artists you've each seen once is just the
               timeline again in a different order. Needs a repeat, or enough shows
               for the order to mean something. */}
-          {(f.shows.length >= 3 || (f.topArtists[0]?.[1] || 0) > 1) && f.topArtists.length > 0 && (
+          {friendTab === 'stats' && (f.shows.length >= 3 || (f.topArtists[0]?.[1] || 0) > 1) && f.topArtists.length > 0 && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Top artists together</div>
               {f.topArtists.slice(0, 6).map(([artist, count], i) => (

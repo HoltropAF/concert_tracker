@@ -3,7 +3,8 @@
 ## 1.1.0 — 8 August 2026
 - Opening the app is one loading screen instead of three, and your library paints instantly from a local copy while it refreshes in the background
 - Friends: your three most-seen friends get a podium, and every row shows a bar per year so you can see when you drifted apart
-- Each friend now has their own page, with Overview, History and Photos tabs
+- Each friend now has their own page, with Overview, History, Photos and Stats tabs
+- A friend's History has the same search, sort and filter controls as the Shows page
 - Shared history: every show together on one timeline, with quiet stretches marked, ratings inline, and upcoming plans joined on the end
 - Nights that were just the two of you are marked as such
 - Tag who is actually in a photo, then filter a friend's photos down to the ones they're in

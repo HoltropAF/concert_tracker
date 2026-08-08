@@ -87,6 +87,40 @@ export async function deleteArtistPhoto(path) {
   urlCache.delete(path)
 }
 
+// * Everything this user has in the bucket, with sizes. Used by Settings to report
+// * storage use and to find files no longer referenced by any show or artist.
+// * Paths are always "<user-id>/<file>", so one non-recursive list is the whole set.
+export async function listUserPhotos() {
+  if (!supabase) return []
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const files = []
+  const PAGE = 100
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase.storage.from('photos').list(user.id, { limit: PAGE, offset })
+    if (error || !data || data.length === 0) break
+    files.push(...data.map(f => ({
+      path: `${user.id}/${f.name}`,
+      name: f.name,
+      size: f.metadata?.size || 0,
+    })))
+    if (data.length < PAGE) break
+  }
+  return files
+}
+
+// * Bulk remove. Supabase caps a single remove() call, so this goes in batches.
+export async function deletePhotos(paths) {
+  if (!supabase || paths.length === 0) return { error: null }
+  for (let i = 0; i < paths.length; i += 50) {
+    const batch = paths.slice(i, i + 50)
+    const { error } = await supabase.storage.from('photos').remove(batch)
+    if (error) return { error }
+    batch.forEach(p => urlCache.delete(p))
+  }
+  return { error: null }
+}
+
 // * Signed URLs are valid for 60 min but cached for only 50 min to avoid
 // * serving an expired URL in the last window before the signature expires.
 // ! The cache is module-level and never cleared on sign-out. Entries are per-path and

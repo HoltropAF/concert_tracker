@@ -21,12 +21,14 @@
 // ! onUpdateSetting props supplied by App, which are backed either by Supabase
 // ! (useSupabase.js) or by localStorage (guest mode).
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto } from '../lib/photos'
+import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
 import { geocodeVenue } from '../lib/geocode'
 import { supabase } from '../lib/supabase'
+import { DEFAULT_SETTINGS } from '../lib/data'
 import { useSWUpdate } from '../lib/swUpdate'
+import { useAppInstall } from '../lib/appInstall'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
 import html2canvas from 'html2canvas'
@@ -265,6 +267,9 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! mismatch between them means either nothing is shown or everything is.
 const APP_VERSION = '1.1.0'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
+// Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
+const STORAGE_BUDGET = 1024 * 1024 * 1024
+const formatBytes = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(0) + ' KB' : (n / 1048576).toFixed(1) + ' MB'
 
 // * Splits changelog.md into { version, date, entries } by its "## " headings.
 // * Anything before the first heading (the title) is ignored.
@@ -309,16 +314,47 @@ const CHART_GROUP_IDS = [
 // ! Every simultaneously-open overlay pushes its own entry, so mounting order and
 // ! unmount order must be strictly nested — two siblings both calling this will
 // ! fight over the same history stack.
+// ! history.go(-1) is asynchronous, and that used to break every navigation where
+// ! one overlay replaced another in a single commit. Opening a show from a friend's
+// ! page unmounted the whole tab tree (ConcertTracker early-returns the concert
+// ! detail), so FriendsView's cleanup queued a pop while ConcertDetail synchronously
+// ! pushed its own entry. The queued pop then landed on ConcertDetail's entry,
+// ! popstate fired, and the show closed itself in the same frame — it looked exactly
+// ! like tapping the photo did nothing.
+//
+// * So pops are deferred by one tick and counted. A mount that happens in the same
+// * tick cancels a pending pop and reuses that entry instead of pushing a new one,
+// * which makes an unmount-then-mount pair a no-op on the history stack rather than
+// * a race between them.
+let pendingBackPops = 0;
+let backPopTimer = null;
+function scheduleBackPop() {
+  pendingBackPops++;
+  if (backPopTimer) return;
+  backPopTimer = setTimeout(() => {
+    backPopTimer = null;
+    const n = pendingBackPops;
+    pendingBackPops = 0;
+    if (n > 0) history.go(-n);
+  }, 0);
+}
+function claimPendingBackPop() {
+  if (pendingBackPops > 0) { pendingBackPops--; return true; }
+  return false;
+}
+
 function useBackButton(onBack, enabled = true) {
   const cb = useRef(onBack);
   const pushed = useRef(false);
   cb.current = onBack;
   useEffect(() => {
     if (!enabled) {
-      if (pushed.current) { pushed.current = false; history.go(-1); }
+      if (pushed.current) { pushed.current = false; scheduleBackPop(); }
       return;
     }
-    history.pushState({ appBack: true }, '');
+    // * Reuse the entry an overlay unmounting in this same commit was about to give
+    // * back, rather than popping it and immediately pushing an identical one.
+    if (!claimPendingBackPop()) history.pushState({ appBack: true }, '');
     pushed.current = true;
     const handler = () => { pushed.current = false; cb.current(); };
     window.addEventListener('popstate', handler);
@@ -327,7 +363,7 @@ function useBackButton(onBack, enabled = true) {
       // If this closed via a button/tab-switch rather than the actual back
       // gesture, the pushed history entry is still sitting there — pop it
       // ourselves so the browser history stack stays in sync with app state.
-      if (pushed.current) { pushed.current = false; history.go(-1); }
+      if (pushed.current) { pushed.current = false; scheduleBackPop(); }
     };
   }, [enabled]);
 }
@@ -4419,8 +4455,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
     const start = Math.max(Math.min(...years), max - 7);
     return Array.from({ length: max - start + 1 }, (_, i) => String(start + i));
   })();
-  const showsPerYear = yearAxis.map(y => withFriends.filter(c => c.date.slice(0, 4) === y).length);
-  const peakYear = Math.max(1, ...showsPerYear);
 
   // * Folds one name into another everywhere it appears: on each affected show, and
   // * across every settings map keyed by friend name. The surviving name's own
@@ -4559,19 +4593,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
       return Array.from({ length: max - min + 1 }, (_, i) => String(min + i));
     })();
 
-    // * Same total the stats page uses: tickets + merch + other costs + travel.
-    const showCost = c => ticketTotal(c)
-      + (c.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0)
-      + (c.otherCosts || []).reduce((s, x) => s + (parseFloat(x.price) || 0), 0)
-      + (parseFloat(c.travelCost) || 0);
-
-    const spend = {
-      tickets: f.shows.reduce((s, c) => s + ticketTotal(c), 0),
-      merch: f.shows.reduce((s, c) => s + (c.merch || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0),
-      other: f.shows.reduce((s, c) => s + (c.otherCosts || []).reduce((m, x) => m + (parseFloat(x.price) || 0), 0), 0),
-      travel: f.shows.reduce((s, c) => s + (parseFloat(c.travelCost) || 0), 0),
-    };
-    spend.total = spend.tickets + spend.merch + spend.other + spend.travel;
 
     // * Every song on a show you were both at is a song you both heard live.
     // * Counts the headliner's setlist and every support act's, deduped by name.
@@ -4707,15 +4728,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
             </div>
-            {/* Header carries identity and the span only — the countable stats moved
-                down into boxes on Overview, where numbers read faster than prose. */}
-            <DetailSubtitle lines={[
-              f.firstShow
-                ? `since ${new Date(f.firstShow.date + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}${spanYears >= 1 ? ` · ${spanYears} year${spanYears !== 1 ? 's' : ''}` : ''}`
-                : yearSpan,
-              profile.contact,
-              profile.note,
-            ]} />
+            {/* * Just the name and whatever you've written about them. "since …" moved
+                * into Details as a "first show" row, where it sits with the other
+                * facts instead of being a second line of chrome under every name. */}
+            <DetailSubtitle lines={[profile.contact, profile.note]} />
           </div>
           {/* Labelled, not icon-only. An unlabelled share glyph is the most
               ambiguous control on the page, and tooltips don't exist on touch. */}
@@ -4739,30 +4755,15 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </div>
         </div>
 
-        {/* Tabs — same shape as a show's General / Financial / Setlist. Overview
-            leads because it's the summary; History is the long read. */}
-        <div style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid #1f1f35" }}>
-          {/* No counts — the boxes below already carry them. */}
-          {[
-            { id: 'overview', label: 'Overview' },
-            { id: 'history', label: 'History' },
-            { id: 'photos', label: 'Photos' },
-            { id: 'stats', label: 'Stats' },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setFriendTab(t.id)}
-              style={{
-                flex: 1, background: "none", border: "none", cursor: "pointer",
-                padding: "10px 0 9px", marginBottom: -1,
-                borderBottom: `2px solid ${friendTab === t.id ? "var(--accent)" : "transparent"}`,
-                color: friendTab === t.id ? "var(--accent)" : "#6b6a8f",
-                fontWeight: friendTab === t.id ? 700 : 400,
-                fontSize: 11.5, fontFamily: "'DM Mono', monospace",
-              }}
-            >
-              {t.label}
-            </button>
+        {/* Same pill tabs the artist page uses for Overview / Shows / Songs / Info,
+            rather than a second tab style two taps away from the first. */}
+        <div style={{ display: "flex", gap: 5, padding: "10px 16px 4px" }}>
+          {[['overview', 'Overview'], ['history', 'History'], ['photos', 'Photos'], ['stats', 'Stats']].map(([id, label]) => (
+            <button key={id} onClick={() => setFriendTab(id)} style={{
+              background: friendTab === id ? "#a78bfa" : "#13131f", color: friendTab === id ? "#0c0c14" : "#6b6a8f",
+              border: `1px solid ${friendTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 99,
+              padding: "4px 11px", fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: 700, cursor: "pointer"
+            }}>{label}</button>
           ))}
         </div>
 
@@ -4884,10 +4885,12 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             Everything countable lives here now, so Overview can be the short
             answer: where you went, and the few facts worth remembering. */}
         {friendTab === 'stats' && f.shows.length > 0 && (() => {
+          // * Spend is gone entirely — it never said anything you'd act on, and it
+          // * was the same number in a box, a block and the graph.
           const boxes = [
             { value: songNames.length, label: 'songs', sub: songsRepeated > 0 ? `${songsRepeated} twice+` : null, when: songNames.length > 0 },
-            { value: `€${Math.round(spend.total)}`, label: 'spent', when: spend.total > 0 },
-            { value: `${shareOfShows}%`, label: 'of your shows', when: past.length > 0 },
+            { value: `${shareOfShows}%`, label: 'of your shows', sub: `${f.shows.length} of ${past.length}`, when: past.length > 0 },
+            { value: sharedGenres.size, label: 'shared genres', when: yourGenres.size > 0 && sharedGenres.size > 0 },
           ].filter(b => b.when);
           return (
             <div style={{ padding: "16px 16px 0" }}>
@@ -4903,23 +4906,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                 </div>
               )}
 
-              {/* Share of your gig life — a real proportion, not an invented score.
-                  Genre overlap sits underneath as the second honest number. */}
-              {past.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
-                    <span style={{ fontSize: 12, color: "#c4c2f0" }}>Share of your shows</span>
-                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "var(--accent)" }}>{shareOfShows}%</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 4, background: "#16162a", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, shareOfShows)}%`, background: "linear-gradient(90deg, #7c5cf0, var(--accent))", borderRadius: 4 }} />
-                  </div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f", marginTop: 6 }}>
-                    {f.shows.length} of your {past.length} shows
-                    {yourGenres.size > 0 && ` · ${sharedGenres.size} of your ${yourGenres.size} genres shared`}
-                  </div>
-                </div>
-              )}
+              {/* The share-of-your-shows bar used to sit here, directly under a box
+                  showing the same percentage. One of them had to go, and the box is
+                  the one that fits the row. */}
               {friendYears.length > 1 && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
@@ -4927,10 +4916,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                     {/* Micro segmented control — symbols, not words, so it fits on the
                         card's own header line and costs no vertical space. */}
                     <div style={{ display: "inline-flex", gap: 2, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 99, padding: 2 }}>
+                      {/* Shows and ratings only — spend is gone from this page. */}
                       {[
                         { id: 'shows', label: 'shows' },
                         { id: 'rating', label: '★' },
-                        { id: 'spend', label: '€' },
                       ].map(m => (
                         <button
                           key={m.id}
@@ -4953,19 +4942,16 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                     const values = friendYears.map(y => {
                       const inYear = f.shows.filter(c => c.date.slice(0, 4) === y);
                       if (yearMetric === 'shows') return inYear.length;
-                      if (yearMetric === 'rating') {
-                        const rated = inYear.filter(c => c.rating);
-                        return rated.length ? rated.reduce((a, c) => a + c.rating, 0) / rated.length : 0;
-                      }
-                      return inYear.reduce((a, c) => a + showCost(c), 0);
+                      const rated = inYear.filter(c => c.rating);
+                      return rated.length ? rated.reduce((a, c) => a + c.rating, 0) / rated.length : 0;
                     });
                     const peak = Math.max(1, ...values);
-                    const colour = yearMetric === 'rating' ? '#facc15' : yearMetric === 'spend' ? '#34d399' : 'var(--accent)';
+                    const colour = yearMetric === 'rating' ? '#facc15' : 'var(--accent)';
                     return (
                       <>
                         <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 44 }}>
                           {values.map((n, i) => (
-                            <div key={friendYears[i]} title={`${friendYears[i]}: ${yearMetric === 'spend' ? `€${Math.round(n)}` : yearMetric === 'rating' ? (n ? `★ ${n.toFixed(1)}` : 'unrated') : `${n} show${n === 1 ? '' : 's'}`}`} style={{
+                            <div key={friendYears[i]} title={`${friendYears[i]}: ${yearMetric === 'rating' ? (n ? `★ ${n.toFixed(1)}` : 'unrated') : `${n} show${n === 1 ? '' : 's'}`}`} style={{
                               flex: 1, borderRadius: 2,
                               height: n === 0 ? 4 : Math.max(6, Math.round((n / peak) * 44)),
                               background: n === 0 ? '#23223c' : colour,
@@ -5306,6 +5292,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             // * "first together" and "most recent" are badged on the History spine and
             // * the boxes carry the counts, so neither is repeated here.
             const rows = [
+              f.firstShow && ["first show", `${formatDate(f.firstShow.date)} · ${f.firstShow.artist}`],
               topA && topA[1] > 1 && ["most seen artist", `${topA[0]} (${topA[1]}×)`],
               topV && topV[1] > 1 && ["usual spot", `${topV[0]} (${topV[1]}×)`],
               // * "Where you stood" was already being collected as ticketType.
@@ -5348,35 +5335,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                   <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>"{criedShow.criedSong}" · {criedShow.artist}</span>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Spend breakdown. Every part of this was already itemised per show and
-              never added up across a friendship. */}
-          {friendTab === 'stats' && spend.total > 0 && (
-            <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
-              <div style={sectionLabel}>Spent together</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}>€{spend.total.toFixed(2)}</div>
-              <div style={{ display: "flex", height: 8, borderRadius: 4, background: "#16162a", overflow: "hidden", marginTop: 10 }}>
-                {[
-                  { k: 'tickets', v: spend.tickets, c: '#a78bfa' },
-                  { k: 'travel', v: spend.travel, c: '#818cf8' },
-                  { k: 'merch', v: spend.merch, c: '#f472b6' },
-                  { k: 'other', v: spend.other, c: '#34d399' },
-                ].filter(p => p.v > 0).map(p => (
-                  <div key={p.k} style={{ width: `${(p.v / spend.total) * 100}%`, background: p.c }} />
-                ))}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", marginTop: 8, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f" }}>
-                {[
-                  { k: 'tickets', v: spend.tickets, c: '#a78bfa' },
-                  { k: 'travel', v: spend.travel, c: '#818cf8' },
-                  { k: 'merch', v: spend.merch, c: '#f472b6' },
-                  { k: 'other', v: spend.other, c: '#34d399' },
-                ].filter(p => p.v > 0).map(p => (
-                  <span key={p.k}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: p.c, marginRight: 4 }} />{p.k} €{Math.round(p.v)}</span>
-                ))}
-              </div>
             </div>
           )}
 
@@ -5445,27 +5403,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           <div style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
             {friendEntries.filter(f => f.shows.length > 1).length} regular{friendEntries.filter(f => f.shows.length > 1).length !== 1 ? 's' : ''}, {past.filter(c => getFriends(c).length === 0).length} solo show{past.filter(c => getFriends(c).length === 0).length !== 1 ? 's' : ''}
           </div>
-          {/* Crew ribbon — shows together per year, the same axis the per-friend rows use */}
-          {yearAxis.length > 1 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 46 }}>
-                {showsPerYear.map((n, i) => (
-                  <div key={yearAxis[i]} style={{
-                    flex: 1,
-                    height: n === 0 ? 3 : Math.max(5, Math.round((n / peakYear) * 46)),
-                    borderRadius: 2,
-                    background: n === 0 ? '#23223c' : 'var(--accent)',
-                    opacity: n === 0 ? 1 : 0.35 + 0.65 * (n / peakYear),
-                  }} title={`${yearAxis[i]}: ${n} show${n === 1 ? '' : 's'} with friends`} />
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-                {yearAxis.map(y => (
-                  <span key={y} style={{ flex: 1, fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textAlign: 'center' }}>{y.slice(2)}</span>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* The crew ribbon (shows-with-friends per year) used to sit here. Removed —
+              the podium is the reason you open this page, and a chart delaying it was
+              the wrong thing to lead with. The per-friend year bars on each row still
+              carry the same information where it's actually about someone. */}
         </div>
       )}
       {/* Inner circle — the three you've seen most. */}
@@ -8781,7 +8722,10 @@ function SettingsSection({ title, icon, children, collapsible = false, defaultOp
           </span>
         </button>
       ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em", margin: "0 0 8px 4px" }}>
+        // * A fixed section reads as a heading, not a control: brighter, no chevron,
+        // * no hover affordance. Previously both kinds looked identical and the only
+        // * clue was a small chevron you had to notice.
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontWeight: 800, letterSpacing: "0.02em", margin: "0 0 8px 4px" }}>
           {icon && <SettingsSectionIcon id={icon} />}
           {title}
         </div>
@@ -8861,7 +8805,7 @@ const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => 
 // ! settings into `next` or they will wipe every unrelated preference.
 // * The XLSX library is imported lazily via loadXlsx() — it is large and most
 // * sessions never open import/export.
-function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSignOut, userEmail, onNotify = () => {}, onThemePreview = () => {} }) {
+function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onDeleteConcert, onSignOut, userEmail, onNotify = () => {}, onThemePreview = () => {} }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
@@ -8961,6 +8905,107 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   // * So track which keys you actually edited. Everything else follows `settings`
   // * live, and Save applies only your edits on top of the current values.
   const swUpdate = useSWUpdate();
+  const appInstall = useAppInstall();
+
+  const [exportScope, setExportScope] = useState('all');
+  const [pendingImport, setPendingImport] = useState(null);
+  const [importMode, setImportMode] = useState('replace');
+  const [storageInfo, setStorageInfo] = useState(null);
+  const [storageBusy, setStorageBusy] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const photoCount = concerts.filter(c => c.photo).length;
+  const dataBreakdown = [
+    { k: 'shows', n: concerts.length, c: '#a78bfa' },
+    { k: 'songs', n: concerts.reduce((s, c) => s + getSongList(c.setlist).length, 0), c: '#818cf8' },
+    { k: 'photos', n: photoCount, c: '#f472b6' },
+    { k: 'friends', n: new Set(concerts.flatMap(c => getFriends(c))).size, c: '#34d399' },
+  ];
+
+  // * Export scope. "Everything" is the default; the others exist so a slice can be
+  // * shared without handing over the whole library.
+  const exportRows = exportScope === 'year'
+    ? concerts.filter(c => c.date?.slice(0, 4) === String(new Date().getFullYear()))
+    : exportScope === 'photos'
+      ? concerts.filter(c => c.photo)
+      : concerts;
+
+  // * How long since the last export, and how much has changed since. Goes amber at
+  // * three months so the collapsed header is worth glancing at.
+  const backupAge = (() => {
+    const at = settings.lastExportAt ? new Date(settings.lastExportAt) : null;
+    if (!at || Number.isNaN(at.getTime())) {
+      return { color: '#f87171', title: 'Never exported', detail: `${concerts.length} shows have never been backed up`, subtitle: { label: 'never', color: '#f87171' } };
+    }
+    const days = Math.floor((Date.now() - at.getTime()) / 86400000);
+    const since = concerts.length - (settings.lastExportCount || 0);
+    const label = days === 0 ? 'today' : days === 1 ? 'yesterday' : days < 31 ? `${days} days ago` : `${Math.round(days / 30)} months ago`;
+    const stale = days >= 90;
+    return {
+      color: stale ? '#facc15' : '#34d399',
+      title: `Last export ${label}`,
+      detail: since > 0 ? `${since} show${since === 1 ? '' : 's'} added since then` : 'Nothing added since then',
+      subtitle: { label, color: stale ? '#facc15' : '#6b6a8f' },
+    };
+  })();
+
+  // * Called by every export path so the status above stays honest.
+  const recordExport = () => {
+    onUpdate('lastExportAt', new Date().toISOString());
+    onUpdate('lastExportCount', concerts.length);
+  };
+
+  const loadStorageInfo = async () => {
+    setStorageBusy(true);
+    try {
+      const files = await listUserPhotos();
+      // * A file is in use if a show or an artist still points at it.
+      const used = new Set([
+        ...concerts.map(c => c.photo).filter(Boolean),
+        ...Object.values(settings.artistPhotos || {}).filter(Boolean),
+      ]);
+      const orphans = files.filter(f => !used.has(f.path));
+      setStorageInfo({
+        files,
+        used: files.reduce((s, f) => s + f.size, 0),
+        orphans,
+        orphanBytes: orphans.reduce((s, f) => s + f.size, 0),
+      });
+    } catch {
+      onNotify('Could not read storage', 'error');
+    }
+    setStorageBusy(false);
+  };
+
+  const cleanUpOrphans = async () => {
+    if (!storageInfo?.orphans.length) return;
+    if (!window.confirm(`Permanently delete ${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}? Shows still using a photo are not affected.`)) return;
+    setStorageBusy(true);
+    const { error } = await deletePhotos(storageInfo.orphans.map(f => f.path));
+    setStorageBusy(false);
+    if (error) { onNotify('Could not delete some files', 'error'); return; }
+    onNotify(`Removed ${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}`);
+    loadStorageInfo();
+  };
+
+  // ! Irreversible. Photos go first (they can't be recovered from an export anyway),
+  // ! then every show, then settings are reset to defaults.
+  const handleDeleteEverything = async () => {
+    if (deleteConfirm !== 'DELETE') return;
+    setDeleteBusy(true);
+    try {
+      const files = await listUserPhotos();
+      if (files.length > 0) await deletePhotos(files.map(f => f.path));
+      for (const c of concerts) await onDeleteConcert?.(c.id);
+      if (onUpdateAll) await onUpdateAll({ ...DEFAULT_SETTINGS });
+      setDeleteConfirm('');
+      onNotify('Everything deleted');
+    } catch (err) {
+      onNotify(err?.message || 'Could not finish deleting', 'error');
+    }
+    setDeleteBusy(false);
+  };
 
   // * "What's new" used to render the whole changelog every time, which is why it
   // * never felt like news. It now shows only the releases above the version you
@@ -9213,8 +9258,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
 
   const handleCsvExport = () => {
+    recordExport();
     const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','TicketItems','Merch','Favorite','Tags','CriedSong','Friends','Solo','VenueSize','Notes'];
-    const rows = concerts.map(c => [
+    const rows = exportRows.map(c => [
       c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
       c.genre||'', c.subgenre||'', (Array.isArray(c.language) ? c.language.join('; ') : c.language||''), c.rating||'', ticketTotal(c)||'',
       (c.tickets||[]).map(t => `${t.name||'Ticket'}:${t.price||0}`).join('; '),
@@ -9230,11 +9276,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   const handleXlsxExport = async () => {
+    recordExport();
     const XLSX = await loadXlsx();
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: Shows
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(concerts.map(c => ({
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows.map(c => ({
       ID: c.id, Date: c.date, Artist: c.artist, Venue: c.venue, Room: c.room || '',
       City: c.city, Country: c.country, Type: c.type, Tour: c.tour || '',
       SeenAs: c.seenAs || '', Genre: c.genre || '', Subgenre: c.subgenre || '',
@@ -9278,8 +9325,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   const handleExport = async () => {
     try {
-      // concerts prop passed from parent
-      setExportData(JSON.stringify(concerts, null, 2));
+      recordExport();
+      setExportData(JSON.stringify(exportRows, null, 2));
     } catch (e) {
       setExportStatus("error");
     }
@@ -9376,17 +9423,47 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     };
   };
 
-  const doImport = async (concerts) => {
-    const valid = concerts.map(normalizeConcertForImport).filter(Boolean);
-    const skipped = concerts.length - valid.length;
+  // * Import used to apply the moment you picked a file. Now every path stages here
+  // * first so you can see what would change and back out — the one destructive
+  // * action in this section that had no confirmation at all.
+  const stageImport = (rows) => {
+    const valid = rows.map(normalizeConcertForImport).filter(Boolean);
+    const skipped = rows.length - valid.length;
+    if (valid.length === 0) {
+      setImportStatus("error");
+      setImportMessage("No valid concerts found — each row needs at least an Artist and Date.");
+      return;
+    }
+    const byId = new Map(concerts.map(c => [c.id, c]));
+    const isNew = c => !byId.has(c.id);
+    const isChanged = c => byId.has(c.id) && JSON.stringify(byId.get(c.id)) !== JSON.stringify({ ...byId.get(c.id), ...c });
+    setImportStatus(null); setImportMessage(""); setImportReport(null);
+    setPendingImport({
+      rows: valid,
+      total: rows.length,
+      skipped,
+      added: valid.filter(isNew).length,
+      changed: valid.filter(isChanged).length,
+      unchanged: valid.filter(c => !isNew(c) && !isChanged(c)).length,
+    });
+  };
+
+  // * mode 'merge' keeps what you already have when a show exists on both sides;
+  // * 'replace' lets the file win. Previously the file always won, silently.
+  const doImport = async (rows, mode = 'replace') => {
+    const valid = rows.map(normalizeConcertForImport).filter(Boolean);
+    const skipped = rows.length - valid.length;
     if (valid.length === 0) { setImportStatus("error"); setImportMessage("No valid concerts found — each row needs at least an Artist and Date."); return; }
+    const existingIds = new Set(concerts.map(c => c.id));
+    const toWrite = mode === 'merge' ? valid.filter(c => !existingIds.has(c.id)) : valid;
     let failed = 0;
-    for (const c of valid) {
+    for (const c of toWrite) {
       const result = await onSaveConcert(c);
       if (result?.error) failed++;
     }
-    const imported = valid.length - failed;
-    setImportReport({ total: concerts.length, imported, skipped, failed });
+    const imported = toWrite.length - failed;
+    const keptMine = valid.length - toWrite.length;
+    setImportReport({ total: rows.length, imported, skipped: skipped + keptMine, failed });
     if (failed > 0) {
       setImportStatus("error");
       setImportMessage(`Imported ${imported}, skipped ${skipped}, failed ${failed}.`);
@@ -9405,7 +9482,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       if (!Array.isArray(parsed)) { setImportStatus("error"); setImportMessage("Expected a list of concerts (JSON array starting with [ ). Got a different format."); return; }
       if (parsed.length === 0) { setImportStatus("error"); setImportMessage("The JSON is empty — no concerts to import."); return; }
       setImportText("");
-      await doImport(parsed);
+      stageImport(parsed);
     } catch { setImportStatus("error"); setImportMessage("Something went wrong during import. Try again."); }
   };
 
@@ -9457,12 +9534,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         if (file.name.endsWith('.csv')) {
           const result = parseCSV(ev.target.result);
           if (result?.error) { setImportStatus("error"); setImportMessage(result.error); return; }
-          await doImport(result);
+          stageImport(result);
         } else {
           let parsed;
           try { parsed = JSON.parse(ev.target.result); } catch { setImportStatus("error"); setImportMessage("Couldn't read the file as JSON — it may be corrupted or the wrong format."); return; }
           if (!Array.isArray(parsed)) { setImportStatus("error"); setImportMessage("Expected a list of concerts (JSON array). Got a different format."); return; }
-          await doImport(parsed);
+          stageImport(parsed);
         }
       } catch { setImportStatus("error"); setImportMessage("Something went wrong reading the file. Try again."); }
     };
@@ -9531,7 +9608,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           solo: r.Solo === 'yes', venueSize: r.VenueSize || null, notes: r.Notes || null,
           seenAs: r.SeenAs || null, support: [],
         }));
-        await doImport(parsed);
+        stageImport(parsed);
       } catch (err) {
         setImportStatus("error");
         setImportMessage("Something went wrong reading the XLSX file. Try again.");
@@ -9602,6 +9679,25 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             onClick={() => swUpdate.apply?.()}
             style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
           >Update</button>
+        </div>
+      )}
+
+      {/* * Same reasoning as the update row: dismissing the install banner should be
+          * "not now". The browser only ever offers the prompt once per visit, so if
+          * it's available it's offered here until it's used. */}
+      {appInstall.available && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 10, padding: "11px 13px",
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>Install settracker</div>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Add to your home screen — opens without the browser bar</div>
+          </div>
+          <button
+            onClick={() => appInstall.prompt?.()}
+            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
+          >Install</button>
         </div>
       )}
 
@@ -10121,14 +10217,61 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </SettingsSection>
 
         {/* Your data */}
-        <SettingsSection title="Your data" icon="data" collapsible defaultOpen={false}>
+        <SettingsSection title="Backup" icon="data" collapsible defaultOpen={false} subtitle={backupAge.subtitle}>
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
+
+            {/* Last export — the single most useful line this section can carry.
+                Goes amber once it's stale, so the collapsed header is worth a glance. */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: backupAge.color, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>{backupAge.title}</div>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{backupAge.detail}</div>
+              </div>
+            </div>
+
+            {/* What an export actually contains — "download a copy" of what, exactly. */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #1f1f35" }}>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 7 }}>In your library</div>
+              <div style={{ display: "flex", height: 7, borderRadius: 4, background: "#16162a", overflow: "hidden" }}>
+                {dataBreakdown.filter(d => d.n > 0).map(d => (
+                  <div key={d.k} style={{ width: `${(d.n / dataBreakdown.reduce((s, x) => s + x.n, 0)) * 100}%`, background: d.c }} />
+                ))}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 11px", marginTop: 7, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f" }}>
+                {dataBreakdown.filter(d => d.n > 0).map(d => (
+                  <span key={d.k}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: d.c, marginRight: 4 }} />{d.n} {d.k}</span>
+                ))}
+              </div>
+              {photoCount > 0 && (
+                <div style={{ marginTop: 9, padding: "8px 10px", background: "#1a1410", border: "1px solid #4a3a28", borderRadius: 8, fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#e0a35f", lineHeight: 1.5 }}>
+                  ! Your {photoCount} photo{photoCount === 1 ? '' : 's'} are stored separately and are <b>not</b> included in an export.
+                </div>
+              )}
+            </div>
 
             {/* Export */}
             <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
               <div style={{ marginBottom: 10 }}>
                 <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>Export</div>
                 <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Download a copy of your concerts</div>
+              </div>
+              {/* Scope — everything, or a slice worth sharing on its own. */}
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+                {[
+                  { id: 'all', label: 'Everything' },
+                  { id: 'year', label: String(new Date().getFullYear()) },
+                  { id: 'photos', label: 'With photos' },
+                ].map(o => (
+                  <button key={o.id} onClick={() => setExportScope(o.id)} style={{
+                    padding: "4px 10px", borderRadius: 99, fontSize: 11, cursor: "pointer",
+                    background: exportScope === o.id ? "#a78bfa" : "#0c0c14",
+                    color: exportScope === o.id ? "#0c0c14" : "#6b6a8f",
+                    border: `1px solid ${exportScope === o.id ? "#a78bfa" : "#1f1f35"}`,
+                    fontFamily: "'DM Mono', monospace", fontWeight: exportScope === o.id ? 700 : 400,
+                  }}>{o.label}</button>
+                ))}
+                <span style={{ alignSelf: "center", fontSize: 9.5, color: "#4a4870", fontFamily: "'DM Mono', monospace" }}>{exportRows.length} shows</span>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={handleXlsxExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↓ XLSX</button>
@@ -10190,6 +10333,44 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               </div>
             )}
 
+            {/* Import preview — nothing is written until this is confirmed. */}
+            {pendingImport && (
+              <div style={{ padding: "14px 16px", borderTop: "1px solid #1f1f35", background: "#10101c" }}>
+                <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600, marginBottom: 9 }}>Ready to import</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, lineHeight: 1.8 }}>
+                  <div style={{ color: "#34d399" }}>+ {pendingImport.added} new show{pendingImport.added === 1 ? '' : 's'}</div>
+                  {pendingImport.changed > 0 && <div style={{ color: "#facc15" }}>~ {pendingImport.changed} already here, with differences</div>}
+                  {pendingImport.unchanged > 0 && <div style={{ color: "#4a4870" }}>· {pendingImport.unchanged} identical</div>}
+                  {pendingImport.skipped > 0 && <div style={{ color: "#f87171" }}>× {pendingImport.skipped} unreadable row{pendingImport.skipped === 1 ? '' : 's'}</div>}
+                </div>
+
+                {pendingImport.changed > 0 && (
+                  <div style={{ marginTop: 11 }}>
+                    <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>For shows that already exist</div>
+                    <div style={{ display: "flex", gap: 5 }}>
+                      {[{ id: 'merge', label: 'Keep mine' }, { id: 'replace', label: "Use the file's" }].map(o => (
+                        <button key={o.id} onClick={() => setImportMode(o.id)} style={{
+                          flex: 1, padding: "7px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer",
+                          background: importMode === o.id ? "#a78bfa" : "#0c0c14",
+                          color: importMode === o.id ? "#0c0c14" : "#6b6a8f",
+                          border: `1px solid ${importMode === o.id ? "#a78bfa" : "#1f1f35"}`,
+                          fontFamily: "'DM Mono', monospace", fontWeight: importMode === o.id ? 700 : 400,
+                        }}>{o.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button onClick={() => setPendingImport(null)} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>Cancel</button>
+                  <button
+                    onClick={async () => { const p = pendingImport; setPendingImport(null); await doImport(p.rows, importMode); }}
+                    style={{ flex: 2, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#a78bfa", border: "none", color: "#0c0c14", fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}
+                  >Import {importMode === 'merge' ? pendingImport.added : pendingImport.added + pendingImport.changed}</button>
+                </div>
+              </div>
+            )}
+
             {/* Import result */}
             {(importStatus || importReport) && (
               <div style={{ padding: "0 16px 14px" }}>
@@ -10209,7 +10390,100 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             )}
           </div>
         </SettingsSection>
+
+        {/* ── Advanced ────────────────────────────────────────────────────
+            Storage housekeeping and the only irreversible action in the app.
+            Collapsed and closed by default: you should have to go looking. */}
+        <SettingsSection title="Advanced" icon="data" collapsible defaultOpen={false}>
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
+
+            <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>Photo storage</div>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                    {storageInfo ? `${storageInfo.files.length} files · ${formatBytes(storageInfo.used)}` : 'Not checked yet'}
+                  </div>
+                </div>
+                <button onClick={loadStorageInfo} disabled={storageBusy} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
+                  {storageBusy ? '…' : storageInfo ? 'Refresh' : 'Check'}
+                </button>
+              </div>
+              {storageInfo && (
+                <div style={{ height: 7, borderRadius: 4, background: "#16162a", overflow: "hidden", marginTop: 9 }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, (storageInfo.used / STORAGE_BUDGET) * 100)}%`, background: "var(--accent)" }} />
+                </div>
+              )}
+            </div>
+
+            {/* Files with nothing pointing at them — photos whose show was deleted
+                before photo deletion existed, or uploads abandoned mid-edit. */}
+            {storageInfo && (
+              <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>
+                    {storageInfo.orphans.length === 0 ? 'No unused photos' : `${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}`}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                    {storageInfo.orphans.length === 0
+                      ? 'Every file is still in use'
+                      : `${formatBytes(storageInfo.orphanBytes)} from shows you've deleted`}
+                  </div>
+                </div>
+                {storageInfo.orphans.length > 0 && (
+                  <button onClick={cleanUpOrphans} disabled={storageBusy} style={{ background: "none", border: "1px solid #4a2828", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Clean up</button>
+                )}
+              </div>
+            )}
+
+            {/* ! The only irreversible action in the app. Typed confirmation rather
+                ! than a yes/no, and it names exactly what goes. */}
+            <div style={{ padding: "13px 16px", background: "#1a1214" }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.09em", color: "#f87171", marginBottom: 8 }}>Danger zone</div>
+              <div style={{ fontSize: 11.5, color: "#c4c2f0", lineHeight: 1.55, marginBottom: 10 }}>
+                Deletes {concerts.length} show{concerts.length === 1 ? '' : 's'}{photoCount > 0 ? `, ${photoCount} photo${photoCount === 1 ? '' : 's'}` : ''} and every setting. This cannot be undone — export first.
+              </div>
+              <input
+                value={deleteConfirm}
+                onChange={e => setDeleteConfirm(e.target.value)}
+                placeholder="type DELETE to confirm"
+                style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #4a2828", borderRadius: 8, color: "#c4c2f0", padding: "8px 11px", fontFamily: "'DM Mono', monospace", fontSize: 12, marginBottom: 9 }}
+              />
+              <button
+                onClick={handleDeleteEverything}
+                disabled={deleteConfirm !== 'DELETE' || deleteBusy}
+                style={{
+                  width: "100%", padding: "10px", borderRadius: 8, fontSize: 12.5, fontWeight: 700,
+                  cursor: deleteConfirm === 'DELETE' && !deleteBusy ? "pointer" : "default",
+                  background: deleteConfirm === 'DELETE' && !deleteBusy ? "#b91c1c" : "#2a1a1a",
+                  border: "none", color: deleteConfirm === 'DELETE' && !deleteBusy ? "#fff" : "#6b6a8f",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >{deleteBusy ? 'Deleting…' : 'Delete everything'}</button>
+            </div>
+          </div>
+        </SettingsSection>
+
+        {/* Sign out gets its own row — it used to sit among the data actions, which
+            is the one place you might tap it by accident. */}
+        <SettingsSection title="Session" icon="person">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 4px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>Signed in</div>
+              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis" }}>{userEmail}</div>
+            </div>
+            <button onClick={onSignOut} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "7px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Sign out</button>
+          </div>
+        </SettingsSection>
       </>}
+
+      {/* Which build you're on, and a way back to the notes. */}
+      <div style={{ textAlign: "center", padding: "22px 0 6px" }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#4a4870" }}>settracker v{APP_VERSION}</div>
+        <button onClick={() => { setActiveSettingsTab(null); setShowAllReleases(true); }} style={{ background: "none", border: "none", color: "#3a3858", fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: "pointer", marginTop: 4, padding: 0 }}>
+          What's new
+        </button>
+      </div>
 
     </div>
   );
@@ -11056,7 +11330,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNotify={notify} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
+        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onDeleteConcert={onDeleteConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
         {view === 'photos' && <PhotoWallView concerts={concerts} onOpen={handleOpenConcert} onBack={() => setView(settings.defaultTab || 'stats')} />}
         </div>
       </div>

@@ -14,6 +14,7 @@ import { Component, Suspense, lazy, useState, useEffect, useCallback } from 'rea
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import { exchangeCodeForTokens } from './lib/spotify'
+import { publishInstallState } from './lib/appInstall'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
 
@@ -228,18 +229,37 @@ export default function App() {
   // * we render nothing and let the HTML splash stay up.
   useEffect(() => { window.__appMounted = true }, [])
 
+  // * The captured event is published so Settings can offer the install too —
+  // * dismissing the banner should mean "not now", not "never". Both listeners are
+  // * cleaned up; `appinstalled` used to leak a handler on every remount.
   useEffect(() => {
-    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowBanner(true) }
-    window.addEventListener('beforeinstallprompt', handler)
-    window.addEventListener('appinstalled', () => setShowBanner(false))
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    const onPrompt = (e) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+      setShowBanner(true)
+      publishInstallState({ available: true, prompt: () => e.prompt() })
+    }
+    const onInstalled = () => {
+      setShowBanner(false)
+      setInstallPrompt(null)
+      publishInstallState({ available: false, prompt: null })
+    }
+    window.addEventListener('beforeinstallprompt', onPrompt)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
   }, [])
 
   const handleInstall = async () => {
     if (!installPrompt) return
     installPrompt.prompt()
     await installPrompt.userChoice
+    // ! A beforeinstallprompt event can only be prompted once, so whatever the
+    // ! choice was, this one is spent — clear it everywhere.
     setInstallPrompt(null); setShowBanner(false)
+    publishInstallState({ available: false, prompt: null })
   }
 
   // * Keep splash counts fresh after every load so the next visit's boot screen

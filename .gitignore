@@ -2,3 +2,7 @@ node_modules
 dist
 .env
 .env.local
+
+# Local Claude Code tool permissions. Machine-specific absolute paths and
+# per-session temp directories — nothing here is useful to another checkout.
+.claude/

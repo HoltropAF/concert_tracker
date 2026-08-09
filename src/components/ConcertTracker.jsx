@@ -8968,16 +8968,22 @@ function SettingsSection({ title, icon, children, collapsible = false, defaultOp
   const [open, setOpen] = useState(defaultOpen);
   const isOpen = !collapsible || open;
   return (
-    <div style={{ marginBottom: 22 }}>
+    // * A collapsible section is the same object as a Collapsible, so it wears the
+    // * same header — Settings had two accordion styles side by side otherwise.
+    <div style={{ marginBottom: collapsible ? 8 : 22 }}>
       {collapsible ? (
-        <button onClick={() => setOpen(o => !o)} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0 8px 4px' }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.10em" }}>
+        <button onClick={() => setOpen(o => !o)} style={{
+          width: '100%', background: '#111119', border: 'none', borderRadius: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px',
+          marginBottom: isOpen ? 6 : 0,
+        }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {icon && <SettingsSectionIcon id={icon} />}
-            {title}
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: isOpen ? "#e2e0ff" : "#c4c2f0" }}>{title}</span>
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {!isOpen && subtitle && <span style={{ fontSize: 10, color: subtitle.color || '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{subtitle.label}</span>}
-            <span style={{ fontSize: 10, color: '#4a4870', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
+            <span style={{ fontSize: 12, color: '#4a4870', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
           </span>
         </button>
       ) : (

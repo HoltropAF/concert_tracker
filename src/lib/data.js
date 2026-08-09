@@ -144,6 +144,8 @@ export const DEFAULT_SETTINGS = {
   subgenres: ['Indie pop','Dutch pop','Latin pop','Pop punk','Indie rock','Alternative rock','Folk rock','Drum & Bass','EDM','Dance','Singer-songwriter','Electropop'],
   languages: ['English','Dutch','Spanish','French','German','Korean','Japanese','Portuguese','Other'],
   venueSizes: ['Small', 'Medium', 'Large', 'Arena', 'Stadium'],
+  // Tags you've chosen to keep even though nothing uses them yet, as "listKey:value".
+  keptTags: [],
   colorTheme: 'purple',
   compactView: false,
   showVenueOnCards: true,

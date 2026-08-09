@@ -4591,9 +4591,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
     const distinctVenues = new Set(f.shows.map(c => c.venue).filter(Boolean)).size;
     const distinctCountries = new Set(f.shows.map(c => c.country).filter(Boolean)).size;
     const duoCount = f.shows.filter(c => getFriends(c).filter(n => n !== f.name).length === 0).length;
-    const spanYears = f.firstShow && f.lastShow
-      ? Math.max(1, Math.round(monthsBetween(f.firstShow.date, f.lastShow.date) / 12))
-      : 0;
 
     // * This friend's own year range, unlike the list's shared axis — here there's
     // * no neighbouring row to line up with, so empty leading years are just noise.
@@ -4878,7 +4875,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           const copyImage = async () => {
             if (!historyShareRef.current) return;
             try {
-              const canvas = await html2canvas(historyShareRef.current, { backgroundColor: shareTab === 'story' ? '#140f24' : '#f4f1e8', scale: 2 });
+              const canvas = await html2canvas(historyShareRef.current, { backgroundColor: '#f4f1e8', scale: 2 });
               canvas.toBlob(async blob => {
                 if (!blob) { onNotify('Could not create image', 'error'); return; }
                 try {
@@ -4979,32 +4976,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             </>
           );
 
-          // * 9:16 and dark, because this one is aimed at a story rather than a chat —
-          // * a cream receipt cropped to portrait looks like a mistake.
-          const storyCard = (
-            <div style={{ aspectRatio: "9 / 16", background: "linear-gradient(165deg, #241d47, #100c1f)", padding: "26px 22px", display: "flex", flexDirection: "column", borderRadius: 5 }}>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a78bfa" }}>{displayName(f.name)} &amp; me</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 27, fontWeight: 800, color: "#fff", lineHeight: 1.05, marginTop: 7 }}>
-                {spanYears >= 1 ? `${spanYears} year${spanYears === 1 ? '' : 's'}` : 'A year'}<br />of shows
-              </div>
-              <div style={{ marginTop: "auto" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 52, fontWeight: 800, color: "#a78bfa", lineHeight: 0.95 }}>{f.shows.length}</div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "rgba(255,255,255,0.7)", marginTop: 6, letterSpacing: "0.06em" }}>SHOWS TOGETHER</div>
-                {songNames.length > 0 && (
-                  <>
-                    <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 30, fontWeight: 800, color: "#a78bfa", lineHeight: 1, marginTop: 18 }}>{songNames.length}</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "rgba(255,255,255,0.7)", marginTop: 5, letterSpacing: "0.06em" }}>SONGS HEARD LIVE</div>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-
           const tabs = [
             ['shows', 'Shows'],
             ['numbers', 'Numbers'],
             shareYears.length > 0 && ['year', 'Year'],
-            ['story', 'Story'],
             ['all', 'All'],
           ].filter(Boolean);
 
@@ -5037,11 +5012,10 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                   </div>
                 )}
 
-                <div ref={historyShareRef} style={shareTab === 'story' ? {} : paper}>
+                <div ref={historyShareRef} style={paper}>
                   {shareTab === 'shows' && showsCard}
                   {shareTab === 'numbers' && numbersCard}
                   {shareTab === 'year' && yearCard}
-                  {shareTab === 'story' && storyCard}
                   {shareTab === 'all' && allCard}
                 </div>
 
@@ -5088,9 +5062,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
                 <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                   <button onClick={copyImage} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as image</button>
-                  {shareTab !== 'story' && (
-                    <button onClick={copyText} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
-                  )}
+                  <button onClick={copyText} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
                   <button onClick={() => setShowHistoryShare(false)} style={{ background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "9px 13px", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>×</button>
                 </div>
               </div>
@@ -5690,22 +5662,28 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
       {/* Search + sort + filters + add */}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+        {/* * Five controls on one row left the search box barely wider than the
+            * buttons beside it. The view toggle and add button move up to their own
+            * row — the same split Shows uses — and what's left is trimmed so the
+            * field itself gets the space. */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end", marginBottom: 8 }}>
+          <button onClick={() => onUpdateSetting('friendsCompactView', !compact)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '4px 9px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 12, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
+            {compact ? '▤' : '☰'}
+          </button>
+          <button onClick={() => { setAddFriendInput(''); setShowAddFriendForm(true); }} aria-label="Add a friend" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>+</button>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10 }}>
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search friend..."
             style={{ flex: 1, minWidth: 0, background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, color: "#c4c2f0", padding: "7px 11px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box" }}
           />
-          <button onClick={() => { setShowSortPanel(p => !p); setShowFriendFilters(false); }} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
+          <button onClick={() => { setShowSortPanel(p => !p); setShowFriendFilters(false); }} style={{ background: showSortPanel || sortBy !== 'most-shows' ? '#1a1a30' : 'none', border: `1px solid ${showSortPanel || sortBy !== 'most-shows' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '4px 9px', cursor: 'pointer', color: sortBy !== 'most-shows' ? '#a78bfa' : '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: sortBy !== 'most-shows' ? 700 : 400, flexShrink: 0 }}>
             Sort{sortBy !== 'most-shows' ? ' ↕' : ''}
           </button>
-          <button onClick={() => { setShowFriendFilters(f => !f); setShowSortPanel(false); }} style={{ background: showFriendFilters || activeFriendFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFriendFilters || activeFriendFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: activeFriendFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: activeFriendFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
+          <button onClick={() => { setShowFriendFilters(f => !f); setShowSortPanel(false); }} style={{ background: showFriendFilters || activeFriendFilterCount > 0 ? '#1a1a30' : 'none', border: `1px solid ${showFriendFilters || activeFriendFilterCount > 0 ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '4px 9px', cursor: 'pointer', color: activeFriendFilterCount > 0 ? '#a78bfa' : '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", fontWeight: activeFriendFilterCount > 0 ? 700 : 400, flexShrink: 0 }}>
             {activeFriendFilterCount > 0 ? `Filters (${activeFriendFilterCount})` : 'Filters'}
           </button>
-          <button onClick={() => onUpdateSetting('friendsCompactView', !compact)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
-            {compact ? '▤' : '☰'}
-          </button>
-          <button onClick={() => { setAddFriendInput(''); setShowAddFriendForm(true); }} aria-label="Add a friend" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
         </div>
 
         {/* Hidden while searching — a count of everyone is noise when you're looking
@@ -9412,6 +9390,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     try { return localStorage.getItem(LAST_SEEN_VERSION_KEY) } catch { return null }
   });
   const [showAllReleases, setShowAllReleases] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   useEffect(() => {
     fetch(`/changelog.md?v=${APP_VERSION}`, { cache: 'no-store' })
       .then(r => r.ok ? r.text() : '')
@@ -10098,48 +10077,64 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       )}
 
-      {/* * What's new — only the releases above the version you last opened. Once
-          * you've read them it collapses to a quiet "you're up to date" line, and
-          * the full history stays one tap away. */}
-      {releases !== null && (() => {
-        const shown = showAllReleases ? releases : unseenReleases;
-        if (releases.length === 0) return null;
-        if (unseenReleases.length === 0 && !showAllReleases) {
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 2px" }}>
-              <span style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
-                Up to date · v{APP_VERSION}
-              </span>
-              <button onClick={() => setShowAllReleases(true)} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace", padding: 0 }}>
-                What's new
-              </button>
-            </div>
-          );
-        }
+      {/* * The changelog is something you read once and then never again, so it gets
+          * one quiet line here and opens as a sheet. It used to sit expanded above
+          * every settings tab, which put release notes in front of you every time
+          * you came in to change a colour. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 2px" }}>
+        <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
+          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Up to date · v${APP_VERSION}`}
+        </span>
+        {releases !== null && releases.length > 0 && (
+          <button onClick={() => { setShowAllReleases(false); setWhatsNewOpen(true); }} style={{
+            background: unseenReleases.length > 0 ? "#30284d" : "none",
+            border: `1px solid ${unseenReleases.length > 0 ? "#5e4c8f" : "transparent"}`,
+            borderRadius: 99, color: unseenReleases.length > 0 ? "#a78bfa" : "#6b6a8f",
+            fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace",
+            padding: unseenReleases.length > 0 ? "3px 10px" : "3px 2px",
+          }}>
+            What's new
+          </button>
+        )}
+      </div>
+
+      {whatsNewOpen && releases !== null && releases.length > 0 && (() => {
+        const shown = showAllReleases || unseenReleases.length === 0 ? releases : unseenReleases;
+        const close = () => { markReleasesSeen(); setWhatsNewOpen(false); setShowAllReleases(false); };
         return (
-          <div style={{ marginBottom: 14, background: "#13131f", border: "1px solid #2e2e50", borderRadius: 10, padding: "13px 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
-                {showAllReleases ? "All changes" : "What's new"}
-              </div>
-              <button onClick={() => { markReleasesSeen(); setShowAllReleases(false); }} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 10, padding: "4px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
-                {showAllReleases ? "Close" : "Got it"}
-              </button>
-            </div>
-            <div style={{ maxHeight: "46vh", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-              {shown.map(r => (
-                <div key={r.version} style={{ marginBottom: 12 }}>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
-                    v{r.version}{r.date ? ` · ${r.date}` : ''}
-                  </div>
-                  {r.entries.map((e, i) => (
-                    <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
-                      <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
-                      <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
-                    </div>
-                  ))}
+          <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "#000000cc", display: "flex", alignItems: "flex-end" }} onClick={close}>
+            <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 34px", boxSizing: "border-box", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexShrink: 0 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
+                  {shown === releases ? "All changes" : "What's new"}
                 </div>
-              ))}
+                <button onClick={close} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: 1, minHeight: 0 }}>
+                {shown.map(r => (
+                  <div key={r.version} style={{ marginBottom: 14 }}>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
+                      v{r.version}{r.date ? ` · ${r.date}` : ''}
+                    </div>
+                    {r.entries.map((e, i) => (
+                      <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
+                        <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
+                        <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
+                {shown !== releases && (
+                  <button onClick={() => setShowAllReleases(true)} style={{ flex: 1, background: "none", border: "1px solid #2e2e50", borderRadius: 10, color: "#6b6a8f", fontSize: 12, padding: "10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
+                    All versions
+                  </button>
+                )}
+                <button onClick={close} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 13, fontWeight: 700, padding: "10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                  Got it
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -10364,12 +10359,23 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           concerts.forEach(c => TAG_FIELDS[key].read(c).forEach(v => { counts[v] = (counts[v] || 0) + 1; }));
           return counts;
         };
+        // * "Unused" is a nudge, not a verdict. A ticket type like VIP is worth having
+        // * in the list before you ever buy one, so anything you've explicitly kept
+        // * stops being counted — it stays in the list, it just no longer nags.
+        const kept = new Set(local.keptTags || []);
+        const keptId = (listKey, value) => `${listKey}:${value}`;
+        const toggleKept = (listKey, value) => {
+          const id = keptId(listKey, value);
+          const next = kept.has(id) ? [...kept].filter(x => x !== id) : [...kept, id];
+          lUpdate('keptTags', next);
+        };
+
         const analysis = {};
         GROUPS.forEach(g => g.lists.forEach(l => {
           const counts = usageFor(l.key);
           const configured = new Set(l.items);
           const unsaved = Object.keys(counts).filter(v => !configured.has(v));
-          const unused = l.items.filter(v => !counts[v]);
+          const unused = l.items.filter(v => !counts[v] && !kept.has(keptId(l.key, v)));
           // * Duplicates differ only by case or punctuation — they split your stats
           // * the same way two spellings of a friend's name split a history.
           const buckets = {};
@@ -10392,6 +10398,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           const styles = {
             unsaved: { border: '1px solid #4a3a28', background: '#1a1410', color: '#e0a35f' },
             unused: { border: '1px dashed #3a3858', background: 'none', color: '#4a4870' },
+            kept: { border: '1px solid #2b3a4a', background: '#0e1620', color: '#6f93ad' },
             hot: { border: '1px solid #a78bfa', background: '#241d47', color: '#fff' },
             warm: { border: '1px solid #3a2f66', background: '#0c0c14', color: '#c4c2f0' },
           };
@@ -10399,6 +10406,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <button
               key={`${list.key}-${value}`}
               onClick={() => setTagDetail({ listKey: list.key, label: list.label, value, count, unsaved: kind === 'unsaved', list })}
+              title={kind === 'kept' ? 'Kept on purpose — not counted as unused' : undefined}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 99,
                 padding: '4px 10px', fontSize: 11.5, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
@@ -10427,12 +10435,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                   <br />Open a group below to sort them out.
                 </div>
               </div>
-            ) : (
-              <div style={{ display: 'flex', gap: 9, alignItems: 'center', background: '#101d18', border: '1px solid #1c4a3a', borderRadius: 10, padding: '11px 13px', marginBottom: 14 }}>
-                <span style={{ color: '#6cc79c', fontSize: 12 }}>·</span>
-                <div style={{ fontSize: 11.5, color: '#6cc79c' }}>Every tag is in use and nothing is missing.</div>
-              </div>
-            )}
+            ) : null}
 
             {GROUPS.map(g => {
               const gUnsaved = g.lists.reduce((n, l) => n + analysis[l.key].unsaved.length, 0);
@@ -10456,7 +10459,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
                             {[...l.items]
                               .sort((x, y) => (a.counts[y] || 0) - (a.counts[x] || 0))
-                              .map(v => tagPill(l, v, a.counts[v] || 0, !a.counts[v] ? 'unused' : (a.counts[v] / max) > 0.5 ? 'hot' : 'warm'))}
+                              .map(v => tagPill(l, v, a.counts[v] || 0,
+                                !a.counts[v] ? (kept.has(keptId(l.key, v)) ? 'kept' : 'unused')
+                                  : (a.counts[v] / max) > 0.5 ? 'hot' : 'warm'))}
                           </div>
 
                           {/* Used on shows, never saved to the list — so they don't get
@@ -10574,6 +10579,21 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                       }}
                     >{tagBusy ? 'Renaming…' : 'Rename everywhere'}</button>
 
+                    {/* * An option you want available before you've ever used it isn't a
+                        * mistake, so unused tags get a way to say "leave this alone"
+                        * instead of only a way to delete them. */}
+                    {!tagDetail.unsaved && tagDetail.count === 0 && (() => {
+                      const isKept = kept.has(keptId(tagDetail.listKey, tagDetail.value));
+                      return (
+                        <button
+                          onClick={() => { toggleKept(tagDetail.listKey, tagDetail.value); setTagDetail(null); setTagRename(''); }}
+                          style={{ width: '100%', background: isKept ? 'none' : '#0e1620', border: `1px solid ${isKept ? '#2e2e50' : '#2b3a4a'}`, borderRadius: 10, color: isKept ? '#6b6a8f' : '#6f93ad', fontSize: 12, padding: '10px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", marginBottom: 9 }}
+                        >
+                          {isKept ? 'Stop keeping it — flag as unused again' : "Keep it — I haven't used it yet"}
+                        </button>
+                      );
+                    })()}
+
                     {!tagDetail.unsaved && (
                       <button
                         onClick={() => { tagDetail.list.onRemove(tagDetail.value); setTagDetail(null); setTagRename(''); }}
@@ -10592,32 +10612,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         );
       })()}
       {activeSettingsTab === 'account' && <>
-        {/* Profile */}
-        <SettingsSection title="Profile" icon="person">
-          <div style={{ padding: "14px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>
-                  {local.userInitials || (userEmail === 'guest' ? '?' : (userEmail || "ST").slice(0, 2).toUpperCase())}
-                </div>
-                <button onClick={() => { setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase())); setEditingInitials(true); }} style={{ position: "absolute", bottom: -4, right: -4, width: 16, height: 16, borderRadius: 99, background: "#30284d", border: "1px solid #5e4c8f", color: "#a78bfa", fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 }}>✎</button>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {local.userName
-                  ? <div style={{ color: "#c4c2f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{local.userName}</div>
-                  : <button onClick={() => { setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase())); setEditingInitials(true); }} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: 0, textAlign: "left" }}>+ add name</button>
-                }
-                <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: local.userName ? 2 : 0 }}>
-                  {userEmail === 'guest' ? 'guest mode · data stored locally' : userEmail}
-                </div>
-              </div>
-              <button onClick={onSignOut} style={{ background: "none", border: "none", color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer", padding: "4px 0", flexShrink: 0 }}>
-                {userEmail === 'guest' ? 'exit' : 'sign out'}
-              </button>
-            </div>
-          </div>
-        </SettingsSection>
-
         {/* Profile edit bottom sheet */}
         {editingInitials && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
@@ -11068,24 +11062,39 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
         {/* Sign out gets its own row — it used to sit among the data actions, which
             is the one place you might tap it by accident. */}
-        <SettingsSection title="Session" icon="person">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 4px" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>Signed in</div>
-              <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis" }}>{userEmail}</div>
-            </div>
-            <button onClick={onSignOut} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "7px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Sign out</button>
-          </div>
+        {/* * Who you are and how you're signed in were two sections saying the same
+            * thing. One row now: tap the initials to change them. */}
+        <SettingsSection title="Profile" icon="person">
+          {(() => {
+            const openEdit = () => {
+              setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase()));
+              setEditingInitials(true);
+            };
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px" }}>
+                <button onClick={openEdit} aria-label="Edit your initials and name" style={{ position: "relative", flexShrink: 0, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13, letterSpacing: "0.05em" }}>
+                    {local.userInitials || (userEmail === 'guest' ? '?' : (userEmail || "ST").slice(0, 2).toUpperCase())}
+                  </div>
+                  <span style={{ position: "absolute", bottom: -3, right: -3, width: 16, height: 16, borderRadius: 99, background: "#30284d", border: "1px solid #5e4c8f", color: "#a78bfa", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>✎</span>
+                </button>
+                <button onClick={openEdit} style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+                  {local.userName
+                    ? <div style={{ color: "#e2e0ff", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{local.userName}</div>
+                    : <div style={{ color: "#4a4870", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>+ add name</div>
+                  }
+                  <div style={{ color: "#6b6a8f", fontSize: 10, fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+                    {userEmail === 'guest' ? 'guest mode · data stored locally' : userEmail}
+                  </div>
+                </button>
+                <button onClick={onSignOut} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "7px 14px", cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
+                  {userEmail === 'guest' ? 'Exit' : 'Sign out'}
+                </button>
+              </div>
+            );
+          })()}
         </SettingsSection>
       </>}
-
-      {/* Which build you're on, and a way back to the notes. */}
-      <div style={{ textAlign: "center", padding: "22px 0 6px" }}>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#4a4870" }}>settracker v{APP_VERSION}</div>
-        <button onClick={() => { setActiveSettingsTab(null); setShowAllReleases(true); }} style={{ background: "none", border: "none", color: "#3a3858", fontSize: 10, fontFamily: "'DM Mono', monospace", cursor: "pointer", marginTop: 4, padding: 0 }}>
-          What's new
-        </button>
-      </div>
 
     </div>
   );
@@ -11741,7 +11750,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'home' && (
           <>
             {concerts.length === 0 && (
-              <EmptyState icon="🎫" title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />
+              <div style={{ padding: '0 16px' }}>
+                <EmptyState icon="🎫" title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />
+              </div>
             )}
         {view === 'home' && concerts.length > 0 && (() => {
           const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
@@ -11819,7 +11830,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
 
         {view === 'home' && showSort && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', margin: '0 16px 10px' }}>
             {sortOrder !== defaultSortId && <button onClick={resetSort} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[{id:'newest',label:'Newest'},{id:'oldest',label:'Oldest'},{id:'alpha',label:'A→Z'},{id:'price',label:'Price ↓'},{id:'rating',label:'Rating ↓'}].map(s => (
@@ -11830,7 +11841,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         )}
 
         {view === 'home' && showFilters && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', margin: '0 16px 10px' }}>
             <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
             {(() => {
               const Row = (label, children) => (
@@ -11882,6 +11893,11 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           </div>
         )}
 
+            {/* * The scroll container already insets everything by 16px, but the header,
+                * type pills and search row each add another 16 on top of that. Anything
+                * below has to match or the cards hang 16px wider than the search box
+                * they sit under — which is exactly how Artists is laid out. */}
+            <div style={{ padding: '0 16px' }}>
             {concerts.length > 0 && showCalendar && (
               <CalendarMode
                 concerts={concerts}
@@ -11926,6 +11942,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 )}
               </div>
             )}
+            </div>
           </>
         )}
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} onSaveConcertQuiet={onSaveConcert} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} onNotify={notify} initialSelectedFriend={pendingFriendSelect} onInitialFriendConsumed={() => setPendingFriendSelect(null)} onRememberFriend={(name, tab) => setPendingFriendSelect(name ? { name, tab } : null)} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}

@@ -8823,10 +8823,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
 
 function SettingsRow({ label, sub, children }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 2px", borderBottom: "1px solid #1a1a24", gap: 12 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 2px", borderBottom: "1px solid #1a1a24", gap: 12 }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{label}</div>
+        {sub && <div style={{ fontSize: 10.5, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{sub}</div>}
       </div>
       {children}
     </div>
@@ -8866,13 +8866,13 @@ function SettingsOptionPills({ value, options, onChange }) {
 // a primary preference with several options).
 function PreferenceBlock({ label, sub, value, options, onChange, isLast = false, compact = false }) {
   return (
-    <div style={{ padding: "14px 2px", borderBottom: isLast ? "none" : "1px solid #1a1a24" }}>
-      <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: sub ? 2 : 10 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>{sub}</div>}
-      <div style={{ display: "flex", flexWrap: compact ? "nowrap" : "wrap", gap: compact ? 4 : 8 }}>
+    <div style={{ padding: "12px 2px", borderBottom: isLast ? "none" : "1px solid #1a1a24" }}>
+      <div style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: sub ? 2 : 8 }}>{label}</div>
+      {sub && <div style={{ fontSize: 10.5, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>{sub}</div>}
+      <div style={{ display: "flex", flexWrap: compact ? "nowrap" : "wrap", gap: compact ? 4 : 5 }}>
         {options.map(o => (
           <button key={o.id} onClick={() => onChange(o.id)} style={{
-            padding: compact ? "6px 4px" : "9px 16px", borderRadius: compact ? 8 : 99, fontSize: compact ? 11 : 13, cursor: "pointer",
+            padding: compact ? "5px 4px" : "5px 11px", borderRadius: compact ? 8 : 99, fontSize: compact ? 10.5 : 11.5, cursor: "pointer",
             background: value === o.id ? "#a78bfa" : "transparent",
             color: value === o.id ? "#0c0c14" : "#c4c2f0",
             border: `1.5px solid ${value === o.id ? "#a78bfa" : "#2e2e48"}`,
@@ -8999,15 +8999,15 @@ function SettingsToggle({ checked, onChange }) {
     <button
       onClick={() => { haptic(); onChange(!checked); }}
       style={{
-        width: 44, height: 26, borderRadius: 99, border: "none", position: "relative",
+        width: 38, height: 22, borderRadius: 99, border: "none", position: "relative",
         background: checked ? "var(--accent)" : "#2a2940", padding: 0, cursor: "pointer", flexShrink: 0,
         transition: "background 0.2s ease",
       }}
     >
       <span style={{
-        width: 22, height: 22, borderRadius: 99, background: "#fff", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+        width: 18, height: 18, borderRadius: 99, background: "#fff", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
         position: "absolute", top: 2, left: 2,
-        transform: checked ? "translateX(18px)" : "translateX(0)",
+        transform: checked ? "translateX(16px)" : "translateX(0)",
         transition: "transform 0.28s cubic-bezier(.34,1.56,.64,1)",
       }} />
     </button>
@@ -9191,6 +9191,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [openSection, setOpenSection] = useState(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState(null);
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
+  // Collapsible draws only its own header row, so a section's body brings the card.
+  const settingsCard = { background: "#111119", borderRadius: 12, padding: "2px 12px" };
   const [showSavedVenues, setShowSavedVenues] = useState(false);
   const [showFriendGroups, setShowFriendGroups] = useState(false);
   const [showAdvancedImport, setShowAdvancedImport] = useState(false);
@@ -10161,6 +10163,46 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       {activeSettingsTab === null && (() => {
         return (
           <div>
+            {/* * General used to hold three links and nothing else while Display
+                * carried eight sections. What opens the app and how the app behaves
+                * belong here; Display keeps what things look like. */}
+            <Collapsible title="Opening defaults" icon="eye" defaultOpen={false} {...sec('g-open')}
+              subtitle={{ label: (defaultViewOptions.find(o => o.id === local.defaultTab) || {}).label || 'Shows', color: '#6b6a8f' }}>
+              <div style={settingsCard}>
+                <SettingsRow label="Show past concerts" sub="On by default when opening app">
+                  <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); }} />
+                </SettingsRow>
+                <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
+                  <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); }} />
+                </SettingsRow>
+                <SettingsRow label="Show upcoming" sub="On by default when opening app">
+                  <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); }} />
+                </SettingsRow>
+                <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
+                  <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); }} />
+                </SettingsRow>
+                <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); }} compact />
+                <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); }} isLast compact />
+              </div>
+            </Collapsible>
+
+            <Collapsible title="App" icon="sliders" defaultOpen={false} {...sec('g-app')}
+              subtitle={{ label: `${local.ratingSystem || 5} stars`, color: '#6b6a8f' }}>
+              <div style={settingsCard}>
+                <PreferenceBlock label="Rating system" sub="Existing ratings are converted automatically" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={handleRatingSystemChange} />
+                <SettingsRow label="Default country" sub="Pre-filled when adding a show">
+                  <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
+                </SettingsRow>
+                <PreferenceBlock
+                  label="Default map view" sub={local.defaultCountry ? `Where the venues map opens` : 'Set a default country above to enable'}
+                  value={local.mapDefaultRegion === 'country' && local.defaultCountry ? 'country' : 'all'}
+                  options={[{ id: 'all', label: 'All venues' }, { id: 'country', label: local.defaultCountry || 'My country' }]}
+                  onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); }}
+                  isLast
+                />
+              </div>
+            </Collapsible>
+
             {/* Help links */}
             <SettingsSection title="Help" icon="help">
               {[
@@ -10197,39 +10239,28 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       })()}
 
       {activeSettingsTab === 'preferences' && <>
-        <SettingsSection title="Opening defaults" icon="eye">
-          <SettingsRow label="Show past concerts" sub="On by default when opening app">
-            <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); }} />
-          </SettingsRow>
-          <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
-            <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); }} />
-          </SettingsRow>
-          <SettingsRow label="Show upcoming" sub="On by default when opening app">
-            <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); }} />
-          </SettingsRow>
-          <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
-            <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); }} />
-          </SettingsRow>
-          <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); }} compact />
-          <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); }} isLast compact />
-        </SettingsSection>
+        {/* * These were fixed headings with everything expanded at once, which meant
+            * scrolling past six sections to reach the seventh. Same accordion the
+            * Tags tab uses now — one open at a time, closed on arrival, with the
+            * current value on the row so you often don't need to open it at all. */}
+        <Collapsible title="Shows list" icon="card" defaultOpen={false} {...sec('p-cards')}
+          subtitle={{ label: `${[local.showVenueOnCards !== false, local.showGenreTagsOnCards !== false, !!local.groupByYear].filter(Boolean).length} of 3`, color: '#6b6a8f' }}>
+          <div style={settingsCard}>
+            <SettingsRow label="Show venue" sub="Display venue name on cards">
+              <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); }} />
+            </SettingsRow>
+            <SettingsRow label="Show genre tags" sub="Tags visible on concert cards">
+              <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); }} />
+            </SettingsRow>
+            <SettingsRow label="Group by year" sub="Year headers in the list">
+              <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); }} />
+            </SettingsRow>
+          </div>
+        </Collapsible>
 
-        <SettingsSection title="Concert cards" icon="card">
-          <SettingsRow label="Show venue" sub="Display venue name on cards">
-            <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); }} />
-          </SettingsRow>
-          <SettingsRow label="Show genre tags" sub="Tags visible on concert cards">
-            <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); }} />
-          </SettingsRow>
-        </SettingsSection>
-
-        <SettingsSection title="Concert list" icon="list">
-          <SettingsRow label="Group by year" sub="Year headers in concert list">
-            <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); }} />
-          </SettingsRow>
-        </SettingsSection>
-
-        <SettingsSection title="Venue details" icon="layout">
+        <Collapsible title="Venue details" icon="layout" defaultOpen={false} {...sec('p-venue')}
+          subtitle={{ label: `${[local.showVenueParking !== false, local.showVenueTransit !== false, local.showVenueRooms !== false, local.showVenueTags !== false].filter(Boolean).length} of 4`, color: '#6b6a8f' }}>
+          <div style={settingsCard}>
           <SettingsRow label="Parking" sub="Show the parking link on venue pages">
             <SettingsToggle checked={local.showVenueParking !== false} onChange={checked => { lUpdate("showVenueParking", checked); }} />
           </SettingsRow>
@@ -10242,9 +10273,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsRow label="Tags" sub='Show venue tags (e.g. "big venue")'>
             <SettingsToggle checked={local.showVenueTags !== false} onChange={checked => { lUpdate("showVenueTags", checked); }} />
           </SettingsRow>
-        </SettingsSection>
+          </div>
+        </Collapsible>
 
-        <SettingsSection title="Summary & stats" icon="chart">
+        <Collapsible title="Summary & stats" icon="chart" defaultOpen={false} {...sec('p-stats')}
+          subtitle={{ label: local.summaryYear && local.summaryYear !== 'all' ? String(local.summaryYear) : 'All time', color: '#6b6a8f' }}>
+          <div style={settingsCard}>
           <PreferenceBlock
             label="Summary scope" sub="Default time range on summary page"
             value={local.summaryYear || 'all'}
@@ -10258,34 +10292,61 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <SettingsSliderRow label="Top venues" sub="Rows shown in charts" value={local.topVenuesRows} min={3} max={20} onChange={v => { lUpdate("topVenuesRows", v); }} />
           <SettingsSliderRow label="Most expensive" sub="Rows shown in list" value={local.topExpensiveRows} min={3} max={20} onChange={v => { lUpdate("topExpensiveRows", v); }} />
           <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); }} isLast />
-        </SettingsSection>
+          </div>
+        </Collapsible>
 
-        <SettingsSection title="Colors" icon="sliders">
+        <Collapsible title="Colors" icon="sliders" defaultOpen={false} {...sec('p-colors')}
+          subtitle={{ label: local.lightMode ? 'Light' : 'Dark', color: '#6b6a8f' }}>
+          <div style={settingsCard}>
           <PreferenceBlock
             label="Appearance" sub="Same colors, flipped background/text"
             value={local.lightMode ? 'light' : 'dark'}
             options={[{id:'dark',label:'Dark'},{id:'light',label:'Light'}]}
             onChange={v => { const val = v === 'light'; lUpdate('lightMode', val); }}
           />
-          <PreferenceBlock
-            label="Highlight color" sub="Buttons, active tabs, and small accents only"
-            value={local.accentColor || 'violet'}
-            options={Object.entries(ACCENT_PRESETS).map(([id, p]) => ({ id, label: p.label, color: p.hex }))}
-            onChange={v => { lUpdate("accentColor", v); }}
-          />
-          <PreferenceBlock
-            label="App color mode" sub="Recolors the whole app at once — different from Highlight color above"
-            value={local.colorTheme || 'purple'}
-            options={[
-              {id:'purple',label:'Purple',color:'#a78bfa'},{id:'blue',label:'Blue',color:'#38bdf8'},{id:'green',label:'Green',color:'#34d399'},
-              {id:'red',label:'Red',color:'#f87171'},{id:'orange',label:'Orange',color:'#fb923c'},{id:'mono',label:'Mono',color:'#9ca3af'},
-            ]}
-            onChange={v => { lUpdate('colorTheme', v); }}
-            isLast
-          />
-        </SettingsSection>
+          {/* * This used to be two pickers — a highlight color and an app color mode —
+              * whose effects multiply, because the theme is a hue-rotate filter over
+              * the whole app and the accent gets rotated along with everything else.
+              * That's why the second one had to carry a subtitle explaining it wasn't
+              * the first one. One list of looks now; each entry sets both underneath. */}
+          {(() => {
+            const THEMES = [
+              { id: 'violet', label: 'Violet', color: '#a78bfa', theme: 'purple', accent: 'violet' },
+              { id: 'rose',   label: 'Rose',   color: '#fb7185', theme: 'purple', accent: 'rose' },
+              { id: 'amber',  label: 'Amber',  color: '#fb923c', theme: 'purple', accent: 'amber' },
+              { id: 'sky',    label: 'Sky',    color: '#38bdf8', theme: 'blue',   accent: 'violet' },
+              { id: 'green',  label: 'Green',  color: '#34d399', theme: 'green',  accent: 'violet' },
+              { id: 'red',    label: 'Red',    color: '#f87171', theme: 'red',    accent: 'violet' },
+              { id: 'orange', label: 'Orange', color: '#fb923c', theme: 'orange', accent: 'violet' },
+              { id: 'mono',   label: 'Mono',   color: '#9ca3af', theme: 'mono',   accent: 'violet' },
+            ];
+            const curTheme = local.colorTheme || 'purple';
+            const curAccent = local.accentColor || 'violet';
+            // * Exact match first; an old combination that no longer has an entry falls
+            // * back to whatever shares its theme, so nothing reads as unselected.
+            const current = THEMES.find(t => t.theme === curTheme && t.accent === curAccent)
+              || THEMES.find(t => t.theme === curTheme);
+            return (
+              <PreferenceBlock
+                label="Theme" sub="Recolors the whole app"
+                value={current?.id}
+                options={THEMES.map(({ id, label, color }) => ({ id, label, color }))}
+                onChange={v => {
+                  const t = THEMES.find(x => x.id === v);
+                  if (!t) return;
+                  lUpdate('colorTheme', t.theme);
+                  lUpdate('accentColor', t.accent);
+                }}
+                isLast
+              />
+            );
+          })()}
+          </div>
+        </Collapsible>
 
-        <SettingsSection title="Setlist" icon="list">
+        <Collapsible title="Setlist" icon="list" defaultOpen={false} {...sec('p-setlist')}
+          subtitle={{ label: local.setlistSort === 'album' ? 'By album' : 'Order of the night', color: '#6b6a8f' }}>
+          <div style={settingsCard}>
           <SettingsRow label="Known vs. discovered live" sub="✓ / ✨ markers on individual songs">
             <SettingsToggle checked={local.showKnownMarkers || false} onChange={checked => { lUpdate("showKnownMarkers", checked); }} />
           </SettingsRow>
@@ -10295,16 +10356,16 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             options={[{ id: 'night', label: 'Order of the night' }, { id: 'album', label: 'By album' }]}
             onChange={v => { lUpdate('setlistSort', v); }}
           />
-          <div style={{ padding: "14px 2px 4px" }}>
-            <div style={{ fontSize: 14, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: 2 }}>Default filters shown</div>
-            <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>Surprise/secret songs are always shown, not offered as a filter</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <div style={{ padding: "12px 2px 4px" }}>
+            <div style={{ fontSize: 13, color: "#e2e0ff", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, marginBottom: 2 }}>Default filters shown</div>
+            <div style={{ fontSize: 10.5, color: "#6b6a8f", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>Surprise/secret songs are always shown, not offered as a filter</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {[['notes','Notes'],['ments','Ments'],['encore','Encore'],['headers','Era headers'],['albums','Albums'],['covers','Covers']].map(([key, label]) => {
                 const view = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(local.setlistView || {}) };
                 const on = view[key] !== false;
                 return (
                   <button key={key} onClick={() => { const next = { ...view, [key]: !on }; lUpdate('setlistView', next); }} style={{
-                    padding: "6px 12px", borderRadius: 99, fontSize: 12, cursor: "pointer",
+                    padding: "5px 11px", borderRadius: 99, fontSize: 11.5, cursor: "pointer",
                     background: on ? "#a78bfa" : "transparent", color: on ? "#0c0c14" : "#c4c2f0",
                     border: `1.5px solid ${on ? "#a78bfa" : "#2e2e48"}`, fontWeight: on ? 700 : 500, fontFamily: "'DM Sans', sans-serif",
                   }}>{label}</button>
@@ -10312,21 +10373,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               })}
             </div>
           </div>
-        </SettingsSection>
-
-        <SettingsSection title="App" icon="sliders">
-          <PreferenceBlock label="Rating system" sub="Existing ratings are converted automatically" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={handleRatingSystemChange} />
-          <SettingsRow label="Default country" sub="Pre-filled when adding a show">
-            <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
-          </SettingsRow>
-          <PreferenceBlock
-            label="Default map view" sub={local.defaultCountry ? `Where the venues map opens` : 'Set a default country above to enable'}
-            value={local.mapDefaultRegion === 'country' && local.defaultCountry ? 'country' : 'all'}
-            options={[{ id: 'all', label: 'All venues' }, { id: 'country', label: local.defaultCountry || 'My country' }]}
-            onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); }}
-            isLast
-          />
-        </SettingsSection>
+          </div>
+        </Collapsible>
       </>}
 
 {activeSettingsTab === 'tags' && (() => {

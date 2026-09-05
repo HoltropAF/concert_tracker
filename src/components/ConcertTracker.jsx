@@ -10227,16 +10227,16 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </SettingsSection>
 
             {/* Social links — quiet footer credit instead of its own card */}
-            <div style={{ textAlign: "center", padding: "12px 0 4px", fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
-              <span>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span><span style={{ color: "#3a3858" }}> &nbsp;·&nbsp; </span></span>
-              <span>
+            <div style={{ textAlign: "center", padding: "10px 0 4px", fontSize: 9.5, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
+              <div style={{ whiteSpace: "nowrap" }}>
                 {socialLinks.map(({ href, label }, i) => (
                   <span key={label}>
                     <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
-                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> &nbsp;/&nbsp; </span>}
+                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> · </span>}
                   </span>
                 ))}
-              </span>
+              </div>
             </div>
           </div>
         );

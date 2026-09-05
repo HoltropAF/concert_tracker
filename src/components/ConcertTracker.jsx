@@ -10206,7 +10206,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               </div>
             </Collapsible>
 
-            {/* Help links */}
+            {/* Two rows of breathing room separate app preferences from support. */}
+            <div style={{ height: 32 }} />
             <SettingsSection title="Help" icon="help">
               {[
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
@@ -10226,16 +10227,16 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </SettingsSection>
 
             {/* Social links — quiet footer credit instead of its own card */}
-            <div style={{ textAlign: "center", padding: "18px 10px 4px", fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.8 }}>
-              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
-              <div>
+            <div style={{ textAlign: "center", padding: "12px 0 4px", fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
+              <span>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span><span style={{ color: "#3a3858" }}> &nbsp;·&nbsp; </span></span>
+              <span>
                 {socialLinks.map(({ href, label }, i) => (
                   <span key={label}>
                     <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
                     {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> &nbsp;/&nbsp; </span>}
                   </span>
                 ))}
-              </div>
+              </span>
             </div>
           </div>
         );
@@ -11015,10 +11016,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </SettingsSection>
 
-        {/* ── Advanced ────────────────────────────────────────────────────
-            Storage housekeeping and the only irreversible action in the app.
-            Collapsed and closed by default: you should have to go looking. */}
-        <SettingsSection title="Advanced" icon="data" collapsible defaultOpen={false}>
+        <SettingsSection title="Photo storage" icon="data" collapsible defaultOpen={false}>
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
 
             <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
@@ -11083,10 +11081,14 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               </div>
             )}
 
-            {/* ! The only irreversible action in the app. Typed confirmation rather
-                ! than a yes/no, and it names exactly what goes. */}
+          </div>
+        </SettingsSection>
+
+        {/* Kept separate from photo housekeeping so destructive account actions
+            cannot be mistaken for part of storage management. */}
+        <SettingsSection title="Danger zone" icon="data" collapsible defaultOpen={false}>
+          <div style={{ background: "#13131f", border: "1px solid #4a2828", borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "13px 16px", background: "#1a1214" }}>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.09em", color: "#f87171", marginBottom: 8 }}>Danger zone</div>
               <div style={{ fontSize: 11.5, color: "#c4c2f0", lineHeight: 1.55, marginBottom: 10 }}>
                 Deletes {concerts.length} show{concerts.length === 1 ? '' : 's'}{photoCount > 0 ? `, ${photoCount} photo${photoCount === 1 ? '' : 's'}` : ''} and every setting. This cannot be undone — export first.
               </div>
@@ -11115,7 +11117,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             is the one place you might tap it by accident. */}
         {/* * Who you are and how you're signed in were two sections saying the same
             * thing. One row now: tap the initials to change them. */}
-        <SettingsSection title="Profile" icon="person">
+        <SettingsSection title="Profile" icon="person" collapsible defaultOpen={false}>
           {(() => {
             const openEdit = () => {
               setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase()));

@@ -1,31 +1,13 @@
-import { useState } from 'react'
+import WelcomeFlow from './WelcomeFlow'
 
-// * The signed-out landing page. Email-only: `onSignIn(email)` sends a magic link and
-// * is expected to resolve to { error }, never to throw. There is no sign-up path
-// * because the first magic link for an address creates the account.
+// * The signed-out landing page. WelcomeFlow separates setup from returning login.
+// * Both use email links; account creation is enabled only in the new-user path.
+// * Installation is optional and uses the prompt captured by App.
 // * `onGuest` is optional — when omitted the "explore it first" link is hidden, so the
 // * same screen works in a deployment where guest mode isn't offered.
 // ! Purely presentational: it does not know whether the user is authenticated. App
 // ! decides whether to render this or ConcertTracker.
-export default function AuthScreen({ onSignIn, onGuest }) {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  const handleSubmit = async () => {
-    if (!email.trim()) return
-    setLoading(true)
-    setError(null)
-    const { error } = await onSignIn(email.trim())
-    if (error) {
-      setError(error.message)
-    } else {
-      setSent(true)
-    }
-    setLoading(false)
-  }
-
+export default function AuthScreen({ onSignIn, onGuest, onInstall, installAvailable }) {
   const bars = [
     { anim: 'bar1', dur: '0.9s', delay: '0.00s' },
     { anim: 'bar2', dur: '0.7s', delay: '0.12s' },
@@ -67,7 +49,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
       <div style={{ maxWidth: 360, width: '100%' }}>
 
         {/* Hero: wave + title */}
-        <div className="auth-block-1" style={{ textAlign: 'center', marginBottom: 36, paddingTop: 48 }}>
+        <div className="auth-block-1" style={{ textAlign: 'center', marginBottom: 36, paddingTop: 0 }}>
           {/* Animated sound wave bars */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 5, height: 40, marginBottom: 24 }}>
             {bars.map((b, i) => (
@@ -102,7 +84,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
         </div>
 
         {/* Feature pills */}
-        <div className="auth-block-2" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 128 }}>
+        <div className="auth-block-2" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 24 }}>
           {['track shows', 'rate nights', 'find patterns', 'friend profiles'].map(label => (
             <span key={label} style={{
               fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em',
@@ -117,92 +99,7 @@ export default function AuthScreen({ onSignIn, onGuest }) {
           background: '#13131f', border: '1px solid #1f1f35',
           borderRadius: 16, padding: '24px', marginBottom: 20
         }}>
-          {!sent ? (
-            <>
-              <div style={{ fontSize: 13, color: '#a78bfa', fontFamily: "'Syne', sans-serif", fontWeight: 700, marginBottom: 4 }}>
-                sign in
-              </div>
-              <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>
-                new or returning — magic link, max twice an hour
-              </div>
-              <input
-                className="auth-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                placeholder="your@email.com"
-                autoFocus
-                style={{
-                  width: '100%', background: '#0c0c14', border: '1px solid #2e2e50',
-                  borderRadius: 10, color: '#e2e0ff', padding: '12px 16px',
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 15,
-                  boxSizing: 'border-box', marginBottom: 10, transition: 'border-color 0.15s'
-                }}
-              />
-
-              {error && (
-                <div style={{ fontSize: 12, color: '#f472b6', marginBottom: 10 }}>{error}</div>
-              )}
-
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !email.trim()}
-                style={{
-                  width: '100%', padding: '13px', borderRadius: 10, fontSize: 14,
-                  fontWeight: 700, cursor: loading ? 'wait' : email.trim() ? 'pointer' : 'default',
-                  background: email.trim() ? '#a78bfa' : '#1a1a30',
-                  color: email.trim() ? '#0c0c14' : '#4a4870',
-                  border: 'none', fontFamily: "'Syne', sans-serif",
-                  transition: 'all 0.2s', letterSpacing: '-0.01em'
-                }}
-              >
-                {loading ? 'sending...' : 'send magic link'}
-              </button>
-
-              {onGuest && (
-                <div style={{ textAlign: 'center', marginTop: 14 }}>
-                  <button onClick={onGuest} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 12, color: '#4a4870', fontFamily: "'DM Sans', sans-serif",
-                    fontStyle: 'italic'
-                  }}>
-                    or explore it first
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{ textAlign: 'center' }}>
-              {/* Mini wave in sent state */}
-              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4, height: 28, marginBottom: 16 }}>
-                {bars.slice(0, 5).map((b, i) => (
-                  <div key={i} style={{
-                    width: 3, borderRadius: 2, minHeight: 3,
-                    background: 'linear-gradient(to top, #a78bfa, #c4b5fd)',
-                    animation: `${b.anim} ${b.dur} ${b.delay} ease-in-out infinite`,
-                  }} />
-                ))}
-              </div>
-              <div style={{ fontSize: 14, color: '#e2e0ff', fontWeight: 700, fontFamily: "'Syne', sans-serif", marginBottom: 8 }}>
-                check your email
-              </div>
-              <div style={{ fontSize: 13, color: '#6b6a8f', lineHeight: 1.6, fontFamily: "'DM Mono', monospace" }}>
-                magic link sent to<br />
-                <span style={{ color: '#a78bfa' }}>{email}</span>
-              </div>
-              <button
-                onClick={() => setSent(false)}
-                style={{
-                  marginTop: 16, background: 'none', border: 'none',
-                  color: '#4a4870', fontSize: 11, cursor: 'pointer',
-                  fontFamily: "'DM Mono', monospace", textDecoration: 'underline'
-                }}
-              >
-                use a different email
-              </button>
-            </div>
-          )}
+          <WelcomeFlow onSignIn={onSignIn} onGuest={onGuest} onInstall={onInstall} installAvailable={installAvailable} />
         </div>
         {/* Social links */}
         <div className="auth-block-3" style={{ textAlign: 'center' }}>

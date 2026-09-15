@@ -1,0 +1,29 @@
+.welcome-flow{color:#e2e0ff;font-family:'DM Sans',sans-serif;text-align:left}
+.welcome-flow h1{font-family:'Syne',sans-serif;font-size:24px;line-height:1.2;margin:0 0 12px;letter-spacing:-.025em}
+.welcome-flow h1:focus{outline:none}
+.welcome-flow p{font-size:14px;line-height:1.6;color:#aaa7c5;margin:0 0 20px}
+.welcome-flow button,.welcome-flow select,.welcome-flow input{font:inherit;font-size:16px;min-height:44px;border-radius:10px}
+.welcome-flow button{cursor:pointer}
+.welcome-flow button:disabled{cursor:default;opacity:.55}
+.welcome-flow button:focus-visible,.welcome-flow input:focus-visible,.welcome-flow select:focus-visible,.welcome-flow summary:focus-visible{outline:2px solid #c4b5fd;outline-offset:3px}
+.welcome-flow .wf-choice{display:block;width:100%;padding:16px;margin:12px 0;text-align:left;background:#191827;color:#e2e0ff;border:1px solid #48405e}
+.welcome-flow .wf-choice:first-of-type{border-color:#a78bfa}
+.welcome-flow .wf-choice strong{display:flex;justify-content:space-between;font-size:17px}
+.welcome-flow .wf-choice small{display:block;color:#aaa7c5;line-height:1.5;font-size:13px;margin-top:5px}
+.welcome-flow .wf-primary{width:100%;background:#a78bfa;color:#0c0c14;border:0;padding:12px;font-weight:700;margin:14px 0 10px}
+.welcome-flow .wf-link,.welcome-flow .wf-back{background:transparent;border:0;color:#c4b5fd;padding:10px 0;font-size:13px}
+.welcome-flow .wf-link{display:block;width:100%;text-align:center}
+.welcome-flow .wf-back{margin-bottom:12px}
+.welcome-flow label{display:block;color:#d0cde7;font-size:13px;margin:12px 0 8px}
+.welcome-flow input,.welcome-flow select{width:100%;padding:12px;background:#0c0c14;color:#e2e0ff;border:1px solid #48405e;color-scheme:dark}
+.welcome-flow .wf-steps{padding-left:23px;margin:20px 0;color:#c4c2dc;font-size:14px;line-height:1.6}
+.welcome-flow li{padding-left:4px;margin-bottom:12px}
+.welcome-flow details{font-size:13px;line-height:1.6;color:#c4b5fd;margin:16px 0}
+.welcome-flow summary{cursor:pointer;min-height:30px}
+.welcome-flow details p{font-size:13px;margin-top:10px}
+.welcome-flow .wf-progress{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#aaa7c5;margin-bottom:20px}
+.welcome-flow .wf-progress .current{color:#c4b5fd;font-weight:700}
+.welcome-flow .wf-email{display:block;color:#e2e0ff;overflow-wrap:anywhere;margin-top:6px}
+.welcome-flow .wf-error{color:#fda4af;margin-top:12px}
+.welcome-flow .wf-note{font-size:12px;margin:4px 0 0}
+@media(prefers-reduced-motion:reduce){.auth-block-1,.auth-block-2,.auth-block-3,.auth-block-1 div{animation:none!important}}

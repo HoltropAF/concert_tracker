@@ -254,12 +254,14 @@ export default function App() {
 
   const handleInstall = async () => {
     if (!installPrompt) return
-    installPrompt.prompt()
-    await installPrompt.userChoice
-    // ! A beforeinstallprompt event can only be prompted once, so whatever the
-    // ! choice was, this one is spent — clear it everywhere.
-    setInstallPrompt(null); setShowBanner(false)
-    publishInstallState({ available: false, prompt: null })
+    try {
+      await installPrompt.prompt()
+      return await installPrompt.userChoice
+    } finally {
+      // Each browser installation prompt can only be consumed once.
+      setInstallPrompt(null); setShowBanner(false)
+      publishInstallState({ available: false, prompt: null })
+    }
   }
 
   // * Keep splash counts fresh after every load so the next visit's boot screen
@@ -370,7 +372,7 @@ export default function App() {
     </div>
   )
 
-  if (!user) return <><AuthScreen onSignIn={signIn} onGuest={enterGuest} />{banner}</>
+  if (!user) return <AuthScreen onSignIn={signIn} onGuest={enterGuest} onInstall={handleInstall} installAvailable={!!installPrompt} />
 
   return (
     <>

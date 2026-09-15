@@ -196,11 +196,11 @@ export function useAuth() {
     return () => { clearTimeout(timeout); subscription.unsubscribe() }
   }, [])
 
-  const signIn = async (email) => {
+  const signIn = async (email, { shouldCreateUser = false } = {}) => {
     if (!isSupabaseConfigured) return { error: new Error('Supabase is not configured') }
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin }
+      options: { emailRedirectTo: window.location.origin, shouldCreateUser }
     })
     return { error }
   }

@@ -165,53 +165,88 @@ function CountUp({ value, duration = 900, id }) {
 // * Photos live in a private Supabase bucket, so a storage path can't be used as an
 // * <img src> directly — it has to be exchanged for a signed URL first (getPhotoUrl
 // * caches those). Renders a skeleton until the URL arrives.
-// * `pos` is the saved crop focal point { x, y } as percentages, applied via
-// * object-position so one upload can be framed differently per aspect ratio.
-function PhotoImg({ path, style, pos }) {
+// * `pos` holds an independent crop — { x, y, zoom } — per place the photo is framed
+// * differently: 'detail' (16:9 show page), 'list' (5:2 shows-list card) and
+// * 'memories' (1:1 grids). Older data only has a flat { x, y } from before crops
+// * were split apart; CROP_VARIANTS.resolve treats that as a shared starting point
+// * for whichever variant hasn't been individually adjusted yet.
+const CROP_VARIANTS = [
+  { key: 'detail', label: 'Detail view', ratio: '16 / 9' },
+  { key: 'list', label: 'Shows list', ratio: '5 / 2' },
+  { key: 'memories', label: 'Memories', ratio: '1' },
+]
+function resolveCropPos(pos, variant) {
+  if (!pos) return { x: 50, y: 50, zoom: 1 }
+  const v = pos[variant]
+  if (v) return { x: v.x ?? 50, y: v.y ?? 50, zoom: v.zoom ?? 1 }
+  if (typeof pos.x === 'number') return { x: pos.x, y: pos.y ?? 50, zoom: pos.zoom ?? 1 }
+  if (pos._legacy) return { x: pos._legacy.x ?? 50, y: pos._legacy.y ?? 50, zoom: pos._legacy.zoom ?? 1 }
+  return { x: 50, y: 50, zoom: 1 }
+}
+function PhotoImg({ path, style, pos, variant = 'list' }) {
   const [url, setUrl] = useState(null)
   useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
-  const objectPosition = pos ? `${pos.x ?? 50}% ${pos.y ?? 50}%` : '50% 50%'
   if (!url) return <div className="skeleton" style={{ ...style }} />
-  return <img src={url} alt="" loading="lazy" style={{ ...style, objectFit: 'cover', objectPosition, display: 'block' }} />
+  const { x, y, zoom } = resolveCropPos(pos, variant)
+  return (
+    <div style={{ ...style, overflow: 'hidden', position: style?.position || 'relative' }}>
+      <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${x}% ${y}%`, transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: `${x}% ${y}%`, display: 'block' }} />
+    </div>
+  )
 }
 
-// Drag-to-reframe control for a concert photo. Nothing is re-encoded — dragging only
-// moves the CSS object-position focal point, which is stored on the concert as
-// `photoPos` and reused everywhere the photo is displayed. Shows both the 16:9 detail
-// crop and the 5:2 list crop, since one focal point has to work for both.
+// Drag-to-reframe + zoom control for a concert photo. Nothing is re-encoded — this
+// only writes a per-variant { x, y, zoom } into `photoPos`, applied everywhere via
+// CSS object-position/transform. One tab is open at a time, and each of the three
+// crops (detail/list/memories) is adjusted independently — reframing the square
+// Memories crop doesn't touch the 16:9 detail crop or vice versa.
 function PhotoAdjust({ path, pos, onChange }) {
   const [url, setUrl] = useState(null)
+  const [activeTab, setActiveTab] = useState('detail')
   const boxRef = useRef(null)
   const drag = useRef(null)
   useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
-  const p = pos || { x: 50, y: 50 }
-  const start = (cx, cy) => { drag.current = { x: cx, y: cy, px: p.x ?? 50, py: p.y ?? 50 } }
+  const crop = resolveCropPos(pos, activeTab)
+  const setCrop = next => {
+    if (pos && typeof pos.x === 'number') {
+      const { x, y, zoom, ...rest } = pos
+      onChange({ ...rest, _legacy: { x, y: y ?? 50, zoom: zoom ?? 1 }, [activeTab]: next })
+    } else {
+      onChange({ ...(pos || {}), [activeTab]: next })
+    }
+  }
+  const start = (cx, cy) => { drag.current = { x: cx, y: cy, px: crop.x, py: crop.y } }
   const move = (cx, cy) => {
     if (!drag.current || !boxRef.current) return
     const rect = boxRef.current.getBoundingClientRect()
     const nx = Math.max(0, Math.min(100, drag.current.px - ((cx - drag.current.x) / rect.width) * 100))
     const ny = Math.max(0, Math.min(100, drag.current.py - ((cy - drag.current.y) / rect.height) * 100))
-    onChange({ x: Math.round(nx), y: Math.round(ny) })
+    setCrop({ ...crop, x: Math.round(nx), y: Math.round(ny) })
   }
+  const tab = CROP_VARIANTS.find(t => t.key === activeTab)
   return (
     <div>
-      <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Detail view</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {CROP_VARIANTS.map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: 1, background: t.key === activeTab ? '#a78bfa' : 'none', border: '1px solid #2e2e50', borderRadius: 8, color: t.key === activeTab ? '#0c0c14' : '#6b6a8f', fontSize: 11, fontWeight: t.key === activeTab ? 700 : 400, padding: '6px 4px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>{t.label}</button>
+        ))}
+      </div>
       <div ref={boxRef}
-        onTouchStart={e => { const t = e.touches[0]; start(t.clientX, t.clientY) }}
-        onTouchMove={e => { const t = e.touches[0]; move(t.clientX, t.clientY) }}
+        onTouchStart={e => { const t2 = e.touches[0]; start(t2.clientX, t2.clientY) }}
+        onTouchMove={e => { const t2 = e.touches[0]; move(t2.clientX, t2.clientY) }}
         onTouchEnd={() => { drag.current = null }}
         onMouseDown={e => start(e.clientX, e.clientY)}
         onMouseMove={e => { if (e.buttons === 1) move(e.clientX, e.clientY) }}
         onMouseUp={() => { drag.current = null }}
         onMouseLeave={() => { drag.current = null }}
-        style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden', touchAction: 'none', cursor: 'grab', background: '#13131f', position: 'relative', border: '1px solid #2e2e50' }}>
-        {url && <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: 'block', pointerEvents: 'none' }} />}
+        style={{ width: '100%', aspectRatio: tab.ratio, borderRadius: 12, overflow: 'hidden', touchAction: 'none', cursor: 'grab', background: '#13131f', position: 'relative', border: '1px solid #2e2e50' }}>
+        {url && <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${crop.x}% ${crop.y}%`, transform: crop.zoom !== 1 ? `scale(${crop.zoom})` : undefined, transformOrigin: `${crop.x}% ${crop.y}%`, display: 'block', pointerEvents: 'none' }} />}
         <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, color: '#e2e0ff', background: '#0c0c14aa', padding: '3px 8px', borderRadius: 99, fontFamily: "'DM Mono', monospace", pointerEvents: 'none' }}>↕↔ drag to reframe</div>
       </div>
-      <button onClick={() => onChange({ x: 50, y: 50 })} style={{ marginTop: 6, background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '4px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>center</button>
-      <div style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 6px' }}>How it looks in your shows list</div>
-      <div style={{ width: '100%', aspectRatio: '5 / 2', borderRadius: 8, overflow: 'hidden', background: '#13131f', border: '1px solid #2e2e50' }}>
-        {url && <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${p.x ?? 50}% ${p.y ?? 50}%`, display: 'block' }} />}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <span style={{ fontSize: 9, color: '#4a4870', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em' }}>zoom</span>
+        <input type="range" min="1" max="2.5" step="0.05" value={crop.zoom} onChange={e => setCrop({ ...crop, zoom: parseFloat(e.target.value) })} style={{ flex: 1 }} />
+        <button onClick={() => setCrop({ x: 50, y: 50, zoom: 1 })} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '4px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>reset</button>
       </div>
     </div>
   )
@@ -1475,7 +1510,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     >
       {hasPhotoDivider && (
         <>
-          <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
+          <PhotoImg path={concert.photo} pos={concert.photoPos} variant="list" style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
           <div style={{ position: "absolute", left: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
           <div style={{ position: "absolute", right: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
         </>
@@ -2296,7 +2331,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {/* Photo */}
           {concert.photo && (
             <div style={{ marginBottom: 14 }}>
-              <PhotoImg path={concert.photo} pos={concert.photoPos} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12 }} />
+              <PhotoImg path={concert.photo} pos={concert.photoPos} variant="detail" style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 12 }} />
             </div>
           )}
 
@@ -4231,7 +4266,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                 {faves.map((c, i) => (
                   <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, borderTop: i > 0 ? "1px solid #1a1a2e" : "none", padding: "8px 0" }}>
                     <button onClick={() => !editingFaveOrder && onOpen(c)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: 0, cursor: editingFaveOrder ? "default" : "pointer", textAlign: "left" }}>
-                      {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
+                      {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
                           <span style={{ color: "#e2e0ff", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist}</span>
@@ -5392,11 +5427,11 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                                 {/* Compact keeps the photo as a thumbnail on the row so the
                                     whole history stays scannable; large lets it breathe. */}
                                 {c.photo && timelineCompact && (
-                                  <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 42, height: 42, borderRadius: 7, flexShrink: 0 }} />
+                                  <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: 42, height: 42, borderRadius: 7, flexShrink: 0 }} />
                                 )}
                               </div>
                               {c.photo && !timelineCompact && (
-                                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 9, marginTop: 6 }} />
+                                <PhotoImg path={c.photo} pos={c.photoPos} variant="detail" style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 9, marginTop: 6 }} />
                               )}
                             </button>
                           </div>
@@ -5463,7 +5498,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
                     aria-label={taggingPhotos ? `${isIn ? 'Remove' : 'Add'} ${displayName(f.name)} from the photo at ${c.artist}, ${formatDate(c.date)}` : `${c.artist}, ${formatDate(c.date)}`}
                     style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "block", position: "relative" }}
                   >
-                    <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4, opacity: taggingPhotos && !isIn ? 0.45 : 1 }} />
+                    <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: "100%", aspectRatio: "1", borderRadius: 4, opacity: taggingPhotos && !isIn ? 0.45 : 1 }} />
                     {taggingPhotos && (
                       <span style={{
                         position: "absolute", top: 5, right: 5, width: 19, height: 19, borderRadius: "50%",
@@ -6485,7 +6520,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                       {photos.map((c, i) => (
                         <button key={c.id} onClick={() => bannerEditMode ? setReframingPolaroid(c) : onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", transform: `rotate(${rotations[i % rotations.length]}deg)`, position: "relative" }}>
                           <div style={{ background: "#fff", borderRadius: 3, padding: "6px 6px 20px", boxShadow: "0 4px 10px rgba(0,0,0,0.35)" }}>
-                            <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 96, height: 108, borderRadius: 2, display: "block" }} />
+                            <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: 96, height: 108, borderRadius: 2, display: "block" }} />
                             <div style={{ position: "absolute", bottom: 4, left: 0, right: 0, textAlign: "center", fontSize: 11, color: "#8a8578", fontFamily: "'DM Mono', monospace" }}>{c.date.slice(0, 4)}</div>
                           </div>
                           <div style={{ position: "absolute", top: -6, left: 34, width: 26, height: 13, background: "rgba(255,220,150,0.55)", transform: `rotate(${-rotations[i % rotations.length] / 2}deg)` }} />
@@ -6505,7 +6540,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   return (
                     <div style={{ padding: "12px 16px 0" }}>
                       <button onClick={() => onOpen(pinned)} style={{ display: "block", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
-                        <PhotoImg path={pinned.photo} pos={pinned.photoPos} style={{ width: "100%", aspectRatio: "16/10", borderRadius: 12 }} />
+                        <PhotoImg path={pinned.photo} pos={pinned.photoPos} variant="detail" style={{ width: "100%", aspectRatio: "16/10", borderRadius: 12 }} />
                         <span style={{ position: "absolute", bottom: 8, left: 10, fontSize: 10, color: "#fff", fontFamily: "'DM Mono', monospace", background: "rgba(0,0,0,0.45)", padding: "2px 8px", borderRadius: 99 }}>{formatDate(pinned.date)}</span>
                       </button>
                       {rest.length > 0 && (
@@ -6515,7 +6550,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                           {rest.map(c => (
                             <div key={c.id} style={{ position: "relative", flexShrink: 0 }}>
                               <button onClick={() => onOpen(c)} title={`${c.artist} · ${formatDate(c.date)}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "block" }}>
-                                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 64, height: 64, borderRadius: 8 }} />
+                                <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: 64, height: 64, borderRadius: 8 }} />
                                 <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)}</div>
                               </button>
                               <button
@@ -6536,7 +6571,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                   <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 16px 0", WebkitOverflowScrolling: "touch" }}>
                     {photos.map(c => (
                       <button key={c.id} onClick={() => onOpen(c)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                        <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
+                        <PhotoImg path={c.photo} pos={c.photoPos} variant="detail" style={{ width: 128, aspectRatio: "16 / 10", borderRadius: 10 }} />
                         <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3, textAlign: "left" }}>{c.date.slice(0, 4)} · {isOnline(c) ? formatOnlineLocation(c) : c.venue}</div>
                       </button>
                     ))}
@@ -6734,7 +6769,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                         marginBottom: i < timelineItems.length - 1 ? 14 : 0,
                         display: "flex", gap: 10, alignItems: "flex-start"
                       }}>
-                        {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0 }} />}
+                        {c.photo && <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0 }} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                             <span style={{ fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 600, padding: "1px 5px", borderRadius: 99, background: item.role === 'headliner' ? "#1a1a30" : "#1a1030", color: item.role === 'headliner' ? "#a78bfa" : "#f472b6", textTransform: "uppercase" }}>{item.role}</span>
@@ -7579,17 +7614,7 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
         <div className="stagger-list" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3, padding: "10px 10px 0" }}>
           {withPhotos.map(c => (
             <button key={c.id} onClick={() => onOpen(c)} title={`${c.artist} · ${formatDate(c.date)}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", position: "relative", display: "block" }}>
-              <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: "100%", aspectRatio: "1", borderRadius: 4 }} />
-              {/* Without a caption this is an anonymous wall — you can see the photo but not
-                  which night it was. Short form ("Mar '24") so it fits a third-width tile. */}
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, borderRadius: "0 0 4px 4px", padding: "14px 6px 5px", textAlign: "left", background: "linear-gradient(to top, rgba(6,6,14,0.88), rgba(6,6,14,0))", pointerEvents: "none" }}>
-                <div style={{ fontSize: 9, color: "#fff", fontFamily: "'DM Mono', monospace", lineHeight: 1.25 }}>
-                  {new Date(c.date + "T00:00:00").toLocaleDateString("en-GB", { month: "short" })} '{c.date.slice(2, 4)}
-                </div>
-                <div style={{ fontSize: 8.5, color: "rgba(255,255,255,0.62)", fontFamily: "'DM Mono', monospace", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.artist}
-                </div>
-              </div>
+              <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: "100%", aspectRatio: "1", borderRadius: 4 }} />
             </button>
           ))}
         </div>
@@ -7937,7 +7962,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, padding: '14px 16px' }}>
             {v.photos.map(c => (
               <button key={c.id} onClick={() => onOpen(c)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-                <PhotoImg path={c.photo} pos={c.photoPos} style={{ width: '100%', aspectRatio: '1', borderRadius: 6 }} />
+                <PhotoImg path={c.photo} pos={c.photoPos} variant="memories" style={{ width: '100%', aspectRatio: '1', borderRadius: 6 }} />
               </button>
             ))}
           </div>

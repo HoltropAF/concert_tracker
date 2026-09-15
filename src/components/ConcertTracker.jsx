@@ -23,7 +23,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
-import { requestPermission as requestNotifyPermission, canNotify, reScheduleAll } from '../lib/notifications'
 import { geocodeVenue } from '../lib/geocode'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_SETTINGS } from '../lib/data'
@@ -9145,7 +9144,7 @@ const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => 
 
 // The Settings tab. Beyond preferences it also hosts the app's admin surface:
 // tag lists (genres, merch categories, venue sizes…), saved venues and friend
-// groups, Spotify connection, notification permission, XLSX import/export, and
+// groups, Spotify connection, XLSX import/export, and
 // sign-out.
 // * Two save paths, deliberately: `onUpdate(key, value)` for a single preference,
 // * `onUpdateAll(next)` for anything that has to change several keys atomically
@@ -9202,37 +9201,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     if (onSaveConcert) await Promise.all(updates.map(c => onSaveConcert(c)));
   };
 
-  const [notifyPermState, setNotifyPermState] = useState(() => (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'));
-  const [ntfyTestStatus, setNtfyTestStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
-  const handleEnableBrowserNotifications = async () => {
-    const result = await requestNotifyPermission();
-    setNotifyPermState(result);
-  };
-  const handleSetupNtfyTopic = () => {
-    // ! An ntfy topic is a shared secret and anyone who knows it can both read your
-    // ! alerts and publish to them. 8 hex chars is only ~32 bits — use the full UUID.
-    const topic = `settracker-${crypto.randomUUID().replace(/-/g, '')}`;
-    onUpdate('ntfyTopic', topic);
-  };
-  const handleSendNtfyTest = async () => {
-    if (!settings.ntfyTopic) return;
-    setNtfyTestStatus('sending');
-    try {
-      // * /api/notify now requires a signed-in caller, so pass the access token.
-      const { data: { session } } = await supabase.auth.getSession();
-      const r = await fetch('/api/notify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ topic: settings.ntfyTopic, title: '🔔 Test notification', body: 'If you see this, background notifications are working!', tags: ['bell'] }),
-      });
-      setNtfyTestStatus(r.ok ? 'sent' : 'error');
-    } catch {
-      setNtfyTestStatus('error');
-    }
-  };
   const [local, setLocal] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
   const [openSection, setOpenSection] = useState(null);
@@ -10751,62 +10719,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         )}
 
-        {/* Notifications */}
-        <SettingsSection title="Notifications" icon="bell" collapsible defaultOpen={false} subtitle={(notifyPermState === 'granted' || settings.ntfyTopic) ? { label: 'Enabled', color: '#4ade80' } : { label: 'Not enabled', color: '#4a4870' }}>
-          <div style={{ padding: '14px 16px' }}>
-            <div style={{ fontSize: 12, color: '#9d9bc0', marginBottom: 12, lineHeight: 1.5 }}>
-              Ticket sale reminders (30 min before + when sales open) come in two layers: instant alerts while the app is open, and a daily background check for when it's closed.
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1a1a2e' }}>
-              <div>
-                <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 600 }}>While the app is open</div>
-                <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 2 }}>
-                  {notifyPermState === 'granted' ? 'Enabled ✓' : notifyPermState === 'denied' ? 'Blocked — allow notifications for this site in your browser settings' : notifyPermState === 'unsupported' ? 'Not supported in this browser' : 'Not enabled yet'}
-                </div>
-              </div>
-              {notifyPermState !== 'granted' && notifyPermState !== 'unsupported' && (
-                <button onClick={handleEnableBrowserNotifications} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Enable</button>
-              )}
-            </div>
-
-            <div style={{ padding: '12px 0 4px' }}>
-              <div style={{ fontSize: 13, color: '#e2e0ff', fontWeight: 600, marginBottom: 4 }}>While the app is closed</div>
-              <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 10, lineHeight: 1.5 }}>
-                Uses <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>ntfy.sh</a> — a free push service. Runs once a day, so this is a "sale's coming up soon" heads-up rather than a precise 30-minute warning.
-              </div>
-              {!settings.ntfyTopic ? (
-                <div style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 10, padding: '12px' }}>
-                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>How it works</div>
-                  <ol style={{ fontSize: 11, color: '#9d9bc0', lineHeight: 1.7, margin: 0, paddingLeft: 18, marginBottom: 12 }}>
-                    <li>Tap "Set up" below — you'll get a private, random topic name (like a channel just for you)</li>
-                    <li>Install the free <b>ntfy</b> app: <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>iOS</a> / <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>Android</a></li>
-                    <li>In the app, subscribe to your topic — that's it, no account or login needed</li>
-                  </ol>
-                  <button onClick={handleSetupNtfyTopic} style={{ background: '#a78bfa', border: 'none', borderRadius: 8, color: '#0c0c14', fontSize: 12, fontWeight: 700, padding: '9px 14px', cursor: 'pointer', fontFamily: "'DM Mono', monospace", width: '100%' }}>Set up background notifications</button>
-                </div>
-              ) : (
-                <div style={{ background: '#0c0c14', border: '1px solid #1f1f35', borderRadius: 10, padding: '12px' }}>
-                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Your topic</div>
-                  <div style={{ fontSize: 13, color: '#a78bfa', fontFamily: "'DM Mono', monospace", fontWeight: 700, marginBottom: 10, wordBreak: 'break-all' }}>{settings.ntfyTopic}</div>
-                  <ol style={{ fontSize: 11, color: '#9d9bc0', lineHeight: 1.7, margin: 0, paddingLeft: 18 }}>
-                    <li>Install the <b>ntfy</b> app (iOS / Android), or just keep <a href={`https://ntfy.sh/${settings.ntfyTopic}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>this page</a> bookmarked</li>
-                    <li>Subscribe to topic <b>{settings.ntfyTopic}</b></li>
-                  </ol>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={handleSendNtfyTest} disabled={ntfyTestStatus === 'sending'} style={{ background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', fontSize: 11, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
-                      {ntfyTestStatus === 'sending' ? 'Sending…' : 'Send test'}
-                    </button>
-                    <button onClick={handleSetupNtfyTopic} style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 8, color: '#6b6a8f', fontSize: 11, padding: '7px 12px', cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>New topic</button>
-                  </div>
-                  {ntfyTestStatus === 'sent' && <div style={{ fontSize: 10, color: '#34d399', marginTop: 8 }}>Sent — check your device</div>}
-                  {ntfyTestStatus === 'error' && <div style={{ fontSize: 10, color: '#f87171', marginTop: 8 }}>Couldn't send — is the topic subscribed?</div>}
-                </div>
-              )}
-            </div>
-          </div>
-        </SettingsSection>
-
         {/* Integrations */}
         <SettingsSection title="Integrations" icon="plug" collapsible defaultOpen={false} subtitle={settings.spotifyAccessToken ? { label: 'Spotify connected', color: '#4ade80' } : { label: 'Not connected', color: '#4a4870' }}>
           <div style={{ padding: "14px 16px" }}>
@@ -11368,11 +11280,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   useEffect(() => { if (showsGroup.includes(view)) setShowsTab(view); }, [view])
   useEffect(() => { setSortOrder(settings.defaultSort || 'newest'); }, [settings.defaultSort])
   useEffect(() => { setCompact(!!settings.compactView); }, [settings.compactView])
-
-  // Re-arm in-app ticket-sale alarms (30-min-before + at-sale-time) whenever the
-  // concert list changes. These only fire while this tab is open — see the
-  // Notifications section in Settings for the background/app-closed fallback.
-  useEffect(() => { reScheduleAll(concerts) }, [concerts])
 
   const allFriends = [...new Set(concerts.flatMap(c => getFriends(c)))].sort()
 

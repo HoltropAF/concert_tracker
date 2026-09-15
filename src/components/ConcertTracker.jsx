@@ -8249,9 +8249,38 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
   );
 }
 
-// The sheet for logging a new show. Which fields appear depends on the three
+// Shared entry menu, also used inside the form to change a selection without
+// unmounting the form or losing the details already entered.
+function QuickShowChoices({ initialType = 'concert', initialAttendanceMode = 'in_person', selectedStatus = null, onChoose }) {
+  const [kind, setKind] = useState(initialType === 'festival' ? 'festival' : initialAttendanceMode === 'online' ? 'online' : 'concert');
+  return (
+    <div>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 27, fontWeight: 800, color: '#e2e0ff' }}>Add a show</div>
+      <p style={{ fontSize: 13, color: '#9491b8', lineHeight: 1.5, margin: '8px 0 24px' }}>A memory, a booked night, or something on your radar.</p>
+      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#9491b8', marginBottom: 10 }}>SHOW TYPE</div>
+      <div role="group" aria-label="Show type" style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
+        {[['concert', 'Concert'], ['online', 'Online'], ['festival', 'Festival']].map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={kind === value} onClick={() => setKind(value)} style={{ flex: 1, minHeight: 42, borderRadius: 10, background: kind === value ? '#252039' : '#13131f', border: `1px solid ${kind === value ? '#a78bfa' : '#2e2e50'}`, color: kind === value ? '#cbb8ff' : '#9491b8', fontSize: 13, cursor: 'pointer' }}>{label}</button>
+        ))}
+      </div>
+      {[
+        { status: 'past', title: 'I was there', description: 'Capture a show you’ve already seen', path: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> },
+        { status: 'upcoming', title: 'I’m going', description: 'An upcoming show with a ticket', path: <><path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4V5Z" /><path d="M15 5v3m0 3v2m0 3v3" /></> },
+        { status: 'wishlist', title: 'Want to go', description: 'Keep it on your wishlist', path: <path d="M6 4h12v17l-6-4-6 4V4Z" /> },
+      ].map(({ status, title, description, path }) => (
+        <button key={status} type="button" aria-pressed={selectedStatus === status} onClick={() => onChoose({ type: kind === 'festival' ? 'festival' : 'concert', attendanceMode: kind === 'online' ? 'online' : 'in_person', status })} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%', padding: '17px 14px', marginBottom: 12, borderRadius: 14, border: `1px solid ${selectedStatus === status ? '#a78bfa' : '#2e2e50'}`, background: selectedStatus === status ? '#252039' : '#13131f', color: '#e2e0ff', cursor: 'pointer' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>{path}</svg>
+          <span style={{ flex: 1 }}><span style={{ display: 'block', fontSize: 16, fontWeight: 700 }}>{title}</span><span style={{ display: 'block', color: '#9491b8', fontSize: 12, marginTop: 4 }}>{description}</span></span>
+          <span aria-hidden="true" style={{ color: '#a78bfa' }}>{selectedStatus === status ? '✓' : '›'}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// The sheet for logging a new show. Which fields appear depends on the
 // initial* props, which the caller has already collected via the add-flow chooser
-// (type → timing → ticket) in MAIN APP: a festival gets an acts list instead of
+// quick choices in MAIN APP: a festival gets an acts list instead of
 // support acts, an online show swaps venue/city for platform, and a wishlist entry
 // hides everything retrospective (rating, setlist, photo).
 // * `friends` / `allArtists` / `recentFriends` are autocomplete sources derived from
@@ -8260,8 +8289,10 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
 // * `onUpdateSetting` is threaded down so a brand-new tag typed here can be promoted
 // * to a permanent option via SaveTagPrompt without leaving the form.
 // * Builds the concert object and hands it to `onSave`; it never writes directly.
-function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', initialAttendanceMode = 'in_person', initialWishlist = false, concerts = [] }) {
-  useBackButton(onClose);
+function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', initialAttendanceMode = 'in_person', initialWishlist = false, initialStatus = 'past', concerts = [] }) {
+  const [showChoices, setShowChoices] = useState(false);
+  const [chosenStatus, setChosenStatus] = useState(initialStatus);
+  useBackButton(() => showChoices ? setShowChoices(false) : onClose());
   const [pendingTag, setPendingTag] = useState(null);
   const [form, setForm] = useState({
     artist: '', date: '', endDate: '', venue: '', room: '', city: '', country: settings.defaultCountry || [...concerts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]?.country || '',
@@ -8302,7 +8333,9 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
       setSfUrl('');
     } catch (e) { setSfStatus('error'); setSfMsg('Fetch failed — check your connection'); }
   };
-  const quickUpcoming = form.date && !isPast(form.date);
+  // Once a date is entered it remains the source of truth used throughout the app.
+  const quickUpcoming = form.date ? !isPast(form.date) : chosenStatus === 'upcoming';
+  const selectionStatus = form.wishlist ? 'wishlist' : quickUpcoming ? 'upcoming' : 'past';
   const autoFillFromSearch = async () => {
     setSfStatus('loading'); setSfMsg('');
     try {
@@ -8452,13 +8485,24 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: form.type === 'festival' ? '#f472b6' : '#e2e0ff' }}>{form.type === 'festival' ? 'Add festival' : 'Add concert'}</div>
-            <button onClick={() => { update('type', form.type === 'festival' ? 'concert' : 'festival'); if (form.type !== 'festival') setShowDetails(true); }} style={{ background: 'none', border: 'none', padding: 0, marginTop: 1, cursor: 'pointer', fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", textDecoration: 'underline', textUnderlineOffset: 2 }}>
-              switch to {form.type === 'festival' ? 'concert' : 'festival'}
-            </button>
           </div>
-          <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>
+          {!showChoices && <button onClick={handleSave} style={{ background: '#a78bfa', border: '1px solid #a78bfa', color: '#0c0c14', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>Save</button>}
         </div>
-        <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1 }}>
+        {!showChoices && <div style={{ margin: '12px 20px 0', padding: '8px 11px', borderRadius: 9, background: '#211b33', border: '1px solid #51416e', display: 'flex', alignItems: 'center', gap: 8, color: '#cbb8ff', fontSize: 12, flexShrink: 0 }}>
+          <span aria-hidden="true">✓</span>
+          <span>{selectionStatus === 'wishlist' ? 'Wishlist' : selectionStatus === 'upcoming' ? 'Upcoming' : 'Past show'} · {form.type === 'festival' ? 'Festival' : form.attendanceMode === 'online' ? 'Online' : 'Concert'}</span>
+          <button type="button" aria-label="Change show selection" onClick={() => setShowChoices(true)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#cbb8ff', padding: '6px 0 6px 10px', cursor: 'pointer', fontSize: 12 }}>Change</button>
+        </div>}
+        {showChoices && <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1 }}>
+          <button type="button" onClick={() => setShowChoices(false)} style={{ background: 'none', border: 'none', padding: '0 0 18px', color: '#a78bfa', cursor: 'pointer' }}>← Keep current selection</button>
+          <QuickShowChoices initialType={form.type} initialAttendanceMode={form.attendanceMode} selectedStatus={selectionStatus} onChoose={({ type, attendanceMode, status }) => {
+            setChosenStatus(status);
+            setForm(f => ({ ...f, type, attendanceMode, wishlist: status === 'wishlist', date: f.date && status !== 'wishlist' && (status === 'upcoming') !== !isPast(f.date) ? '' : f.date }));
+            setErrors({});
+            setShowChoices(false);
+          }} />
+        </div>}
+        <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1, display: showChoices ? 'none' : undefined }}>
         {(() => {
           const isFest = form.type === 'festival';
           const sectionIcon = (svg, color) => (
@@ -11245,6 +11289,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
   const [showAddAttendance, setShowAddAttendance] = useState('in_person')
   const [showAddWishlist, setShowAddWishlist] = useState(false)
+  const [showAddStatus, setShowAddStatus] = useState('past')
   // * Lifted out of StatsView so the sub-tab and chart group survive tab switches.
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
   const [chartGroup, setChartGroup] = useState('activity')
@@ -11272,12 +11317,9 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showPast, setShowPast] = useState(settings.defaultShowPast === 'open')
   const [showWishlist, setShowWishlist] = useState(settings.defaultShowWishlist === 'open')
   const [showUpcoming, setShowUpcoming] = useState(settings.defaultShowUpcoming !== 'closed')
-  // * The three questions asked before AddConcertForm opens. Kept here rather than
-  // * inside the form so answering them can be skipped when the entry point already
-  // * implies the answer (e.g. "+ add" from the wishlist section).
-  const [addFlowStep, setAddFlowStep] = useState(null) // null | 'type' | 'timing' | 'ticket'
-  const [addFlowType, setAddFlowType] = useState(null) // 'concert' | 'festival'
-  const [addFlowAttendance, setAddFlowAttendance] = useState(null) // 'in_person' | 'online'
+  // * Opens the quick-choice menu before the form; the form reuses the same
+  // * chooser in place when a user changes their selection.
+  const [addFlowStep, setAddFlowStep] = useState(null) // null | 'type' (quick choices)
   // --- Cross-view navigation. With no router, jumping from one view into another's
   // --- detail page is a two-part handshake:
   // ---   pending*Select     — the target the destination view should open on mount.
@@ -11644,81 +11686,20 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     </div>
   )
 
-  if (addFlowStep) {
-    const stepNum = { type: 1, timing: 2, ticket: 3 }[addFlowStep]
-    const stepTotal = addFlowStep === 'ticket' || (addFlowStep === 'timing') ? 3 : 3
-    const OptionCard = ({ color, icon, title, sub, onClick }) => (
-      <button onClick={onClick} style={{
-        display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', width: '100%',
-        background: '#13131f', border: '1px solid #1f1f35', borderLeft: `3px solid ${color}`,
-        borderRadius: 14, padding: '16px 16px 16px 15px', cursor: 'pointer',
-      }}>
-        {icon && (
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: `${color}22`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {icon}
-          </div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: '#e2e0ff' }}>{title}</div>
-          <div style={{ fontSize: 12, color: '#6b6a8f', marginTop: 3, lineHeight: 1.4 }}>{sub}</div>
-        </div>
-        <span style={{ color: '#3a3858', fontSize: 18, flexShrink: 0 }}>›</span>
-      </button>
-    )
-    return (
+  if (addFlowStep) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 40px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 6 }}>
-          <button onClick={() => { if (addFlowStep === 'type') setAddFlowStep(null); else if (addFlowStep === 'timing') setAddFlowStep('type'); else setAddFlowStep('timing'); }} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[1, 2, 3].map(n => (
-              <div key={n} style={{ width: n === stepNum ? 18 : 6, height: 6, borderRadius: 3, background: n <= stepNum ? '#a78bfa' : '#1f1f35', transition: 'width 0.2s' }} />
-            ))}
-          </div>
-        </div>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 27, fontWeight: 800, color: '#e2e0ff', lineHeight: 1.15, margin: '14px 0 4px' }}>
-          {addFlowStep === 'type' ? 'What are you logging?' : addFlowStep === 'timing' ? 'When is it?' : 'Got a ticket?'}
-        </div>
-        <div style={{ fontSize: 13, color: '#6b6a8f', marginBottom: 26 }}>
-          {addFlowStep === 'type' ? 'Pick the kind of show first.' : addFlowStep === 'timing' ? 'Past shows and upcoming plans both get logged, just a little differently.' : "We'll keep it lighter if you're still deciding."}
-        </div>
-
-        {addFlowStep === 'type' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <OptionCard color="#a78bfa" title="Offline show" sub="A concert you go to in person"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>}
-              onClick={() => { setAddFlowType('concert'); setAddFlowAttendance('in_person'); setAddFlowStep('timing'); }} />
-            <OptionCard color={ONLINE_COLOR} title="Online show" sub="A livestream or online performance"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>}
-              onClick={() => { setAddFlowType('concert'); setAddFlowAttendance('online'); setAddFlowStep('timing'); }} />
-            <OptionCard color="#f472b6" title="Festival" sub="Multiple acts, one event"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 18H5L12 3z"/><path d="M9 14h6"/></svg>}
-              onClick={() => { setAddFlowType('festival'); setAddFlowAttendance('in_person'); setAddFlowStep('timing'); }} />
-          </div>
-        )}
-
-        {addFlowStep === 'timing' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <OptionCard color="#a78bfa" title="Already happened" sub="Log a show from the past"
-              onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} />
-            <OptionCard color="#818cf8" title="Coming up" sub="Something upcoming, or on your radar"
-              onClick={() => setAddFlowStep('ticket')} />
-          </div>
-        )}
-
-        {addFlowStep === 'ticket' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <OptionCard color="#818cf8" title="Yes" sub="It's booked — log the full details"
-              onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(false); setAddFlowStep(null); }} />
-            <OptionCard color="#34d399" title="Not yet" sub="Add it to your want-to-go list instead"
-              onClick={() => { setShowAdd(addFlowType); setShowAddAttendance(addFlowAttendance); setShowAddWishlist(true); setAddFlowStep(null); }} />
-          </div>
-        )}
+        <button type="button" aria-label="Back to shows" onClick={() => setAddFlowStep(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 22, cursor: 'pointer', padding: '0 0 18px' }}>←</button>
+        <QuickShowChoices onChoose={({ type, attendanceMode, status }) => {
+          setShowAdd(type);
+          setShowAddAttendance(attendanceMode);
+          setShowAddWishlist(status === 'wishlist');
+          setShowAddStatus(status);
+          setAddFlowStep(null);
+        }} />
       </div>
     </div>
   )
-  }
-
   if (showAdd) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
@@ -11737,6 +11718,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           initialType={showAdd}
           initialAttendanceMode={showAddAttendance}
           initialWishlist={showAddWishlist}
+          initialStatus={showAddStatus}
           settings={settings}
           onUpdateSetting={onUpdateSetting}
           friends={allFriends}
@@ -11861,7 +11843,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             <button onClick={() => setShowCalendar(c => !c)} style={{ background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', display: 'inline-flex', alignItems: 'center', flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
             </button>
-            <button onClick={() => { setAddFlowStep('type'); setAddFlowType(null); setAddFlowAttendance(null); }} aria-label="Add a show" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
+            <button onClick={() => { setAddFlowStep('type'); }} aria-label="Add a show" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
           </div>
         )}
 

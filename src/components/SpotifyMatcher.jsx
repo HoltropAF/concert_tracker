@@ -9,6 +9,7 @@
 // ! Requires an already-connected Spotify account (Settings). Without a valid token
 // ! getToken() returns null and every row silently stays in the "searching" state.
 import { useState, useEffect, useRef } from 'react'
+import { setlistSongs, mergeSetlistSongs } from '../lib/setlistRows'
 import { getValidSpotifyToken } from '../lib/spotify'
 
 // ! Duplicated from ConcertTracker.jsx rather than imported, to keep this component
@@ -107,7 +108,9 @@ function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick
 // *   removals.has(i)       existing link will be stripped on save
 // ! `songs` is read once into per-index state; the component assumes the array does
 // ! not change identity or length while it's mounted.
-export default function SpotifyMatcher({ artist, songs, settings, saveSettings, onSave, onClose }) {
+export default function SpotifyMatcher({ artist, songs: rows, settings, saveSettings, onSave: saveRows, onClose }) {
+  const songs = setlistSongs(rows)
+  const onSave = updated => saveRows(mergeSetlistSongs(rows, updated))
   const [results, setResults] = useState(() => new Array(songs.length).fill(null))
   const [choices, setChoices] = useState({})   // index → confirmed track object
   const [removals, setRemovals] = useState(new Set()) // indices to wipe spotifyId on save

@@ -61,7 +61,7 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
       zoomControl: interactive || showZoomControl,
-      attributionControl: interactive,
+      attributionControl: true,
       dragging: interactive,
       scrollWheelZoom: interactive,
       doubleClickZoom: interactive,
@@ -70,12 +70,12 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
       keyboard: interactive,
       tap: true,
     })
-    // CartoDB Positron — free, no API key, a clean light basemap (closer to
-    // the reference style than the standard OSM tiles, and easier to read
-    // with colored pins on top).
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // CARTO's former keyless endpoint now returns an "API KEY REQUIRED" image.
+    // Use standard OSM tiles; normal browser caching and referrers are preserved.
+    // Attribution must remain visible on static friend/venue previews too.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '© OpenStreetMap contributors © CARTO',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }

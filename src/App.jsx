@@ -175,8 +175,9 @@ export default function App() {
   // * while those const bindings are still in TDZ, causing a runtime crash.
   const guest = useGuestMode()
   const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
-  const { concerts, loaded, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
-  const { settings, settingsLoaded, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
+  const { concerts, loaded, loadError: concertLoadError, reload: reloadConcerts, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
+  const { settings, settingsLoaded, loadError: settingsLoadError, reload: reloadSettings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
+  const [retryingData, setRetryingData] = useState(false)
 
   // * Detect a Spotify OAuth callback (?code=…) on every fresh page load.
   // * Reads the code verifier + client ID from sessionStorage (written by startSpotifyAuth
@@ -210,7 +211,7 @@ export default function App() {
   // ! `settings` into a full overwrite, so running it while settings are still
   // ! DEFAULT_SETTINGS would wipe every real preference the user has.
   useEffect(() => {
-    if (!pendingSpotifyExchange || !user || !settingsLoaded) return
+    if (!pendingSpotifyExchange || !user || !settingsLoaded || settingsLoadError) return
     const { code, verifier, clientId } = pendingSpotifyExchange
     setPendingSpotifyExchange(null)
     exchangeCodeForTokens(code, verifier, clientId)
@@ -222,7 +223,7 @@ export default function App() {
         spotifyTokenExpiry: Date.now() + data.expires_in * 1000,
       }))
       .catch(err => console.error('Spotify token exchange failed:', err))
-  }, [pendingSpotifyExchange, user, settingsLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingSpotifyExchange, user, settingsLoaded, settingsLoadError]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // * Tells the emergency fallback in index.html that React is alive. It used to
   // * infer that from #root having children, which no longer holds: while booting
@@ -307,7 +308,7 @@ export default function App() {
     <>
       {!setupBannerDismissed && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 90,
           background: '#13121f', borderBottom: '1px solid #2a2550',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '9px 40px 9px 16px',
@@ -316,7 +317,7 @@ export default function App() {
           <span style={{ color: '#6b6890' }}>Exploring as guest —</span>
           <a href="/setup.html" target="_blank" rel="noopener noreferrer"
             style={{ color: '#a78bfa', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            want your own copy? →
+            Set up a separate private copy →
           </a>
           <button onClick={() => setSetupBannerDismissed(true)} style={{
             position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
@@ -373,6 +374,19 @@ export default function App() {
   )
 
   if (!user) return <AuthScreen onSignIn={signIn} onGuest={enterGuest} onInstall={handleInstall} installAvailable={!!installPrompt} />
+
+  if (concertLoadError || settingsLoadError) return (
+    <main style={{ minHeight: '100vh', padding: 32, background: '#0c0c14', color: '#e2e0ff', fontFamily: 'sans-serif' }}>
+      <h1>Couldn’t refresh your library</h1>
+      <p role="alert">{concertLoadError ? 'Your concerts could not be loaded.' : 'Your settings could not be loaded.'} Check your connection and try again.</p>
+      <p>{concerts.length ? 'Your cached concerts are still on this device, but may be out of date.' : 'This does not mean your library is empty.'} Editing is paused until loading succeeds.</p>
+      <button disabled={retryingData} onClick={async () => {
+        setRetryingData(true)
+        try { await Promise.all([reloadConcerts(), reloadSettings()]) }
+        finally { setRetryingData(false) }
+      }}>{retryingData ? 'Retrying…' : 'Retry loading'}</button>
+    </main>
+  )
 
   return (
     <>

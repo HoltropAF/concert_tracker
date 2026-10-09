@@ -457,6 +457,7 @@
       <pre id="vercel-url-wild-display" class="pre-sm"></pre>
     </div>
     <p data-t-html="s7_p4"></p>
+    <p class="muted">Email delivery: configure <a href="https://supabase.com/docs/guides/auth/auth-smtp" target="_blank" rel="noopener">custom SMTP</a> before inviting users outside your Supabase project team. The default mail service restricts recipients and has low rate limits. Send a test login email before sharing your site.</p>
     <div class="actions">
       <button type="button" class="btn btn-primary btn-full" onclick="goTo(8)" data-t="s7_btn2"></button>
       <button type="button" class="btn btn-secondary btn-full" onclick="goBack()" data-t="back_btn"></button>
@@ -584,8 +585,8 @@ const T = {
     err_key:         'Please paste your anon public key before continuing.',
     s6_h1:           'Deploy to Vercel',
     s6_why:          'Vercel puts your app online for free. It takes the code from your GitHub fork and builds it into a live website at a <code>*.vercel.app</code> address.',
-    s6_p1:           '<strong>1.</strong> Click the button below. Vercel will open its import page, already pointed at your fork.',
-    s6_muted:        'On that page, Vercel will show a form with two fields — <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>. Paste the values from the previous step into those fields, then click <strong>Deploy</strong>.',
+    s6_p1:           '<strong>1.</strong> Click the button below, connect GitHub if needed, and import the <strong>concert_tracker</strong> fork under your own GitHub account.',
+    s6_muted:        'Before deploying, expand <strong>Environment Variables</strong> and add <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>. Paste the values from the previous step, then click <strong>Deploy</strong>.',
     s6_btn1:         'Deploy on Vercel ↗',
     s6_callout:      'After clicking Deploy on Vercel\'s page, wait about <strong>60 seconds</strong>. When it finishes, Vercel shows you a URL like <code>your-project.vercel.app</code>. Copy it and paste it below.',
     s6_label:        'Your Vercel URL',
@@ -686,8 +687,8 @@ const T = {
     err_key:         'Plak eerst je anon public sleutel voordat je verdergaat.',
     s6_h1:           'Deployen naar Vercel',
     s6_why:          'Vercel zet je app gratis online. Het neemt de code van je GitHub-fork en bouwt er een live website van op een <code>*.vercel.app</code>-adres.',
-    s6_p1:           '<strong>1.</strong> Klik op de knop hieronder. Vercel opent zijn importpagina, al ingesteld op jouw fork.',
-    s6_muted:        'Op die pagina toont Vercel een formulier met twee velden — <strong>VITE_SUPABASE_URL</strong> en <strong>VITE_SUPABASE_ANON_KEY</strong>. Plak de waarden uit de vorige stap in die velden en klik op <strong>Deploy</strong>.',
+    s6_p1:           '<strong>1.</strong> Klik hieronder, verbind GitHub indien nodig en importeer de <strong>concert_tracker</strong>-fork van je eigen GitHub-account. Voeg voor het deployen bij <strong>Environment Variables</strong> de variabelen <strong>VITE_SUPABASE_URL</strong> en <strong>VITE_SUPABASE_ANON_KEY</strong> toe.',
+    s6_muted:        'Open voor het deployen <strong>Environment Variables</strong> en voeg <strong>VITE_SUPABASE_URL</strong> en <strong>VITE_SUPABASE_ANON_KEY</strong> toe. Plak de waarden uit de vorige stap en klik op <strong>Deploy</strong>.',
     s6_btn1:         'Deployen op Vercel ↗',
     s6_callout:      'Na het klikken op Deploy op de Vercel-pagina, wacht ongeveer <strong>60 seconden</strong>. Als het klaar is toont Vercel een URL zoals <code>your-project.vercel.app</code>. Kopieer die en plak hem hieronder.',
     s6_label:        'Jouw Vercel URL',
@@ -783,7 +784,43 @@ create policy "Users can manage own concerts"
 create policy "Users can manage own settings"
   on public.settings for all
   using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);`;
+  with check (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Storage: the "photos" bucket
+--
+-- src/lib/photos.js uploads every concert and artist photo here and reads them
+-- back through signed URLs. Without this block the app looks fine but every
+-- photo upload fails, which is easy to mistake for a bug in the app.
+--
+-- Paths are always "<user-id>/<something>.jpg" (see uploadConcertPhoto and
+-- uploadArtistPhoto), so the first path segment is what the policies below
+-- check against auth.uid(). The bucket is private — nothing is readable without
+-- a signed URL, which is why getPhotoUrl exists.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('photos', 'photos', false)
+on conflict (id) do nothing;
+
+create policy "Users can read own photos"
+  on storage.objects for select
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can upload own photos"
+  on storage.objects for insert
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Update is required as well as insert: uploads use upsert:true, so replacing a
+-- photo for the same concert overwrites the existing object rather than adding one.
+create policy "Users can update own photos"
+  on storage.objects for update
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete own photos"
+  on storage.objects for delete
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+`;
 
 document.getElementById('sql-block').textContent = SQL;
 
@@ -881,12 +918,7 @@ function goToVercel() {
 
 // ── Step 6 ────────────────────────────────────────────────────────────────
 function onEnterVercelStep() {
-  const params = new URLSearchParams({
-    'repository-url': 'https://github.com/HoltropAF/concert_tracker',
-    'env':            'VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY',
-    'envDescription': 'Your Supabase Project URL and anon public key from the previous step',
-  });
-  document.getElementById('vercel-btn').href = 'https://vercel.com/new/clone?' + params.toString();
+  document.getElementById('vercel-btn').href = 'https://vercel.com/new';
 }
 
 // ── Step 7 ────────────────────────────────────────────────────────────────

@@ -409,6 +409,7 @@ function useBackButton(onBack, enabled = true) {
 // * browser reads a bare date as UTC and a show can display one day early west of
 // * Greenwich. Any new date helper here must keep that suffix.
 const formatDate = (dateStr) => {
+  if (!dateStr || dateStr === '9999-12-31') return 'Date to be confirmed';
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 };
@@ -2117,7 +2118,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   };
   const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => getSupportName(x) !== getSupportName(s)) }));
 
-  const handleShare = (mode = 'general') => {
+  const handleShare = async (mode = 'general') => {
     const songs = getSongList(concert.setlist);
     const genres = getGenres(concert);
     const ticketItems = (concert.tickets && concert.tickets.length > 0)
@@ -2168,8 +2169,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     else if (mode === 'all') lines = [...header, ...generalLines, '', ...financialLines, '', ...setlistLines];
     else lines = [...header, ...generalLines];
 
-    navigator.clipboard?.writeText(lines.filter(l => l !== null).join('\n'));
-    onNotify('Copied share text');
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(lines.filter(l => l !== null).join('\n'));
+      onNotify('Copied share text');
+    } catch {
+      onNotify('Could not copy text. Allow clipboard access and try again.');
+    }
   };
 
   const handleCopyImage = async () => {
@@ -2310,8 +2316,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             ) : (
               <>
                 {concert.tour && <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, color: "#e2e0ff", fontWeight: 800, marginBottom: 4 }}>{concert.tour}</div>}
-                <button onClick={() => onNavigate({ view: 'venues', venue: concert.venue })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: concert.tour ? 14 : 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button>
-                <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{concert.city}, {concert.country}</div>
+                {concert.venue ? <button onClick={() => onNavigate({ view: 'venues', venue: concert.venue })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: concert.tour ? 14 : 16, color: "#c4c2f0", fontWeight: 600, textAlign: "left" }}>{concert.venue}{concert.room ? ` · ${concert.room}` : ""} ›</button> : <div style={{ color: '#6b6a8f', fontSize: 13 }}>Venue to be confirmed</div>}
+                <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>{[concert.city, concert.country].filter(Boolean).join(', ')}</div>
               </>
             )}
           </div>
@@ -2688,7 +2694,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                           {songs.length > 0
-                            ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {songs.length}</span>
+                            ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {getSongList(songs).length}</span>
                             : <span style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>+ setlist</span>}
                           <span style={{ color: '#4a4870', fontSize: 10, lineHeight: 1 }}>{isOpen ? '▴' : '▾'}</span>
                         </div>
@@ -3307,7 +3313,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         {songs.length > 0
-                          ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {songs.length}</span>
+                          ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {getSongList(songs).length}</span>
                           : <span style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>+ setlist</span>}
                         <span style={{ color: '#4a4870', fontSize: 10, lineHeight: 1 }}>{isOpen ? '▴' : '▾'}</span>
                       </div>
@@ -4888,7 +4894,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             topStand && ["USUALLY", String(topStand[0]).toUpperCase()],
           ].filter(Boolean);
 
-          const copyText = () => {
+          const copyText = async () => {
             let lines;
             if (shareTab === 'numbers') {
               lines = [title, 'BY THE NUMBERS', '', ...numbersRows.map(([k, v]) => `${k}: ${v}`), ...numbersExtra.map(([k, v]) => `${k}: ${v}`), avgRating ? `AVG RATING: ★ ${avgRating}` : null];
@@ -4897,8 +4903,13 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             } else {
               lines = [title, `${f.shows.length} shows together · ${span}`, '', ...picked.map(c => `${c.date.slice(0, 4)}  ${c.artist}`), overflow > 0 ? `+ ${overflow} more` : null];
             }
-            navigator.clipboard?.writeText(lines.filter(l => l !== null).join('\n'));
-            onNotify('Copied share text');
+            try {
+              if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+              await navigator.clipboard.writeText(lines.filter(l => l !== null).join('\n'));
+              onNotify('Copied share text');
+            } catch {
+              onNotify('Could not copy text. Allow clipboard access and try again.');
+            }
           };
 
           const copyImage = async () => {
@@ -8333,6 +8344,10 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   const [friendInput, setFriendInput] = useState('')
   const [showFriendPicker, setShowFriendPicker] = useState(false)
   const [errors, setErrors] = useState({})
+  const invalidFieldRef = useRef(null)
+  useEffect(() => { invalidFieldRef.current?.focus() }, [errors])
+  const requiredField = key => key === "artist" || (!form.wishlist && (key === "date" || form.attendanceMode !== "online"))
+  const fieldProps = key => ({ id: `add-show-${key}`, "aria-label": key === "artist" ? "Artist or festival" : key, "aria-required": requiredField(key), "aria-invalid": !!errors[key], "aria-describedby": errors[key] ? "add-show-errors" : undefined, ref: Object.keys(errors)[0] === key ? invalidFieldRef : undefined })
   const [sfStatus, setSfStatus] = useState(null)
   const [sfMsg, setSfMsg] = useState('')
   const [openCards, setOpenCards] = useState([])
@@ -8496,9 +8511,11 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
     fontFamily: "'DM Mono', monospace", fontSize: 13, boxSizing: 'border-box'
   }
   const errStyle = { ...inputStyle, border: '1px solid #f472b6' }
-  const fieldLabel = (text) => (
-    <div style={{ fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{text}</div>
-  )
+  const fieldLabel = (text) => {
+    const key = /^(Artist|Festival name)/.test(text) ? 'artist' : /^(Start date|Date)/.test(text) ? 'date' : /^(Venue(?: name)?(?: \*)?$|Festival site|Festival grounds)/.test(text) ? 'venue' : /^City/.test(text) ? 'city' : /^Country/.test(text) ? 'country' : null
+    const label = key ? text.replace(/ \*$/, '') + (requiredField(key) ? ' *' : ' (optional)') : text
+    return <label htmlFor={key ? 'add-show-' + key : undefined} style={{ display: 'block', fontSize: 11, color: '#6b6a8f', marginBottom: 6, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</label>
+  }
 
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort()
 
@@ -8529,6 +8546,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
             setShowChoices(false);
           }} />
         </div>}
+        {!showChoices && Object.keys(errors).length > 0 && <p id="add-show-errors" role="alert" style={{ color: '#f472b6', margin: '12px 20px' }}>Please complete: {Object.keys(errors).join(', ')}.</p>}
         {!showChoices && <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} />}
         <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1, display: showChoices ? 'none' : undefined }}>
         {editorTab === 'setlist' && form.type !== 'festival' && <div>
@@ -8657,14 +8675,14 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 </button>
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   {fieldLabel('Artist *')}
-                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+                  <input {...fieldProps('artist')} value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
                   {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
                 {(form.wishlist || quickUpcoming) ? (
-                  <div style={{ marginBottom: 10 }}>{fieldLabel(form.wishlist ? 'Date (if known)' : 'Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                  <div style={{ marginBottom: 10 }}>{fieldLabel(form.wishlist ? 'Date (if known)' : 'Date *')}<input type="date" {...fieldProps('date')} value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                    <div>{fieldLabel(form.wishlist ? 'Date (optional)' : 'Date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                    <div>{fieldLabel(form.wishlist ? 'Date (optional)' : 'Date *')}<input type="date" {...fieldProps('date')} value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                     <div>{fieldLabel('Rating')}<div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}><StarRating value={form.rating} onChange={v => update('rating', v)} max={settings.ratingSystem || 5} /></div></div>
                   </div>
                 )}
@@ -8699,12 +8717,12 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
 {!form.wishlist && form.attendanceMode !== 'online' && <>
                 {fieldLabel('Venue *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
-                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
+                  <input {...fieldProps('venue')} value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
-                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input {...fieldProps('city')} value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input {...fieldProps('country')} value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 </>}
                 {form.wishlist ? null : quickUpcoming
@@ -8736,21 +8754,21 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 </button>
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   {fieldLabel('Festival name *')}
-                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={errors.artist ? errStyle : inputStyle} />
+                  <input {...fieldProps('artist')} value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={errors.artist ? errStyle : inputStyle} />
                   {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                  <div>{fieldLabel('Start date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Start date *')}<input type="date" {...fieldProps('date')} value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                   <div>{fieldLabel('End date')}<input type="date" value={form.endDate || ''} onChange={e => update('endDate', e.target.value)} style={inputStyle} /></div>
                 </div>
                 {fieldLabel('Festival site *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
-                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Festival site / grounds" style={errors.venue ? errStyle : inputStyle} />
+                  <input {...fieldProps('venue')} value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Festival site / grounds" style={errors.venue ? errStyle : inputStyle} />
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
-                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input {...fieldProps('city')} value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input {...fieldProps('country')} value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 {form.wishlist ? null : quickUpcoming
                   ? <div style={{ fontSize: 11, color: '#38bdf8', fontFamily: "'DM Mono', monospace", textAlign: 'center', padding: '8px 0' }}>📅 upcoming festival — acts & extras unlock after the date</div>
@@ -8767,11 +8785,11 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
               {card('Festival', <>
                 {fieldLabel('Festival name *')}
                 <div style={{ marginBottom: 10, position: 'relative' }}>
-                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={{ ...(errors.artist ? errStyle : inputStyle) }} />
+                  <input {...fieldProps('artist')} value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Festival name" style={{ ...(errors.artist ? errStyle : inputStyle) }} />
                   {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                  <div>{fieldLabel('Start date *')}<input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
+                  <div>{fieldLabel('Start date *')}<input type="date" {...fieldProps('date')} value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} /></div>
                   <div>{fieldLabel('End date')}<input type="date" value={form.endDate || ''} onChange={e => update('endDate', e.target.value)} style={inputStyle} /></div>
                 </div>
                 {fieldLabel('Edition / year')}
@@ -8781,12 +8799,12 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue === v.name && form.city === v.city && form.country === v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}</button>; })}</div>}
                 {fieldLabel('Festival grounds')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
-                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Festival site / grounds" style={errors.venue ? errStyle : inputStyle} />
+                  <input {...fieldProps('venue')} value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Festival site / grounds" style={errors.venue ? errStyle : inputStyle} />
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
-                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input {...fieldProps('city')} value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input {...fieldProps('country')} value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
               </>)}
               {foldCard('Acts seen', <FestivalActsSection acts={form.acts || []} onChange={v => update('acts', v)} startDate={form.date} endDate={form.endDate} ratingMax={settings.ratingSystem || 5} allArtists={allArtists} />, (form.acts || []).length > 0)}
@@ -8801,12 +8819,12 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
               {card('Show', <>
                 <div style={{ marginBottom: 10, position: 'relative' }}>
                   {fieldLabel('Artist *')}
-                  <input value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
+                  <input {...fieldProps('artist')} value={form.artist} onChange={e => handleArtistChange(e.target.value)} onBlur={() => setTimeout(() => setArtistSuggestions([]), 150)} placeholder="Artist name" style={errors.artist ? errStyle : inputStyle} />
                   {artistSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{artistSuggestions.map(a => <button key={a} onMouseDown={() => selectArtist(a)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{a}</button>)}</div>}
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   {fieldLabel(form.wishlist ? 'Date (optional)' : 'Date *')}
-                  <input type="date" value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
+                  <input type="date" {...fieldProps('date')} value={form.date} onChange={e => update('date', e.target.value)} style={errors.date ? errStyle : inputStyle} />
                 </div>
                 <div style={{ marginBottom: 12 }}>
                   <button
@@ -8841,13 +8859,13 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 {(settings.savedVenues || []).length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>{(settings.savedVenues || []).map((v, i) => { const active = form.venue===v.name && form.city===v.city && form.country===v.country; return <button key={i} onClick={() => setForm(f => ({ ...f, venue: v.name, room: v.room||f.room, city: v.city, country: v.country }))} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: active ? '#a78bfa' : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? '#a78bfa' : '#2e2e50'}`, fontWeight: active ? 700 : 400 }}>{v.name}{v.room ? ` · ${v.room}` : ''}</button>; })}</div>}
                 {fieldLabel('Venue name *')}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
-                  <input value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
+                  <input {...fieldProps('venue')} value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
                 </div>
                 <input value={form.room} onChange={e => update('room', e.target.value)} placeholder="Room / stage (optional)" style={{ ...inputStyle, marginBottom: 8 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
-                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('City *')}<input {...fieldProps('city')} value={form.city} onChange={e => handleCityChange(e.target.value)} onBlur={() => setTimeout(() => setCitySuggestions([]), 150)} placeholder="City" style={errors.city ? errStyle : inputStyle} />{citySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{citySuggestions.map(v => <button key={v} onMouseDown={() => selectCity(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{cityBook[v] ? ` · ${cityBook[v]}` : ''}</span></button>)}</div>}</div>
+                  <div style={{ position: 'relative' }}>{fieldLabel('Country *')}<input {...fieldProps('country')} value={form.country} onChange={e => handleCountryChange(e.target.value)} onBlur={() => setTimeout(() => setCountrySuggestions([]), 150)} placeholder="Country" style={errors.country ? errStyle : inputStyle} />{countrySuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{countrySuggestions.map(v => <button key={v} onMouseDown={() => selectCountry(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}</button>)}</div>}</div>
                 </div>
                 {fieldLabel('Venue size')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>{(settings.venueSizes||[]).map(vs => <button key={vs} onClick={() => update('venueSize', form.venueSize===vs ? null : vs)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: form.venueSize===vs ? '#a78bfa' : '#0c0c14', color: form.venueSize===vs ? '#0c0c14' : '#6b6a8f', border: `1px solid ${form.venueSize===vs ? '#a78bfa' : '#2e2e50'}`, fontWeight: form.venueSize===vs ? 700 : 400 }}>{vs}</button>)}<AddNewTagPill onAdd={v => { update('venueSize', v); setPendingTag({ value: v, settingsKey: 'venueSizes', label: 'venue sizes' }); }} /></div>
@@ -9318,6 +9336,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   const [exportScope, setExportScope] = useState('all');
+  const [exportSnapshot, setExportSnapshot] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
   const [importMode, setImportMode] = useState('replace');
   const [storageInfo, setStorageInfo] = useState(null);
@@ -9361,9 +9380,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   })();
 
   // * Called by every export path so the status above stays honest.
-  const recordExport = () => {
+  const recordExport = (scope = exportScope, count = concerts.length) => {
+    if (scope !== 'all') return;
     onUpdate('lastExportAt', new Date().toISOString());
-    onUpdate('lastExportCount', concerts.length);
+    onUpdate('lastExportCount', count);
   };
 
   const loadStorageInfo = async () => {
@@ -9697,7 +9717,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const toggleGroupFriend = (f) => setNewGroupFriends(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
 
   const handleCsvExport = () => {
-    recordExport();
     const headers = ['ID','Date','Artist','Venue','Room','City','Country','Type','Tour','Genre','SubGenre','Language','Rating','TicketPrice','TicketItems','Merch','Favorite','Tags','CriedSong','Friends','Solo','VenueSize','Notes'];
     const rows = exportRows.map(c => [
       c.id, c.date, c.artist, c.venue, c.room||'', c.city, c.country, c.type, c.tour||'',
@@ -9712,10 +9731,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download='settracker.csv'; a.click();
     URL.revokeObjectURL(url);
+    recordExport();
   };
 
   const handleXlsxExport = async () => {
-    recordExport();
     const XLSX = await loadXlsx();
     const wb = XLSX.utils.book_new();
 
@@ -9730,22 +9749,36 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       Merch: (c.merch||[]).map(m => `${m.item||'Item'}:${m.price||0}`).join('; '),
       Favorite: c.favorite ? 'yes' : '', Tags: (c.tags||[]).join('; '), CriedSong: c.criedSong || '',
       Friends: getFriends(c).join('; '), Solo: c.solo ? 'yes' : '',
-      VenueSize: c.venueSize || '', Notes: (c.notes || '').replace(/\n/g, ' '),
+      VenueSize: c.venueSize || '', Notes: c.notes || '',
+      Wishlist: c.wishlist ? 'yes' : '', EndDate: c.endDate || '',
+      AttendanceMode: c.attendanceMode || 'in_person', OnlineType: c.onlineType || '', Platform: c.platform || '',
+      TicketType: c.ticketType || '', TicketAddons: JSON.stringify(c.ticketAddons || []),
+      OtherCosts: JSON.stringify(c.otherCosts || []), Acts: JSON.stringify(c.acts || []),
     }))), 'Shows');
+
+    // Preserve fields without spreadsheet columns, including photo references.
+    const extraRows = [];
+    exportRows.forEach(c => {
+      const json = JSON.stringify(c);
+      for (let offset = 0; offset < json.length; offset += 30000) extraRows.push({ ConcertID: c.id, Part: offset / 30000, JSON: json.slice(offset, offset + 30000) });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extraRows), 'Record details');
 
     // Sheet 2: Setlists (main artist + support acts, each song its own row)
     const setlistRows = [];
-    concerts.forEach(c => {
-      getSongList(c.setlist).forEach((s, i) => setlistRows.push({
+    exportRows.forEach(c => {
+      normalizeSetlistRows(c.setlist).forEach((s, i) => setlistRows.push({
         ConcertID: c.id, Date: c.date, MainArtist: c.artist,
         Performer: c.artist, IsSupport: 'no',
         Position: i + 1, Song: getSongName(s), Note: getSongInfo(s) || '',
+        RowType: isSectionRow(s) ? 'section' : 'song', SectionLabel: isSectionRow(s) ? s.label : '', Metadata: JSON.stringify(typeof s === 'object' ? s : {}),
       }));
       Object.entries(c.supportSetlists || {}).forEach(([artist, songs]) =>
-        getSongList(songs).forEach((s, i) => setlistRows.push({
+        normalizeSetlistRows(songs).forEach((s, i) => setlistRows.push({
           ConcertID: c.id, Date: c.date, MainArtist: c.artist,
           Performer: artist, IsSupport: 'yes',
           Position: i + 1, Song: getSongName(s), Note: getSongInfo(s) || '',
+          RowType: isSectionRow(s) ? 'section' : 'song', SectionLabel: isSectionRow(s) ? s.label : '', Metadata: JSON.stringify(typeof s === 'object' ? s : {}),
         }))
       );
     });
@@ -9753,27 +9786,29 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
     // Sheet 3: Support acts
     const supportRows = [];
-    concerts.forEach(c => (c.support || []).forEach(s => supportRows.push({
+    exportRows.forEach(c => (c.support || []).forEach(s => supportRows.push({
       ConcertID: c.id, Date: c.date, MainArtist: c.artist,
       SupportAct: getSupportName(s), Role: getSupportRole(s),
     })));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(supportRows.length ? supportRows : [{}]), 'Support acts');
 
     XLSX.writeFile(wb, 'settracker.xlsx');
+    recordExport();
   };
 
   const handleExport = async () => {
     try {
-      recordExport();
       setExportData(JSON.stringify(exportRows, null, 2));
+      setExportSnapshot({ scope: exportScope, count: exportRows.length });
     } catch (e) {
       setExportStatus("error");
     }
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     try {
-      navigator.clipboard.writeText(exportData);
+      await navigator.clipboard.writeText(exportData);
+      recordExport(exportSnapshot?.scope, exportSnapshot?.count);
       setExportStatus("copied");
       onNotify('Backup copied');
       setTimeout(() => setExportStatus(null), 2000);
@@ -9865,6 +9900,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   // * Import used to apply the moment you picked a file. Now every path stages here
   // * first so you can see what would change and back out — the one destructive
   // * action in this section that had no confirmation at all.
+  const hasImportChanges = (existing, incoming) => JSON.stringify(normalizeConcertForImport(existing)) !== JSON.stringify(normalizeConcertForImport({ ...existing, ...incoming }));
   const stageImport = (rows) => {
     const valid = rows.map(normalizeConcertForImport).filter(Boolean);
     const skipped = rows.length - valid.length;
@@ -9875,7 +9911,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     }
     const byId = new Map(concerts.map(c => [c.id, c]));
     const isNew = c => !byId.has(c.id);
-    const isChanged = c => byId.has(c.id) && JSON.stringify(byId.get(c.id)) !== JSON.stringify({ ...byId.get(c.id), ...c });
+    const isChanged = c => byId.has(c.id) && hasImportChanges(byId.get(c.id), c);
     setImportStatus(null); setImportMessage(""); setImportReport(null);
     setPendingImport({
       rows: valid,
@@ -9893,8 +9929,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     const valid = rows.map(normalizeConcertForImport).filter(Boolean);
     const skipped = rows.length - valid.length;
     if (valid.length === 0) { setImportStatus("error"); setImportMessage("No valid concerts found — each row needs at least an Artist and Date."); return; }
-    const existingIds = new Set(concerts.map(c => c.id));
-    const toWrite = mode === 'merge' ? valid.filter(c => !existingIds.has(c.id)) : valid;
+    const existingById = new Map(concerts.map(c => [c.id, c]));
+    const toWrite = valid.filter(c => !existingById.has(c.id) || (mode !== 'merge' && hasImportChanges(existingById.get(c.id), c)));
     let failed = 0;
     for (const c of toWrite) {
       const result = await onSaveConcert(c);
@@ -9915,6 +9951,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   const handleImport = async () => {
+    setImportReport(null);
     try {
       let parsed;
       try { parsed = JSON.parse(importText); } catch { setImportStatus("error"); setImportMessage("Couldn't read this as JSON — check for missing brackets or commas."); return; }
@@ -9997,7 +10034,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
         // Merge support acts from "Support acts" sheet into existing concerts
         const supportSheet = wb.Sheets['Support acts'];
-        if (supportSheet) {
+        if (supportSheet && !wb.Sheets['Shows']) {
           const rows = XLSX.utils.sheet_to_json(supportSheet);
           const byId = {};
           rows.forEach(r => {
@@ -10008,19 +10045,17 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             if (!byId[id]) byId[id] = [];
             byId[id].push({ name, role });
           });
-          let updated = 0;
+          const updates = [];
           for (const concert of concerts) {
             const incoming = byId[concert.id];
             if (!incoming) continue;
             const existingNames = (concert.support || []).map(s => getSupportName(s).toLowerCase());
             const toAdd = incoming.filter(a => !existingNames.includes(a.name.toLowerCase()));
             if (toAdd.length === 0) continue;
-            await onSaveConcert({ ...concert, support: [...(concert.support || []), ...toAdd] });
-            updated++;
+            updates.push({ ...concert, support: [...(concert.support || []), ...toAdd] });
           }
-          if (updated > 0) {
-            setImportStatus("success");
-            setImportMessage(`Updated support acts for ${updated} concert${updated !== 1 ? 's' : ''}.`);
+          if (updates.length > 0) {
+            stageImport(updates);
           } else {
             setImportStatus("success");
             setImportMessage("All support acts were already up to date — nothing to add.");
@@ -10032,13 +10067,21 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         const showsSheet = wb.Sheets['Shows'];
         if (!showsSheet) { setImportStatus("error"); setImportMessage("No recognised sheet found. Expected 'Support acts' or 'Shows'."); return; }
         const rows = XLSX.utils.sheet_to_json(showsSheet);
+        const detailRows = wb.Sheets['Record details'] ? XLSX.utils.sheet_to_json(wb.Sheets['Record details']) : [];
+        const details = new Map();
+        for (const r of detailRows) {
+          if (!details.has(String(r.ConcertID))) details.set(String(r.ConcertID), []);
+          details.get(String(r.ConcertID)).push(r);
+        }
+        const metadata = id => details.has(String(id)) ? JSON.parse(details.get(String(id)).sort((a,b) => Number(a.Part) - Number(b.Part)).map(r => r.JSON).join('')) : {};
         const parsed = rows.map(r => ({
+          ...metadata(r.ID),
           id: r.ID || `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           date: excelDateToIso(r.Date, XLSX), artist: r.Artist || null, venue: r.Venue || '', room: r.Room || null,
           city: r.City || '', country: r.Country || '', type: r.Type || 'concert',
           tour: r.Tour || null, genre: r.Genre || null, subgenre: r.Subgenre || null,
           language: r.Language ? r.Language.split('; ').filter(Boolean) : [],
-          rating: r.Rating ? parseInt(r.Rating) : null,
+          rating: r.Rating ? Number(r.Rating) : null,
           ticketPrice: r.TicketPrice ? parseFloat(r.TicketPrice) : null,
           tickets: r.TicketItems ? String(r.TicketItems).split('; ').filter(Boolean).map(s => { const idx = s.lastIndexOf(':'); return { name: idx > -1 ? s.slice(0, idx) : s, price: idx > -1 ? parseFloat(s.slice(idx + 1)) || 0 : 0 }; }) : [],
           merch: r.Merch ? String(r.Merch).split('; ').filter(Boolean).map(s => { const idx = s.lastIndexOf(':'); return { item: idx > -1 ? s.slice(0, idx) : s, price: idx > -1 ? parseFloat(s.slice(idx + 1)) || 0 : 0 }; }) : [],
@@ -10046,7 +10089,28 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           friends: r.Friends ? r.Friends.split('; ').filter(Boolean) : [],
           solo: r.Solo === 'yes', venueSize: r.VenueSize || null, notes: r.Notes || null,
           seenAs: r.SeenAs || null, support: [],
+          wishlist: r.Wishlist === 'yes', endDate: excelDateToIso(r.EndDate, XLSX) || '',
+          attendanceMode: r.AttendanceMode || 'in_person', onlineType: r.OnlineType || '', platform: r.Platform || '',
+          ticketType: r.TicketType || null, ticketAddons: r.TicketAddons ? JSON.parse(r.TicketAddons) : [],
+          otherCosts: r.OtherCosts ? JSON.parse(r.OtherCosts) : [], acts: r.Acts ? JSON.parse(r.Acts) : [],
         }));
+        const supportRows = supportSheet ? XLSX.utils.sheet_to_json(supportSheet) : [];
+        const songRows = wb.Sheets['Setlists'] ? XLSX.utils.sheet_to_json(wb.Sheets['Setlists']) : [];
+        parsed.forEach(concert => {
+          concert.support = supportRows.filter(r => String(r.ConcertID) === String(concert.id) && r.SupportAct)
+            .map(r => ({ name: r.SupportAct, role: r.Role || 'support' }));
+          concert.setlist = [];
+          concert.supportSetlists = Object.create(null);
+          songRows.filter(r => String(r.ConcertID) === String(concert.id) && (r.Song || r.RowType === 'section'))
+            .sort((a, b) => Number(a.Position) - Number(b.Position))
+            .forEach(r => {
+              const extra = r.Metadata ? JSON.parse(r.Metadata) : {};
+              const song = r.RowType === 'section' ? { ...extra, type: 'section', label: r.SectionLabel || '' } : r.Note || Object.keys(extra).length ? { ...extra, name: r.Song, info: r.Note || '' } : r.Song;
+              if (r.IsSupport === 'yes' && r.Performer) {
+                (concert.supportSetlists[r.Performer] ||= []).push(song);
+              } else concert.setlist.push(song);
+            });
+        });
         stageImport(parsed);
       } catch (err) {
         setImportStatus("error");
@@ -10881,7 +10945,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             <div style={{ padding: "14px 16px", borderBottom: "1px solid #1f1f35" }}>
               <div style={{ marginBottom: 10 }}>
                 <div style={{ color: "#c4c2f0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>Export</div>
-                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Download a copy of your concerts</div>
+                <div style={{ fontSize: 10, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Export concert records. Settings and photo files are not included.</div>
               </div>
               {/* Scope — everything, or a slice worth sharing on its own. */}
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
@@ -10903,7 +10967,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={handleXlsxExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "#1a1a30", border: "1px solid #a78bfa", color: "#a78bfa", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>↓ XLSX</button>
                 {!exportData
-                  ? <button onClick={handleExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>↓ JSON</button>
+                  ? <button onClick={handleExport} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #2e2e50", color: "#c4c2f0", fontFamily: "'DM Mono', monospace" }}>Preview JSON</button>
                   : <button onClick={() => setExportData(null)} style={{ flex: 1, padding: "9px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>Close</button>
                 }
               </div>
@@ -11005,7 +11069,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 {importStatus === "error" && <div style={{ fontSize: 11, color: "#f472b6", marginBottom: 8, lineHeight: 1.5 }}>{importMessage}</div>}
                 {importReport && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-                    {[["Rows", importReport.total], ["Added", importReport.imported], ["Skipped", importReport.skipped], ["Failed", importReport.failed]].map(([label, value]) => (
+                    {[["Rows", importReport.total], ["Saved", importReport.imported], ["Skipped", importReport.skipped], ["Failed", importReport.failed]].map(([label, value]) => (
                       <div key={label} style={{ background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "7px 4px", textAlign: "center" }}>
                         <div style={{ color: label === "Failed" && value > 0 ? "#f472b6" : "#a78bfa", fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{value}</div>
                         <div style={{ color: "#4a4870", fontFamily: "'DM Mono', monospace", fontSize: 8, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 3 }}>{label}</div>
@@ -11445,8 +11509,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   }
   const matchesYear = c => filterYears.length === 0 || filterYears.includes(c.date.slice(0,4))
 
-  const filtered = concerts.filter(c => {
-    if (isWish(c)) return false
+  const matchingShows = concerts.filter(c => {
     if (!matchesYear(c)) return false
     if (!matchesType(c)) return false
     if (filterFriend !== 'all' && !getFriends(c).includes(filterFriend)) return false
@@ -11478,7 +11541,8 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     return b.date.localeCompare(a.date)
   })
 
-  const wishlist = concerts.filter(c => isWish(c) && matchesType(c))
+  const filtered = matchingShows.filter(c => !isWish(c))
+  const wishlist = matchingShows.filter(isWish)
   const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
   const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
   const combinedShows = filterStatus.length === 0
@@ -11725,7 +11789,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
           <button onClick={() => setView('settings')} aria-label="Settings" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: view === 'settings' ? '#a78bfa' : '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: '6px 4px', lineHeight: 1, letterSpacing: '1px' }}>⋯</button>
           {isSummaryHeader && (
             <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-            {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isPastDate(c.date)).length} upcoming
+            {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isWish(c) && !isPastDate(c.date)).length} upcoming
             </div>
           )}
         </div>
@@ -11897,10 +11961,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                 onOpen={handleOpenConcert}
               />
             )}
-            {concerts.length > 0 && !showCalendar && filtered.length === 0 && (
+            {concerts.length > 0 && !showCalendar && combinedShows.length === 0 && (
               <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
-            {!showCalendar && filtered.length > 0 && (
+            {!showCalendar && combinedShows.length > 0 && (
               <div style={{ marginTop: 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
                   <div style={{ marginBottom: 6 }}>

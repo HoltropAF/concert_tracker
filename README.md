@@ -54,15 +54,15 @@ Node.js lets you run the project on your computer.
 1. Go to **github.com** and create a free account if you don't have one
 2. Go to [github.com/HoltropAF/concert_tracker](https://github.com/HoltropAF/concert_tracker)
 3. Click **Fork** (top right) → click **Create fork** — this makes a copy under your own account
-4. On your fork, click the green **Code** button → **Download ZIP**
-5. Unzip it somewhere easy to find (e.g. your Desktop)
-6. In PowerShell/Terminal, navigate into the folder:
+4. Install [Git](https://git-scm.com/downloads) if it is not already installed.
+5. In PowerShell/Terminal, open the folder where you want the project and clone your fork:
 
    ```sh
-   cd C:\Users\YOUR_NAME\Desktop\concert_tracker-main
+   git clone https://github.com/YOUR_GITHUB_USERNAME/concert_tracker.git
+   cd concert_tracker
    ```
 
-   Replace `YOUR_NAME` with your actual Windows username. On Mac: `cd ~/Desktop/concert_tracker-main`
+   Replace `YOUR_GITHUB_USERNAME` with your GitHub username. Cloning preserves the fork's history and sets up its remote automatically.
 
 7. Install dependencies (this downloads everything the app needs):
 
@@ -117,15 +117,12 @@ Vercel (the next step) needs your code to be on GitHub to deploy it.
 1. Run these one by one in PowerShell/Terminal:
 
    ```sh
-   git init
    git add .
-   git commit -m "first commit"
-   git branch -M main
-   git remote add origin https://github.com/YOUR_GITHUB_USERNAME/concert_tracker.git
-   git push -u origin main
+   git commit -m "Customize settracker"
+   git push
    ```
 
-   Replace `YOUR_GITHUB_USERNAME` with your actual GitHub username.
+   If you have not changed any files, there is nothing to commit or push; continue to deployment. Keep `.env` private and do not commit credentials.
 
 2. If it asks for a password, you need a **Personal Access Token** (GitHub no longer accepts plain passwords):
 

@@ -12,7 +12,10 @@ export default function WelcomeFlow({ onSignIn, onGuest, onInstall, installAvail
   const [email, setEmail] = useState('')
   const [sentEmail, setSentEmail] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    return params.has('error') ? 'This email link is invalid or has expired. Choose Log in to request a fresh link.' : ''
+  })
   const [installMessage, setInstallMessage] = useState('')
   const [retryAt, setRetryAt] = useState(0)
   const [remaining, setRemaining] = useState(0)
@@ -62,10 +65,11 @@ export default function WelcomeFlow({ onSignIn, onGuest, onInstall, installAvail
     {path === 'new' && step !== 'choose' && <div className="wf-progress" aria-label="Setup progress"><span className={step === 'install' ? 'current' : ''}>{step === 'install' ? '1' : '✓'} Install · optional</span><span className={step === 'email' ? 'current' : ''}>2 Email</span><span className={step === 'sent' ? 'current' : ''}>3 Open link</span></div>}
     <h1 ref={heading} tabIndex={-1}>{step === 'choose' ? 'Your next great night starts here.' : step === 'install' ? 'Keep settracker close' : step === 'sent' ? 'Check your inbox' : path === 'new' ? 'Create your concert log' : 'Welcome back'}</h1>
     {step === 'choose' && <>
-      <p>New here, or picking up where you left off?</p>
+      <p>Create an account on this website with just your email. No GitHub, Vercel or database setup is needed to use this hosted app.</p>
       <button className="wf-choice" onClick={() => choose('new')}><strong>I’m new <span aria-hidden="true">→</span></strong><small>Get set up, install the app, and start your log.</small></button>
       <button className="wf-choice" onClick={() => choose('returning')}><strong>Log in <span aria-hidden="true">→</span></strong><small>Get back to your shows with an email link.</small></button>
       {onGuest && <button className="wf-link" onClick={onGuest}>Explore a demo first</button>}
+      <p className="wf-note">Prefer to manage your own hosting and database? <a href="/setup.html">Set up a separate private copy</a>. Accounts and data stay with the website where you create them.</p>
     </>}
     {step === 'install' && <>
       <p>Settracker installs straight from this website. No app-store download or extra software needed. You can also use it in your browser.</p>

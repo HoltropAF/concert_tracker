@@ -225,6 +225,7 @@ export function useAuth() {
 export function useConcerts(userId) {
   const [concerts, setConcerts] = useState([])
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured || !userId) return
@@ -248,42 +249,45 @@ export function useConcerts(userId) {
 
   const loadConcerts = async () => {
     if (!isSupabaseConfigured || !userId) return
-    const { data, error } = await supabase
-      .from('concerts')
-      .select('id, data')
-      .eq('user_id', userId)
-      .order('id')
+    try {
+      const { data, error } = await supabase
+        .from('concerts')
+        .select('id, data')
+        .eq('user_id', userId)
+        .order('id')
 
-    if (error) {
-      console.error('Error loading concerts:', error)
+      if (error) throw error
+      setLoadError(null)
+
+      if (!data || data.length === 0) {
+        // * First login — seed from built-in data if any exists in src/lib/data.js
+        if (SEED_DATA.length > 0) await seedConcerts(userId)
+        else setConcerts([])
+        setLoaded(true)
+        return
+      }
+
+      if (SEED_DATA.length === 0) {
+        // * No hardcoded seed — concerts are fully self-contained in the DB
+        setConcerts(data.map(r => normalizeConcert(r.data, r.id)).sort((a, b) => b.date.localeCompare(a.date)))
+      } else {
+        // * Merge: SEED_DATA is source of truth for base fields; DB wins for user edits
+        const userFields = ['rating', 'merch', 'notes', 'friends', 'solo']
+        const dbMap = Object.fromEntries(data.map(r => [r.id, r.data]))
+        const merged = SEED_DATA.map(seed => {
+          const saved = dbMap[seed.id]
+          if (!saved) return seed
+          const out = { ...seed }
+          userFields.forEach(f => { if (saved[f] !== undefined) out[f] = saved[f] })
+          return normalizeConcert(out, seed.id)
+        })
+        setConcerts(merged)
+      }
       setLoaded(true)
-      return
-    }
-
-    if (!data || data.length === 0) {
-      // * First login — seed from built-in data if any exists in src/lib/data.js
-      if (SEED_DATA.length > 0) await seedConcerts(userId)
+    } catch (error) {
+      setLoadError(error)
       setLoaded(true)
-      return
     }
-
-    if (SEED_DATA.length === 0) {
-      // * No hardcoded seed — concerts are fully self-contained in the DB
-      setConcerts(data.map(r => normalizeConcert(r.data, r.id)).sort((a, b) => b.date.localeCompare(a.date)))
-    } else {
-      // * Merge: SEED_DATA is source of truth for base fields; DB wins for user edits
-      const userFields = ['rating', 'merch', 'notes', 'friends', 'solo']
-      const dbMap = Object.fromEntries(data.map(r => [r.id, r.data]))
-      const merged = SEED_DATA.map(seed => {
-        const saved = dbMap[seed.id]
-        if (!saved) return seed
-        const out = { ...seed }
-        userFields.forEach(f => { if (saved[f] !== undefined) out[f] = saved[f] })
-        return normalizeConcert(out, seed.id)
-      })
-      setConcerts(merged)
-    }
-    setLoaded(true)
   }
 
   const seedConcerts = async (uid) => {
@@ -333,7 +337,7 @@ export function useConcerts(userId) {
     return { error: null }
   }, [userId])
 
-  return { concerts, loaded, saveConcert, deleteConcert, reload: loadConcerts }
+  return { concerts, loaded, loadError, saveConcert, deleteConcert, reload: loadConcerts }
 }
 
 // * All user preferences as one object. Returns
@@ -347,6 +351,7 @@ export function useConcerts(userId) {
 // ! saveSetting(key, value) does that spread for you and is the safer default.
 export function useSettings(userId) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [loadError, setLoadError] = useState(null)
   // * Distinguishes "these are still the defaults" from "these are really yours".
   // * Deliberately NOT used to block rendering — only to defer decisions that
   // * would be wrong under defaults, like whether to show the onboarding tour.
@@ -365,24 +370,29 @@ export function useSettings(userId) {
       setSettings(merged)
       setLoaded(true)
     }
-    supabase
-      .from('settings')
-      .select('data')
-      .eq('user_id', userId)
-      .single()
-      .then(({ data }) => {
-        if (data?.data) {
-          const merged = normalizeSettings(data.data)
-          settingsRef.current = merged
-          setSettings(merged)
-          writeCache('settings', userId, merged)
-        }
-        setLoaded(true)
-      })
-      // * No settings row yet (first login) is a normal outcome, not a failure —
-      // * the defaults already in state are the right answer.
-      .catch(() => setLoaded(true))
+    loadSettings()
   }, [userId])
+
+  const loadSettings = async () => {
+    if (!isSupabaseConfigured || !userId) return
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('data')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (error) throw error
+      const merged = normalizeSettings(data?.data)
+      settingsRef.current = merged
+      setSettings(merged)
+      writeCache('settings', userId, merged)
+      setLoadError(null)
+      setLoaded(true)
+    } catch (error) {
+      setLoadError(error)
+      setLoaded(true)
+    }
+  }
 
   const saveSettings = useCallback(async (next) => {
     if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
@@ -405,5 +415,5 @@ export function useSettings(userId) {
     return saveSettings({ ...settingsRef.current, [key]: value })
   }, [saveSettings])
 
-  return { settings, settingsLoaded: loaded, saveSetting, saveSettings }
+  return { settings, settingsLoaded: loaded, loadError, reload: loadSettings, saveSetting, saveSettings }
 }

@@ -10,6 +10,7 @@
 // ! numeric lat/lng are silently skipped.
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
+import {validCoordinates} from '../lib/venueCoordinates'
 import 'leaflet/dist/leaflet.css'
 
 // Google-Maps-style pin markers built from CSS, not raster images (keeps the
@@ -53,7 +54,7 @@ const ICONS = {
 // showZoomControl: show +/- buttons even when the map is otherwise static.
 // clickOpensMaps: tapping a pin opens Google Maps for that point instead of
 // showing an in-app popup (used for the single-venue preview/expanded view).
-export default function VenueMap({ points, onSelect, height = 360, focus = null, interactive = true, autoOpenName = null, fitPoints = null, showZoomControl = false, clickOpensMaps = false }) {
+export default function VenueMap({ points, onSelect, onPick = null, height = 360, focus = null, interactive = true, autoOpenName = null, fitPoints = null, showZoomControl = false, clickOpensMaps = false }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
 
@@ -78,15 +79,25 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
     mapRef.current = map
-    return () => { map.remove(); mapRef.current = null }
+    const observer = new ResizeObserver(() => map.invalidateSize({pan:false}))
+    observer.observe(containerRef.current)
+    return () => { observer.disconnect(); map.remove(); mapRef.current = null }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !onPick) return
+    const pick = event => onPick({lat:event.latlng.lat,lng:event.latlng.lng})
+    map.on('click',pick)
+    return ()=>map.off('click',pick)
+  }, [onPick])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
     const markers = []
     points.forEach(p => {
-      if (typeof p.lat !== 'number' || typeof p.lng !== 'number') return
+      if (!validCoordinates(p.lat,p.lng)) return
       const shapeKey = p.shape === 'diamond' ? 'diamond' : 'pin'
       const iconKey = `${shapeKey}-${p.wantToVisit ? 'want' : p.pastCount > 0 ? 'visited' : 'upcoming'}`
       const marker = L.marker([p.lat, p.lng], { icon: ICONS[iconKey] }).addTo(map)
@@ -119,7 +130,7 @@ export default function VenueMap({ points, onSelect, height = 360, focus = null,
     if (focus) {
       map.setView([focus.lat, focus.lng], focus.zoom ?? 14)
     } else {
-      const boundsSource = (fitPoints && fitPoints.length > 0 ? fitPoints : points).filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')
+      const boundsSource = (fitPoints && fitPoints.length > 0 ? fitPoints : points).filter(p => validCoordinates(p.lat,p.lng))
       if (boundsSource.length > 0) {
         const b = L.latLngBounds(boundsSource.map(p => [p.lat, p.lng]))
         map.fitBounds(b.pad(0.2), { maxZoom: 13 })

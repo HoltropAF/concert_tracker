@@ -3,20 +3,24 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const apiKey = process.env.SETLISTFM_API_KEY;
-  const { url, artist, date } = req.query;
+  const { url, artist, date, city, search, page = '1' } = req.query;
 
   // Search mode: ?artist=X&date=YYYY-MM-DD → find the show and return songs + venue metadata
-  if (artist && date) {
+  if (artist && (date || search === '1')) {
+    if (typeof artist !== 'string' || artist.length > 200 || (date && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))) || (city && (typeof city !== 'string' || city.length > 200)) || !/^\d{1,3}$/.test(String(page)) || Number(page) < 1) return res.status(400).json({error:'invalid_search'});
     if (!apiKey) return res.status(501).json({ error: 'search_unavailable' });
     try {
-      const [y, m, d] = String(date).split('-');
-      const sfDate = `${d}-${m}-${y}`;
-      const apiRes = await fetch(`https://api.setlist.fm/rest/1.0/search/setlists?artistName=${encodeURIComponent(artist)}&date=${sfDate}`, {
-        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }
+      const params = new URLSearchParams({artistName:artist.trim(),p:String(page)});
+      if (date) { const [y,m,d] = date.split('-'); params.set('date',`${d}-${m}-${y}`); }
+      if (city) params.set('cityName',city.trim());
+      const apiRes = await fetch(`https://api.setlist.fm/rest/1.0/search/setlists?${params}`, {
+        headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }, signal: AbortSignal.timeout(12000)
       });
       if (apiRes.status === 404) return res.status(404).json({ error: 'not_found' });
       if (!apiRes.ok) return res.status(apiRes.status).json({ error: `setlist.fm returned ${apiRes.status}` });
       const data = await apiRes.json();
+      if (search === '1') return res.status(200).json({results:(data.setlist || []).map(extractSetlist),page:Number(data.page || page),total:Number(data.total || 0),itemsPerPage:Number(data.itemsPerPage || 20)});
+      if ((data.setlist || []).length > 1) return res.status(409).json({error:'multiple_matches'});
       const sl = (data.setlist || [])[0];
       if (!sl) return res.status(404).json({ error: 'not_found' });
       return res.status(200).json(extractSetlist(sl));

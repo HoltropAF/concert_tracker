@@ -91,14 +91,15 @@ export async function deleteArtistPhoto(path) {
 // * storage use and to find files no longer referenced by any show or artist.
 // * Paths are always "<user-id>/<file>", so one non-recursive list is the whole set.
 export async function listUserPhotos() {
-  if (!supabase) return []
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
+  if (!supabase) throw new Error('Sign in to access your photos')
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) throw authError || new Error('Sign in to access your photos')
   const files = []
   const PAGE = 100
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await supabase.storage.from('photos').list(user.id, { limit: PAGE, offset })
-    if (error || !data || data.length === 0) break
+    if (error) throw error
+    if (!data || data.length === 0) break
     files.push(...data.map(f => ({
       path: `${user.id}/${f.name}`,
       name: f.name,
@@ -107,6 +108,32 @@ export async function listUserPhotos() {
     if (data.length < PAGE) break
   }
   return files
+}
+
+export async function downloadBackupPhoto(path) {
+  if (!supabase) throw new Error('Sign in to back up photos')
+  const {data,error} = await supabase.storage.from('photos').download(path)
+  if (error) throw error
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader()
+    reader.onload = ()=>resolve(reader.result)
+    reader.onerror = ()=>reject(new Error('Could not read a backup photo'))
+    reader.readAsDataURL(data)
+  })
+}
+
+export async function uploadBackupPhoto(dataUrl) {
+  if (!supabase) throw new Error('Sign in to restore photos')
+  const {data:{user},error:authError} = await supabase.auth.getUser()
+  if (authError || !user) throw authError || new Error('Sign in to restore photos')
+  const [header,encoded] = dataUrl.split(',')
+  const mime = header.slice(5,-7)
+  const bytes = Uint8Array.from(atob(encoded), c=>c.charCodeAt(0))
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
+  const path = `${user.id}/backup-${crypto.randomUUID()}.${ext}`
+  const {error} = await supabase.storage.from('photos').upload(path,new Blob([bytes],{type:mime}),{contentType:mime,upsert:false})
+  if (error) throw error
+  return path
 }
 
 // * Bulk remove. Supabase caps a single remove() call, so this goes in batches.

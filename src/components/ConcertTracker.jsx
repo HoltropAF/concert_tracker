@@ -32,6 +32,12 @@ import { useSWUpdate } from '../lib/swUpdate'
 import { useAppInstall } from '../lib/appInstall'
 import SpotifyMatcher from './SpotifyMatcher'
 import VenueMap from './VenueMap'
+import MapRepair from './MapRepair'
+import CompleteBackup from './CompleteBackup'
+import ConcertSearch from './ConcertSearch'
+import CalendarExport from './CalendarExport'
+import {validCoordinates} from '../lib/venueCoordinates'
+import {frequentVenues} from '../lib/quickEntry'
 import html2canvas from 'html2canvas'
 
 // * Fires a short vibration where supported (mostly Android Chrome); silently
@@ -2388,6 +2394,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {detailTab === 'general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div>
@@ -4681,9 +4688,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
     const friendMapPoints = (() => {
       const byVenue = {};
       f.shows.forEach(c => {
-        if (!c.venue) return;
+        if (!c.venue || c.attendanceMode === 'online') return;
         const info = (settings.venueInfo || {})[c.venue] || {};
-        if (typeof info.lat !== 'number') return;
+        if (!validCoordinates(info.lat,info.lng)) return;
         if (!byVenue[c.venue]) byVenue[c.venue] = { name: c.venue, lat: info.lat, lng: info.lng, pastCount: 0, upcomingCount: 0, shape: c.type === 'festival' ? 'diamond' : 'pin' };
         byVenue[c.venue].pastCount += 1;
       });
@@ -5598,8 +5605,9 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             </div>
           )}
 
+          {friendTab === 'overview' && <MapRepair concerts={f.shows} settings={settings} onUpdateSetting={onUpdateSetting} includeSaved={false} />}
           {/* Map — reuses VenueMap and the coordinates already saved per venue. */}
-          {friendTab === 'overview' && friendMapPoints.length > 1 && (
+          {friendTab === 'overview' && friendMapPoints.length > 0 && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>Where you go</div>
               <VenueMap points={friendMapPoints} height={170} interactive={false} clickOpensMaps />
@@ -7951,10 +7959,11 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
           );
         })()}
 
+        {venueDetailTab === 'overview' && <MapRepair key={selectedVenue} concerts={concerts} settings={settings} onUpdateSetting={onUpdateSetting} venueName={selectedVenue} />}
         {/* Mini map */}
         {venueDetailTab === 'overview' && (() => {
           const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
-          if (typeof vInfo.lat !== 'number') return null;
+          if (!validCoordinates(vInfo.lat,vInfo.lng)) return null;
           const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, v.city, v.country].filter(Boolean).join(' '))}`;
           return (
             <div style={{ padding: '12px 16px 0', position: 'relative' }}>
@@ -8231,11 +8240,12 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
       )}
 
+      <MapRepair concerts={concerts} settings={settings} onUpdateSetting={onUpdateSetting} />
       {showVenuesMap && (() => {
         const mapPoints = sorted.map(v => {
           const info = (settings.venueInfo || {})[v.name] || {};
           return { name: v.name, lat: info.lat, lng: info.lng, pastCount: v.pastCount, upcomingCount: v.upcoming.length, shape: v.mapShape, country: v.country, wantToVisit: v.wantToVisit };
-        }).filter(p => typeof p.lat === 'number');
+        }).filter(p => validCoordinates(p.lat,p.lng));
         const useCountryDefault = settings.mapDefaultRegion === 'country' && settings.defaultCountry;
         const fitPoints = useCountryDefault ? mapPoints.filter(p => p.country === settings.defaultCountry) : null;
         return (
@@ -8420,7 +8430,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   }
   const selectCountry = (v) => { update('country', v); setCountrySuggestions([]) }
   const [artistSuggestions, setArtistSuggestions] = useState([])
-  const [showDetails, setShowDetails] = useState(true)
+  const [showDetails, setShowDetails] = useState(false)
   const merchCategories = settings.merchCategories || ['T-shirt','Hoodie','Crewneck','Tote bag','Poster','Hat / Cap','Other']
   const addMerchItem = () => setForm(f => ({ ...f, merch: [...f.merch, { item: merchCategories[0], price: '' }] }))
   const updateMerch = (i, key, val) => setForm(f => ({ ...f, merch: f.merch.map((m, j) => j === i ? { ...m, [key]: val } : m) }))
@@ -8450,7 +8460,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   }
   const selectVenue = (v) => {
     const b = venueBook[v] || {};
-    setForm(f => ({ ...f, venue: v, city: f.city || b.city, country: f.country || b.country, venueSize: f.venueSize || b.venueSize }));
+    setForm(f => ({ ...f, venue: v, city: b.city || f.city, country: b.country || f.country, venueSize: b.venueSize || f.venueSize }));
     setVenueSuggestions([])
   }
 
@@ -8668,6 +8678,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           })();
           if (!isFest && !showDetails) return (
             <>
+              <ConcertSearch concerts={concerts} onChoose={c=>setForm(f=>({...f,artist:c.artist||'',date:c.date||'',venue:c.venue||'',city:c.city||'',country:c.country||'',tour:c.tour||'',setlist:c.songs||[],setlistSource:c.url||'',attendanceMode:'in_person'}))} />
               {card(form.wishlist ? 'Want to go' : quickUpcoming ? 'Upcoming show' : 'Show details', <>
                 <button onClick={() => update('wishlist', !form.wishlist)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#34d399' : '#1f1f35'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
                   <span style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.wishlist ? '#34d399' : '#3d3564'}`, background: form.wishlist ? '#34d399' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '✓' : ''}</span>
@@ -8716,6 +8727,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
                 )}
 {!form.wishlist && form.attendanceMode !== 'online' && <>
                 {fieldLabel('Venue *')}
+                {!form.venue && <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>{frequentVenues(concerts).map(name => <button type="button" key={name} onClick={()=>selectVenue(name)} style={{background:'#1a1a30',color:'#c4c2f0',border:'1px solid #3d3564',borderRadius:8,padding:'6px 10px'}}>↳ {name}</button>)}</div>}
                 <div style={{ position: 'relative', marginBottom: 8 }}>
                   <input {...fieldProps('venue')} value={form.venue} onChange={e => handleVenueChange(e.target.value)} onBlur={() => setTimeout(() => setVenueSuggestions([]), 150)} placeholder="Venue name" style={errors.venue ? errStyle : inputStyle} />
                   {venueSuggestions.length > 0 && <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a30', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 200, overflow: 'hidden', marginTop: 2 }}>{venueSuggestions.map(v => <button key={v} onMouseDown={() => selectVenue(v)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', background: 'none', border: 'none', borderBottom: '1px solid #2e2e50', color: '#c4c2f0', cursor: 'pointer', fontSize: 13 }}>{v}<span style={{ color: '#6b6a8f', fontSize: 11 }}>{venueBook[v]?.city ? ` · ${venueBook[v].city}` : ''}</span></button>)}</div>}
@@ -10909,6 +10921,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
         {/* Your data */}
         <SettingsSection title="Backup" icon="data" collapsible defaultOpen={false} subtitle={backupAge.subtitle}>
+          <CompleteBackup concerts={concerts} settings={settings} onSaveConcert={onSaveConcertQuiet} onUpdateAll={onUpdateAll} userEmail={userEmail} />
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
 
             {/* Last export — the single most useful line this section can carry.

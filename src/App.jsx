@@ -10,13 +10,35 @@
 // *
 // * It also completes the Spotify OAuth redirect, since that lands on "/" and has to
 // * be handled before any view renders.
-import { Component, Suspense, lazy, useState, useEffect, useCallback } from 'react'
+import { Component, Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
 import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
 import { exchangeCodeForTokens } from './lib/spotify'
 import { publishInstallState } from './lib/appInstall'
 import AuthScreen from './components/AuthScreen'
 import ConcertTracker from './components/ConcertTracker'
+import SaveStatus from './components/SaveStatus'
+import { createSaveQueue } from './lib/saveQueue'
+
+function SaveTrackedTracker(props) {
+  const [status, setStatus] = useState({pending:0,failed:0,completed:false})
+  const [queue] = useState(() => createSaveQueue(setStatus))
+  useEffect(() => {
+    if (!status.pending && !status.failed) return
+    const warn = event => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [status.pending, status.failed])
+  return <>
+    <ConcertTracker {...props}
+      onSaveConcert={concert => queue.run(`concert:${concert.id}`, () => props.onSaveConcert(concert))}
+      onDeleteConcert={id => queue.run(`concert:${id}`, () => props.onDeleteConcert(id))}
+      onUpdateSetting={(key,value) => queue.run(`setting:${key}`, () => props.onUpdateSetting(key,value))}
+      onUpdateSettings={settings => queue.run('settings', () => props.onUpdateSettings(settings))}
+    />
+    <SaveStatus status={status} onRetry={queue.retry} />
+  </>
+}
 
 // * Lazy-loaded so a failure in useRegisterSW (or the workbox-window chunk) cannot
 // * crash the main App component. If the import fails, the banner just doesn't render.
@@ -111,39 +133,28 @@ function useGuestMode() {
     try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('guest_settings') || '{}') } } catch { return DEFAULT_SETTINGS }
   })
 
+  const concertsRef = useRef(concerts)
+  const settingsRef = useRef(settings)
   const saveConcert = useCallback((concert) => {
-    setConcerts(prev => {
-      const next = prev.some(c => c.id === concert.id)
-        ? prev.map(c => c.id === concert.id ? concert : c)
-        : [...prev, concert]
-      localStorage.setItem('guest_concerts', JSON.stringify(next))
-      return next
-    })
-    return { error: null }
+    const previous = concertsRef.current
+    const next = previous.some(c => c.id === concert.id)
+      ? previous.map(c => c.id === concert.id ? concert : c) : [...previous, concert]
+    localStorage.setItem('guest_concerts', JSON.stringify(next))
+    concertsRef.current = next; setConcerts(next)
+    return {error:null}
   }, [])
-
   const deleteConcert = useCallback((id) => {
-    setConcerts(prev => {
-      const next = prev.filter(c => c.id !== id)
-      localStorage.setItem('guest_concerts', JSON.stringify(next))
-      return next
-    })
-    return { error: null }
+    const next = concertsRef.current.filter(c => c.id !== id)
+    localStorage.setItem('guest_concerts', JSON.stringify(next))
+    concertsRef.current = next; setConcerts(next)
+    return {error:null}
   }, [])
-
-  const saveSetting = useCallback((key, value) => {
-    setSettings(prev => {
-      const next = { ...prev, [key]: value }
-      localStorage.setItem('guest_settings', JSON.stringify(next))
-      return next
-    })
-  }, [])
-
   const saveSettings = useCallback((next) => {
     localStorage.setItem('guest_settings', JSON.stringify(next))
-    setSettings(next)
-    return { error: null }
+    settingsRef.current = next; setSettings(next)
+    return {error:null}
   }, [])
+  const saveSetting = useCallback((key, value) => saveSettings({...settingsRef.current,[key]:value}), [saveSettings])
 
   const clearGuest = () => {
     localStorage.removeItem('guest_concerts')
@@ -153,6 +164,7 @@ function useGuestMode() {
 
   const initWithSamples = useCallback((samples) => {
     localStorage.setItem('guest_concerts', JSON.stringify(samples))
+    concertsRef.current = samples
     setConcerts(samples)
   }, [])
 
@@ -228,7 +240,10 @@ export default function App() {
   // * Tells the emergency fallback in index.html that React is alive. It used to
   // * infer that from #root having children, which no longer holds: while booting
   // * we render nothing and let the HTML splash stay up.
-  useEffect(() => { window.__appMounted = true }, [])
+  useEffect(() => {
+    window.__appMounted = true
+    document.getElementById('_fb')?.remove()
+  }, [])
 
   // * The captured event is published so Settings can offer the install too —
   // * dismissing the banner should mean "not now", not "never". Both listeners are
@@ -328,7 +343,7 @@ export default function App() {
         </div>
       )}
       <AppErrorBoundary>
-        <ConcertTracker
+        <SaveTrackedTracker key="guest"
           concerts={guest.concerts}
           settings={guest.settings}
           onSaveConcert={guest.saveConcert}
@@ -394,7 +409,7 @@ export default function App() {
         <SWUpdateBanner />
       </Suspense>
       <AppErrorBoundary>
-        <ConcertTracker
+        <SaveTrackedTracker key={user.id}
           concerts={concerts}
           settings={settings}
           onSaveConcert={saveConcert}

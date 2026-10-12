@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "test": "node scripts/test.mjs",
+    "build": "npm test && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

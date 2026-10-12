@@ -154,12 +154,21 @@ export async function deletePhotos(paths) {
 // ! paths are namespaced by user id, so this can't leak one account's photo to
 // ! another within a session, but the map does grow for the life of the page.
 const urlCache = new Map()
-export async function getPhotoUrl(path) {
+const pendingUrls = new Map()
+export async function getPhotoUrl(path, refresh = false) {
   if (!supabase || !path) return null
+  if (refresh) urlCache.delete(path)
   const hit = urlCache.get(path)
   if (hit && hit.expires > Date.now()) return hit.url
-  const { data, error } = await supabase.storage.from('photos').createSignedUrl(path, 3600)
-  if (error || !data?.signedUrl) return null
-  urlCache.set(path, { url: data.signedUrl, expires: Date.now() + 50 * 60 * 1000 })
-  return data.signedUrl
+  if (pendingUrls.has(path)) return pendingUrls.get(path)
+  const request = (async () => {
+    try {
+      const { data, error } = await supabase.storage.from('photos').createSignedUrl(path, 3600)
+      if (error || !data?.signedUrl) return null
+      urlCache.set(path, { url: data.signedUrl, expires: Date.now() + 50 * 60 * 1000 })
+      return data.signedUrl
+    } catch { return null }
+  })()
+  pendingUrls.set(path, request)
+  try { return await request } finally { pendingUrls.delete(path) }
 }

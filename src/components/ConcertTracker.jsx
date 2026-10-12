@@ -193,12 +193,32 @@ function resolveCropPos(pos, variant) {
 }
 function PhotoImg({ path, style, pos, variant = 'list' }) {
   const [url, setUrl] = useState(null)
-  useEffect(() => { let on = true; getPhotoUrl(path).then(u => { if (on) setUrl(u) }); return () => { on = false } }, [path])
-  if (!url) return <div className="skeleton" style={{ ...style }} />
+  const container = useRef(null)
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let active = true
+    setUrl(null); setLoaded(false); setFailed(false)
+    const load = () => getPhotoUrl(path, attempt > 0).then(u => {
+      if (active) { setUrl(u); setFailed(!u) }
+    }).catch(() => { if (active) setFailed(true) })
+    if (!('IntersectionObserver' in window)) { load(); return () => { active = false } }
+    // Load several screens ahead, including horizontal photo strips. Once a URL
+    // is ready, eager image loading starts the actual download immediately.
+    let scrollRoot = container.current?.parentElement
+    while (scrollRoot && !/(auto|scroll)/.test(`${getComputedStyle(scrollRoot).overflowX} ${getComputedStyle(scrollRoot).overflowY}`)) scrollRoot = scrollRoot.parentElement
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); load() }
+    }, {root:scrollRoot, rootMargin:'1600px 800px'})
+    if (container.current) observer.observe(container.current)
+    return () => { active = false; observer.disconnect() }
+  }, [path, attempt])
   const { x, y, zoom } = resolveCropPos(pos, variant)
   return (
-    <div style={{ ...style, overflow: 'hidden', position: style?.position || 'relative' }}>
-      <img src={url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${x}% ${y}%`, transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: `${x}% ${y}%`, display: 'block' }} />
+    <div ref={container} className={!loaded && !failed ? 'skeleton' : undefined} style={{ ...style, overflow: 'hidden', position: style?.position || 'relative' }}>
+      {url && !failed && <img src={url} alt="" loading="eager" decoding="async" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${x}% ${y}%`, transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: `${x}% ${y}%`, display: 'block', opacity: loaded ? 1 : 0 }} />}
+      {failed && <span role="button" tabIndex={0} aria-label="Retry loading photo" onClick={e => { e.stopPropagation(); setAttempt(n => n + 1) }} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setAttempt(n => n + 1) } }} style={{position:'absolute',inset:0,display:'grid',placeItems:'center',background:'#1a1a30',color:'#c4c2f0',cursor:'pointer'}}>↻</span>}
     </div>
   )
 }

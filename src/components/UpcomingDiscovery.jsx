@@ -3,7 +3,7 @@ import {discoveryCountries,discoveryCountry,discoveryDuplicate,discoveryInvite,w
 
 const field={width:'100%',minWidth:0,boxSizing:'border-box',padding:'9px 10px',borderRadius:8,border:'1px solid #3d3564',background:'#13131f',color:'#e2e0ff'}
 const button={...field,width:'auto',cursor:'pointer',color:'#c4b5fd'}
-export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',initialCity='',initialCountry='NL'}) {
+export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',initialCity='',initialCountry='NL',title=null,defaultOpen=false,draftLabel='Continue to wishlist draft'}) {
   const [artist,setArtist]=useState(''),[venue,setVenue]=useState(initialVenue),[city,setCity]=useState(initialCity),[country,setCountry]=useState(discoveryCountry(initialCountry))
   const [events,setEvents]=useState([]),[candidate,setCandidate]=useState(null),[type,setType]=useState('concert')
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[report,setReport]=useState(null)
@@ -24,9 +24,9 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
     }catch(e){setError(e.name==='TimeoutError'?'Search took too long. Please try again.':e.message)}finally{lock.current=false;setBusy(false)}
   }
   const duplicate=candidate && discoveryDuplicate(candidate,concerts)
-  return <details style={{padding:14,margin:'12px 0',border:'1px solid #3d3564',borderRadius:12,color:'#c4c2f0'}}>
-    <summary style={{cursor:'pointer',fontWeight:600}}>{initialVenue?'What’s coming up here?':'Discover upcoming shows'}</summary>
-    <p style={{fontSize:12}}>Find shows on Ticketmaster and review them before adding to your wishlist.</p>
+  return <details open={defaultOpen || undefined} style={{margin:'8px 0 12px',color:'#c4c2f0'}}>
+    <summary style={{cursor:'pointer',color:'var(--accent, #a78bfa)',fontSize:12,fontFamily:"'DM Mono', monospace",padding:'6px 0'}}>{title || (initialVenue?'What’s coming up here?':'Discover upcoming shows')}</summary>
+    <p style={{fontSize:12}}>Find upcoming shows on Ticketmaster and review their details before saving.</p>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
       <label>Artist or keyword<input style={field} value={artist} disabled={busy} onChange={e=>setArtist(e.target.value)}/></label>
       <label>Venue<input style={field} value={venue} disabled={busy} onChange={e=>setVenue(e.target.value)}/></label>
@@ -51,8 +51,8 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
       <h4 style={{marginTop:0}}>Review: {candidate.artist}</h4><p>{candidate.date} · {candidate.venue} · {candidate.city}</p>
       {duplicate&&<p role="alert">A matching show may already be saved. Check your library before adding another copy.</p>}
       <label>Save as <select style={field} value={type} onChange={e=>setType(e.target.value)}><option value="concert">Concert</option><option value="festival">Festival</option></select></label>
-      <p style={{fontSize:12}}>This opens an editable wishlist draft. Check the event title and location, then press Save. Festival listings do not mark individual artists as seen.</p>
-      <button type="button" style={button} onClick={()=>{onChoose(wishlistDraft(candidate,type));setCandidate(null)}}>Continue to wishlist draft</button>{' '}
+      <p style={{fontSize:12}}>Check the event title and location in your draft, then press Save. Festival listings do not mark individual artists as seen.</p>
+      <button type="button" style={button} onClick={()=>{onChoose(wishlistDraft(candidate,type));setCandidate(null);setMessage('Details added to your draft. Review them before saving.')}}>{draftLabel}</button>{' '}
       <button type="button" style={button} onClick={()=>setCandidate(null)}>Cancel</button>
     </section>}
   </details>

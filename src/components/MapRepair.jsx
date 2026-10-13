@@ -34,7 +34,7 @@ export default function MapRepair({concerts,settings,onUpdateSetting,venueName=n
     } catch(e) {setMessage(e.message || 'Could not save map position.')} finally {setBusy(false);lock.current=false}
   }
   const point = parseCoordinates(lat,lng)
-  if(!venues.length) return null
+  if(!missing.length) return null
   return <details style={{padding:12,border:'1px solid #2e2e50',borderRadius:10,margin:'12px 0'}}>
     <summary>Map positions · {missing.length} missing</summary>
     {missing.length > 0 && <p style={{fontSize:12}}>Missing pins: {missing.map(v=>v.name).join(', ')}</p>}

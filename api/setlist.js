@@ -1,25 +1,28 @@
+import {validDate} from '../src/lib/calendar.js'
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const apiKey = process.env.SETLISTFM_API_KEY;
-  const { url, artist, date, city, search, page = '1' } = req.query;
+  const { url, artist, date, city, country, period, today, search, page = '1' } = req.query;
 
   // Search mode: ?artist=X&date=YYYY-MM-DD → find the show and return songs + venue metadata
   if (artist && (date || search === '1')) {
+    if ((country && (typeof country !== 'string' || !/^[A-Z]{2}$/.test(country))) || (period && (period !== 'past' || !validDate(today)))) return res.status(400).json({error:'invalid_search'});
     if (typeof artist !== 'string' || artist.length > 200 || (date && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))) || (city && (typeof city !== 'string' || city.length > 200)) || !/^\d{1,3}$/.test(String(page)) || Number(page) < 1) return res.status(400).json({error:'invalid_search'});
     if (!apiKey) return res.status(501).json({ error: 'search_unavailable' });
     try {
       const params = new URLSearchParams({artistName:artist.trim(),p:String(page)});
       if (date) { const [y,m,d] = date.split('-'); params.set('date',`${d}-${m}-${y}`); }
       if (city) params.set('cityName',city.trim());
+      if (country) params.set('countryCode',country);
       const apiRes = await fetch(`https://api.setlist.fm/rest/1.0/search/setlists?${params}`, {
         headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }, signal: AbortSignal.timeout(12000)
       });
       if (apiRes.status === 404) return res.status(404).json({ error: 'not_found' });
       if (!apiRes.ok) return res.status(apiRes.status).json({ error: `setlist.fm returned ${apiRes.status}` });
       const data = await apiRes.json();
-      if (search === '1') return res.status(200).json({results:(data.setlist || []).map(extractSetlist),page:Number(data.page || page),total:Number(data.total || 0),itemsPerPage:Number(data.itemsPerPage || 20)});
+      if (search === '1') return res.status(200).json({results:(data.setlist || []).map(extractSetlist).filter(c=>period!=='past' || (validDate(c.date) && c.date<today)),page:Number(data.page || page),total:Number(data.total || 0),itemsPerPage:Number(data.itemsPerPage || 20)});
       if ((data.setlist || []).length > 1) return res.status(409).json({error:'multiple_matches'});
       const sl = (data.setlist || [])[0];
       if (!sl) return res.status(404).json({ error: 'not_found' });

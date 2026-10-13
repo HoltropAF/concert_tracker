@@ -8316,13 +8316,14 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
 
 // Shared entry menu, also used inside the form to change a selection without
 // unmounting the form or losing the details already entered.
-function QuickShowChoices({ initialType = 'concert', initialAttendanceMode = 'in_person', selectedStatus = null, onChoose }) {
+function QuickShowChoices({ initialType = 'concert', initialAttendanceMode = 'in_person', selectedStatus = null, onChoose, onDiscover }) {
   const [kind, setKind] = useState(initialType === 'festival' ? 'festival' : initialAttendanceMode === 'online' ? 'online' : 'concert');
   return (
     <div>
       <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 27, fontWeight: 800, color: '#e2e0ff' }}>Add a show</div>
       <p style={{ fontSize: 13, color: '#9491b8', lineHeight: 1.5, margin: '8px 0 24px' }}>A memory, a booked night, or something on your radar.</p>
-      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#9491b8', marginBottom: 10 }}>SHOW TYPE</div>
+      {onDiscover && <button type="button" onClick={onDiscover} style={{padding:'6px 0',marginBottom:18,border:0,background:'none',color:'var(--accent, #a78bfa)',textAlign:'left',fontSize:12,fontFamily:"'DM Mono', monospace",cursor:'pointer'}}>Discover upcoming shows ›</button>}
+      <div style={{fontSize:11,color:'#9491b8',marginBottom:10}}>SHOW TYPE</div>
       <div role="group" aria-label="Show type" style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
         {[['concert', 'Concert'], ['online', 'Online'], ['festival', 'Festival']].map(([value, label]) => (
           <button key={value} type="button" aria-pressed={kind === value} onClick={() => setKind(value)} style={{ flex: 1, minHeight: 42, borderRadius: 10, background: kind === value ? '#252039' : '#13131f', border: `1px solid ${kind === value ? '#a78bfa' : '#2e2e50'}`, color: kind === value ? '#cbb8ff' : '#9491b8', fontSize: 13, cursor: 'pointer' }}>{label}</button>
@@ -8701,7 +8702,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           })();
           if (!isFest && !showDetails) return (
             <>
-              <ConcertSearch concerts={concerts} onChoose={c=>setForm(f=>({...f,artist:c.artist||'',date:c.date||'',venue:c.venue||'',city:c.city||'',country:c.country||'',tour:c.tour||'',setlist:c.songs||[],setlistSource:c.url||'',attendanceMode:'in_person'}))} />
+              <ConcertSearch key={chosenStatus} mode={chosenStatus === 'past' ? 'past' : 'upcoming'} initialCountry={settings.defaultCountry || ''} concerts={concerts} onChoose={c=>setForm(f=>({...f,...(c.discovery ? {discovery:c.discovery,ticketSaleAt:c.ticketSaleAt,ticketSaleLink:c.ticketSaleLink,type:c.type} : {}),artist:c.artist||'',date:c.date||'',venue:c.venue||'',city:c.city||'',country:c.country||'',tour:c.tour||'',setlist:c.songs||[],setlistSource:c.url||'',attendanceMode:'in_person'}))} />
               {card(form.wishlist ? 'Want to go' : quickUpcoming ? 'Upcoming show' : 'Show details', <>
                 <button onClick={() => update('wishlist', !form.wishlist)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#34d399' : '#1f1f35'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
                   <span style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.wishlist ? '#34d399' : '#3d3564'}`, background: form.wishlist ? '#34d399' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '✓' : ''}</span>
@@ -11350,7 +11351,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showAddStatus, setShowAddStatus] = useState('past')
   const [discoveryDraft, setDiscoveryDraft] = useState(null)
   const openDiscoveryDraft = draft => {
-    setDiscoveryDraft(draft); setShowAdd(draft.type); setShowAddAttendance('in_person'); setShowAddWishlist(true); setShowAddStatus('wishlist')
+    setAddFlowStep(null); setDiscoveryDraft(draft); setShowAdd(draft.type); setShowAddAttendance('in_person'); setShowAddWishlist(true); setShowAddStatus('wishlist')
   }
   // * Lifted out of StatsView so the sub-tab and chart group survive tab switches.
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
@@ -11747,13 +11748,16 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 40px' }}>
         <button type="button" aria-label="Back to shows" onClick={() => setAddFlowStep(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 22, cursor: 'pointer', padding: '0 0 18px' }}>←</button>
-        <QuickShowChoices onChoose={({ type, attendanceMode, status }) => {
+        {addFlowStep === 'discover' ? <>
+          <button type="button" onClick={()=>setAddFlowStep('type')} style={{background:'none',border:0,color:'#c4b5fd',cursor:'pointer'}}>← Add a show options</button>
+          <UpcomingDiscovery concerts={concerts} onChoose={openDiscoveryDraft} initialCountry={settings.defaultCountry || 'NL'} defaultOpen />
+        </> : <QuickShowChoices onDiscover={()=>setAddFlowStep('discover')} onChoose={({ type, attendanceMode, status }) => {
           setShowAdd(type);
           setShowAddAttendance(attendanceMode);
           setShowAddWishlist(status === 'wishlist');
           setShowAddStatus(status);
           setAddFlowStep(null);
-        }} />
+        }} />}
       </div>
     </div>
   )
@@ -11843,7 +11847,6 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         <div key={view} className="tab-fade-in" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {view === 'home' && (
           <>
-            <UpcomingDiscovery concerts={concerts} onChoose={openDiscoveryDraft} initialCountry={settings.defaultCountry || 'NL'} />
             {concerts.length === 0 && (
               <div style={{ padding: '0 16px' }}>
                 <EmptyState icon="🎫" title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />

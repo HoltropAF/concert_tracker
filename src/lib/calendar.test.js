@@ -26,6 +26,11 @@ test('concert search returns choices, preserves pagination and rejects ambiguous
     const found=await call({search:'1',artist:'Band',city:'Amsterdam',page:'2'})
     assert.equal(found.status,200);assert.equal(found.body.results.length,2);assert.equal(found.body.page,2)
     assert.ok(requested.includes('cityName=Amsterdam'));assert.equal(found.body.results[0].date,'2026-10-01')
+    const past=await call({search:'1',artist:'Band',period:'past',today:'2026-10-02',country:'NL'})
+    assert.equal(past.status,200);assert.equal(past.body.results.length,1)
+    assert.equal(past.body.results[0].date,'2026-10-01')
+    assert.ok(requested.includes('countryCode=NL'))
+    assert.equal((await call({search:'1',artist:'Band',period:'past',today:'invalid'})).status,400)
     assert.equal((await call({artist:'Band',date:'2026-10-01'})).status,409)
     delete process.env.SETLISTFM_API_KEY
     assert.equal((await call({search:'1',artist:'Band'})).status,501)

@@ -35,6 +35,7 @@ import VenueMap from './VenueMap'
 import MapRepair from './MapRepair'
 import CompleteBackup from './CompleteBackup'
 import ConcertSearch from './ConcertSearch'
+import UpcomingDiscovery from './UpcomingDiscovery'
 import CalendarExport from './CalendarExport'
 import {validCoordinates} from '../lib/venueCoordinates'
 import {frequentVenues} from '../lib/quickEntry'
@@ -7669,7 +7670,7 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
 // * MAIN APP the first time a show at that venue is saved.
 // * settings.savedVenues is a separate list: venues the user pre-registered for
 // * autocomplete, which may not have any shows attached yet.
-function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {}, onBackToOrigin = null }) {
+function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {}, onBackToOrigin = null }) {
   const [selectedVenue, setSelectedVenue] = useState(initialSelectedVenue);
   const [headerElevated, setHeaderElevated] = useState(false);
   useEffect(() => {
@@ -7810,6 +7811,7 @@ function VenuesView({ concerts, onOpen, settings, onUpdateSetting = () => {}, on
         </div>
 
         {/* Hero: maps / website / parking / transit / edit */}
+        {venueDetailTab === 'overview' && onDiscover && <div style={{padding:'0 16px'}}><UpcomingDiscovery key={selectedVenue} concerts={concerts} onChoose={onDiscover} initialVenue={selectedVenue} initialCity={v.city} initialCountry={v.country} /></div>}
         {venueDetailTab === 'overview' && <div style={{ padding: '14px 16px 0' }}>
           {(() => {
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
@@ -8352,7 +8354,7 @@ function QuickShowChoices({ initialType = 'concert', initialAttendanceMode = 'in
 // * `onUpdateSetting` is threaded down so a brand-new tag typed here can be promoted
 // * to a permanent option via SaveTagPrompt without leaving the form.
 // * Builds the concert object and hands it to `onSave`; it never writes directly.
-function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', initialAttendanceMode = 'in_person', initialWishlist = false, initialStatus = 'past', concerts = [], photosEnabled = false }) {
+function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null, friends = [], allArtists = [], recentFriends = [], initialType = 'concert', initialAttendanceMode = 'in_person', initialWishlist = false, initialStatus = 'past', initialDraft = null, concerts = [], photosEnabled = false }) {
   const [editorTab, setEditorTab] = useState('show');
   const [draftId] = useState(() => `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -8368,6 +8370,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
     ticketType: null, ticketAddons: [],
     genre: null, subgenre: null, language: [], venueSize: null, seenAs: 'Headliner',
     acts: [], attendanceMode: initialAttendanceMode, onlineType: 'concert', platform: '',
+    ...(initialDraft || {}),
   })
   const [supportInput, setSupportInput] = useState('')
   const [supportRole, setSupportRole] = useState('support')
@@ -11345,6 +11348,10 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
   const [showAddAttendance, setShowAddAttendance] = useState('in_person')
   const [showAddWishlist, setShowAddWishlist] = useState(false)
   const [showAddStatus, setShowAddStatus] = useState('past')
+  const [discoveryDraft, setDiscoveryDraft] = useState(null)
+  const openDiscoveryDraft = draft => {
+    setDiscoveryDraft(draft); setShowAdd(draft.type); setShowAddAttendance('in_person'); setShowAddWishlist(true); setShowAddStatus('wishlist')
+  }
   // * Lifted out of StatsView so the sub-tab and chart group survive tab switches.
   const [statsTab, setStatsTab] = useState(settings.defaultStatsTab || 'summary')
   const [chartGroup, setChartGroup] = useState('activity')
@@ -11758,13 +11765,14 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
             const result = await onSaveConcert(c);
             notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success');
             if (result?.error) return;
-            setShowAdd(null); savedScrollPos.current = 0; setSelected(c);
+            setShowAdd(null); setDiscoveryDraft(null); savedScrollPos.current = 0; setSelected(c);
             maybeGeocodeVenue(c);
             if (settings.spotifyAccessToken && getSongList(c.setlist).length > 0) {
               setSpotifyPrompt(c);
             }
           }}
-          onClose={() => setShowAdd(null)}
+          onClose={() => { setShowAdd(null); setDiscoveryDraft(null) }}
+          initialDraft={discoveryDraft}
           initialType={showAdd}
           initialAttendanceMode={showAddAttendance}
           initialWishlist={showAddWishlist}
@@ -11835,6 +11843,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         <div key={view} className="tab-fade-in" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {view === 'home' && (
           <>
+            <UpcomingDiscovery concerts={concerts} onChoose={openDiscoveryDraft} initialCountry={settings.defaultCountry || 'NL'} />
             {concerts.length === 0 && (
               <div style={{ padding: '0 16px' }}>
                 <EmptyState icon="🎫" title="No shows yet" detail="Start with a quick concert entry, then fill in setlists, merch, and notes when you feel like it." actionLabel="Add show" onAction={() => setAddFlowStep('type')} />
@@ -12034,7 +12043,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
         {view === 'stats' && <StatsView concerts={concerts} settings={settings} onNavigate={({ view: v, filterType: ft }) => { setView(v); if (ft !== undefined) setFilterType(ft); }} onUpdateSetting={updateSetting} onSaveConcert={handleSave} onSaveConcertQuiet={onSaveConcert} statsTab={statsTab} setStatsTab={setStatsTab} chartGroup={chartGroup} setChartGroup={setChartGroup} onOpen={handleOpenConcert} onNotify={notify} initialSelectedFriend={pendingFriendSelect} onInitialFriendConsumed={() => setPendingFriendSelect(null)} onRememberFriend={(name, tab) => setPendingFriendSelect(name ? { name, tab } : null)} hideTabs fillHeight={statsTab === 'charts' || statsTab === 'summary'} />}
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNotify={notify} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
-        {view === 'venues' && <VenuesView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
+        {view === 'venues' && <VenuesView concerts={concerts} onDiscover={openDiscoveryDraft} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
         {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSaveConcertQuiet={onSaveConcert} onDeleteConcert={onDeleteConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
         {view === 'photos' && <PhotoWallView concerts={concerts} onOpen={handleOpenConcert} onBack={() => setView(settings.defaultTab || 'stats')} />}
         </div>

@@ -1802,12 +1802,17 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
           {displayList.map(({ song, origIdx: i }, displayPos) => {
             if (isSectionRow(song)) {
               if (readOnly && (song.label === '__SECTION_END__' || setlistView[sectionLabelCategory(song.label, song.sectionCategory)] === false)) return null;
-              return <div key={`section-${i}`} onDragOver={e => { if (!readOnly) e.preventDefault(); }} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px', margin: '14px 0 8px', borderRadius: 8, background: '#211b33', color: '#c4b5fd' }}>
+              return <div key={`section-${i}`} onDragOver={e => { if (!readOnly) e.preventDefault(); }} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '8px', margin: '14px 0 8px', borderRadius: 8, background: '#211b33', color: '#c4b5fd' }}>
                 {!readOnly && rowButtons(i)}
                 {readOnly ? <strong style={{ fontFamily: "'Syne', sans-serif", fontSize: 13 }}>{song.label}</strong> : <>
-                  <input aria-label={`Section heading ${i + 1}`} defaultValue={song.label} key={`${i}-${song.label}`} onBlur={e => { const label = e.target.value.trim(); if (label && label !== song.label) save(songs.map((s, j) => j === i ? { ...s, label } : s)); else e.target.value = song.label; }} style={{ ...inputStyle, minWidth: 0, width: '100%', fontSize: 13 }} />
+                  <input aria-label={`Section heading ${i + 1}`} defaultValue={song.label} key={`${i}-${song.label}`} onBlur={e => { const label = e.target.value.trim(); if (label && label !== song.label) save(songs.map((s, j) => j === i ? { ...s, label } : s)); else e.target.value = song.label; }} style={{ ...inputStyle, minWidth: 80, width: 0, fontSize: 13 }} />
+                  <button type="button" aria-label={`I cried during ${song.label}`} aria-pressed={song.cried === true} title="I cried" onClick={() => save(songs.map((s, j) => j === i ? { ...s, cried: !s.cried } : s))} style={{ flexShrink: 0, color: song.cried ? '#93c5fd' : '#9491b8', background: song.cried ? '#25334a' : 'none', border: '1px solid currentColor', borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>💧</button>
                   <button type="button" aria-label={`Delete section ${song.label}`} onClick={() => save(songs.filter((_, j) => j !== i))} style={{ color: '#fda4af', background: 'none', border: 0, padding: 8 }}>×</button>
                 </>}
+                {readOnly && song.cried && <span title="I cried" aria-label="I cried">💧</span>}
+                {song.cried && (readOnly
+                  ? song.criedNote && <div style={{ flexBasis: '100%', fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{song.criedNote}</div>
+                  : <input aria-label={`Why I cried during ${song.label}`} placeholder="Optional memory — what moved you?" defaultValue={song.criedNote || ''} key={`cried-note-${i}-${song.label}`} maxLength={1000} onBlur={e => { const criedNote = e.target.value.trim(); if (criedNote !== (song.criedNote || '')) save(songs.map((s, j) => j === i ? { ...s, criedNote } : s)); }} style={{ ...inputStyle, flexBasis: '100%', minWidth: 0 }} />)}
               </div>;
             }
             const name = getSongName(song);

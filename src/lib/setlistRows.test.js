@@ -18,3 +18,13 @@ test('Spotify updates preserve consecutive and empty sections',()=>{
  const rows=[{type:'section',label:'Act I'},{type:'section',label:'Acoustic'},'One',{type:'section',label:'Encore'}]
  assert.deepEqual(mergeSetlistSongs(rows,[{name:'One',spotifyId:'id'}]),[rows[0],rows[1],{name:'One',spotifyId:'id'},rows[3]])
 })
+
+test('crying memories survive section moves, serialization and Spotify enrichment',()=>{
+ const section={type:'section',label:'MENT',cried:true,criedNote:'When they thanked the fans'}
+ const rows=JSON.parse(JSON.stringify([section,'One',{type:'section',label:'Speech',cried:true}]))
+ const enriched=mergeSetlistSongs(normalizeSetlistRows(rows),[{name:'One',spotifyId:'track'}])
+ assert.deepEqual(enriched[0],section)
+ assert.deepEqual(moveSetlistRow(enriched,0,2)[2],section)
+ assert.equal(enriched[2].cried,true)
+ assert.equal(setlistSongs(enriched).length,1)
+})

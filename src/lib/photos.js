@@ -1,12 +1,11 @@
 // * Supabase Storage wrapper for the two kinds of user photo: one per concert and one
 // * per artist. Both live in a single private `photos` bucket, namespaced by user id.
 // *
-// * Paths are deterministic, not random, and are the only thing persisted (on the
-// * concert as `photo`, or in settings for an artist):
-// *   {userId}/{concertId}.jpg
+// * Stored paths (concert paths are unique per upload) are persisted on the
+// * concert as `photo`, or in settings for an artist:
+// *   {userId}/{concertId}-{uuid}.jpg
 // *   {userId}/artist-{slug}.jpg
-// * That makes re-uploading an implicit replace, but also means renaming an artist
-// * orphans their photo — the slug no longer matches.
+// * Unique concert paths keep the previous image intact until the edit is saved.
 // !
 // ! The bucket is private, so a stored path is not directly usable as an <img src>.
 // ! Always resolve it through getPhotoUrl().
@@ -37,15 +36,15 @@ export async function resizeImage(file) {
 }
 
 // * Photos are stored at userId/concertId.jpg — each user owns their own folder.
-// * Re-uploading the same concertId replaces the previous photo (upsert: true).
+// * Each upload uses a fresh path so removing an old photo cannot delete its replacement.
 export async function uploadConcertPhoto(concertId, file) {
   if (!supabase) throw new Error('Not connected')
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in to add photos')
   const blob = await resizeImage(file)
-  const path = `${user.id}/${concertId}.jpg`
+  const path = `${user.id}/${concertId}-${crypto.randomUUID()}.jpg`
   const { error } = await supabase.storage.from('photos').upload(path, blob, {
-    upsert: true,
+    upsert: false,
     contentType: 'image/jpeg',
     cacheControl: '3600',
   })

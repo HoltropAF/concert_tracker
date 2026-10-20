@@ -1,3 +1,4 @@
+import { withCriedTag } from '../lib/criedTag'
 // * The entire settracker UI lives in this one module. It is deliberately a single
 // * file: every view reads from the same `concerts` array and `settings` object
 // * passed down from App, and they share ~40 module-level helpers (date/cost/setlist
@@ -204,7 +205,7 @@ function PhotoImg({ path, style, pos, variant = 'list' }) {
     const load = () => getPhotoUrl(path, attempt > 0).then(u => {
       if (active) { setUrl(u); setFailed(!u) }
     }).catch(() => { if (active) setFailed(true) })
-    if (!('IntersectionObserver' in window)) { load(); return () => { active = false } }
+    if (attempt > 0 || !('IntersectionObserver' in window)) { load(); return () => { active = false } }
     // Load several screens ahead, including horizontal photo strips. Once a URL
     // is ready, eager image loading starts the actual download immediately.
     let scrollRoot = container.current?.parentElement
@@ -219,7 +220,7 @@ function PhotoImg({ path, style, pos, variant = 'list' }) {
   return (
     <div ref={container} className={!loaded && !failed ? 'skeleton' : undefined} style={{ ...style, overflow: 'hidden', position: style?.position || 'relative' }}>
       {url && !failed && <img src={url} alt="" loading="eager" decoding="async" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${x}% ${y}%`, transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: `${x}% ${y}%`, display: 'block', opacity: loaded ? 1 : 0 }} />}
-      {failed && <span role="button" tabIndex={0} aria-label="Retry loading photo" onClick={e => { e.stopPropagation(); setAttempt(n => n + 1) }} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setAttempt(n => n + 1) } }} style={{position:'absolute',inset:0,display:'grid',placeItems:'center',background:'#1a1a30',color:'#c4c2f0',cursor:'pointer'}}>↻</span>}
+      {failed && <span role="button" tabIndex={0} aria-label="Retry loading photo" onClick={e => { e.stopPropagation(); setAttempt(n => n + 1) }} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setAttempt(n => n + 1) } }} style={{position:'absolute',inset:0,display:'grid',placeItems:'center',background:'#1a1a30',color:'#c4c2f0',cursor:'pointer',fontSize:12}}>↻ Retry photo</span>}
     </div>
   )
 }
@@ -2089,7 +2090,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [spotifyMatcher, setSpotifyMatcher] = useState(null);
 
-  const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const update = (key, val) => setForm(f => { const next = { ...f, [key]: val }; return ['criedSong', 'setlist', 'supportSetlists'].includes(key) ? withCriedTag(next) : next; });
 
   const toggleFriend = (name) => {
     setForm(f => ({
@@ -2899,16 +2900,17 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace" }}>{formatDate(concert.date)} · {concert.city}</div>
         </div>
         <button onClick={async () => {
+          if (photoBusy) return;
           const result = await onSave(form);
           if (result?.error) return;
           // * Only now is the show definitely no longer referencing these files.
           // * A failure here leaves an unreferenced file behind, which is untidy but
           // * harmless — never worth blocking the save or alarming the user over.
-          const toDelete = pendingPhotoDeletes.current;
+          const toDelete = [...new Set(pendingPhotoDeletes.current)].filter(path => path !== form.photo);
           pendingPhotoDeletes.current = [];
           toDelete.forEach(path => deleteConcertPhoto(path).catch(() => { /* orphaned file */ }));
           setEditing(false);
-        }} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>Save</button>
+        }} disabled={photoBusy} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{photoBusy ? "Uploading…" : "Save"}</button>
       </div>
 
       <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} />
@@ -2963,6 +2965,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               setPhotoBusy(true);
               try {
                 const path = await uploadConcertPhoto(concert.id, file);
+                if (form.photo) pendingPhotoDeletes.current.push(form.photo);
                 setForm(f => ({ ...f, photo: path }));
               } catch (err) { onNotify(err.message || 'Upload failed', 'error'); }
               setPhotoBusy(false);
@@ -3316,7 +3319,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               const name = getSupportName(s); const role = getSupportRole(s);
               return { key: name, name, role,
                 songs: normalizeSetlistRows((form.supportSetlists || {})[name]),
-                onSaveSetlist: (ns) => setForm(f => ({ ...f, supportSetlists: { ...(f.supportSetlists || {}), [name]: ns } })) };
+                onSaveSetlist: (ns) => setForm(f => withCriedTag({ ...f, supportSetlists: { ...(f.supportSetlists || {}), [name]: ns } })) };
             }),
             { key: '__headliner__', name: form.artist, role: 'headliner',
               songs: normalizeSetlistRows(form.setlist),
@@ -8459,7 +8462,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   const updateMerch = (i, key, val) => setForm(f => ({ ...f, merch: f.merch.map((m, j) => j === i ? { ...m, [key]: val } : m) }))
   const removeMerch = (i) => setForm(f => ({ ...f, merch: f.merch.filter((_, j) => j !== i) }))
 
-  const update = (key, val) => setForm(f => ({ ...f, [key]: val }))
+  const update = (key, val) => setForm(f => { const next = { ...f, [key]: val }; return ['criedSong', 'setlist', 'supportSetlists'].includes(key) ? withCriedTag(next) : next; })
 
   const handleArtistChange = (val) => {
     update('artist', val)
@@ -8584,7 +8587,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
         <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1, display: showChoices ? 'none' : undefined }}>
         {editorTab === 'setlist' && form.type !== 'festival' && <div>
           <SetlistSection concert={{ ...form, id: draftId }} settings={settings} onSaveSetlist={v => update('setlist', v)} allArtists={allArtists} />
-          {form.support.map(s => { const name = getSupportName(s); return <details key={name} style={{ marginTop: 18 }}><summary style={{ color: '#c4b5fd', cursor: 'pointer', marginBottom: 12 }}>{name}</summary><SetlistSection concert={{ ...form, id: draftId }} settings={settings} overrideArtist={name} overrideSongs={form.supportSetlists?.[name] || []} onSaveSetlist={v => setForm(f => ({ ...f, supportSetlists: { ...f.supportSetlists, [name]: v } }))} allArtists={allArtists} /></details>; })}
+          {form.support.map(s => { const name = getSupportName(s); return <details key={name} style={{ marginTop: 18 }}><summary style={{ color: '#c4b5fd', cursor: 'pointer', marginBottom: 12 }}>{name}</summary><SetlistSection concert={{ ...form, id: draftId }} settings={settings} overrideArtist={name} overrideSongs={form.supportSetlists?.[name] || []} onSaveSetlist={v => setForm(f => withCriedTag({ ...f, supportSetlists: { ...f.supportSetlists, [name]: v } }))} allArtists={allArtists} /></details>; })}
         </div>}
         {editorTab === 'memories' && <div style={{ marginBottom: 18 }}>
           <div style={{ fontFamily: "'Syne', sans-serif", color: '#e2e0ff', marginBottom: 12 }}>Concert photo</div>
@@ -10200,19 +10203,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       )}
 
-      <div style={{ background: '#1a1a30', border: '1px solid #30284d', borderRadius: 12, padding: 14, marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, color: '#e2e0ff', marginBottom: 6 }}>App updates</div>
-        <div style={{ fontSize: 12, color: '#9491b8', marginBottom: 10 }}>Installed version: v{APP_VERSION}</div>
-        <div role="status" style={{ fontSize: 13, color: '#c4c2f0', marginBottom: 10 }}>
-          {swUpdate.pending ? 'A new version is ready. Save your edits before updating.' : swUpdate.checking ? 'Checking and downloading any available update…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Connect to the internet and try again.', failed: 'Could not complete the update check. Please try again.', unsupported: 'Updates are not available here yet. Open the installed app or deployed site and try again.' }[swUpdate.result] || 'Check whether a new version is available.')}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {swUpdate.pending && <button type="button" onClick={() => swUpdate.apply?.()} style={{ background: '#a78bfa', color: '#0c0c14', border: 0, borderRadius: 8, padding: '12px 16px', fontWeight: 700 }}>Update now</button>}
-          <button type="button" disabled={swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.check?.()} style={{ background: 'none', color: '#c4b5fd', border: '1px solid #51416e', borderRadius: 8, padding: '12px 16px', opacity: swUpdate.checking || !swUpdate.check ? 0.5 : 1 }}>{swUpdate.checking ? 'Checking…' : 'Check for updates'}</button>
-        </div>
-        {swUpdate.checkedAt && <div style={{ color: '#9491b8', fontSize: 11, marginTop: 8 }}>Last checked: {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>}
-      </div>
-
       {/* * Same reasoning as the update row: dismissing the install banner should be
           * "not now". The browser only ever offers the prompt once per visit, so if
           * it's available it's offered here until it's used. */}
@@ -10236,10 +10226,13 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           * one quiet line here and opens as a sheet. It used to sit expanded above
           * every settings tab, which put release notes in front of you every time
           * you came in to change a colour. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 2px" }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, padding: "0 2px" }}>
         <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
           {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
         </span>
+        <button type="button" disabled={swUpdate.pending ? !swUpdate.apply : swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.pending ? swUpdate.apply?.() : swUpdate.check?.()} style={{ background: 'none', border: 0, color: '#a78bfa', padding: '8px 2px', minHeight: 44, fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', flexShrink: 0, opacity: swUpdate.checking ? 0.5 : 1 }}>
+          {swUpdate.pending ? 'Update now' : swUpdate.checking ? 'Checking…' : 'Check updates'}
+        </button>
         {releases !== null && releases.length > 0 && (
           <button onClick={() => { setShowAllReleases(false); setWhatsNewOpen(true); }} style={{
             background: unseenReleases.length > 0 ? "#30284d" : "none",
@@ -10251,6 +10244,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             What's new
           </button>
         )}
+      </div>
+
+      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: '-8px 2px 14px', lineHeight: 1.5 }}>
+        {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
+        {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
       </div>
 
       {whatsNewOpen && releases !== null && releases.length > 0 && (() => {

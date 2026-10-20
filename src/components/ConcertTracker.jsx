@@ -1,3 +1,4 @@
+import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge } from './WishlistUpdates'
 import { withCriedTag } from '../lib/criedTag'
 // * The entire settracker UI lives in this one module. It is deliberately a single
 // * file: every view reads from the same `concerts` array and `settings` object
@@ -1497,6 +1498,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
       }}>
         <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#e2e0ff", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {concert.artist}
+          <WishlistUpdateBadge concert={concert} />
         </span>
         <span style={{ fontSize: 11, color: "#4a4870", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
           {concert.date && concert.date !== '9999-12-31' ? formatDate(concert.date) : ''}
@@ -1539,6 +1541,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         transition: "all 0.15s ease", marginBottom: 8, position: "relative"
       }}
     >
+      <WishlistUpdateBadge concert={concert} />
       {hasPhotoDivider && (
         <>
           <PhotoImg path={concert.photo} pos={concert.photoPos} variant="list" style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
@@ -2369,7 +2372,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             </div>
           )}
 
-          {ticketSaleBlock}
+          {concert.wishlist ? <WishlistUpdateDetails key={concert.id} concert={concert} onSave={onSave} /> : ticketSaleBlock}
           {/* Stat cards */}
           {statCards.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
@@ -11281,7 +11284,11 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
 // * onUpdateSetting / onUpdateSettings.
 // * `settingsLoaded` distinguishes "still defaults" from "really yours" and gates
 // * anything that would be wrong under defaults — currently the onboarding tour.
-export default function ConcertTracker({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
+export default function ConcertTracker(props) {
+  return <WishlistUpdateProvider><ConcertTrackerContent {...props} /></WishlistUpdateProvider>
+}
+
+function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
   const today = new Date()
   const isPastDate = (dateStr) => dateStr < todayStr
 
@@ -12010,7 +12017,7 @@ export default function ConcertTracker({ concerts, settings, onSaveConcert, onDe
                       </div>
                       <span style={{ fontSize: 11, color: '#34d399', transform: showWishlist ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>▾</span>
                     </button>
-                    {showWishlist && renderConcertList(wishlist, false, true)}
+                    {showWishlist && <><WishlistCheckAll concerts={concerts} />{renderConcertList(wishlist, false, true)}</>}
                   </div>
                 )}
                 {(filterStatus.length === 0 || filterStatus.includes('upcoming')) && upcoming.length > 0 && (

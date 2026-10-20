@@ -342,6 +342,7 @@ export default function App() {
           }}>×</button>
         </div>
       )}
+      <Suspense fallback={null}><SWUpdateBanner /></Suspense>
       <AppErrorBoundary>
         <SaveTrackedTracker key="guest"
           concerts={guest.concerts}

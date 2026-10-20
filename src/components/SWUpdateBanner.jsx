@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { checkAppUpdate } from '../lib/checkAppUpdate'
 import { publishUpdateState } from '../lib/swUpdate'
 
 // * Self-contained: owns the SW registration hook. Isolated here so a failure in
@@ -12,13 +13,27 @@ import { publishUpdateState } from '../lib/swUpdate'
 // * Dismissing means *later*, not never: the pending state is published to the
 // * shared store so Settings keeps offering the update until it's taken.
 export default function SWUpdateBanner() {
-  const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW()
+  const [dismissed, setDismissed] = useState(false)
+  const [registration, setRegistration] = useState(null)
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
+    onRegisteredSW(_url, reg) { setRegistration(reg) },
+    onRegisterError() { publishUpdateState({ result: 'failed' }) },
+  })
+  useEffect(() => {
+    publishUpdateState({ check: async () => {
+      publishUpdateState({ checking: true, result: null })
+      const result = await checkAppUpdate(registration, { online: navigator.onLine })
+      publishUpdateState({ checking: false, result, checkedAt: Date.now(), ...(result === 'found' ? { pending: true } : {}) })
+      if (result === 'found') setDismissed(false)
+    } })
+  }, [registration])
 
   useEffect(() => {
+    if (needRefresh) setDismissed(false)
     publishUpdateState({ pending: needRefresh, apply: () => updateServiceWorker(true) })
   }, [needRefresh]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!needRefresh) return null
+  if (!needRefresh || dismissed) return null
 
   return (
     <div style={{
@@ -35,7 +50,7 @@ export default function SWUpdateBanner() {
         New version available
       </div>
       <button
-        onClick={() => setNeedRefresh(false)}
+        onClick={() => setDismissed(true)}
         style={{ background: 'none', border: 'none', color: '#6b6a8f', cursor: 'pointer', fontSize: 11, fontFamily: "'DM Mono', monospace", padding: '4px 2px', flexShrink: 0 }}
       >Later</button>
       <button

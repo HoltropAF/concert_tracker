@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 
-let state = { pending: false, apply: null }
+let state = { pending: false, apply: null, check: null, checking: false, result: null, checkedAt: null }
 const listeners = new Set()
 
 export function publishUpdateState(next) {

@@ -3327,13 +3327,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <div style={labelStyle}>Setlist</div>
               {performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
                 const { color, bg } = roleConfig[role] || roleConfig.support;
-                const isOpen = expandedSupportSetlists.has(key);
                 return (
                   <div key={key} style={{ marginBottom: 6 }}>
-                    <button onClick={() => toggleSupportSetlist(key)} style={{
+                    <div style={{
                       width: '100%', textAlign: 'left', background: '#13131f',
                       border: '1px solid #1f1f35', borderLeft: `3px solid ${color}`,
-                      borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
+                      borderRadius: 10, padding: '10px 14px',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3344,10 +3343,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                         {songs.length > 0
                           ? <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>♫ {getSongList(songs).length}</span>
                           : <span style={{ color: '#4a4870', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>+ setlist</span>}
-                        <span style={{ color: '#4a4870', fontSize: 10, lineHeight: 1 }}>{isOpen ? '▴' : '▾'}</span>
                       </div>
-                    </button>
-                    {isOpen && (
+                    </div>
+                    {(
                       <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: `2px solid ${color}44` }}>
                         {songs.length > 0 && settings.spotifyAccessToken && (
                           <button
@@ -10202,25 +10200,18 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       )}
 
-      {/* * Dismissing the update banner means "later", not "never" — so the offer
-          * lives here permanently until it's taken. Sits above the tabs so it's the
-          * first thing on the page, on whichever tab you land on. */}
-      {swUpdate.pending && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-          background: "#1a1a30", border: "1px solid #f87171", borderRadius: 10, padding: "11px 13px",
-        }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f87171", flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>New version available</div>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Reloads the app — nothing is lost</div>
-          </div>
-          <button
-            onClick={() => swUpdate.apply?.()}
-            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
-          >Update</button>
+      <div style={{ background: '#1a1a30', border: '1px solid #30284d', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, color: '#e2e0ff', marginBottom: 6 }}>App updates</div>
+        <div style={{ fontSize: 12, color: '#9491b8', marginBottom: 10 }}>Installed version: v{APP_VERSION}</div>
+        <div role="status" style={{ fontSize: 13, color: '#c4c2f0', marginBottom: 10 }}>
+          {swUpdate.pending ? 'A new version is ready. Save your edits before updating.' : swUpdate.checking ? 'Checking and downloading any available update…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Connect to the internet and try again.', failed: 'Could not complete the update check. Please try again.', unsupported: 'Updates are not available here yet. Open the installed app or deployed site and try again.' }[swUpdate.result] || 'Check whether a new version is available.')}
         </div>
-      )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {swUpdate.pending && <button type="button" onClick={() => swUpdate.apply?.()} style={{ background: '#a78bfa', color: '#0c0c14', border: 0, borderRadius: 8, padding: '12px 16px', fontWeight: 700 }}>Update now</button>}
+          <button type="button" disabled={swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.check?.()} style={{ background: 'none', color: '#c4b5fd', border: '1px solid #51416e', borderRadius: 8, padding: '12px 16px', opacity: swUpdate.checking || !swUpdate.check ? 0.5 : 1 }}>{swUpdate.checking ? 'Checking…' : 'Check for updates'}</button>
+        </div>
+        {swUpdate.checkedAt && <div style={{ color: '#9491b8', fontSize: 11, marginTop: 8 }}>Last checked: {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>}
+      </div>
 
       {/* * Same reasoning as the update row: dismissing the install banner should be
           * "not now". The browser only ever offers the prompt once per visit, so if
@@ -10247,7 +10238,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           * you came in to change a colour. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 2px" }}>
         <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
-          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Up to date · v${APP_VERSION}`}
+          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
         </span>
         {releases !== null && releases.length > 0 && (
           <button onClick={() => { setShowAllReleases(false); setWhatsNewOpen(true); }} style={{

@@ -4340,12 +4340,12 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
 
 
-          {/* Countdown — one next show, hidden when browsing other years */}
+          {/* Countdown — three for All, one for this year, hidden for other years */}
           {!(settings.hiddenSummaryBlocks||[]).includes("upnext") && !summaryFavOnly && (summaryYear === 'all' || summaryYear === String(new Date().getFullYear())) && (() => {
             const upcoming = concerts
               .filter(c => !isWish(c) && !isPast(c.date) && c.date && c.date !== '9999-12-31')
               .sort((a,b) => a.date.localeCompare(b.date))
-              .slice(0, 1);
+              .slice(0, summaryYear === 'all' ? 3 : 1);
             if (upcoming.length === 0) return null;
             const todayMs = new Date().setHours(0,0,0,0);
             return (

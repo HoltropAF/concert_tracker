@@ -45,12 +45,13 @@ export async function checkWish(concert, { fetcher = fetch, signal, sources = ['
   let checkedAt, hasMore = false
   const reports=[]
   for (const source of sources) {
-    let pages=0, count=0, error=null
+    let pages=0, count=0, error=null, skipped=null
     for (let page=1;page<=5;page++) {
       try {
         const response=await fetcher(`/api/upcoming?${new URLSearchParams({...query,source,page:String(page)})}`,{signal})
         const data=await response.json()
         if(!response.ok || !Array.isArray(data.events))throw Error(data.error || 'Source unavailable')
+        if(data.skipped) { skipped=data.skipped;break }
         pages++; checkedAt=data.checkedAt
         for(const event of data.events) {
           if(typeof event.artist!=='string'||!event.id||!safeTicketUrl(event.url))continue
@@ -60,11 +61,11 @@ export async function checkWish(concert, { fetcher = fetch, signal, sources = ['
         if(!hasMore)break
       } catch(e) {error=e.message;hasMore=true;break}
     }
-    reports.push({source,count,pages,error,checkedAt:new Date().toISOString()})
+    reports.push({source,count,pages,error,skipped,checkedAt:new Date().toISOString()})
     if(signal?.aborted)break
   }
   if(!sources.length)throw Error('Enable a concert search source in Settings → Integrations.')
   const candidates = [...events.values()]
   const exact = candidates.filter(event => isSameWish(concert, event))
-  return { events: exact.length ? exact : candidates, exact: exact.length === 1, checkedAt, limited: hasMore || reports.some(r=>r.error), reports, status: candidates.length ? 'found' : reports.some(r=>r.error) ? 'error' : 'empty', message: reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ') }
+  return { events: exact.length ? exact : candidates, exact: exact.length === 1, checkedAt, limited: hasMore || reports.some(r=>r.error), reports, status: candidates.length ? 'found' : reports.some(r=>r.error) ? (reports.some(r=>r.pages>0)?'partial':'error') : reports.every(r=>r.skipped)?'skipped':'empty', message: reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ') }
 }

@@ -32,7 +32,7 @@ export function parseUpcomingPage(html, query, today, checkedAt) {
 export async function searchUpcoming(query, fetcher=fetch, now=new Date()) {
   const params=new URLSearchParams({q:query.artist || query.venue,page:String(query.page-1)})
   const response=await fetcher(`${site}/search?${params}`,{headers:{Accept:'text/html'},signal:AbortSignal.timeout(12000)})
-  if(!response.ok)throw Error('Ticketmaster is temporarily unavailable. Please try again later.')
+  if(!response.ok) { const error=Error(`Ticketmaster returned HTTP ${response.status}.`);error.sourceStatus=response.status;throw error }
   const reader=response.body.getReader(),decoder=new TextDecoder()
   let html='',bytes=0
   try {

@@ -40,7 +40,7 @@ test('wishlist draft keeps provenance and does not assume festival attendance or
 test('HTTP boundary reads provider response, reports failure and rejects invalid filters without searching',async()=>{
   const result=await searchUpcoming(query,async()=>new Response(page([event])))
   assert.equal(result.events.length,1)
-  await assert.rejects(searchUpcoming(query,async()=>new Response('',{status:403})),/unavailable/)
+  await assert.rejects(searchUpcoming(query,async()=>new Response('',{status:403})),/HTTP 403/)
   let status,body
   await handler({method:'GET',query:{artist:['bad'],today:'2026-10-13'}},{status(n){status=n;return this},json(v){body=v}})
   assert.equal(status,400);assert.match(body.error,/Invalid/)

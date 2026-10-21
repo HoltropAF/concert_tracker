@@ -52,3 +52,9 @@ test('a failed later page preserves earlier source results', async()=>{
  assert.equal(result.reports[0].error,'blocked')
  assert.equal(result.limited,true)
 })
+
+test('empty working source plus failed source is incomplete, not total failure',async()=>{
+ const result=await checkWish({artist:'Artist'},{fetcher:async url=>({ok:!url.includes('source=ticketmaster'),json:async()=>url.includes('source=ticketmaster')?{error:'Refused'}:{events:[],hasMore:false}})})
+ assert.equal(result.status,'partial')
+ assert.equal(result.reports[1].pages,1)
+})

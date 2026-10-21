@@ -41,7 +41,9 @@ function statusText(result) {
   if (result.status === 'checking') return 'Checking…'
   if (result.status === 'error') return 'Couldn’t check · try again'
   if (result.status === 'saved') return 'Updates saved'
-  if (result.status === 'empty') return 'No matches found in this source'
+  if (result.status === 'partial') return 'Check incomplete · no matches in available sources'
+  if (result.status === 'skipped') return 'Enabled sources don’t cover this location'
+  if (result.status === 'empty') return 'Checked · no matching listings'
   return result.exact ? 'Show found · review details' : 'Possible matches · choose a show'
 }
 export function WishlistUpdateBadge({ concert }) {
@@ -111,8 +113,8 @@ export default function WishlistUpdateDetails({ concert, onSave }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={muted}>UPDATES</span><button type="button" disabled={!!ctx.progress} style={action} onClick={() => ctx.check([concert])}>Check for news ↻</button></div>
       <p style={muted}>Uses the sources enabled in Settings. Coverage varies; no results does not mean sold out.</p>
       <p role="status" style={muted}>{statusText(result)}{result?.checkedAt ? ` · ${new Date(result.checkedAt).toLocaleString()}` : ''}</p>
-      {result?.reports?.map(report => <p key={report.source} style={muted}>{report.source}: {report.error ? (report.pages ? 'Partial results — ' : 'Unavailable — ') + report.error : `${report.count} results checked`}</p>)}
-      {result?.message && <p style={muted}>{result.message}</p>}
+      {result?.reports?.map(report => <p key={report.source} style={muted}>{report.source}: {report.skipped || (report.error ? (report.pages ? 'Partial results — ' : 'Unavailable — ') + report.error : report.count ? `${report.count} matching listings` : 'Checked · no matches')}</p>)}
+      {result?.message && !result?.reports?.length && <p style={muted}>{result.message}</p>}
       {result?.limited && <p style={muted}>More results may exist beyond the checked pages.</p>}
       {result?.status === 'found' && result.events.map(event => <button type="button" key={event.id} onClick={() => review(event)} style={{ ...action, textAlign: 'left', display: 'block', width: '100%', borderTop: '1px solid #29233c' }}>
         {event.artist}<span style={{ ...muted, display: 'block' }}>{event.date} · {event.venue} · {event.city}</span><span>{result.exact ? 'Review updates →' : 'Possible match · review →'}</span>
@@ -148,7 +150,7 @@ export function ConcertSearchSettings({ settings, onChange }) {
     <p style={muted}>Public listings; no account connection needed. Save Settings to apply. Status is from this session.</p>
     {['ticketmaster','mojo'].map(source => <div key={source} style={{marginBottom:8}}>
       <label style={{display:'flex',gap:10,alignItems:'center',minHeight:44,color:'#c4c2f0',fontSize:13}}><input type="checkbox" checked={settings.concertSearchSources?.[source] !== false} onChange={e=>onChange({...settings.concertSearchSources,[source]:e.target.checked})}/>{source==='mojo'?'MOJO · Dutch promoter agenda':'Ticketmaster · ticket listings'}</label>
-      <div style={muted}>{ctx?.sourceStatus[source] ? (ctx.sourceStatus[source].error ? 'Unavailable / partial' : 'Working')+' · '+new Date(ctx.sourceStatus[source].checkedAt).toLocaleString() : 'Not checked'}</div>
+      <div style={muted}>{ctx?.sourceStatus[source] ? (ctx.sourceStatus[source].skipped ? 'Outside coverage' : ctx.sourceStatus[source].error ? 'Unavailable / partial' : 'Working')+' · '+new Date(ctx.sourceStatus[source].checkedAt).toLocaleString() : 'Not checked'}</div>
     </div>)}
   </div>
 }

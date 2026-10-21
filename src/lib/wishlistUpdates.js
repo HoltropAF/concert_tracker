@@ -6,7 +6,7 @@ export const updateFields = { date: 'Show date', venue: 'Venue', city: 'City', c
 export function safeTicketUrl(value) {
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' && /(^|\.)ticketmaster\.(nl|be|de|fr|com|co\.uk)$/i.test(url.hostname) ? url.href : ''
+    return url.protocol === 'https:' && /(^|\.)(ticketmaster\.(nl|be|de|fr|com|co\.uk)|mojo\.nl)$/i.test(url.hostname) ? url.href : ''
   } catch { return '' }
 }
 export function isSameWish(concert, event) {
@@ -37,26 +37,34 @@ export function applyWishUpdates(concert, event, selected) {
     },
   }
 }
-export async function checkWish(concert, { fetcher = fetch, signal, now = new Date() } = {}) {
+export async function checkWish(concert, { fetcher = fetch, signal, sources = ['ticketmaster', 'mojo'], now = new Date() } = {}) {
   if (!String(concert.artist || '').trim()) throw Error('Add an artist before checking.')
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const query = { artist: concert.artist, country: discoveryCountry(concert.country), today }
   const events = new Map()
   let checkedAt, hasMore = false
-  // Bounded, sequential pagination; no unsupported venue/date assumptions.
-  for (let page = 1; page <= 5; page++) {
-    const response = await fetcher(`/api/upcoming?${new URLSearchParams({ ...query, page: String(page) })}`, { signal })
-    const data = await response.json()
-    if (!response.ok || !Array.isArray(data.events)) throw Error(data.error || 'Could not check the ticket source.')
-    checkedAt = data.checkedAt
-    for (const event of data.events) {
-      if (typeof event.artist !== 'string' || !event.id || !safeTicketUrl(event.url)) continue
-      events.set(event.id, event)
+  const reports=[]
+  for (const source of sources) {
+    let pages=0, count=0, error=null
+    for (let page=1;page<=5;page++) {
+      try {
+        const response=await fetcher(`/api/upcoming?${new URLSearchParams({...query,source,page:String(page)})}`,{signal})
+        const data=await response.json()
+        if(!response.ok || !Array.isArray(data.events))throw Error(data.error || 'Source unavailable')
+        pages++; checkedAt=data.checkedAt
+        for(const event of data.events) {
+          if(typeof event.artist!=='string'||!event.id||!safeTicketUrl(event.url))continue
+          events.set(event.id,event);count++
+        }
+        hasMore=Boolean(data.hasMore)
+        if(!hasMore)break
+      } catch(e) {error=e.message;hasMore=true;break}
     }
-    hasMore = data.hasMore
-    if (!hasMore) break
+    reports.push({source,count,pages,error,checkedAt:new Date().toISOString()})
+    if(signal?.aborted)break
   }
+  if(!sources.length)throw Error('Enable a concert search source in Settings → Integrations.')
   const candidates = [...events.values()]
   const exact = candidates.filter(event => isSameWish(concert, event))
-  return { events: exact.length ? exact : candidates, exact: exact.length === 1, checkedAt, limited: hasMore, status: candidates.length ? 'found' : 'empty' }
+  return { events: exact.length ? exact : candidates, exact: exact.length === 1, checkedAt, limited: hasMore || reports.some(r=>r.error), reports, status: candidates.length ? 'found' : reports.some(r=>r.error) ? 'error' : 'empty', message: reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ') }
 }

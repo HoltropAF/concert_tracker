@@ -7,8 +7,9 @@ const Context = createContext(null)
 const action = { background: 'none', border: 0, color: '#a78bfa', cursor: 'pointer', minHeight: 44, padding: '8px 2px', fontSize: 12 }
 const muted = { color: '#9491b8', fontSize: 12, lineHeight: 1.5 }
 const section = { borderBottom: '1px solid #29233c', padding: '12px 0' }
-export function WishlistUpdateProvider({ children }) {
+export function WishlistUpdateProvider({ children, settings = {} }) {
   const [results, setResults] = useState({})
+  const [sourceStatus, setSourceStatus] = useState({})
   const [progress, setProgress] = useState(null)
   const lock = useRef(false), controller = useRef(null)
   useEffect(() => () => controller.current?.abort(), [])
@@ -24,7 +25,8 @@ export function WishlistUpdateProvider({ children }) {
         setResults(previous => ({ ...previous, [concert.id]: { status: 'checking' } }))
         const timeout = setTimeout(() => abort.abort(), 90000)
         try {
-          const result = await checkWish(concert, { signal: abort.signal })
+          const result = await checkWish(concert, { signal: abort.signal, sources: ['ticketmaster','mojo'].filter(source => settings.concertSearchSources?.[source] !== false) })
+          setSourceStatus(previous => ({...previous,...Object.fromEntries((result.reports||[]).map(report=>[report.source,report]))}))
           setResults(previous => ({ ...previous, [concert.id]: result }))
         } catch (error) {
           setResults(previous => ({ ...previous, [concert.id]: { status: 'error', message: abort.signal.aborted ? 'Check stopped or timed out. Try again.' : error.message } }))
@@ -32,7 +34,7 @@ export function WishlistUpdateProvider({ children }) {
       }
     } finally { lock.current = false; setProgress(null) }
   }
-  return <Context.Provider value={{ results, check, progress, stop: () => controller.current?.abort(), reviewed: id => setResults(previous => ({ ...previous, [id]: { ...previous[id], status: 'saved' } })) }}>{children}</Context.Provider>
+  return <Context.Provider value={{ results, sourceStatus, check, progress, stop: () => controller.current?.abort(), reviewed: id => setResults(previous => ({ ...previous, [id]: { ...previous[id], status: 'saved' } })) }}>{children}</Context.Provider>
 }
 function statusText(result) {
   if (!result) return ''
@@ -53,7 +55,7 @@ export function WishlistCheckAll({ concerts }) {
   const wishes = concerts.filter(c => c.wishlist)
   return <div style={{ marginBottom: 8 }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <span style={muted}>{ctx.progress ? `Checking ${ctx.progress.done + 1} of ${ctx.progress.total}` : 'Ticketmaster · limited coverage'}</span>
+      <span style={muted}>{ctx.progress ? `Checking ${ctx.progress.done + 1} of ${ctx.progress.total}` : 'Search enabled sources'}</span>
       <button type="button" style={action} onClick={() => ctx.progress ? ctx.stop() : ctx.check(wishes)}>{ctx.progress ? 'Stop' : 'Check all for updates ↻'}</button>
     </div>
     {!ctx.progress && wishes.some(c => ctx.results[c.id]) && <p role="status" style={muted}>Checked {wishes.filter(c => ctx.results[c.id]).length} of {wishes.length} · open a show to review its result.</p>}
@@ -107,8 +109,9 @@ export default function WishlistUpdateDetails({ concert, onSave }) {
     </div>
     <div style={section}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={muted}>UPDATES</span><button type="button" disabled={!!ctx.progress} style={action} onClick={() => ctx.check([concert])}>Check for news ↻</button></div>
-      <p style={muted}>Ticketmaster Netherlands only; announcements and availability may be missing. A missing result does not mean sold out.</p>
+      <p style={muted}>Uses the sources enabled in Settings. Coverage varies; no results does not mean sold out.</p>
       <p role="status" style={muted}>{statusText(result)}{result?.checkedAt ? ` · ${new Date(result.checkedAt).toLocaleString()}` : ''}</p>
+      {result?.reports?.map(report => <p key={report.source} style={muted}>{report.source}: {report.error ? (report.pages ? 'Partial results — ' : 'Unavailable — ') + report.error : `${report.count} results checked`}</p>)}
       {result?.message && <p style={muted}>{result.message}</p>}
       {result?.limited && <p style={muted}>More results may exist beyond the checked pages.</p>}
       {result?.status === 'found' && result.events.map(event => <button type="button" key={event.id} onClick={() => review(event)} style={{ ...action, textAlign: 'left', display: 'block', width: '100%', borderTop: '1px solid #29233c' }}>
@@ -135,5 +138,17 @@ export default function WishlistUpdateDetails({ concert, onSave }) {
         <button type="button" disabled={!confirmed || busy} onClick={save} style={{ ...action, width: '100%', background: '#a78bfa', color: '#0c0c14', borderRadius: 9, fontWeight: 700, opacity: !confirmed || busy ? 0.5 : 1 }}>{busy ? 'Saving…' : 'Save updates to Want to go'}</button>
       </div>
     </div>, document.body)}
+  </div>
+}
+
+export function ConcertSearchSettings({ settings, onChange }) {
+  const ctx=useContext(Context)
+  return <div style={{padding:'14px 16px',borderBottom:'1px solid #29233c'}}>
+    <strong style={{color:'#c4b5fd',fontSize:13}}>Concert search sources</strong>
+    <p style={muted}>Public listings; no account connection needed. Save Settings to apply. Status is from this session.</p>
+    {['ticketmaster','mojo'].map(source => <div key={source} style={{marginBottom:8}}>
+      <label style={{display:'flex',gap:10,alignItems:'center',minHeight:44,color:'#c4c2f0',fontSize:13}}><input type="checkbox" checked={settings.concertSearchSources?.[source] !== false} onChange={e=>onChange({...settings.concertSearchSources,[source]:e.target.checked})}/>{source==='mojo'?'MOJO · Dutch promoter agenda':'Ticketmaster · ticket listings'}</label>
+      <div style={muted}>{ctx?.sourceStatus[source] ? (ctx.sourceStatus[source].error ? 'Unavailable / partial' : 'Working')+' · '+new Date(ctx.sourceStatus[source].checkedAt).toLocaleString() : 'Not checked'}</div>
+    </div>)}
   </div>
 }

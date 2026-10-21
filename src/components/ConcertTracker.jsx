@@ -1,4 +1,4 @@
-import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge } from './WishlistUpdates'
+import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
 import { withCriedTag } from '../lib/criedTag'
 // * The entire settracker UI lives in this one module. It is deliberately a single
 // * file: every view reads from the same `concerts` array and `settings` object
@@ -10860,6 +10860,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
         {/* Integrations */}
         <SettingsSection title="Integrations" icon="plug" collapsible defaultOpen={false} subtitle={settings.spotifyAccessToken ? { label: 'Spotify connected', color: '#4ade80' } : { label: 'Not connected', color: '#4a4870' }}>
+          <ConcertSearchSettings settings={local} onChange={value => lUpdate("concertSearchSources", value)} />
           <div style={{ padding: "14px 16px" }}>
             {(() => {
               const spotifyConnected = Boolean(settings.spotifyAccessToken)
@@ -11285,7 +11286,7 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
 // * `settingsLoaded` distinguishes "still defaults" from "really yours" and gates
 // * anything that would be wrong under defaults — currently the onboarding tour.
 export default function ConcertTracker(props) {
-  return <WishlistUpdateProvider><ConcertTrackerContent {...props} /></WishlistUpdateProvider>
+  return <WishlistUpdateProvider settings={props.settings}><ConcertTrackerContent {...props} /></WishlistUpdateProvider>
 }
 
 function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {

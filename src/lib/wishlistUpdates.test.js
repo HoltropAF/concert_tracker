@@ -35,11 +35,20 @@ test('checks paginate and distinguish empty results from provider failures', asy
     pages.push(page)
     return { ok: true, json: async () => ({ events: page === '1' ? [] : [event], hasMore: page === '1', checkedAt: event.checkedAt }) }
   }
-  const result = await checkWish({ artist: 'Artist', country: 'Netherlands' }, { fetcher })
+  const result = await checkWish({ artist: 'Artist', country: 'Netherlands' }, { fetcher, sources: ['ticketmaster'] })
   assert.deepEqual(pages, ['1', '2'])
   assert.equal(result.exact, false)
   assert.equal(result.events.length, 1)
   const empty = await checkWish({ artist: 'Artist' }, { fetcher: async () => ({ ok: true, json: async () => ({ events: [], hasMore: false }) }) })
   assert.equal(empty.status, 'empty')
-  await assert.rejects(checkWish({ artist: 'Artist' }, { fetcher: async () => ({ ok: false, json: async () => ({ error: 'Source unavailable' }) }) }), /Source unavailable/)
+  assert.equal((await checkWish({ artist: 'Artist' }, { fetcher: async () => ({ ok: false, json: async () => ({ error: 'Source unavailable' }) }) })).status, 'error')
+})
+
+test('a failed later page preserves earlier source results', async()=>{
+ let calls=0
+ const result=await checkWish({artist:'Artist'},{sources:['ticketmaster'],fetcher:async()=>({ok:++calls===1,json:async()=>calls===1?{events:[event],hasMore:true}:{error:'blocked'}})})
+ assert.equal(result.events.length,1)
+ assert.equal(result.status,'found')
+ assert.equal(result.reports[0].error,'blocked')
+ assert.equal(result.limited,true)
 })

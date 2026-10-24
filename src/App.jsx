@@ -31,10 +31,10 @@ function SaveTrackedTracker(props) {
   }, [status.pending, status.failed])
   return <>
     <ConcertTracker {...props}
-      onSaveConcert={concert => queue.run(`concert:${concert.id}`, () => props.onSaveConcert(concert))}
+      onSaveConcert={(concert,options) => queue.run(`concert:${concert.id}`, () => props.onSaveConcert(concert), options)}
       onDeleteConcert={id => queue.run(`concert:${id}`, () => props.onDeleteConcert(id))}
       onUpdateSetting={(key,value) => queue.run(`setting:${key}`, () => props.onUpdateSetting(key,value))}
-      onUpdateSettings={settings => queue.run('settings', () => props.onUpdateSettings(settings))}
+      onUpdateSettings={(settings,options) => queue.run('settings', () => props.onUpdateSettings(settings), options)}
     />
     <SaveStatus status={status} onRetry={queue.retry} />
   </>

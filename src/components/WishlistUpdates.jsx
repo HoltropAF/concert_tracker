@@ -63,7 +63,7 @@ export function WishlistCheckAll({ concerts }) {
     {!ctx.progress && wishes.some(c => ctx.results[c.id]) && <p role="status" style={muted}>Checked {wishes.filter(c => ctx.results[c.id]).length} of {wishes.length} · open a show to review its result.</p>}
   </div>
 }
-export default function WishlistUpdateDetails({ concert, onSave }) {
+export default function WishlistUpdateDetails({ concert, onSave, tab = 'general', onEdit }) {
   const ctx = useContext(Context), result = ctx.results[concert.id]
   const [candidate, setCandidate] = useState(null), [selected, setSelected] = useState([])
   const [confirmed, setConfirmed] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('')
@@ -89,7 +89,7 @@ export default function WishlistUpdateDetails({ concert, onSave }) {
   const save = async () => {
     setBusy(true); setError('')
     try {
-      const response = await onSave(applyWishUpdates(concert, candidate, selected))
+      const response = await onSave(applyWishUpdates(concert, candidate, selected), {notify:true})
       if (response?.error) throw Error('Could not save updates. Please try again.')
       ctx.reviewed(concert.id); setCandidate(null)
     } catch (e) { setError(e.message) } finally { setBusy(false) }
@@ -103,26 +103,32 @@ export default function WishlistUpdateDetails({ concert, onSave }) {
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
   return <div style={{ marginBottom: 16 }}>
+    {tab === 'general' && <>
     <div style={section}><div style={muted}>SHOW DETAILS</div><div>{validDate(concert.date) ? concert.date : 'Date not announced / not entered'}</div><div style={muted}>{[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ') || 'Venue not announced / not entered'}</div></div>
     <div style={section}><div style={muted}>TICKETS</div>
-      <p style={muted}>{concert.ticketSaleAt ? `Sale: ${concert.ticketSaleAt.replace('T', ' ')} (your local time)` : 'No ticket-sale date saved.'}</p>
+      <p style={muted}>{concert.ticketSaleAt ? `${new Date(concert.ticketSaleAt).getTime() <= Date.now() ? 'Sale started' : 'Sale starts'}: ${new Date(concert.ticketSaleAt).toLocaleString([], {dateStyle:'medium', timeStyle:'short'})}` : 'Sale date not announced / not entered'}</p>
       {safeTicketUrl(concert.ticketSaleLink) && <a href={safeTicketUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={action}>Open ticket seller ↗</a>}
       <p style={muted}>{concert.discovery?.status || 'Availability unknown — check seller.'}{concert.discovery?.checkedAt ? ` · Checked ${new Date(concert.discovery.checkedAt).toLocaleString()}` : ''}</p>
     </div>
     <div style={section}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={muted}>UPDATES</span><button type="button" disabled={!!ctx.progress} style={action} onClick={() => ctx.check([concert])}>Check for news ↻</button></div>
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}><span style={muted}>YOUR NOTES</span><button type="button" onClick={onEdit} style={action}>{concert.notes ? 'Edit notes' : 'Add notes'}</button></div>
+      <p style={{...muted, whiteSpace:'pre-wrap', marginTop:0}}>{concert.notes || 'Who would you go with? Any preferred city or plans to remember?'}</p>
+    </div>
+    </>}
+    {tab === 'updates' && <div style={section}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={muted}>UPDATES</span><button type="button" disabled={!!ctx.progress} style={action} onClick={() => ctx.check([concert])}>Check for updates ↻</button></div>
       <p style={muted}>Uses the sources enabled in Settings. Coverage varies; no results does not mean sold out.</p>
-      <p role="status" style={muted}>{statusText(result)}{result?.checkedAt ? ` · ${new Date(result.checkedAt).toLocaleString()}` : ''}</p>
-      {result?.reports?.map(report => <p key={report.source} style={muted}>{report.source}: {report.skipped || (report.error ? (report.pages ? 'Partial results — ' : 'Unavailable — ') + report.error : report.count ? `${report.count} matching listings` : 'Checked · no matches')}</p>)}
+      <p role="status" style={muted}>{result ? statusText(result) : concert.discovery?.checkedAt ? `Last checked ${new Date(concert.discovery.checkedAt).toLocaleString()}` : 'Not checked yet. Search for dates, venues and ticket news.'}{result?.checkedAt ? ` · ${new Date(result.checkedAt).toLocaleString()}` : ''}</p>
+      {!!result?.reports?.length && <details style={muted}><summary style={{cursor:'pointer', padding:'10px 0'}}>Sources checked</summary>{result.reports.map(report => <p key={report.source} style={muted}>{report.source}: {report.skipped || (report.error ? (report.pages ? 'Partial results — ' : 'Unavailable — ') + report.error : report.count ? `${report.count} matching listings` : 'Checked · no matches')}</p>)}</details>}
       {result?.message && !result?.reports?.length && <p style={muted}>{result.message}</p>}
       {result?.limited && <p style={muted}>More results may exist beyond the checked pages.</p>}
       {result?.status === 'found' && result.events.map(event => <button type="button" key={event.id} onClick={() => review(event)} style={{ ...action, textAlign: 'left', display: 'block', width: '100%', borderTop: '1px solid #29233c' }}>
         {event.artist}<span style={{ ...muted, display: 'block' }}>{event.date} · {event.venue} · {event.city}</span><span>{result.exact ? 'Review updates →' : 'Possible match · review →'}</span>
       </button>)}
-    </div>
+    </div>}
     {error && !candidate && <p role="alert" style={{ color: '#fda4af' }}>{error}</p>}
-    {moving ? <div style={section}><p style={muted}>Move this show to Going? Your details and notes stay saved.</p><button type="button" style={action} disabled={busy} onClick={move}>Yes, I have tickets</button><button type="button" style={{ ...action, marginLeft: 14 }} disabled={busy} onClick={() => setMoving(false)}>Cancel</button></div>
-      : <button type="button" style={action} onClick={() => setMoving(true)}>Got tickets → Going</button>}
+    {tab === 'general' && (moving ? <div style={section}><p style={muted}>Move this show to Going? Your details and notes stay saved.</p><button type="button" style={action} disabled={busy} onClick={move}>Yes, I have tickets</button><button type="button" style={{ ...action, marginLeft: 14 }} disabled={busy} onClick={() => setMoving(false)}>Cancel</button></div>
+      : <button type="button" style={{...action, width:'100%', marginTop:16, borderRadius:9, background:'#a78bfa', color:'#0c0c14', fontWeight:700}} onClick={() => setMoving(true)}>Got tickets → Going</button>)}
     {candidate && createPortal(<div style={{ position: 'fixed', inset: 0, background: '#000b', zIndex: 6000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div role="dialog" aria-modal="true" aria-labelledby="wish-review-title" style={{ width: '100%', maxWidth: 480, maxHeight: '90dvh', overflowY: 'auto', boxSizing: 'border-box', background: '#13131f', color: '#e2e0ff', borderRadius: '16px 16px 0 0', padding: '16px 20px 28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2 id="wish-review-title" style={{ fontSize: 18 }}>Review updates</h2><button ref={closeRef} type="button" style={action} disabled={busy} onClick={() => setCandidate(null)}>Close</button></div>

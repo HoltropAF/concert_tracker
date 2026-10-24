@@ -1451,6 +1451,8 @@ function CalendarMode({ concerts, month, onMonthChange, selectedDate, onSelectDa
 // * `compact` is forced on for any not-yet-happened show: there is no photo,
 // * rating or setlist to show yet, so the full card would be mostly empty.
 function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showVenue = true, showGenreTags = true, onDelete = null }) {
+  const saleTime = concert.ticketSaleAt ? new Date(concert.ticketSaleAt).getTime() : NaN;
+  const saleStarted = saleTime <= Date.now();
   const past = isPast(concert.date) && !concert.wishlist;
   const effectiveCompact = compact || !past;
   const isFestival = concert.type === "festival";
@@ -1513,8 +1515,10 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         ) : !past ? (
           <span style={{ fontSize: 10, color: "#818cf8", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>upcoming</span>
         ) : null}
-        {concert.wishlist && concert.ticketSaleAt && (
-          <span style={{ fontSize: 11, flexShrink: 0 }}>🔔</span>
+        {concert.wishlist && Number.isFinite(saleTime) && (
+          <span title={saleStarted ? 'Sale started — check seller for availability' : 'Ticket sale upcoming'} aria-label={saleStarted ? 'Sale started — check seller for availability' : 'Ticket sale upcoming'} style={{ fontSize: 11, flexShrink: 0 }}>
+            {saleStarted ? '🎫' : '🔔'}
+          </span>
         )}
       </button>
     );
@@ -2358,12 +2362,16 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           {/* Tabs */}
           <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-            {[['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])].map(([id, label]) => (
+            {(concert.wishlist ? [['general', 'Overview'], ['updates', 'Updates']] : [['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])]).map(([id, label]) => (
               <button key={id} onClick={() => setDetailTab(id)} style={{ flex: 1, background: detailTab === id ? "#1a1a30" : "none", border: `1px solid ${detailTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 8, padding: "7px 0", fontSize: 12, fontWeight: detailTab === id ? 700 : 400, color: detailTab === id ? "#a78bfa" : "#6b6a8f", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{label}</button>
             ))}
           </div>
 
-          {detailTab === 'general' && (
+          {concert.wishlist && <>
+            {detailTab === 'general' && concert.photo && <PhotoImg path={concert.photo} pos={concert.photoPos} variant="detail" style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, marginBottom: 12 }} />}
+            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} tab={detailTab} onEdit={() => setEditing(true)} />
+          </>}
+          {!concert.wishlist && detailTab === 'general' && (
           <>
           {/* Photo */}
           {concert.photo && (
@@ -2372,7 +2380,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             </div>
           )}
 
-          {concert.wishlist ? <WishlistUpdateDetails key={concert.id} concert={concert} onSave={onSave} /> : ticketSaleBlock}
+          {ticketSaleBlock}
           {/* Stat cards */}
           {statCards.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
@@ -2422,7 +2430,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
-          {detailTab === 'general' && <CalendarExport concert={concert} />}
+          {!concert.wishlist && detailTab === 'general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div>
@@ -2495,14 +2503,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           )}
 
           {/* Notes */}
-          {detailTab === 'general' && concert.notes && (
+          {!concert.wishlist && detailTab === 'general' && concert.notes && (
             <div style={detailCard}>
               {sec("Notes")}
               <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>
             </div>
           )}
 
-          {detailTab === 'general' && !concert.notes && (
+          {!concert.wishlist && detailTab === 'general' && !concert.notes && (
             <div style={{ textAlign: "center", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", padding: "24px 0" }}>no notes added</div>
           )}
 
@@ -2904,7 +2912,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         </div>
         <button onClick={async () => {
           if (photoBusy) return;
-          const result = await onSave(form);
+          const result = await onSave(form, {notify:true});
           if (result?.error) return;
           // * Only now is the show definitely no longer referencing these files.
           // * A failure here leaves an unreferenced file behind, which is untidy but
@@ -9635,7 +9643,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     for (const k of edited) next[k] = local[k];
 
     const result = onUpdateAll
-      ? await onUpdateAll(next)
+      ? await onUpdateAll(next, {notify:true})
       : await edited.reduce(
           (chain, k) => chain.then(() => onUpdate(k, local[k])),
           Promise.resolve()
@@ -9647,7 +9655,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     dirtyKeys.current = new Set();
     setSaved(true);
     onNotify('Settings saved');
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   const categories = local.merchCategories || [];
@@ -11480,11 +11488,11 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     })
   }
 
-  const handleSave = async (updated) => {
+  const handleSave = async (updated, options) => {
     setNavLoading(true)
-    const result = await onSaveConcert(updated)
+    const result = await onSaveConcert(updated, options)
     setNavLoading(false)
-    notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success')
+    if (result?.error) notify('Could not save show', 'error')
     if (result?.error) return result
     setSelected(updated)
     maybeGeocodeVenue(updated)
@@ -11521,8 +11529,8 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     return onUpdateSetting(key, value)
   }
 
-  const updateSettings = (next) => {
-    return onUpdateSettings ? onUpdateSettings(next) : Promise.resolve()
+  const updateSettings = (next, options) => {
+    return onUpdateSettings ? onUpdateSettings(next, options) : Promise.resolve()
   }
 
   const years = [...new Set(concerts.filter(c => c.date !== '9999-12-31').map(c => c.date.slice(0,4)))].sort().reverse()
@@ -11764,7 +11772,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <AddConcertForm
           onSave={async c => {
-            const result = await onSaveConcert(c);
+            const result = await onSaveConcert(c, {notify:true});
             notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success');
             if (result?.error) return;
             setShowAdd(null); setDiscoveryDraft(null); savedScrollPos.current = 0; setSelected(c);

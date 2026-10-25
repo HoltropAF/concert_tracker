@@ -1,3 +1,4 @@
+import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
 import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
 import { withCriedTag } from '../lib/criedTag'
 // * The entire settracker UI lives in this one module. It is deliberately a single
@@ -3487,7 +3488,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   } = settings;
   const [chartType, setChartType] = useState('all');
   const typeMatch = c => chartType === 'all' || c.type === (chartType === 'festivals' ? 'festival' : 'concert');
-  const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
+  const pastAll = combinedShows.filter(c => !isWish(c) && isPast(c.date));
   const concertsT = concerts.filter(c => !isWish(c) && typeMatch(c));
   const past = pastAll.filter(typeMatch);
   const shows = past.filter(c => c.type === "concert");
@@ -6046,9 +6047,11 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [showAddArtistForm, setShowAddArtistForm] = useState(false);
   const [addArtistInput, setAddArtistInput] = useState('');
 
+  const scopedConcerts = concerts.filter(c => matchesShowType(c, filterType));
+
   // Group headliner shows by artist (festivals excluded — their name is not an artist)
   const artistMap = {};
-  concerts.forEach(c => {
+  scopedConcerts.forEach(c => {
     if (c.type === 'festival') return;
     const key = c.artist.trim();
     if (!artistMap[key]) artistMap[key] = [];
@@ -6057,7 +6060,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
   // Build support/guest/festival appearance map
   const supportAppearancesMap = {};
-  concerts.forEach(c => {
+  scopedConcerts.forEach(c => {
     (c.support || []).forEach(s => {
       const name = getSupportName(s).trim();
       const role = getSupportRole(s);
@@ -6089,8 +6092,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const genreCount = {};
     shows.forEach(c => { getGenres(c).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }); });
     const topGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-    const supportApps = (supportAppearancesMap[name] || []).filter(a => isPast(a.concert.date));
-    const upcomingSupportApps = (supportAppearancesMap[name] || []).filter(a => !isPast(a.concert.date));
+    const supportApps = (supportAppearancesMap[name] || []).filter(a => !isWish(a.concert) && isPast(a.concert.date));
+    const upcomingSupportApps = (supportAppearancesMap[name] || []).filter(a => !isWish(a.concert) && !isPast(a.concert.date));
     const supportCount = supportApps.filter(a => a.role === 'support').length;
     const guestCount = supportApps.filter(a => a.role === 'guest').length;
     const festivalCount = supportApps.filter(a => a.role === 'festival').length;
@@ -6120,8 +6123,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       if (filterGenre !== 'all' && a.topGenre !== filterGenre) return false;
       if (filterMinSeen > 0 && (a.pastCount + a.supportCount + a.guestCount + a.festivalCount) < filterMinSeen) return false;
       if (filterUpcoming && a.upcomingShows.length === 0 && a.upcomingSupportApps.length === 0) return false;
-      if (filterType === 'concerts' && a.pastCount === 0) return false;
-      if (filterType === 'festivals' && a.festivalCount === 0 && a.upcomingSupportApps.filter(u => u.role === 'festival').length === 0) return false;
+      if (filterType !== 'all' && a.wantToSee) return false;
+
       if (filterUltGroup && !(settings.ultGroups || []).includes(a.name)) return false;
       return true;
     })
@@ -6193,7 +6196,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
 
     // Songs of this artist covered by others
     const coversByOthers = [];
-    concerts.filter(c => !isWish(c) && isPast(c.date)).forEach(c => {
+    scopedConcerts.filter(c => !isWish(c) && isPast(c.date)).forEach(c => {
       const checkSongs = (songList, performingArtist) => {
         if (performingArtist === selectedArtist) return;
         getSongList(songList).forEach(song => {
@@ -6990,10 +6993,11 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   }
 
   // ── Artist overview stats ───────────────────────────────────────────────────
-  const totalArtists = artistEntries.filter(a => !a.wantToSee).length;
-  const uniqueGenres = new Set(artistEntries.flatMap(a => a.shows.flatMap(c => getGenres(c)))).size;
-  const pastArtists = artistEntries.filter(a => a.pastCount > 0);
-  const avgShowsPerArtist = pastArtists.length ? (pastArtists.reduce((s, a) => s + a.pastCount, 0) / pastArtists.length).toFixed(1) : null;
+  const seenArtists = sorted.filter(a => a.pastCount + a.supportCount + a.guestCount + a.festivalCount > 0);
+  const totalArtists = seenArtists.length;
+  const uniqueGenres = new Set(seenArtists.flatMap(a => [...a.pastShows,...a.supportApps.map(x=>x.concert)].flatMap(c => getGenres(c)))).size;
+  const pastArtists = seenArtists;
+  const avgShowsPerArtist = pastArtists.length ? (pastArtists.reduce((s, a) => s + new Set([...a.pastShows,...a.supportApps.map(x=>x.concert)].map(c=>c.id)).size, 0) / pastArtists.length).toFixed(1) : null;
   const thisYear = String(new Date().getFullYear());
   const newThisYear = artistEntries.filter(a => {
     const pastSorted = [...a.pastShows].sort((x,y) => x.date.localeCompare(y.date));
@@ -7011,7 +7015,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   return (
     <div style={{ padding: "0 0 100px" }}>
       {/* Artist overview header */}
-      {!search && activeFilterCount === 0 && (
+      {(
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalArtists} id="artists-total" /></span>
@@ -7299,15 +7303,17 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   useBackButton(goBackFromSong, selectedSong !== null);
   const songCount = {};
   const maxRating = settings.ratingSystem || 5;
-  past.filter(c => filterType === 'all' || (filterType === 'concerts' ? c.type !== 'festival' : c.type === 'festival')).forEach(c => {
+  const scopedPast = past.filter(c => matchesShowType(c,filterType));
+  scopedPast.forEach(c => {
     const tally = (s, performer) => {
       const n = getSongName(s); if (!n) return;
       const cov = getSongCover(s);
       const a = (typeof cov === 'string' && cov) || performer || '';
       const k = n + '\n' + a;
       const sp = (s && typeof s === 'object') ? s : null;
-      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, spotifyId: null, spotifyName: null, albumName: null, albumId: null, albumArt: null, durationMs: null, popularity: null, trackNumber: null, criedFor: false, topRated: false };
+      if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, showIds: [], spotifyId: null, spotifyName: null, albumName: null, albumId: null, albumArt: null, durationMs: null, popularity: null, trackNumber: null, criedFor: false, topRated: false };
       songCount[k].count += 1;
+      if(!songCount[k].showIds.includes(c.id))songCount[k].showIds.push(c.id);
       if (c.criedSong === n) songCount[k].criedFor = true;
       if (c.rating === maxRating) songCount[k].topRated = true;
       if (sp?.spotifyId && !songCount[k].spotifyId) {
@@ -7344,6 +7350,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
     .sort((a, b) => { const dir = sortDir === 'asc' ? -1 : 1; return sortBy === 'count' ? (dir * ((rank(b) - rank(a)) || (b.count - a.count))) : (-dir * (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist))); });
 
+  const visibleTotals = visibleSongTotals(filtered);
   const [displaySong, songExiting] = useExitingValue(selectedSong);
   if (displaySong) {
     const selectedSong = displaySong;
@@ -7352,7 +7359,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       const cov = getSongCover(s);
       return ((typeof cov === 'string' && cov) || performer || '') === selectedSong.artist;
     };
-    const appearances = past.flatMap(c => {
+    const appearances = scopedPast.flatMap(c => {
       const result = [];
       const mainMatches = getSongList(c.setlist).filter(s => matchSong(s, c.artist));
       mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: getSongInfo(s), cover: getSongCover(s), isSupport: false }));
@@ -7470,17 +7477,17 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   return (
     <div style={{ padding: '0 0 100px' }}>
       {/* Overview: headline stat + subtitle, matching Venues */}
-      {!search && totalUnique > 0 && (() => {
-        const totalArtists = [...new Set(songEntries.map(e => e.artist).filter(Boolean))].length;
+      {(() => {
+        const totalArtists = visibleTotals.artists;
         return (
           <div style={{ padding: '14px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={totalUnique} id="songs-total" /></span>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}><CountUp value={visibleTotals.songs} id="songs-total" /></span>
               <span style={{ fontSize: 12, color: '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>songs heard</span>
             </div>
-            {(past.length > 0 || totalArtists > 0) && (
+            {(visibleTotals.shows > 0 || totalArtists > 0) && (
               <div style={{ fontSize: 11, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginTop: 4 }}>
-                across {past.length} show{past.length !== 1 ? 's' : ''}{totalArtists > 0 ? `, ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}
+                across {visibleTotals.shows} show{visibleTotals.shows !== 1 ? 's' : ''}{totalArtists > 0 ? `, ${totalArtists} artist${totalArtists !== 1 ? 's' : ''}` : ''}
               </div>
             )}
           </div>
@@ -11599,7 +11606,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         ...(filterStatus.includes('upcoming') ? upcoming : []),
         ...(filterStatus.includes('past') ? past : []),
       ]
-  const allPast = concerts.filter(c => !isWish(c) && isPastDate(c.date))
+  const allPast = combinedShows.filter(c => !isWish(c) && isPastDate(c.date))
   const isSummaryHeader = view === 'stats' && statsTab === 'summary'
   const shellTitle = isSummaryHeader
     ? 'all the music'
@@ -11840,7 +11847,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
           <button onClick={() => setView('settings')} aria-label="Settings" style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: view === 'settings' ? '#a78bfa' : '#6b6a8f', fontSize: 20, cursor: 'pointer', padding: '6px 4px', lineHeight: 1, letterSpacing: '1px' }}>⋯</button>
           {isSummaryHeader && (
             <div style={{ fontSize: 10, color: '#5a5880', fontFamily: "'DM Mono', monospace", marginTop: 3 }}>
-            {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {concerts.filter(c => !isWish(c) && !isPastDate(c.date)).length} upcoming
+            {allPast.filter(c => c.type !== 'festival').length} concerts · {allPast.filter(c => c.type === 'festival').length} festivals · {combinedShows.filter(c => !isWish(c) && !isPastDate(c.date)).length} upcoming
             </div>
           )}
         </div>

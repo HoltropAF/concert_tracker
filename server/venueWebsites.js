@@ -15,7 +15,7 @@ export function venueUrl(value,base) {
   return u
 }
 // Pin the validated public address on every request, including redirects.
-export async function readVenuePage(value, redirects=0, deadline=Date.now()+8000) {
+async function readVenuePageUncached(value, redirects=0, deadline=Date.now()+3000) {
   const url=venueUrl(value)
   const addresses=await Promise.race([lookup(url.hostname,{all:true,family:4}),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('Venue DNS lookup timed out.')),3000);timer.unref?.()})])
   if(!addresses.length||addresses.some(x=>!publicIPv4(x.address)))throw Error('Venue website address is not public.')
@@ -24,7 +24,7 @@ export async function readVenuePage(value, redirects=0, deadline=Date.now()+8000
       if([301,302,303,307,308].includes(res.statusCode)){
         res.resume()
         if(redirects>=3||!res.headers.location)return reject(Error('Venue redirect could not be followed.'))
-        try {resolve(readVenuePage(venueUrl(res.headers.location,url).href,redirects+1,deadline))}catch(e){reject(e)}
+        try {resolve(readVenuePageUncached(venueUrl(res.headers.location,url).href,redirects+1,deadline))}catch(e){reject(e)}
         return
       }
       if(res.statusCode!==200){res.resume();reject(Error(`Venue returned HTTP ${res.statusCode}.`));return}
@@ -58,10 +58,10 @@ export function parseVenueEvents(html,page,query) {
   return {events,readable}
 }
 export async function searchVenueWebsite(query,read=readVenuePage) {
-  const deadline=Date.now()+45000
+  const deadline=Date.now()+9000
   const first=await read(query.website),queue=[first],seen=new Set([first.url]),events=new Map()
   let pages=0,readable=false,failed=false,limited=false
-  while(queue.length&&pages<6){
+  while(queue.length&&pages<3){
     const page=queue.shift();pages++
     const parsed=parseVenueEvents(page.html,page.url,query);readable ||= parsed.readable
     parsed.events.forEach(e=>events.set(e.id,e))
@@ -77,10 +77,22 @@ export async function searchVenueWebsite(query,read=readVenuePage) {
     }
     for(const link of links.sort((a,b)=>Number(b.artist)-Number(a.artist))){
       if(seen.has(link.url))continue
-      if(pages+queue.length>=6||Date.now()>deadline-8000){limited=true;break}
+      if(pages+queue.length>=3||Date.now()>deadline-3000){limited=true;break}
       seen.add(link.url)
       try{queue.push(await read(link.url))}catch{failed=true}
     }
   }
   return {events:[...events.values()],hasMore:false,notice:`Checked ${pages} pages; venue coverage may be incomplete.`,warning:failed?'Some venue pages could not be read.':!readable?'No readable event data found; check the venue website manually.':limited?'Venue page limit reached; other listings may exist.':'Venue check covers linked pages only; other listings may exist.'}
+}
+
+// Share public pages across different wishes; never cache failures.
+const pageCache=new Map()
+export async function readVenuePage(value){
+  const key=venueUrl(value).href,hit=pageCache.get(key)
+  if(hit&&hit.expires>Date.now())return hit.promise
+  if(pageCache.size>=30)pageCache.delete(pageCache.keys().next().value)
+  const entry={expires:Date.now()+300000,promise:null}
+  entry.promise=readVenuePageUncached(key).catch(error=>{if(pageCache.get(key)===entry)pageCache.delete(key);throw error})
+  pageCache.set(key,entry)
+  return entry.promise
 }

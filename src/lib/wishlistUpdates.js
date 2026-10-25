@@ -38,37 +38,42 @@ export function applyWishUpdates(concert, event, selected) {
     },
   }
 }
-export async function checkWish(concert, { fetcher = fetch, signal, sources = ['ticketmaster', 'mojo'], venues = [], now = new Date() } = {}) {
+export async function checkWish(concert, { fetcher = fetch, signal, sources = ['ticketmaster', 'mojo'], venues = [], now = new Date(), budgetMs = 15000, sourceMs = 10000, onProgress = () => {} } = {}) {
   if (!String(concert.artist || '').trim()) throw Error('Add an artist before checking.')
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  const query = { artist: concert.artist, country: discoveryCountry(concert.country), today }
-  const events = new Map()
-  let checkedAt, hasMore = false
-  const reports=[]
-  for (const source of [...sources,...venues]) {
-    let pages=0, count=0, error=null, skipped=null, warning=null
-    for (let page=1;page<=5;page++) {
+  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const queue = [...sources,...[...venues].sort((a,b)=>Number(normalize(b.name)===normalize(concert.venue))-Number(normalize(a.name)===normalize(concert.venue)))]
+  if(!queue.length)throw Error('Enable a concert search source in Settings → Integrations.')
+  const deadline=Date.now()+budgetMs, events=new Map(),reports=new Array(queue.length)
+  let next=0,completed=0
+  const publish=()=>onProgress({done:completed,total:queue.length,found:events.size})
+  const worker=async()=>{
+    while(next<queue.length){
+      const index=next++,source=queue[index],venueSource=typeof source==='object'
+      const report={source:venueSource?source.name:source,count:0,pages:0,error:null,skipped:null,warning:null,checkedAt:new Date().toISOString()}
+      reports[index]=report
+      if(signal?.aborted||Date.now()>=deadline){report.error=signal?.aborted?'Stopped before checking this source.':'Not checked within the time limit.';completed++;publish();continue}
+      const controller=new AbortController(),stop=()=>controller.abort()
+      signal?.addEventListener('abort',stop,{once:true})
+      let timer
+      const aborted=new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(Error(signal?.aborted?'Check stopped.':'Source timed out.')),{once:true}))
+      timer=setTimeout(stop,Math.min(sourceMs,deadline-Date.now()))
       try {
-        const venueSource=typeof source==='object'
-        const endpoint=venueSource ? `/api/venue-updates?${new URLSearchParams({artist:query.artist,today,website:source.url,venueName:source.name})}` : `/api/upcoming?${new URLSearchParams({...query,source,page:String(page)})}`
-        const response=await fetcher(endpoint,{signal})
-        const data=await response.json()
-        if(!response.ok || !Array.isArray(data.events))throw Error(data.error || 'Source unavailable')
-        if(data.skipped) { skipped=data.skipped;break }
-        pages++; checkedAt=data.checkedAt;warning=data.warning||null
-        for(const event of data.events) {
-          if(typeof event.artist!=='string'||!event.id||!safeTicketUrl(event.url,event))continue
-          events.set(event.id,event);count++
+        for(let page=1;page<=2;page++){
+          const params=venueSource?{artist:concert.artist,today,website:source.url,venueName:source.name}:{artist:concert.artist,country:discoveryCountry(concert.country),today,source,page:String(page)}
+          const request=async()=>{const response=await fetcher((venueSource?'/api/venue-updates?':'/api/upcoming?')+new URLSearchParams(params),{signal:controller.signal});const data=await response.json();if(!response.ok||!Array.isArray(data.events))throw Error(data.error||'Source unavailable');return data}
+          const data=await Promise.race([request(),aborted])
+          if(data.skipped){report.skipped=data.skipped;break}
+          report.pages++;report.warning=data.warning||null;report.checkedAt=data.checkedAt||report.checkedAt
+          for(const event of data.events){if(typeof event.artist!=='string'||!event.id||!safeTicketUrl(event.url,event))continue;events.set(event.id,event);report.count++}
+          if(!data.hasMore||venueSource)break
+          if(page===2)report.warning='More pages available; quick check is limited to two pages.'
         }
-        hasMore=Boolean(data.hasMore)
-        if(!hasMore)break
-      } catch(e) {error=e.message;hasMore=true;break}
+      }catch(error){report.error=error.message}
+      finally{clearTimeout(timer);signal?.removeEventListener('abort',stop);completed++;publish()}
     }
-    reports.push({source:typeof source==='object'?source.name:source,count,pages,error,skipped,warning,checkedAt:new Date().toISOString()})
-    if(signal?.aborted)break
   }
-  if(!sources.length&&!venues.length)throw Error('Enable a concert search source in Settings → Integrations.')
-  const candidates = [...events.values()]
-  const exact = candidates.filter(event => isSameWish(concert, event))
-  return { events: exact.length ? exact : candidates, exact: exact.length === 1, checkedAt: checkedAt || new Date().toISOString(), limited: hasMore || reports.some(r=>r.error||r.warning), reports, status: candidates.length ? 'found' : reports.some(r=>r.error||r.warning) ? (reports.some(r=>r.pages>0)?'partial':'error') : reports.every(r=>r.skipped)?'skipped':'empty', message: reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ') }
+  await Promise.all(Array.from({length:Math.min(4,queue.length)},worker))
+  const candidates=[...events.values()],exact=candidates.filter(event=>isSameWish(concert,event))
+  const incomplete=reports.some(r=>r.error||r.warning),checked=reports.filter(r=>r.pages>0).length
+  return {events:exact.length?exact:candidates,exact:exact.length===1,checkedAt:new Date().toISOString(),limited:incomplete,reports,checkedSources:checked,totalSources:queue.length,status:candidates.length?'found':incomplete?(checked?'partial':'error'):reports.every(r=>r.skipped)?'skipped':'empty',message:reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ')}
 }

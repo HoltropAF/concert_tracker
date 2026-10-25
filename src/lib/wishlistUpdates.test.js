@@ -58,3 +58,28 @@ test('empty working source plus failed source is incomplete, not total failure',
  assert.equal(result.status,'partial')
  assert.equal(result.reports[1].pages,1)
 })
+
+test('stalled sources cannot hold up successful matches or exceed the check budget',async()=>{
+ const progress=[];let active=0,maxActive=0
+ const result=await checkWish({artist:'Artist'},{sources:['ticketmaster','mojo'],budgetMs:40,sourceMs:20,onProgress:p=>progress.push(p),fetcher:async url=>{
+  active++;maxActive=Math.max(active,maxActive)
+  if(url.includes('source=ticketmaster'))return new Promise(()=>{})
+  await new Promise(resolve=>setTimeout(resolve,2));active--
+  return {ok:true,json:async()=>({events:[event],hasMore:false})}
+ }})
+ assert.equal(maxActive,2);assert.equal(result.status,'found');assert.equal(result.events.length,1)
+ assert.equal(result.reports[0].error,'Source timed out.');assert.equal(progress.at(-1).done,2)
+})
+test('budget exhaustion explicitly marks sites not checked',async()=>{
+ const venues=Array.from({length:7},(_,i)=>({name:'Venue '+i,url:'https://v'+i+'.example'}))
+ const result=await checkWish({artist:'Artist'},{sources:[],venues,budgetMs:15,sourceMs:100,fetcher:()=>new Promise(()=>{})})
+ assert.equal(result.reports.length,7);assert.equal(result.checkedSources,0);assert.equal(result.status,'error')
+ assert.ok(result.reports.some(r=>r.error==='Not checked within the time limit.'))
+})
+test('stop aborts a hung request and returns without losing source reports',async()=>{
+ const controller=new AbortController()
+ const task=checkWish({artist:'Artist'},{sources:['ticketmaster'],signal:controller.signal,fetcher:()=>new Promise(()=>{})})
+ controller.abort()
+ const result=await task
+ assert.equal(result.reports[0].error,'Check stopped.')
+})

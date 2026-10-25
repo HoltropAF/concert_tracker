@@ -24,14 +24,13 @@ export function WishlistUpdateProvider({ children, settings = {} }) {
         const concert = concerts[index]
         setProgress({ done: index, total: concerts.length })
         setResults(previous => ({ ...previous, [concert.id]: { status: 'checking' } }))
-        const timeout = setTimeout(() => abort.abort(), 90000 + (settings.concertSearchSources?.venues !== false ? savedVenueSources(settings).length * 60000 : 0))
         try {
-          const result = await checkWish(concert, { signal: abort.signal, venues: settings.concertSearchSources?.venues !== false ? savedVenueSources(settings) : [], sources: ['ticketmaster','mojo'].filter(source => settings.concertSearchSources?.[source] !== false) })
+          const result = await checkWish(concert, { signal: abort.signal, onProgress: state => setResults(previous=>({...previous,[concert.id]:{status:'checking',progress:state}})), venues: settings.concertSearchSources?.venues !== false ? savedVenueSources(settings) : [], sources: ['ticketmaster','mojo'].filter(source => settings.concertSearchSources?.[source] !== false) })
           setSourceStatus(previous => ({...previous,...Object.fromEntries((result.reports||[]).map(report=>[report.source,report]))}))
           setResults(previous => ({ ...previous, [concert.id]: result }))
         } catch (error) {
           setResults(previous => ({ ...previous, [concert.id]: { status: 'error', checkedAt:new Date().toISOString(), message: abort.signal.aborted ? 'Check stopped or timed out. Try again.' : error.message } }))
-        } finally { clearTimeout(timeout) }
+        }
       }
     } finally { lock.current = false; setProgress(null) }
   }
@@ -39,12 +38,12 @@ export function WishlistUpdateProvider({ children, settings = {} }) {
 }
 function statusText(result) {
   if (!result) return ''
-  if (result.status === 'checking') return 'Checking…'
-  if (result.status === 'error') return 'Couldn’t check · try again'
+  if (result.status === 'checking') return result.progress ? `Checking sources · ${result.progress.done}/${result.progress.total}${result.progress.found ? ' · '+result.progress.found+' matches found' : ''}` : 'Checking…'
+  if (result.status === 'error') return 'No sources could be checked · try again'
   if (result.status === 'saved') return 'Updates saved'
-  if (result.status === 'partial') return 'Check incomplete · no matches in available sources'
+  if (result.status === 'partial') return `Checked ${result.checkedSources || 0}/${result.totalSources || result.reports?.length || 0} sources · no matches found · coverage incomplete`
   if (result.status === 'skipped') return 'Enabled sources don’t cover this location'
-  if (result.status === 'empty') return 'Checked · no matching listings'
+  if (result.status === 'empty') return `Checked ${result.checkedSources || result.reports?.length || 0} sources · no matching listings`
   return result.exact ? 'Show found · review details' : 'Possible matches · choose a show'
 }
 export function WishlistUpdateBadge({ concert }) {
@@ -124,6 +123,7 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
       </form>}
     </div>)}
     <button type="button" disabled={!!ctx.progress||busy} style={{...action,width:'100%',marginTop:16,...(!known.every(Boolean)?{background:'#a78bfa',color:'#0c0c14',borderRadius:9,fontWeight:700}:{})}} onClick={()=>ctx.check([concert])}>{result?.status==='checking'?'Checking…':known.every(Boolean)?'Check for updates ↻':'Check for missing details'}</button>
+    {result?.status==='checking'&&<button type="button" style={action} onClick={ctx.stop}>Stop checking</button>}
     <p style={muted}>{checked?'Last checked '+new Date(checked).toLocaleString():'Not checked yet'}</p>
     {result&&<p role="status" style={muted}>{statusText(result)}</p>}
     {result?.status==='found'&&result.events.map(event=><button type="button" key={event.id} style={{...action,display:'block',textAlign:'left',width:'100%',borderBottom:'1px solid #29233c'}} onClick={()=>review(event)}>{event.artist}<span style={{...muted,display:'block'}}>{event.date} · {event.venue} · {event.city}</span>{result.exact?'Review found details →':'Choose this show →'}</button>)}

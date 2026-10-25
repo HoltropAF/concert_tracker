@@ -3488,7 +3488,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   } = settings;
   const [chartType, setChartType] = useState('all');
   const typeMatch = c => chartType === 'all' || c.type === (chartType === 'festivals' ? 'festival' : 'concert');
-  const pastAll = combinedShows.filter(c => !isWish(c) && isPast(c.date));
+  const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
   const concertsT = concerts.filter(c => !isWish(c) && typeMatch(c));
   const past = pastAll.filter(typeMatch);
   const shows = past.filter(c => c.type === "concert");
@@ -11866,7 +11866,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
               </div>
             )}
         {view === 'home' && concerts.length > 0 && (() => {
-          const pastAll = concerts.filter(c => !isWish(c) && isPast(c.date));
+          const pastAll = combinedShows.filter(c => !isWish(c) && isPast(c.date));
           const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;

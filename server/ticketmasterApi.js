@@ -19,7 +19,8 @@ export async function searchTicketmasterApi(query, key, fetcher=fetch) {
     if(!raw.id||!raw.name||!url)return []
     const code=venue.country?.countryCode||''
     const status={onsale:'On sale — check seller for availability',offsale:'Off sale',cancelled:'Cancelled',postponed:'Postponed',rescheduled:'Rescheduled'}[raw.dates?.status?.code]||'Check ticket site'
-    const event={id:`ticketmaster:${raw.id}`,artist:raw.name,date:raw.dates?.start?.localDate||'',venue:venue.name||'',city:venue.city?.name||'',country:discoveryCountries[code]||venue.country?.name||code,countryCode:code,url,source:'Ticketmaster',status,saleStart:raw.sales?.public?.startTBD?null:raw.sales?.public?.startDateTime||null,checkedAt}
+    const range=raw.priceRanges?.[0]
+    const event={startTime:raw.dates?.start?.localTime||'',ticketDescription:String(raw.info||raw.pleaseNote||'').slice(0,1200),priceRange:range?{min:range.min,max:range.max,currency:range.currency}:null,id:`ticketmaster:${raw.id}`,artist:raw.name,date:raw.dates?.start?.localDate||'',venue:venue.name||'',city:venue.city?.name||'',country:discoveryCountries[code]||venue.country?.name||code,countryCode:code,url,source:'Ticketmaster',status,saleStart:raw.sales?.public?.startTBD?null:raw.sales?.public?.startDateTime||null,checkedAt}
     return matchesDiscovery(event,query,query.today)?[event]:[]
   })
   return {events,total:Number(data.page.totalElements)||0}

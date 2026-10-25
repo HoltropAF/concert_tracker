@@ -1,3 +1,4 @@
+import { groupTicketEvents, mergeTicketOptions } from './ticketOptions.js'
 import { discoveryCountry, wishlistDraft } from './discovery.js'
 import { validDate } from './calendar.js'
 
@@ -11,7 +12,7 @@ export function safeTicketUrl(value, event) {
   } catch { return '' }
 }
 export function isSameWish(concert, event) {
-  if (concert.discovery?.id === event.id) return true
+  if (concert.discovery?.id === event.id || event.listingIds?.includes(concert.discovery?.id)) return true
   return validDate(concert.date) && concert.date === event.date &&
     normalize(concert.artist) === normalize(event.artist) &&
     !!normalize(concert.venue) && normalize(concert.venue) === normalize(event.venue)
@@ -19,19 +20,22 @@ export function isSameWish(concert, event) {
 export function proposedChanges(concert, event) {
   const draft = wishlistDraft(event)
   draft.ticketSaleLink = safeTicketUrl(event.url,event)
-  return Object.entries(updateFields).flatMap(([key, label]) => {
+  const changes = Object.entries(updateFields).flatMap(([key, label]) => {
     const value = draft[key]
     const current = key === 'date' && !validDate(concert.date) ? '' : concert[key] || ''
     if (!value || current === value || (key === 'date' && !validDate(value))) return []
     return [{ key, label, before: current, after: value }]
   })
+  const merged=mergeTicketOptions(concert.ticketOptions,event.ticketOptions)
+  if(event.ticketOptions?.length && JSON.stringify(merged)!==JSON.stringify(concert.ticketOptions||[]))changes.push({key:'ticketOptions',label:'Ticket options',before:(concert.ticketOptions||[]).map(o=>o.label).join(', '),after:merged.map(o=>o.label).join(', ')})
+  return changes
 }
 export function applyWishUpdates(concert, event, selected) {
   if (!concert.wishlist) throw Error('This show is no longer in Want to go.')
   const changes = proposedChanges(concert, event).filter(change => selected.includes(change.key))
   return {
     ...concert,
-    ...Object.fromEntries(changes.map(change => [change.key, change.after])),
+    ...Object.fromEntries(changes.map(change => [change.key, change.key==='ticketOptions'?mergeTicketOptions(concert.ticketOptions,event.ticketOptions):change.after])),
     discovery: {
       ...concert.discovery, id: event.id, source: event.source, url: safeTicketUrl(event.url,event),
       status: event.status, checkedAt: event.checkedAt, venueWebsite: !!event.venueWebsite,
@@ -73,7 +77,7 @@ export async function checkWish(concert, { fetcher = fetch, signal, sources = ['
     }
   }
   await Promise.all(Array.from({length:Math.min(4,queue.length)},worker))
-  const candidates=[...events.values()],exact=candidates.filter(event=>isSameWish(concert,event))
+  const candidates=groupTicketEvents([...events.values()]),exact=candidates.filter(event=>isSameWish(concert,event))
   const incomplete=reports.some(r=>r.error||r.warning),checked=reports.filter(r=>r.pages>0).length
   return {events:exact.length?exact:candidates,exact:exact.length===1,checkedAt:new Date().toISOString(),limited:incomplete,reports,checkedSources:checked,totalSources:queue.length,status:candidates.length?'found':incomplete?(checked?'partial':'error'):reports.every(r=>r.skipped)?'skipped':'empty',message:reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ')}
 }

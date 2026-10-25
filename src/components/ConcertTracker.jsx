@@ -2370,7 +2370,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           {concert.wishlist && <>
             {detailTab === 'general' && concert.photo && <PhotoImg path={concert.photo} pos={concert.photoPos} variant="detail" style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, marginBottom: 12 }} />}
-            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} onGotTickets={() => { setForm(normalizeConcertForm({...concert,wishlist:false})); setEditorTab('show'); setEditing(true); }} />
+            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} onGotTickets={option => { setForm(normalizeConcertForm({...concert,wishlist:false,...(option?{ticketType:option.label,selectedTicketOption:option}: {})})); setEditorTab('show'); setEditing(true); }} />
           </>}
           {!concert.wishlist && detailTab === 'general' && (
           <>

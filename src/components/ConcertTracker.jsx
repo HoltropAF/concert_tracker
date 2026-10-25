@@ -2339,7 +2339,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
           <button onClick={() => { setReceiptTab('general'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
-          <button onClick={() => setEditing(true)} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
+          <button onClick={() => {setForm(normalizeConcertForm(concert));setEditing(true)}} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
         {/* Venue + tour hero */}
@@ -2361,15 +2361,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           </div>
 
           {/* Tabs */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          {!concert.wishlist && <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
             {(concert.wishlist ? [['general', 'Overview'], ['updates', 'Updates']] : [['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])]).map(([id, label]) => (
               <button key={id} onClick={() => setDetailTab(id)} style={{ flex: 1, background: detailTab === id ? "#1a1a30" : "none", border: `1px solid ${detailTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 8, padding: "7px 0", fontSize: 12, fontWeight: detailTab === id ? 700 : 400, color: detailTab === id ? "#a78bfa" : "#6b6a8f", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{label}</button>
             ))}
-          </div>
+          </div>}
 
           {concert.wishlist && <>
             {detailTab === 'general' && concert.photo && <PhotoImg path={concert.photo} pos={concert.photoPos} variant="detail" style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, marginBottom: 12 }} />}
-            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} tab={detailTab} onEdit={() => setEditing(true)} />
+            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} onGotTickets={() => { setForm(normalizeConcertForm({...concert,wishlist:false})); setEditorTab('show'); setEditing(true); }} />
           </>}
           {!concert.wishlist && detailTab === 'general' && (
           <>

@@ -67,7 +67,7 @@ export async function checkWish(concert, { fetcher = fetch, signal, sources = ['
           const request=async()=>{const response=await fetcher((venueSource?'/api/venue-updates?':'/api/upcoming?')+new URLSearchParams(params),{signal:controller.signal});const data=await response.json();if(!response.ok||!Array.isArray(data.events))throw Error(data.error||'Source unavailable');return data}
           const data=await Promise.race([request(),aborted])
           if(data.skipped){report.skipped=data.skipped;break}
-          report.pages++;report.warning=data.warning||null;report.checkedAt=data.checkedAt||report.checkedAt
+          report.pages++;report.reader=data.reader||null;report.cached=!!data.cached;report.warning=data.warning||null;report.checkedAt=data.checkedAt||report.checkedAt
           for(const event of data.events){if(typeof event.artist!=='string'||!event.id||!safeTicketUrl(event.url,event))continue;events.set(event.id,event);report.count++}
           if(!data.hasMore||venueSource)break
           if(page===2)report.warning='More pages available; quick check is limited to two pages.'

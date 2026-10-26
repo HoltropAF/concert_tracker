@@ -2,6 +2,7 @@ import https from 'node:https'
 import {lookup} from 'node:dns/promises'
 import {isIP} from 'node:net'
 import {validDate} from '../src/lib/calendar.js'
+import {readSupportedAgenda} from './venueAgendas.js'
 
 export function publicIPv4(ip) {
   if(isIP(ip)!==4)return false
@@ -58,6 +59,9 @@ export function parseVenueEvents(html,page,query) {
   return {events,readable}
 }
 export async function searchVenueWebsite(query,read=readVenuePage) {
+  venueUrl(query.website)
+  const agenda=await readSupportedAgenda(query,read)
+  if(agenda)return agenda
   const deadline=Date.now()+9000
   const first=await read(query.website),queue=[first],seen=new Set([first.url]),events=new Map()
   let pages=0,readable=false,failed=false,limited=false

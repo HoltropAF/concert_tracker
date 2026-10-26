@@ -1,3 +1,4 @@
+import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
 import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
 import { withCriedTag } from '../lib/criedTag'
@@ -2324,8 +2325,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     const statCards = [
       past && { label: "Rating", value: concert.rating ? "★".repeat(Math.min(concert.rating, settings.ratingSystem || 5)) : "—", nav: null },
       ticketTotal(concert) > 0 ? { label: concert.ticketType ? `Ticket · ${concert.ticketType}` : "Ticket", value: `€${ticketTotal(concert).toFixed(2)}`, nav: null } : null,
-      past && companions.length > 0 && { label: "With", value: companions.length === 1 ? companions[0] : `${companions.length} friends`, nav: 'friends' },
-      past && companions.length === 0 && { label: "With", value: "Solo", nav: null },
+      companions.length > 0 && { label: "With", value: companions.length === 1 ? companions[0] : `${companions.length} friends`, nav: 'friends' },
+      companions.length === 0 && { label: "With", value: concert.solo ? "Solo" : "Not recorded", nav: null },
     ].filter(Boolean);
     return (
       <div onScroll={e => setHeaderElevated(e.currentTarget.scrollTop > 4)} style={{ position: "fixed", inset: 0, background: "#0c0c14", overflowY: "auto", zIndex: 100 }}>
@@ -2386,7 +2387,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {statCards.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 8, marginBottom: 14 }}>
               {statCards.map(({ label, value, nav }) => (
-                <div key={label} onClick={nav ? () => onNavigate({ view: nav }) : undefined} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: nav ? "pointer" : "default" }}>
+                <div key={label} onClick={nav ? () => onNavigate({ view: nav, friendNames: nav === 'friends' ? companions : undefined }) : undefined} style={{ background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center", cursor: nav ? "pointer" : "default" }}>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontSize: label === "Rating" ? 13 : 15, fontWeight: 800, color: label === "Rating" && concert.favorite ? "#facc15" : "#a78bfa", lineHeight: 1 }}>{value}{nav ? <span style={{ fontSize: 10, color: "#6b6a8f", marginLeft: 2 }}>›</span> : null}</div>
                   <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 4 }}>{label}</div>
                 </div>
@@ -4416,6 +4417,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 // * detail on every call, which would fire once per show mid-merge.
 function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveConcertQuiet = () => {}, onNotify = () => {}, onBackToSummary = () => {}, initialSelectedFriend = null, onInitialFriendConsumed = () => {}, onRememberFriend = () => {} }) {
   const [selectedFriend, setSelectedFriend] = useState(initialSelectedFriend?.name || null);
+  const [friendScope,setFriendScope] = useState(initialSelectedFriend?.names || null);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('most-shows');
   const [sortDir, setSortDir] = useState('desc');
@@ -4474,7 +4476,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   const openShow = (c) => { onRememberFriend(selectedFriend, friendTab); onOpen && onOpen(c); };
   useEffect(() => {
     if (!initialSelectedFriend) return;
-    setSelectedFriend(initialSelectedFriend.name);
+    setSelectedFriend(initialSelectedFriend.name || null);
+    setFriendScope(initialSelectedFriend.names || null);
     setFriendTab(initialSelectedFriend.tab || 'overview');
     onInitialFriendConsumed();
   }, [initialSelectedFriend]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -4611,6 +4614,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 
   const activeFriendFilterCount = [filterMinTogether > 0, filterHasUpcoming].filter(Boolean).length;
   const filtered = friendEntries
+    .filter(f => !friendScope || friendScope.includes(f.name))
     .filter(f => !search || f.name.toLowerCase().includes(search.toLowerCase()))
     .filter(f => filterType === 'all' || (filterType === 'concerts' ? f.concertCount > 0 : f.festivalCount > 0))
     .filter(f => filterMinTogether === 0 || f.shows.length >= filterMinTogether)
@@ -5604,8 +5608,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             return (
               <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
                 <div style={sectionLabel}>Details</div>
-                {rows.map(([l, v]) => (
-                  <div key={l} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                {rows.map(([l, v], rowIndex) => (
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: rowIndex < rows.length - 1 ? "1px solid #1a1a2e" : "none" }}>
                     <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{l}</span>
                     <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>{v}</span>
                   </div>
@@ -5620,13 +5624,13 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
               <div style={sectionLabel}>The big ones</div>
               {favouriteShow && (
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: (bestRated && bestRated.id !== favouriteShow?.id) || criedShow ? "1px solid #1a1a2e" : "none" }}>
                   <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>favourite</span>
                   <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>{favouriteShow.artist} · {favouriteShow.date.slice(0, 4)}</span>
                 </div>
               )}
               {bestRated && bestRated.id !== favouriteShow?.id && (
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: "1px solid #1a1a2e" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: criedShow ? "1px solid #1a1a2e" : "none" }}>
                   <span style={{ color: "#6b6a8f", fontSize: 12, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>best rated</span>
                   <span style={{ color: "#c4c2f0", fontSize: 12, textAlign: "right" }}>{bestRated.artist} · {"★".repeat(Math.min(bestRated.rating, settings.ratingSystem || 5))}</span>
                 </div>
@@ -5644,7 +5648,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           {/* Map — reuses VenueMap and the coordinates already saved per venue. */}
           {friendTab === 'overview' && friendMapPoints.length > 0 && (
             <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: '1px solid #1f1f35' }}>
-              <div style={sectionLabel}>Where you go</div>
+              <div style={sectionLabel}>Where you went</div>
               <VenueMap points={friendMapPoints} height={170} interactive={false} clickOpensMaps />
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#6b6a8f", marginTop: 7 }}>
                 {friendMapPoints.length} venues{distinctCountries > 1 ? ` · ${distinctCountries} countries` : ''}
@@ -5744,6 +5748,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
       })()}
 
       {/* Search + sort + filters + add */}
+      {friendScope&&<div style={{padding:'10px 16px',fontSize:12,color:'var(--accent)'}}>Friends at this show · {friendScope.join(', ')} <button onClick={()=>setFriendScope(null)} style={{background:'none',border:0,color:'inherit',cursor:'pointer'}}>Show all</button></div>}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
         {/* * Five controls on one row left the search box barely wider than the
             * buttons beside it. The view toggle and add button move up to their own
@@ -7345,12 +7350,29 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   const byCount = [...songEntries].sort((a, b) => (rank(b) - rank(a)) || (b.count - a.count));
   const topSet = topN ? new Set(byCount.slice(0, topN)) : null;
   const filtered = songEntries
-    .filter(e => (!search && topSet ? topSet.has(e) : true)
+    .filter(e => (!search && filterSpotify === 'all' && topSet ? topSet.has(e) : true)
       && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase()))
       && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
     .sort((a, b) => { const dir = sortDir === 'asc' ? -1 : 1; return sortBy === 'count' ? (dir * ((rank(b) - rank(a)) || (b.count - a.count))) : (-dir * (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist))); });
 
-  const visibleTotals = visibleSongTotals(filtered);
+  const visibleTotals = visibleSongTotals(songEntries);
+  const renderSongMatcher = () => (songMatcher && (
+        <SpotifyMatcher
+          artist={songMatcher.artist}
+          songs={[{ name: songMatcher.name, spotifyId: songMatcher.spotifyId, spotifyName: songMatcher.spotifyName, albumName: songMatcher.albumName, albumId: songMatcher.albumId, albumArt: songMatcher.albumArt, durationMs: songMatcher.durationMs, popularity: songMatcher.popularity, trackNumber: songMatcher.trackNumber }]}
+          settings={settings}
+          saveSettings={saveSettings || (() => {})}
+          onSave={([updated]) => {
+            if (updated?.spotifyId && onLinkSong) {
+              const data = { spotifyId: updated.spotifyId, spotifyName: updated.spotifyName, albumName: updated.albumName, albumId: updated.albumId, albumArt: updated.albumArt, durationMs: updated.durationMs, popularity: updated.popularity, trackNumber: updated.trackNumber }
+              onLinkSong(songMatcher.name, songMatcher.artist, data)
+              setSelectedSong(prev => prev ? { ...prev, ...data } : prev)
+            }
+            setSongMatcher(null)
+          }}
+          onClose={() => setSongMatcher(null)}
+        />
+      ));
   const [displaySong, songExiting] = useExitingValue(selectedSong);
   if (displaySong) {
     const selectedSong = displaySong;
@@ -7423,6 +7445,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
             </div>
           </div>
         )}
+        {renderSongMatcher()}
         {/* Stat tiles: times live, cried, popularity */}
         {(() => {
           const criedCount = appearances.filter(a => a.concert.criedSong === selectedSong.name).length;
@@ -7551,7 +7574,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           <div style={{ textAlign: 'center', color: '#2e2e4a', padding: '40px 0', fontSize: 13, fontFamily: "'DM Mono', monospace" }}>log setlists on your shows to see songs here</div>
         ) : filtered.length === 0 ? (
           <EmptyState icon="🎵" title="No songs found" detail="Add setlists to shows and songs will collect here." />
-        ) : filtered.map((e, i) => (
+        ) : filtered.map((e, i) => (<div key={e.name+'\n'+e.artist}>
           <button key={`${e.name}\n${e.artist}`} onClick={() => setSelectedSong({ name: e.name, artist: e.artist, spotifyId: e.spotifyId || null, spotifyName: e.spotifyName || null, albumName: e.albumName || null, albumId: e.albumId || null, albumArt: e.albumArt || null, durationMs: e.durationMs || null, popularity: typeof e.popularity === 'number' ? e.popularity : null, trackNumber: e.trackNumber || null })} style={{
             width: '100%', textAlign: 'left', background: '#13131f', border: '1px solid #1f1f35',
             borderLeft: `3px solid ${e.count >= 5 ? '#a78bfa' : e.count >= 3 ? '#6d5fa8' : e.count >= 2 ? '#3d3564' : '#2e2e4a'}`,
@@ -7582,25 +7605,11 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
             </div>
             <span style={{ color: '#6b6a8f', fontSize: 11, fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{e.count}×</span>
           </button>
+          {!e.spotifyId&&<button type="button" disabled={!settings.spotifyAccessToken} title={!settings.spotifyAccessToken ? 'Connect Spotify in Settings first' : 'Link this song'} onClick={()=>setSongMatcher(e)} style={{background:'none',border:0,color:'#1DB954',cursor:'pointer',padding:'4px 12px 10px',minHeight:44,fontSize:12}}>{settings.spotifyAccessToken ? 'Link to Spotify →' : 'Connect Spotify in Settings to link'}</button>}
+          </div>
         ))}
       </div>
-      {songMatcher && (
-        <SpotifyMatcher
-          artist={songMatcher.artist}
-          songs={[{ name: songMatcher.name, spotifyId: songMatcher.spotifyId, spotifyName: songMatcher.spotifyName, albumName: songMatcher.albumName, albumId: songMatcher.albumId, albumArt: songMatcher.albumArt, durationMs: songMatcher.durationMs, popularity: songMatcher.popularity, trackNumber: songMatcher.trackNumber }]}
-          settings={settings}
-          saveSettings={saveSettings || (() => {})}
-          onSave={([updated]) => {
-            if (updated?.spotifyId && onLinkSong) {
-              const data = { spotifyId: updated.spotifyId, spotifyName: updated.spotifyName, albumName: updated.albumName, albumId: updated.albumId, albumArt: updated.albumArt, durationMs: updated.durationMs, popularity: updated.popularity, trackNumber: updated.trackNumber }
-              onLinkSong(songMatcher.name, songMatcher.artist, data)
-              setSelectedSong(prev => prev ? { ...prev, ...data } : prev)
-            }
-            setSongMatcher(null)
-          }}
-          onClose={() => setSongMatcher(null)}
-        />
-      )}
+      {renderSongMatcher()}
     </div>
   );
 }
@@ -7726,7 +7735,7 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
   const [venueEditInput, setVenueEditInput] = useState({ url: '', parking: '', transit: '', rooms: [], tags: [] });
   const [newRoomInput, setNewRoomInput] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
-  const [showVenuesMap, setShowVenuesMap] = useState(false);
+  const [showVenuesMap, setShowVenuesMap] = useState(true);
   const [openVenueInfoPopup, setOpenVenueInfoPopup] = useState(null);
   const [showAddVenueForm, setShowAddVenueForm] = useState(false);
   const [addVenueInput, setAddVenueInput] = useState({ name: '', city: '', country: '' });
@@ -7823,7 +7832,7 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, padding: '12px 16px 0' }}>
-          {[['overview', 'Overview'], ['gallery', 'Gallery'], ['shows', 'Shows']].map(([id, label]) => (
+          {[['overview', 'Overview'], ['gallery', 'Gallery'], ['shows', 'Shows'], ['upnext', 'Up next']].map(([id, label]) => (
             (id !== 'gallery' || v.photos.length > 0) && (
               <button key={id} onClick={() => setVenueDetailTab(id)} style={{ padding: '6px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: venueDetailTab === id ? 'var(--accent)' : '#13131f', color: venueDetailTab === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${venueDetailTab === id ? 'var(--accent)' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: venueDetailTab === id ? 700 : 400 }}>{label}</button>
             )
@@ -7831,7 +7840,7 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
         </div>
 
         {/* Hero: maps / website / parking / transit / edit */}
-        {venueDetailTab === 'overview' && onDiscover && <div style={{padding:'0 16px'}}><UpcomingDiscovery key={selectedVenue} concerts={concerts} onChoose={onDiscover} initialVenue={selectedVenue} initialCity={v.city} initialCountry={v.country} /></div>}
+        {venueDetailTab === 'upnext' && onDiscover && <div style={{padding:'0 16px'}}><UpcomingDiscovery standalone title="Up next" defaultOpen key={selectedVenue} concerts={concerts} onChoose={onDiscover} initialVenue={selectedVenue} initialCity={v.city} initialCountry={v.country} /></div>}
         {venueDetailTab === 'overview' && <div style={{ padding: '14px 16px 0' }}>
           {(() => {
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
@@ -8185,6 +8194,7 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
                 />
               </div>
             ))}
+            <VenueLookup name={addVenueInput.name} city={addVenueInput.city} country={addVenueInput.country} onChoose={venue=>setAddVenueInput({name:venue.name,city:venue.city,country:venue.country})} />
             {addVenueError && (
               <div style={{ fontSize: 11, color: '#f87171', marginBottom: 12, lineHeight: 1.5 }}>{addVenueError}</div>
             )}
@@ -11301,7 +11311,7 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
 // * `settingsLoaded` distinguishes "still defaults" from "really yours" and gates
 // * anything that would be wrong under defaults — currently the onboarding tour.
 export default function ConcertTracker(props) {
-  return <WishlistUpdateProvider settings={props.settings}><ConcertTrackerContent {...props} /></WishlistUpdateProvider>
+  return <WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded}><ConcertTrackerContent {...props} /></WishlistUpdateProvider>
 }
 
 function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
@@ -11821,7 +11831,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <div className={selectedExiting ? "slide-out-detail" : "slide-in-detail"} key={displaySelected.id}>
-        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),

@@ -3,7 +3,7 @@ import {discoveryCountries,discoveryCountry,discoveryDuplicate,discoveryInvite,w
 
 const field={width:'100%',minWidth:0,boxSizing:'border-box',padding:'9px 10px',borderRadius:8,border:'1px solid #3d3564',background:'#13131f',color:'#e2e0ff'}
 const button={...field,width:'auto',cursor:'pointer',color:'#c4b5fd'}
-export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',initialCity='',initialCountry='NL',title=null,defaultOpen=false,draftLabel='Continue to wishlist draft'}) {
+export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',initialCity='',initialCountry='NL',title=null,defaultOpen=false,standalone=false,draftLabel='Continue to wishlist draft'}) {
   const [artist,setArtist]=useState(''),[venue,setVenue]=useState(initialVenue),[city,setCity]=useState(initialCity),[country,setCountry]=useState(discoveryCountry(initialCountry))
   const [events,setEvents]=useState([]),[candidate,setCandidate]=useState(null),[type,setType]=useState('concert')
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[report,setReport]=useState(null)
@@ -24,8 +24,9 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
     }catch(e){setError(e.name==='TimeoutError'?'Search took too long. Please try again.':e.message)}finally{lock.current=false;setBusy(false)}
   }
   const duplicate=candidate && discoveryDuplicate(candidate,concerts)
-  return <details open={defaultOpen || undefined} style={{margin:'8px 0 12px',color:'#c4c2f0'}}>
-    <summary style={{cursor:'pointer',color:'var(--accent, #a78bfa)',fontSize:12,fontFamily:"'DM Mono', monospace",padding:'6px 0'}}>{title || (initialVenue?'What’s coming up here?':'Discover upcoming shows')}</summary>
+  const Container=standalone?'section':'details'
+  return <Container open={standalone?undefined:defaultOpen || undefined} style={{margin:'8px 0 12px',color:'#c4c2f0'}}>
+    {!standalone&&<summary style={{cursor:'pointer',color:'var(--accent, #a78bfa)',fontSize:12,fontFamily:"'DM Mono', monospace",padding:'6px 0'}}>{title || (initialVenue?'What’s coming up here?':'Discover upcoming shows')}</summary>}
     <p style={{fontSize:12}}>Find upcoming shows on Ticketmaster and review their details before saving.</p>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
       <label>Artist or keyword<input style={field} value={artist} disabled={busy} onChange={e=>setArtist(e.target.value)}/></label>
@@ -55,5 +56,5 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
       <button type="button" style={button} onClick={()=>{onChoose(wishlistDraft(candidate,type));setCandidate(null);setMessage('Details added to your draft. Review them before saving.')}}>{draftLabel}</button>{' '}
       <button type="button" style={button} onClick={()=>setCandidate(null)}>Cancel</button>
     </section>}
-  </details>
+  </Container>
 }

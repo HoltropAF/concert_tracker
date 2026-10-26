@@ -1,23 +1,42 @@
+import VenueLookup from './VenueLookup'
 import { sellerLink, ticketSaleOpen, wishStepStates } from '../lib/ticketOptions'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { applyWishUpdates, checkWish, proposedChanges, safeTicketUrl } from '../lib/wishlistUpdates'
 import { savedVenueSources } from '../lib/venueSources'
 import { validDate } from '../lib/calendar'
+import {localDay,readDailyCheck,claimDailyCheck} from '../lib/dailyWishlist'
 
 const Context = createContext(null)
 const action = { background: 'none', border: 0, color: '#a78bfa', cursor: 'pointer', minHeight: 44, padding: '8px 2px', fontSize: 12 }
 const muted = { color: '#9491b8', fontSize: 12, lineHeight: 1.5 }
 const section = { borderBottom: '1px solid #29233c', padding: '12px 0' }
-export function WishlistUpdateProvider({ children, settings = {} }) {
+export function WishlistUpdateProvider({ children, settings = {}, concerts = [], account, ready = true }) {
   const [results, setResults] = useState({})
   const [sourceStatus, setSourceStatus] = useState({})
   const [progress, setProgress] = useState(null)
   const lock = useRef(false), controller = useRef(null)
+  const dailyKey=account?`settracker:wishlist-daily:${account}`:null
+  const dailySession=useRef(null)
   useEffect(() => () => controller.current?.abort(), [])
+  useEffect(()=>{
+    if(!ready||!dailyKey||!concerts.some(c=>c.wishlist))return
+    const timer=setTimeout(()=>{
+      const marker=dailyKey+localDay()
+      if(dailySession.current===marker)return
+      dailySession.current=marker
+      const saved=readDailyCheck(localStorage,dailyKey)
+      if(saved?.day===localDay()){setResults(saved.results||{});return}
+      if(lock.current){dailySession.current=null;return}
+      if(claimDailyCheck(localStorage,dailyKey))check(concerts.filter(c=>c.wishlist))
+    },500)
+    return ()=>clearTimeout(timer)
+  },[ready,dailyKey,concerts])
+  const wishIds=concerts.filter(c=>c.wishlist).map(c=>c.id)
   const check = async concerts => {
     if (lock.current) return
     lock.current = true
+    if(dailyKey&&wishIds.length&&wishIds.every(id=>concerts.some(c=>c.id===id)))claimDailyCheck(localStorage,dailyKey)
     const abort = new AbortController()
     controller.current = abort
     try {
@@ -29,6 +48,10 @@ export function WishlistUpdateProvider({ children, settings = {} }) {
           const result = await checkWish(concert, { signal: abort.signal, onProgress: state => setResults(previous=>({...previous,[concert.id]:{status:'checking',progress:state}})), venues: settings.concertSearchSources?.venues !== false ? savedVenueSources(settings) : [], sources: ['ticketmaster','mojo'].filter(source => settings.concertSearchSources?.[source] !== false) })
           setSourceStatus(previous => ({...previous,...Object.fromEntries((result.reports||[]).map(report=>[report.source,report]))}))
           setResults(previous => ({ ...previous, [concert.id]: result }))
+          if(dailyKey){
+            const saved=readDailyCheck(localStorage,dailyKey)
+            try{localStorage.setItem(dailyKey,JSON.stringify({day:saved?.day||null,results:{...saved?.results,[concert.id]:result}}))}catch{/* Checking remains usable when storage is full. */}
+          }
         } catch (error) {
           setResults(previous => ({ ...previous, [concert.id]: { status: 'error', checkedAt:new Date().toISOString(), message: abort.signal.aborted ? 'Check stopped or timed out. Try again.' : error.message } }))
         }
@@ -126,6 +149,7 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
       {index===3&&<button type="button" disabled={busy} style={action} onClick={()=>editStep(3)}>Edit ticket details</button>}
       {editingStep===index&&<form onSubmit={e=>{e.preventDefault();saveStep()}}>
         {fields[index].map(([key,title,type])=><label key={key} style={{...muted,display:'block',marginTop:10}}>{title}<input type={type} value={draft[key]||''} onChange={e=>setDraft({...draft,[key]:e.target.value})} disabled={busy} style={{display:'block',width:'100%',boxSizing:'border-box',background:'#13131f',color:'#c4c2f0',border:'1px solid #3d3564',borderRadius:8,padding:12,fontSize:16}}/></label>)}
+        {index===1&&<VenueLookup name={draft.venue||''} city={draft.city||''} country={draft.country||''} onChoose={venue=>setDraft(d=>({...d,venue:venue.name,city:venue.city,country:venue.country}))}/>}
         <button type="submit" disabled={busy} style={action}>{busy?'Saving…':'Save detail'}</button><button type="button" disabled={busy} style={{...action,marginLeft:16}} onClick={()=>setEditingStep(null)}>Cancel</button>
       </form>}
     </div>)}

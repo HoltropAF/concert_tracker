@@ -1,3 +1,5 @@
+import {createBackStack} from '../lib/backStack'
+import {NavigationMemory,useRememberedState,useChangedValue} from './NavigationMemory'
 import PerformanceDetails from './PerformanceDetails'
 import {performanceSongs, mapSetlistSongs, releaseNote, matchesSongLinkFilter} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
@@ -412,6 +414,8 @@ function claimPendingBackPop() {
   return false;
 }
 
+const backStack=createBackStack();
+const dispatchAppBack=()=>backStack.back();
 function useBackButton(onBack, enabled = true) {
   const cb = useRef(onBack);
   const pushed = useRef(false);
@@ -426,9 +430,11 @@ function useBackButton(onBack, enabled = true) {
     if (!claimPendingBackPop()) history.pushState({ appBack: true }, '');
     pushed.current = true;
     const handler = () => { pushed.current = false; cb.current(); };
-    window.addEventListener('popstate', handler);
+    if(!backStack.size)window.addEventListener('popstate',dispatchAppBack);
+    const removeBack=backStack.add(handler);
     return () => {
-      window.removeEventListener('popstate', handler);
+      removeBack();
+      if(!backStack.size)window.removeEventListener('popstate',dispatchAppBack);
       // If this closed via a button/tab-switch rather than the actual back
       // gesture, the pushed history entry is still sitting there — pop it
       // ourselves so the browser history stack stays in sync with app state.
@@ -3711,9 +3717,9 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
   useBackButton(() => setStatsTab("summary"), statsTab === "charts");
   const swipeTouchStart = useRef({ x: 0, y: 0, t: 0 });
-  const [selectedChart, setSelectedChart] = useState("artists");
-  const [selectedSong, setSelectedSong] = useState(null);
-  const [selectedVenue, setSelectedVenue] = useState(null);
+  const [selectedChart, setSelectedChart] = useRememberedState('StatsView.selectedChart',"artists");
+  const [selectedSong, setSelectedSong] = useRememberedState('StatsView.selectedSong',null);
+  const [selectedVenue, setSelectedVenue] = useRememberedState('StatsView.selectedVenue',null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   useBackButton(() => setSelectedSong(null), selectedSong !== null);
   useBackButton(() => setSelectedVenue(null), selectedVenue !== null);
@@ -3809,7 +3815,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
   };
   const setChartOpt = (id, val) => setChartOptions(o => ({ ...o, [id]: val }));
   const summaryYear = settings.summaryYear || 'all';
-  const [summaryFavOnly, setSummaryFavOnly] = useState(false);
+  const [summaryFavOnly, setSummaryFavOnly] = useRememberedState('StatsView.summaryFavOnly',false);
   const [editingFaveOrder, setEditingFaveOrder] = useState(false);
   const summaryFinType = settings.summaryFinType || 'all';
   const showsChartRef = useRef(null);
@@ -4420,11 +4426,11 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 // * the merge writes one show at a time, and handleSave toasts and opens the concert
 // * detail on every call, which would fire once per show mid-merge.
 function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveConcertQuiet = () => {}, onNotify = () => {}, onBackToSummary = () => {}, initialSelectedFriend = null, onInitialFriendConsumed = () => {}, onRememberFriend = () => {} }) {
-  const [selectedFriend, setSelectedFriend] = useState(initialSelectedFriend?.name || null);
-  const [friendScope,setFriendScope] = useState(initialSelectedFriend?.names || null);
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('most-shows');
-  const [sortDir, setSortDir] = useState('desc');
+  const [selectedFriend, setSelectedFriend] = useRememberedState('FriendsView.selectedFriend',initialSelectedFriend?.name || null);
+  const [friendScope, setFriendScope] = useRememberedState('FriendsView.friendScope',initialSelectedFriend?.names || null);
+  const [search, setSearch] = useRememberedState('FriendsView.search','');
+  const [sortBy, setSortBy] = useRememberedState('FriendsView.sortBy','most-shows');
+  const [sortDir, setSortDir] = useRememberedState('FriendsView.sortDir','desc');
   const [compact, setCompact] = useState(!!settings.friendsCompactView);
   useEffect(() => { setCompact(!!settings.friendsCompactView); }, [settings.friendsCompactView]);
   // * Photo size inside a friend's shared history. Saved like friendsCompactView
@@ -4438,19 +4444,19 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   useEffect(() => { setNewestFirst(!!settings.friendTimelineNewestFirst); }, [settings.friendTimelineNewestFirst]);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showFriendFilters, setShowFriendFilters] = useState(false);
-  const [filterMinTogether, setFilterMinTogether] = useState(0);
-  const [filterHasUpcoming, setFilterHasUpcoming] = useState(false);
+  const [filterMinTogether, setFilterMinTogether] = useRememberedState('FriendsView.filterMinTogether',0);
+  const [filterHasUpcoming, setFilterHasUpcoming] = useRememberedState('FriendsView.filterHasUpcoming',false);
   const [showAddFriendForm, setShowAddFriendForm] = useState(false);
   const [addFriendInput, setAddFriendInput] = useState('');
   const [editingProfile, setEditingProfile] = useState(null); // { name, nickname, contact, note }
-  const [filterType, setFilterType] = useState('all');
+  const [filterType, setFilterType] = useRememberedState('FriendsView.filterType','all');
   // * Narrows the shared-history spine. Deliberately not persisted — a filter you
   // * forgot you left on would silently hide history the next time you open someone.
-  const [historyFilter, setHistoryFilter] = useState('all');
-  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useRememberedState('FriendsView.historyFilter','all');
+  const [historySearch, setHistorySearch] = useRememberedState('FriendsView.historySearch','');
   const [historySortOpen, setHistorySortOpen] = useState(false);
   const [historyFiltersOpen, setHistoryFiltersOpen] = useState(false);
-  const [photosOnlyTagged, setPhotosOnlyTagged] = useState(false);
+  const [photosOnlyTagged, setPhotosOnlyTagged] = useRememberedState('FriendsView.photosOnlyTagged',false);
   const [taggingPhotos, setTaggingPhotos] = useState(false);
 
   // * Adds or removes one friend from one show's photo tags. Saved immediately and
@@ -4470,7 +4476,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   // * null means "the default most-recent 22"; an array means you've chosen.
   const [sharePicked, setSharePicked] = useState(null);
   const [sharePicking, setSharePicking] = useState(false);
-  const [friendTab, setFriendTab] = useState(initialSelectedFriend?.tab || 'overview');
+  const [friendTab, setFriendTab] = useRememberedState('FriendsView.friendTab',initialSelectedFriend?.tab || 'overview');
   const [yearMetric, setYearMetric] = useState('shows');
 
   // * Opening a show unmounts this whole view (ConcertTracker early-returns the
@@ -4481,21 +4487,20 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   useEffect(() => {
     if (!initialSelectedFriend) return;
     setSelectedFriend(initialSelectedFriend.name || null);
-    setFriendScope(initialSelectedFriend.names || null);
+    if(initialSelectedFriend.names)setFriendScope(initialSelectedFriend.names);
+    else if(initialSelectedFriend.name!==selectedFriend)setFriendScope(null);
     setFriendTab(initialSelectedFriend.tab || 'overview');
     onInitialFriendConsumed();
   }, [initialSelectedFriend]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // * Per-friend state resets when you move between friends — but not on mount,
   // * or it would clobber the tab restored from initialSelectedFriend above.
-  const mountedFriend = useRef(false);
-  useEffect(() => {
-    if (!mountedFriend.current) { mountedFriend.current = true; return; }
+  useChangedValue(() => {
     setHistoryFilter('all'); setHistorySearch(''); setHistorySortOpen(false); setHistoryFiltersOpen(false);
     setPhotosOnlyTagged(false); setTaggingPhotos(false);
     setShareTab('shows'); setShareYear(null); setSharePicked(null); setSharePicking(false);
     setMergeTarget(null); setShowHistoryShare(false); setFriendTab('overview'); setYearMetric('shows');
-  }, [selectedFriend]);
+  }, selectedFriend);
 
   const friendProfiles = settings.friendProfiles || {};
   const getProfile = name => friendProfiles[name] || {};
@@ -4641,7 +4646,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   const podium = podiumEligible ? filtered.slice(0, 3) : [];
   const listed = podiumEligible ? filtered.slice(3) : filtered;
 
-  useBackButton(() => { if (selectedFriend) setSelectedFriend(null); else onBackToSummary(); }, true);
+  useBackButton(() => setSelectedFriend(null), selectedFriend !== null);
+  useBackButton(onBackToSummary, selectedFriend === null);
 
   const [displayFriend, friendExiting] = useExitingValue(selectedFriend);
   if (displayFriend) {
@@ -4826,11 +4832,11 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
             into a three-line wrap. As icons they cost ~62px, which buys the text
             column back — so they stay on the header row rather than below it. */}
         <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #1f1f35" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 10 }}>
           <button onClick={() => setSelectedFriend(null)} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: "18px", flexShrink: 0 }}>←</button>
           <FriendAvatar name={displayName(f.name)} size={44} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e0ff", lineHeight: 1.2, overflowWrap: "anywhere" }}>
               {displayName(f.name)}
               {profile.nickname && <span style={{ fontSize: 12, color: "#4a4870", fontFamily: "'DM Mono', monospace", fontWeight: 400, marginLeft: 8 }}>{f.name}</span>}
             </div>
@@ -4841,7 +4847,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </div>
           {/* Labelled, not icon-only. An unlabelled share glyph is the most
               ambiguous control on the page, and tooltips don't exist on touch. */}
-          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 6, gridColumn: "1 / -1", justifyContent: "flex-end" }}>
             {f.shows.length > 0 && (
               <button onClick={() => setShowHistoryShare(true)} style={labelBtn}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -5943,8 +5949,8 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
 // * pending value is cleared and doesn't re-trigger. `onBackToOrigin` sends the user
 // * back where they came from instead of to the artist list.
 function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, onUpdateSetting = () => {}, onUpdateSettings = null, onSaveConcert = () => {}, onDetailChange = () => {}, initialSelectedArtist = null, onInitialArtistConsumed = () => {}, onBackToOrigin = null, onNotify = () => {} }) {
-  const [selectedArtist, setSelectedArtist] = useState(initialSelectedArtist);
-  const [artistTab, setArtistTab] = useState('overview');
+  const [selectedArtist, setSelectedArtist] = useRememberedState('ArtistsView.selectedArtist',initialSelectedArtist);
+  const [artistTab, setArtistTab] = useRememberedState('ArtistsView.artistTab','overview');
   const [reframingArtistPhoto, setReframingArtistPhoto] = useState(false);
   const [bannerScrollY, setBannerScrollY] = useState(0);
   useEffect(() => {
@@ -5955,7 +5961,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     return () => el.removeEventListener('scroll', onScroll);
   }, [selectedArtist]);
   const [bannerEditMode, setBannerEditMode] = useState(false);
-  const [enteredViaArtist] = useState(initialSelectedArtist);
+  const [enteredViaArtist,setEnteredViaArtist] = useRememberedState('ArtistsView.enteredViaArtist',initialSelectedArtist);
+  useEffect(()=>{if(initialSelectedArtist)setEnteredViaArtist(initialSelectedArtist)},[initialSelectedArtist]);
   useEffect(() => { if (initialSelectedArtist) { setSelectedArtist(initialSelectedArtist); onInitialArtistConsumed(); } }, [initialSelectedArtist]);
   const goBackFromArtist = () => {
     if (selectedArtist && selectedArtist === enteredViaArtist && onBackToOrigin) onBackToOrigin();
@@ -5976,7 +5983,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
   const [reframingPolaroid, setReframingPolaroid] = useState(null);
   const dragStartRef = useRef(null);
   useEffect(() => { onDetailChange(selectedArtist !== null); return () => onDetailChange(false); }, [selectedArtist]);
-  useEffect(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, [selectedArtist]);
+  useChangedValue(() => { setArtistTab('overview'); setReframingArtistPhoto(false); setBannerEditMode(false); }, selectedArtist);
   useEffect(() => {
     if (!selectedArtist) return;
     const cached = (settings.artistSpotifyInfo || {})[selectedArtist];
@@ -6053,19 +6060,19 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     })();
     return () => { cancelled = true; };
   }, [selectedArtist]);
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("most-seen");
-  const [sortDir, setSortDir] = useState('desc');
-  const [filterGenre, setFilterGenre] = useState("all");
-  const [filterMinSeen, setFilterMinSeen] = useState(0);
-  const [filterUpcoming, setFilterUpcoming] = useState(false);
-  const [filterUltGroup, setFilterUltGroup] = useState(false);
+  const [search, setSearch] = useRememberedState('ArtistsView.search',"");
+  const [sortBy, setSortBy] = useRememberedState('ArtistsView.sortBy',"most-seen");
+  const [sortDir, setSortDir] = useRememberedState('ArtistsView.sortDir','desc');
+  const [filterGenre, setFilterGenre] = useRememberedState('ArtistsView.filterGenre',"all");
+  const [filterMinSeen, setFilterMinSeen] = useRememberedState('ArtistsView.filterMinSeen',0);
+  const [filterUpcoming, setFilterUpcoming] = useRememberedState('ArtistsView.filterUpcoming',false);
+  const [filterUltGroup, setFilterUltGroup] = useRememberedState('ArtistsView.filterUltGroup',false);
   const [showFilters, setShowFilters] = useState(false);
   const [artistsCompact, setArtistsCompact] = useState(!!settings.artistsCompactView);
   useEffect(() => { setArtistsCompact(!!settings.artistsCompactView); }, [settings.artistsCompactView]);
   const [showSort, setShowSort] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-  const [filterType, setFilterType] = useState('all');
+  const [filterType, setFilterType] = useRememberedState('ArtistsView.filterType','all');
   const [showAddArtistForm, setShowAddArtistForm] = useState(false);
   const [addArtistInput, setAddArtistInput] = useState('');
 
@@ -7277,23 +7284,23 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   // ! Wishlist entries are excluded — a want-to-go show you didn't attend shouldn't
   // ! contribute songs to "heard live" counts.
   const past = concerts.filter(c => !isWish(c) && isPast(c.date));
-  const [search, setSearch] = useState(initialSearch || '');
+  const [search, setSearch] = useRememberedState('SongsView.search',initialSearch || '');
   useEffect(() => { if (initialSearch) { setSearch(initialSearch); onInitialSearchConsumed(); } }, [initialSearch]);
-  const [sortBy, setSortBy] = useState('count');
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortBy, setSortBy] = useRememberedState('SongsView.sortBy','count');
+  const [sortDir, setSortDir] = useRememberedState('SongsView.sortDir','desc');
   const [compact, setCompact] = useState(!!settings.songsCompactView);
   useEffect(() => { setCompact(!!settings.songsCompactView); }, [settings.songsCompactView]);
-  const [topN, setTopN] = useState(settings?.topSongsRows || 5);
-  const [selectedSong, setSelectedSong] = useState(null);
-  const [enteredViaSong, setEnteredViaSong] = useState(null);
+  const [topN, setTopN] = useRememberedState('SongsView.topN',settings?.topSongsRows || 5);
+  const [selectedSong, setSelectedSong] = useRememberedState('SongsView.selectedSong',null);
+  const [enteredViaSong, setEnteredViaSong] = useRememberedState('SongsView.enteredViaSong',null);
   const goBackFromSong = () => {
     if (selectedSong && selectedSong === enteredViaSong && onBackToOrigin) onBackToOrigin();
     else setSelectedSong(null);
   };
   useEffect(() => { onDetailChange(selectedSong !== null); return () => onDetailChange(false); }, [selectedSong]);
   const [songMatcher, setSongMatcher] = useState(null);
-  const [filterType, setFilterType] = useState('all');
-  const [filterSpotify, setFilterSpotify] = useState('all'); // 'all' | 'linked' | 'unlinked'
+  const [filterType, setFilterType] = useRememberedState('SongsView.filterType','all');
+  const [filterSpotify, setFilterSpotify] = useRememberedState('SongsView.filterSpotify','all'); // 'all' | 'linked' | 'unlinked'
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showSongSort, setShowSongSort] = useState(false);
   const [showSongFilters, setShowSongFilters] = useState(false);
@@ -7720,7 +7727,7 @@ function PhotoWallView({ concerts, onOpen, onBack }) {
 // * settings.savedVenues is a separate list: venues the user pre-registered for
 // * autocomplete, which may not have any shows attached yet.
 function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = () => {}, onNavigate = () => {}, onDetailChange = () => {}, initialSelectedVenue = null, onInitialVenueConsumed = () => {}, onBackToOrigin = null }) {
-  const [selectedVenue, setSelectedVenue] = useState(initialSelectedVenue);
+  const [selectedVenue, setSelectedVenue] = useRememberedState('VenuesView.selectedVenue',initialSelectedVenue);
   const [headerElevated, setHeaderElevated] = useState(false);
   useEffect(() => {
     const el = document.getElementById('content-scroll');
@@ -7729,26 +7736,27 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   }, [selectedVenue]);
-  const [enteredViaVenue] = useState(initialSelectedVenue);
+  const [enteredViaVenue,setEnteredViaVenue] = useRememberedState('VenuesView.enteredViaVenue',initialSelectedVenue);
+  useEffect(()=>{if(initialSelectedVenue)setEnteredViaVenue(initialSelectedVenue)},[initialSelectedVenue]);
   useEffect(() => { if (initialSelectedVenue) { setSelectedVenue(initialSelectedVenue); onInitialVenueConsumed(); } }, [initialSelectedVenue]);
-  const [venueDetailTab, setVenueDetailTab] = useState('overview');
-  useEffect(() => { setVenueDetailTab('overview'); }, [selectedVenue]);
-  const [venueShowsSort, setVenueShowsSort] = useState('date');
+  const [venueDetailTab, setVenueDetailTab] = useRememberedState('VenuesView.venueDetailTab','overview');
+  useChangedValue(() => { setVenueDetailTab('overview'); }, selectedVenue);
+  const [venueShowsSort, setVenueShowsSort] = useRememberedState('VenuesView.venueShowsSort','date');
   const goBackFromVenue = () => {
     if (selectedVenue && selectedVenue === enteredViaVenue && onBackToOrigin) onBackToOrigin();
     else setSelectedVenue(null);
   };
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('most-visited');
-  const [sortDir, setSortDir] = useState('desc');
+  const [search, setSearch] = useRememberedState('VenuesView.search','');
+  const [sortBy, setSortBy] = useRememberedState('VenuesView.sortBy','most-visited');
+  const [sortDir, setSortDir] = useRememberedState('VenuesView.sortDir','desc');
   const [compact, setCompact] = useState(!!settings.venuesCompactView);
   useEffect(() => { setCompact(!!settings.venuesCompactView); }, [settings.venuesCompactView]);
   const [showSort, setShowSort] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filterCountry, setFilterCountry] = useState('all');
-  const [filterWantToGo, setFilterWantToGo] = useState(false);
-  const [filterMinVisited, setFilterMinVisited] = useState(0);
-  const [filterType, setFilterType] = useState('all');
+  const [filterCountry, setFilterCountry] = useRememberedState('VenuesView.filterCountry','all');
+  const [filterWantToGo, setFilterWantToGo] = useRememberedState('VenuesView.filterWantToGo',false);
+  const [filterMinVisited, setFilterMinVisited] = useRememberedState('VenuesView.filterMinVisited',0);
+  const [filterType, setFilterType] = useRememberedState('VenuesView.filterType','all');
   const [showVenuePast, setShowVenuePast] = useState(false);
   const [showVenueUpcoming, setShowVenueUpcoming] = useState(false);
   const [editingVenueInfo, setEditingVenueInfo] = useState(false);
@@ -7851,13 +7859,11 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6, padding: '12px 16px 0' }}>
-          {[['overview', 'Overview'], ['gallery', 'Gallery'], ['shows', 'Shows'], ['upnext', 'Up next']].map(([id, label]) => (
-            (id !== 'gallery' || v.photos.length > 0) && (
-              <button key={id} onClick={() => setVenueDetailTab(id)} style={{ padding: '6px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer', background: venueDetailTab === id ? 'var(--accent)' : '#13131f', color: venueDetailTab === id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${venueDetailTab === id ? 'var(--accent)' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: venueDetailTab === id ? 700 : 400 }}>{label}</button>
-            )
+        <nav aria-label="Venue sections" style={{display:'flex',margin:'4px 16px 0',borderBottom:'1px solid #29263d',gap:4}}>
+          {[['overview','Overview'],['gallery','Gallery'],['shows','Shows'],['upnext','Up next']].filter(([id])=>id!=='gallery'||v.photos.length>0).map(([id,label])=>(
+            <button type="button" key={id} aria-current={venueDetailTab===id?'page':undefined} onClick={()=>setVenueDetailTab(id)} style={{flex:1,minWidth:0,minHeight:46,padding:'12px 4px 10px',border:0,borderBottom:venueDetailTab===id?'2px solid var(--accent)':'2px solid transparent',marginBottom:-1,borderRadius:0,background:'transparent',color:venueDetailTab===id?'var(--accent)':'#9491b8',fontFamily:"'DM Sans', sans-serif",fontSize:13,fontWeight:venueDetailTab===id?600:400,cursor:'pointer',whiteSpace:'nowrap'}}>{label}</button>
           ))}
-        </div>
+        </nav>
 
         {/* Hero: maps / website / parking / transit / edit */}
         {venueDetailTab === 'upnext' && onDiscover && <div style={{padding:'0 16px'}}><UpcomingDiscovery standalone title="Up next" defaultOpen key={selectedVenue} concerts={concerts} onChoose={onDiscover} initialVenue={selectedVenue} initialCity={v.city} initialCountry={v.country} /></div>}
@@ -11331,7 +11337,7 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
 // * `settingsLoaded` distinguishes "still defaults" from "really yours" and gates
 // * anything that would be wrong under defaults — currently the onboarding tour.
 export default function ConcertTracker(props) {
-  return <WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded}><ConcertTrackerContent {...props} /></WishlistUpdateProvider>
+  return <NavigationMemory key={props.userEmail||'local'}><WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded}><ConcertTrackerContent {...props} /></WishlistUpdateProvider></NavigationMemory>
 }
 
 function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {

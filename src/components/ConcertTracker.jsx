@@ -1,5 +1,5 @@
 import PerformanceDetails from './PerformanceDetails'
-import {performanceSongs, mapSetlistSongs, releaseNote} from '../lib/setlistRows'
+import {performanceSongs, mapSetlistSongs, releaseNote, matchesSongLinkFilter} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
 import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
@@ -1880,8 +1880,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   <span style={{ color: '#9491b8', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{isIntroLike ? '' : songs.slice(0, i + 1).filter(row=>!isSectionRow(row)).length}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400 }}>{name}</span>
-                      {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
+                      <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400 }}>{song?.type === 'medley' ? 'Mashup of' : name}</span>
+                      {song?.type !== 'medley' && song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {(criedSong !== undefined ? criedSong : concert.criedSong) === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
                     {readOnly&&<PerformanceDetails song={song} readOnly />}
@@ -7323,6 +7323,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
       const sp = (s && typeof s === 'object') ? s : null;
       if (!songCount[k]) songCount[k] = { name: n, artist: a, count: 0, showIds: [], spotifyId: null, spotifyName: null, albumName: null, albumId: null, albumArt: null, durationMs: null, popularity: null, trackNumber: null, criedFor: false, topRated: false };
       songCount[k].count += 1;
+      if(sp?.unreleasedAtShow)songCount[k].unreleasedAtShow=true;
       if(!songCount[k].showIds.includes(c.id))songCount[k].showIds.push(c.id);
       if (c.criedSong === n) songCount[k].criedFor = true;
       if (c.rating === maxRating) songCount[k].topRated = true;
@@ -7357,7 +7358,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   const filtered = songEntries
     .filter(e => (!search && filterSpotify === 'all' && topSet ? topSet.has(e) : true)
       && (!search || e.name.toLowerCase().includes(search.toLowerCase()) || e.artist.toLowerCase().includes(search.toLowerCase()))
-      && (filterSpotify === 'all' || (filterSpotify === 'linked' ? e.spotifyId : !e.spotifyId)))
+      && matchesSongLinkFilter(e,filterSpotify))
     .sort((a, b) => { const dir = sortDir === 'asc' ? -1 : 1; return sortBy === 'count' ? (dir * ((rank(b) - rank(a)) || (b.count - a.count))) : (-dir * (a.name.localeCompare(b.name) || a.artist.localeCompare(b.artist))); });
 
   const visibleTotals = visibleSongTotals(songEntries);
@@ -7538,7 +7539,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           Sort{sortBy !== 'count' || topN !== null ? ' ↕' : ''}
         </button>
         <button onClick={() => { setShowSongFilters(f => !f); setShowSongSort(false); }} style={{ background: showSongFilters || filterSpotify !== 'all' ? '#1a1a30' : 'none', border: `1px solid ${showSongFilters || filterSpotify !== 'all' ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: filterSpotify !== 'all' ? '#a78bfa' : '#6b6a8f', fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify !== 'all' ? 700 : 400, flexShrink: 0 }}>
-          {filterSpotify === 'all' ? 'Filters' : filterSpotify === 'linked' ? 'Linked' : 'Unlinked'}
+          {filterSpotify === 'all' ? 'Filters' : filterSpotify === 'linked' ? 'Linked' : filterSpotify === 'unreleased' ? 'Unreleased' : 'Unlinked'}
         </button>
         <button onClick={() => saveSettings({ ...settings, songsCompactView: !compact })} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
           {compact ? '▤' : '☰'}
@@ -7568,7 +7569,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
         <div style={{ margin: '0 16px 8px', background: '#13131f', border: '1px solid #1f1f35', borderRadius: 10, padding: '10px 12px' }}>
           {filterSpotify !== 'all' && <button onClick={() => setFilterSpotify('all')} style={{ marginBottom: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {[['all','All'],['linked','Linked'],['unlinked','Unlinked']].map(([id, label]) => (
+            {[['all','All'],['linked','Linked'],['unlinked','Unlinked'],['unreleased','Unreleased']].map(([id, label]) => (
               <button key={id} onClick={() => setFilterSpotify(id)} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: filterSpotify===id ? '#a78bfa' : '#0c0c14', color: filterSpotify===id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${filterSpotify===id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace", fontWeight: filterSpotify===id ? 700 : 400 }}>{label}</button>
             ))}
           </div>
@@ -7603,6 +7604,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ color: '#c4c2f0', fontSize: compact ? 12 : 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><HighlightMatch text={e.name} query={search} /></span>
+                  {e.unreleasedAtShow && <span style={{color:'#fbbf24',fontSize:9,flexShrink:0}}>Unreleased at show</span>}
                   {e.spotifyId && !e.albumArt && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, flexShrink: 0, lineHeight: 1 }}>●</span>}
                 </span>
                 {!compact && <span style={{ color: '#6b6a8f', fontSize: 10, fontFamily: "'DM Mono', monospace", display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.artist}</span>}

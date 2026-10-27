@@ -33,6 +33,20 @@ export function releaseNote(song){
   return 'Unreleased at this show'+(song.releaseDate?` · released ${song.releaseDate}`:'')
 }
 
+export function toMedley(song){
+  const row=typeof song==='string'?{name:song}:song
+  const names=String(row.name||'').split('/').map(name=>name.trim()).filter(Boolean)
+  return {...row,type:'medley',name:'Mashup of',parts:names.length>1
+    ?names.map(name=>({name,...(row.unreleasedAtShow?{unreleasedAtShow:true}:{}),...(row.cover?{cover:row.cover}:{})}))
+    :[row]}
+}
+
+export function matchesSongLinkFilter(song,filter){
+  if(filter==='all')return true
+  if(song.unreleasedAtShow)return filter==='unreleased'
+  return filter==='linked'?!!song.spotifyId:filter==='unlinked'?!song.spotifyId:false
+}
+
 // Spotify only sees songs; put its updates back between the original headings.
 export function mergeSetlistSongs(rows, updatedSongs) {
   let index = 0

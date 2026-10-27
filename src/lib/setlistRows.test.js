@@ -1,6 +1,29 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {normalizeSetlistRows, setlistSongs, mergeSetlistSongs, moveSetlistRow, performanceSongs, mapSetlistSongs, releaseNote} from './setlistRows.js'
+import {normalizeSetlistRows, setlistSongs, mergeSetlistSongs, moveSetlistRow, performanceSongs, mapSetlistSongs, releaseNote, toMedley, matchesSongLinkFilter} from './setlistRows.js'
+
+test('explicit medley conversion splits slash titles without assigning one Spotify track to every part',()=>{
+ const row={name:' One / Two// Three / ',spotifyId:'original',info:'Keep this note',unreleasedAtShow:true}
+ const medley=toMedley(row)
+ assert.deepEqual(medley.parts.map(p=>p.name),['One','Two','Three'])
+ assert.ok(medley.parts.every(p=>!p.spotifyId&&p.unreleasedAtShow))
+ assert.equal(medley.info,row.info)
+ assert.equal(toMedley({name:'One',spotifyId:'one'}).parts[0].spotifyId,'one')
+ assert.equal(normalizeSetlistRows([row])[0].name,row.name)
+})
+
+test('unreleased performances have their own filter even after linking a later release',()=>{
+ for(const spotifyId of [null,'track']){
+   const song={unreleasedAtShow:true,spotifyId,releaseDate:'2027-01'}
+   assert.equal(matchesSongLinkFilter(song,'unreleased'),true)
+   assert.equal(matchesSongLinkFilter(song,'linked'),false)
+   assert.equal(matchesSongLinkFilter(song,'unlinked'),false)
+   assert.equal(matchesSongLinkFilter(song,'all'),true)
+ }
+ assert.equal(matchesSongLinkFilter({spotifyId:'track'},'linked'),true)
+ assert.equal(matchesSongLinkFilter({},'unlinked'),true)
+ assert.equal(matchesSongLinkFilter({},'unreleased'),false)
+})
 
 test('medley links preserve one performance, headings and unreleased memories',()=>{
  const rows=[{type:'section',label:'Encore'},{type:'medley',name:'Dance remix',parts:[{name:'Working title',unreleasedAtShow:true},'Two']}]

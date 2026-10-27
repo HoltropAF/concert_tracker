@@ -4635,7 +4635,7 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
   // * order — under a search, a filter or another sort, "top 3" would be the top 3
   // * of something the podium never explains. It also needs a real gap to be worth
   // * the space, so it stays hidden until someone has been to 2+ shows with you.
-  const podiumEligible = !search && activeFriendFilterCount === 0 && filterType === 'all'
+  const podiumEligible = !friendScope && !search && activeFriendFilterCount === 0 && filterType === 'all'
     && sortBy === 'most-shows' && sortDir === 'desc'
     && filtered.length >= 4 && (filtered[0]?.shows.length || 0) >= 2;
   const podium = podiumEligible ? filtered.slice(0, 3) : [];
@@ -5701,6 +5701,19 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
       </div>
     );
   }
+
+  if(friendScope)return (
+    <div style={{padding:'20px 16px 100px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginBottom:16}}>
+        <div><div style={{fontFamily:"'Syne', sans-serif",fontSize:18,fontWeight:700,color:'#e2e0ff'}}>Together at this show</div><div style={{fontSize:12,color:'#9491b8',marginTop:4}}>{friendScope.length} friends · tap a name to open their page</div></div>
+        <button type="button" onClick={()=>setFriendScope(null)} style={{background:'none',border:0,color:'var(--accent)',fontSize:12,padding:'10px 0',cursor:'pointer'}}>All friends</button>
+      </div>
+      {[...new Set(friendScope)].sort((a,b)=>displayName(a).localeCompare(displayName(b))).map(name=><button type="button" key={name} onClick={()=>setSelectedFriend(name)} style={{display:'flex',alignItems:'center',gap:12,width:'100%',padding:'12px 0',background:'none',border:0,borderBottom:'1px solid #1f1f35',textAlign:'left',cursor:'pointer',color:'#c4c2f0'}}>
+        <span style={{width:34,height:34,borderRadius:'50%',display:'grid',placeItems:'center',flexShrink:0,background:'hsl('+friendColor(displayName(name))+', 55%, 22%)',fontSize:12}}>{friendInitials(displayName(name))}</span>
+        <span style={{flex:1,fontSize:14}}>{displayName(name)}</span><span style={{color:'#9491b8'}}>›</span>
+      </button>)}
+    </div>
+  );
 
   return (
     <div style={{ padding: "0 0 100px" }}>

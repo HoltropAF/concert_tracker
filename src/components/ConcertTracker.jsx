@@ -1880,7 +1880,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   <span style={{ color: '#9491b8', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{isIntroLike ? '' : songs.slice(0, i + 1).filter(row=>!isSectionRow(row)).length}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400 }}>{song?.type === 'medley' ? 'Mashup of' : name}</span>
+                      <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400, ...(song?.type === 'medley' ? {fontFamily: "'DM Mono', monospace",fontSize:9,fontWeight:500,color:'#9491b8',letterSpacing:'0.1em',textTransform:'uppercase',lineHeight:1.5} : {}) }}>{song?.type === 'medley' ? 'Mashup of' : name}</span>
                       {song?.type !== 'medley' && song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {(criedSong !== undefined ? criedSong : concert.criedSong) === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>

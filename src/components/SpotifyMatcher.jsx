@@ -49,6 +49,7 @@ const extractTrack = t => ({
   durationMs: t.duration_ms || null,
   popularity: typeof t.popularity === 'number' ? t.popularity : null,
   trackNumber: t.track_number || null,
+  releaseDate: t.album?.release_date || null,
 })
 
 // Inline free-text Spotify search, expanded under a single song row when the
@@ -238,7 +239,7 @@ export default function SpotifyMatcher({ artist, songs: rows, settings, saveSett
       const choice = choices[i]
       if (choice) {
         const base = typeof song === 'string' ? { name: song } : { ...song }
-        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt, durationMs: choice.durationMs, popularity: choice.popularity, trackNumber: choice.trackNumber }
+        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt, durationMs: choice.durationMs, popularity: choice.popularity, trackNumber: choice.trackNumber, releaseDate:base.releaseDateManual ? base.releaseDate : choice.releaseDate || base.releaseDate }
       }
       if (removals.has(i)) {
         if (typeof song === 'string') return song

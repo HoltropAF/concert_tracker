@@ -1,6 +1,25 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {normalizeSetlistRows, setlistSongs, mergeSetlistSongs, moveSetlistRow} from './setlistRows.js'
+import {normalizeSetlistRows, setlistSongs, mergeSetlistSongs, moveSetlistRow, performanceSongs, mapSetlistSongs, releaseNote} from './setlistRows.js'
+
+test('medley links preserve one performance, headings and unreleased memories',()=>{
+ const rows=[{type:'section',label:'Encore'},{type:'medley',name:'Dance remix',parts:[{name:'Working title',unreleasedAtShow:true},'Two']}]
+ assert.equal(setlistSongs(rows).length,2)
+ const linked=mergeSetlistSongs(rows,[{...rows[1].parts[0],spotifyId:'one',releaseDate:'2027-03-14'},{name:'Two',spotifyId:'two'}])
+ assert.equal(linked.length,2);assert.deepEqual(linked[0],rows[0]);assert.equal(linked[1].parts[1].spotifyId,'two')
+ const songs=performanceSongs(JSON.parse(JSON.stringify(linked)))
+ assert.equal(songs[0].medleyTitle,'Dance remix')
+ assert.equal(releaseNote(songs[0]),'Unreleased at this show · released 2027-03-14')
+ const patched=mapSetlistSongs(linked,s=>s.name==='Two'?{...s,albumName:'Album'}:s)
+ assert.equal(patched[1].parts[1].albumName,'Album');assert.deepEqual(patched[0],rows[0])
+})
+
+test('song statistics count repeated parts once per medley, but separate performances separately',()=>{
+ const medley={type:'medley',name:'Mix',parts:['One','One','Two']}
+ assert.equal(performanceSongs([medley,'One']).length,3)
+ assert.equal(setlistSongs([medley]).length,3)
+ assert.equal(releaseNote({name:'Released song',releaseDate:'2020'}),'')
+})
 test('legacy headings become independent rows without losing song metadata',()=>{
  const song={name:'One',sectionLabel:'Encore',sectionCategory:'encores',spotifyId:'track',info:'note'}
  const rows=normalizeSetlistRows([song,'Two'])

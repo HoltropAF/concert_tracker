@@ -1,3 +1,5 @@
+import PerformanceDetails from './PerformanceDetails'
+import {performanceSongs, mapSetlistSongs, releaseNote} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
 import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
@@ -615,7 +617,7 @@ const sectionLabelCategory = (label, explicitCategory) => {
 const getSongAlbum = s => typeof s === 'string' || !s ? null : (s.albumName || null);
 // * Guards every setlist read: a setlist may be undefined (never entered) and may
 // * contain nulls left behind by deletions, both of which crash a bare .map.
-const getSongList = setlistSongs;
+const getSongList = performanceSongs;
 const formatDuration = ms => { if (!ms) return null; const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 // Deterministic colored-initials avatar for friends — same name always gets the same hue.
 // * Friends have no stored ID, only their name, so the colour has to be derived from
@@ -1684,7 +1686,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     const t = songInput.trim();
     if (!t) return;
     const next = [...songs];
-    next.splice(insertAt === 'end' ? next.length : Math.min(Number(insertAt), next.length), 0, newRowType === 'section' ? { type: 'section', label: t } : t);
+    next.splice(insertAt === 'end' ? next.length : Math.min(Number(insertAt), next.length), 0, newRowType === 'section' ? { type: 'section', label: t } : newRowType === 'medley' ? {type:'medley',name:t,parts:[]} : t);
     save(next);
     setSongInput('');
   };
@@ -1875,13 +1877,14 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   {!readOnly && rowButtons(i)}
-                  <span style={{ color: '#9491b8', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{isIntroLike ? '' : getSongList(songs.slice(0, i + 1)).length}</span>
+                  <span style={{ color: '#9491b8', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{isIntroLike ? '' : songs.slice(0, i + 1).filter(row=>!isSectionRow(row)).length}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400 }}>{name}</span>
                       {song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {(criedSong !== undefined ? criedSong : concert.criedSong) === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
                     </div>
+                    {readOnly&&<PerformanceDetails song={song} readOnly />}
                     {info && (!readOnly || setlistView.notes) && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
                     {cover && (!readOnly || setlistView.covers) && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
                     {feat && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>🤝</span>with {feat}</div>}
@@ -1903,8 +1906,9 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                   )}
                   {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
                 </div>
-                {editPanelIdx === i && (
+                {!readOnly && editPanelIdx === i && (
                   <div style={{ marginTop: 8, padding: 12, background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <PerformanceDetails song={song} onChange={value=>save(songs.map((row,index)=>index===i?value:row))} />
                     <div>
                       <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Note</div>
                       <input
@@ -2004,7 +2008,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             </button>
           </div>
           <div role="group" aria-label="New setlist row" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            {['song', 'section'].map(type => <button key={type} type="button" aria-pressed={newRowType === type} onClick={() => setNewRowType(type)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid #51416e', background: newRowType === type ? '#a78bfa' : '#13131f', color: newRowType === type ? '#0c0c14' : '#c4b5fd' }}>+ {type === 'song' ? 'Song' : 'Section'}</button>)}
+            {['song', 'section', 'medley'].map(type => <button key={type} type="button" aria-pressed={newRowType === type} onClick={() => setNewRowType(type)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid #51416e', background: newRowType === type ? '#a78bfa' : '#13131f', color: newRowType === type ? '#0c0c14' : '#c4b5fd' }}>+ {type === 'song' ? 'Song' : type === 'medley' ? 'Medley' : 'Section'}</button>)}
           </div>
           <select aria-label="Insert setlist row position" value={insertAt} onChange={e => setInsertAt(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 8 }}>
             <option value="end">At the end</option><option value="0">At the beginning</option>
@@ -3870,10 +3874,10 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
         const appearances = past.flatMap(c => {
           const result = [];
           const mainMatches = getSongList(c.setlist).filter(s => matchSong(s, c.artist));
-          mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: getSongInfo(s), cover: getSongCover(s), isSupport: false }));
+          mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: [getSongInfo(s),s?.medleyTitle ? `Part of ${s.medleyTitle}` : null,releaseNote(s)].filter(Boolean).join(' · '), cover: getSongCover(s), isSupport: false }));
           Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
             const matches = getSongList(songs).filter(x => matchSong(x, artistName));
-            matches.forEach(s => result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true }));
+            matches.forEach(s => result.push({ concert: c, artist: artistName, info: [getSongInfo(s),s?.medleyTitle ? `Part of ${s.medleyTitle}` : null,releaseNote(s)].filter(Boolean).join(' · '), cover: getSongCover(s), isSupport: true }));
           });
           // Tag each occurrence with its position among repeats in the same show, so
           // "played twice in one show" is visible (e.g. festival version + acoustic encore).
@@ -7294,6 +7298,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           durationMs: t.duration_ms || null,
           popularity: typeof t.popularity === 'number' ? t.popularity : null,
           trackNumber: t.track_number || null,
+          releaseDate: t.album?.release_date || undefined,
           albumName: t.album?.name || selectedSong.albumName,
           albumId: t.album?.id || selectedSong.albumId,
           albumArt: t.album?.images?.[0]?.url || selectedSong.albumArt,
@@ -7364,7 +7369,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
           saveSettings={saveSettings || (() => {})}
           onSave={([updated]) => {
             if (updated?.spotifyId && onLinkSong) {
-              const data = { spotifyId: updated.spotifyId, spotifyName: updated.spotifyName, albumName: updated.albumName, albumId: updated.albumId, albumArt: updated.albumArt, durationMs: updated.durationMs, popularity: updated.popularity, trackNumber: updated.trackNumber }
+              const data = { spotifyId: updated.spotifyId, spotifyName: updated.spotifyName, albumName: updated.albumName, albumId: updated.albumId, albumArt: updated.albumArt, durationMs: updated.durationMs, popularity: updated.popularity, trackNumber: updated.trackNumber, releaseDate:updated.releaseDate }
               onLinkSong(songMatcher.name, songMatcher.artist, data)
               setSelectedSong(prev => prev ? { ...prev, ...data } : prev)
             }
@@ -7384,10 +7389,10 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
     const appearances = scopedPast.flatMap(c => {
       const result = [];
       const mainMatches = getSongList(c.setlist).filter(s => matchSong(s, c.artist));
-      mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: getSongInfo(s), cover: getSongCover(s), isSupport: false }));
+      mainMatches.forEach(s => result.push({ concert: c, artist: c.artist, info: [getSongInfo(s),s?.medleyTitle ? `Part of ${s.medleyTitle}` : null,releaseNote(s)].filter(Boolean).join(' · '), cover: getSongCover(s), isSupport: false }));
       Object.entries(c.supportSetlists || {}).forEach(([artistName, songs]) => {
         const matches = getSongList(songs).filter(x => matchSong(x, artistName));
-        matches.forEach(s => result.push({ concert: c, artist: artistName, info: getSongInfo(s), cover: getSongCover(s), isSupport: true }));
+        matches.forEach(s => result.push({ concert: c, artist: artistName, info: [getSongInfo(s),s?.medleyTitle ? `Part of ${s.medleyTitle}` : null,releaseNote(s)].filter(Boolean).join(' · '), cover: getSongCover(s), isSupport: true }));
       });
       const perConcertCount = {};
       result.forEach(r => { perConcertCount[r.concert.id] = (perConcertCount[r.concert.id] || 0) + 1; });
@@ -10884,7 +10889,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
 
         {/* Integrations */}
-        <SettingsSection title="Integrations" icon="plug" collapsible defaultOpen={false} subtitle={settings.spotifyAccessToken ? { label: 'Spotify connected', color: '#4ade80' } : { label: 'Not connected', color: '#4a4870' }}>
+        <SettingsSection title="Integrations" icon="plug" collapsible defaultOpen={false} subtitle={{label:'Music & concert sources',color:'#9491b8'}}>
           <ConcertSearchSettings settings={local} onChange={value => lUpdate("concertSearchSources", value)} />
           <div style={{ padding: "14px 16px" }}>
             {(() => {
@@ -11524,8 +11529,8 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
       )
       return inMain || inSupport
     })
-    const patch = (sl) => getSongList(sl).map(s =>
-      getSongName(s) === songName ? { ...(typeof s === 'string' ? { name: s } : s), ...spotifyData } : s
+    const patch = (sl) => mapSetlistSongs(sl,s =>
+      getSongName(s) === songName ? { ...(typeof s === 'string' ? { name: s } : s), ...spotifyData, ...(s?.releaseDateManual ? {releaseDate:s.releaseDate,releaseDateManual:true} : {}) } : s
     )
     for (const concert of matching) {
       const updated = {

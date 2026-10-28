@@ -2420,7 +2420,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               </div>
             );
           })()}
-          {detailTab === 'general' && <ReferenceComparison key={concert.id} concert={concert} onSave={onSave} />}
           {/* Tag pills — favorite & moments first, category tags below */}
           {(concert.favorite || (concert.tags || []).length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
@@ -2527,6 +2526,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {!concert.wishlist && detailTab === 'general' && !concert.notes && (
             <div style={{ textAlign: "center", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", padding: "24px 0" }}>no notes added</div>
           )}
+
+          {detailTab === 'general' && <ReferenceComparison key={concert.id} concert={concert} onSave={onSave} />}
 
           {/* Acts — festivals */}
           {detailTab === 'setlist' && isFestival && (concert.acts || []).length > 0 && (

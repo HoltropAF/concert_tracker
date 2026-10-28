@@ -35,3 +35,13 @@ test('non-Latin song names remain distinct during comparison',()=>{
  const report=compareReference({setlist:['봄날']},parseReference('Setlist:\n봄날\n불타오르네\n소우주'))
  assert.deepEqual(report.additions.map(s=>s.after),['불타오르네','소우주'])
 })
+
+test('Spotify and YouTube links are reviewed additions and reject misleading domains',()=>{
+ const ref=parseReference('Spotify: https://open.spotify.com/playlist/example\nYouTube: https://youtu.be/example')
+ const report=compareReference({},ref)
+ assert.equal(report.fields.length,2)
+ const updated=applyReference({},ref,['spotifyUrl'],{name:'Source',url:''})
+ assert.equal(updated.spotifyUrl,ref.spotifyUrl);assert.equal(updated.youtubeUrl,undefined)
+ assert.throws(()=>parseReference('Spotify: https://open.spotify.com.evil.example/track'))
+ assert.throws(()=>parseReference('YouTube: javascript:alert(1)'))
+})

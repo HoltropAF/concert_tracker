@@ -1,3 +1,4 @@
+import ReferenceComparison from './ReferenceComparison'
 import {createBackStack} from '../lib/backStack'
 import {NavigationMemory,useRememberedState,useChangedValue} from './NavigationMemory'
 import PerformanceDetails from './PerformanceDetails'
@@ -2419,6 +2420,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               </div>
             );
           })()}
+          {detailTab === 'general' && <ReferenceComparison key={concert.id} concert={concert} onSave={onSave} />}
           {/* Tag pills — favorite & moments first, category tags below */}
           {(concert.favorite || (concert.tags || []).length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>

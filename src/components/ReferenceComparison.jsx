@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {applyReference,compareReference,parseReference,referenceFields,referenceUrl,mediaUrl} from '../lib/referenceComparison'
+import {applyReference,compareReference,parseReference,referenceFields,referenceUrl} from '../lib/referenceComparison'
 const field={width:'100%',boxSizing:'border-box',background:'#13131f',border:'1px solid #3d3564',borderRadius:7,color:'#c4c2f0',padding:9,fontSize:14}
 const button={background:'none',border:0,color:'var(--accent, #a78bfa)',padding:'10px 0',minHeight:44,cursor:'pointer',fontSize:12}
 export default function ReferenceComparison({concert,onSave}){
@@ -9,11 +9,8 @@ export default function ReferenceComparison({concert,onSave}){
   const report=draft?compareReference(concert,draft):null
   const changes=report?[...report.fields,...report.additions]:[]
   const update=(key,value)=>{setDraft(prev=>({...prev,[key]:value}));setSelected([]);setConfirmed(false);setMessage('')}
-  const mediaLink=(key,fallback)=>{try{return mediaUrl(concert[key]||'',key)||fallback}catch{return fallback}}
-  const links=[['Concert Archives','https://www.concertarchives.org/'],[concert.spotifyUrl?'Spotify':'Find on Spotify',mediaLink('spotifyUrl','https://open.spotify.com/search/'+encodeURIComponent(concert.artist||''))],[concert.youtubeUrl?'YouTube':'Find on YouTube',mediaLink('youtubeUrl','https://www.youtube.com/results?search_query='+encodeURIComponent([concert.artist,concert.venue,concert.date==='9999-12-31'?'':concert.date,'live'].filter(Boolean).join(' ')))]]
   return <section style={{margin:'14px 0',color:'#c4c2f0',borderTop:'1px solid #29233c',paddingTop:12}}>
     <div style={{fontSize:10,color:'#9491b8',fontFamily:"'DM Mono', monospace",textTransform:'uppercase',letterSpacing:'.08em'}}>Sources & comparison</div>
-    <div style={{display:'flex',flexWrap:'wrap',gap:'0 16px'}}>{links.map(([label,url])=><a key={label} href={url} target="_blank" rel="noopener noreferrer" style={{...button,textDecoration:'none'}}>{label} ↗</a>)}</div>
     <details><summary style={{...button,fontFamily:"'DM Mono', monospace"}}>Compare or add source details</summary>
     <p style={{fontSize:12,color:'#9491b8',marginBottom:10}}>Paste details you have copied or received in an authorised export. Links are saved as references; this does not fetch Concert Archives. Compare one artist’s setlist at a time.</p>
     <label style={{fontSize:12}}>Source name<input style={field} value={source.name} onChange={e=>setSource({...source,name:e.target.value})}/></label>

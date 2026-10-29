@@ -2,7 +2,7 @@ import VenueLookup from './VenueLookup'
 import { sellerLink, ticketSaleOpen, wishStepStates } from '../lib/ticketOptions'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { applyWishUpdates, checkWish, proposedChanges, safeTicketUrl } from '../lib/wishlistUpdates'
+import { applyWishUpdates, checkWish, proposedChanges, safeTicketUrl, summarizeWishCheck } from '../lib/wishlistUpdates'
 import { savedVenueSources } from '../lib/venueSources'
 import { validDate } from '../lib/calendar'
 import {localDay,readDailyCheck,claimDailyCheck} from '../lib/dailyWishlist'
@@ -45,7 +45,9 @@ export function WishlistUpdateProvider({ children, settings = {}, concerts = [],
         setProgress({ done: index, total: concerts.length })
         setResults(previous => ({ ...previous, [concert.id]: { status: 'checking' } }))
         try {
-          const result = await checkWish(concert, { signal: abort.signal, onProgress: state => setResults(previous=>({...previous,[concert.id]:{status:'checking',progress:state}})), venues: settings.concertSearchSources?.venues !== false ? savedVenueSources(settings) : [], sources: ['ticketmaster','mojo'].filter(source => settings.concertSearchSources?.[source] !== false) })
+          const previousResult = (dailyKey && readDailyCheck(localStorage,dailyKey)?.results?.[concert.id]) || results[concert.id];
+          const checkedResult = await checkWish(concert, { signal: abort.signal, onProgress: state => setResults(previous=>({...previous,[concert.id]:{status:'checking',progress:state}})), venues: settings.concertSearchSources?.venues !== false ? savedVenueSources(settings) : [], sources: ['ticketmaster','mojo'].filter(source => settings.concertSearchSources?.[source] !== false) })
+          const result = summarizeWishCheck(concert, checkedResult, previousResult);
           setSourceStatus(previous => ({...previous,...Object.fromEntries((result.reports||[]).map(report=>[report.source,report]))}))
           setResults(previous => ({ ...previous, [concert.id]: result }))
           if(dailyKey){
@@ -65,6 +67,8 @@ function statusText(result) {
   if (result.status === 'checking') return result.progress ? `Checking sources · ${result.progress.done}/${result.progress.total}${result.progress.found ? ' · '+result.progress.found+' matches found' : ''}` : 'Checking…'
   if (result.status === 'error') return 'No sources could be checked · try again'
   if (result.status === 'saved') return 'Updates saved'
+  if (result.repeat && result.status === 'found') return (result.newCount ? 'New information found · review updates' : 'No new information found') + (result.limited ? ' · some sources could not be fully checked' : '');
+  if (result.repeat && result.status === 'empty') return result.locked ? 'The selected show was not found in checked sources · saved details kept' : 'No new information found';
   if (result.status === 'partial') return `Checked ${result.checkedSources || 0}/${result.totalSources || result.reports?.length || 0} sources · no matches found · coverage incomplete`
   if (result.status === 'skipped') return 'Enabled sources don’t cover this location'
   if (result.status === 'empty') return `Checked ${result.checkedSources || result.reports?.length || 0} sources · no matching listings`
@@ -170,7 +174,7 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
     {result?.status==='checking'&&<button type="button" style={action} onClick={ctx.stop}>Stop checking</button>}
     <p style={muted}>{checked?'Last checked '+new Date(checked).toLocaleString():'Not checked yet'}</p>
     {result&&<p role="status" style={muted}>{statusText(result)}</p>}
-    {result?.status==='found'&&result.events.map(event=><button type="button" key={event.id} style={{...action,display:'block',textAlign:'left',width:'100%',borderBottom:'1px solid #29233c'}} onClick={()=>review(event)}>{event.artist}<span style={{...muted,display:'block'}}>{event.date} · {event.venue} · {event.city}{event.ticketOptions?.length>1?' · '+event.ticketOptions.length+' ticket options':''}</span>{result.exact?'Review found details →':'Choose this show →'}</button>)}
+    {result?.status==='found'&&<details open={!result.repeat || result.newCount > 0}><summary style={muted}>{result.repeat && !result.newCount ? 'Previously found details' : 'Review found details'}</summary>{result.events.map(event=><button type="button" key={event.id} style={{...action,display:'block',textAlign:'left',width:'100%',borderBottom:'1px solid #29233c'}} onClick={()=>review(event)}>{event.artist}<span style={{...muted,display:'block'}}>{event.date} · {event.venue} · {event.city}{event.ticketOptions?.length>1?' · '+event.ticketOptions.length+' ticket options':''}</span>{result.exact?'Review found details →':'Choose this show →'}</button>)}</details>}
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginTop:14}}>
       <details style={muted}><summary style={{padding:'12px 0',cursor:'pointer'}}>Your notes</summary><textarea aria-label="Your notes" key={concert.notes||''} defaultValue={concert.notes||''} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} style={{width:'100%',boxSizing:'border-box',minHeight:90,background:'#13131f',color:'#c4c2f0',fontSize:16}}/><button type="button" disabled={busy} style={action} onClick={async()=>{setBusy(true);setError('');try{const r=await onSave({...concert,notes:draft.notes??concert.notes??''},{notify:true});if(r?.error)throw Error('Could not save notes.')}catch(e){setError(e.message)}finally{setBusy(false)}}}>Save notes</button></details>
       <details style={muted}><summary style={{padding:'12px 0',cursor:'pointer'}}>Sources checked</summary>{result?.reports?.map((report,i)=><p key={i}>{report.source}: {report.error||report.skipped||(report.count?report.count+' matches':'No matches')}{report.reader?' · '+report.reader:''}{report.cached?' · cached (up to 5 min)':''}{report.reader&&report.checkedAt?' · fetched '+new Date(report.checkedAt).toLocaleTimeString():''}{report.warning?' · '+report.warning:''}</p>)}{result?.message&&!result.reports?.length&&<p>{result.message}</p>}<p>Coverage varies. No results does not mean sold out.</p>{result?.limited&&<p>Other listings may exist beyond the checked pages.</p>}</details>

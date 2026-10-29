@@ -6,6 +6,6 @@ export function readDailyCheck(storage,key) {
 }
 export function claimDailyCheck(storage,key,day=localDay()) {
   if(readDailyCheck(storage,key)?.day===day)return false
-  try{storage.setItem(key,JSON.stringify({day,results:{}}))}catch{/* Session guard still prevents repeated checks. */}
+  try{storage.setItem(key,JSON.stringify({day,results:readDailyCheck(storage,key)?.results||{}}))}catch{/* Session guard still prevents repeated checks. */}
   return true
 }

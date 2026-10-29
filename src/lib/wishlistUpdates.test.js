@@ -1,6 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { applyWishUpdates, checkWish, isSameWish, proposedChanges, safeTicketUrl } from './wishlistUpdates.js'
+import { applyWishUpdates, checkWish, isSameWish, proposedChanges, safeTicketUrl, summarizeWishCheck } from './wishlistUpdates.js'
+
+test('repeat checks ignore timestamps but detect ticket status changes once', () => {
+  const result={events:[event],status:'found',checkedAt:'today'};
+  const first=summarizeWishCheck({},result);
+  assert.equal(first.repeat,false);
+  const second=summarizeWishCheck({}, {...result,events:[{...event,checkedAt:'later'}]}, first);
+  assert.equal(second.newCount,0);
+  const changed=summarizeWishCheck({}, {...result,events:[{...event,status:'Sold out'}]}, second);
+  assert.equal(changed.newCount,1);
+  assert.equal(summarizeWishCheck({},changed,changed).newCount,0);
+});
+
+test('accepted shows do not fall back to other dates and only check their venue', async () => {
+  const concert=applyWishUpdates({artist:'Artist',wishlist:true},event,[]);
+  const calls=[];
+  const result=await checkWish(concert,{sources:['ticketmaster'],venues:[{name:'Other venue',url:'https://other.example'},{name:'Venue',url:'https://venue.example'}],fetcher:async url=>{
+    calls.push(url);return {ok:true,json:async()=>({events:[{...event,id:'another',date:'2027-07-01'}]})};
+  }});
+  assert.equal(result.events.length,0);
+  assert.equal(result.status,'empty');
+  assert.equal(calls.length,2);
+  assert.equal(calls.some(url=>url.includes('other.example')),false);
+  assert.equal(isSameWish(concert,{...event,date:'2027-07-02'}),true);
+});
 
 const event = { id: 'ticketmaster:1', artist: 'Artist', date: '2027-06-18', venue: 'Venue', city: 'Amsterdam', country: 'Netherlands', countryCode: 'NL', url: 'https://www.ticketmaster.nl/event/1', status: 'Check ticket site', source: 'Ticketmaster', checkedAt: '2026-10-20T12:00:00Z' }
 test('artist-only wishes are possible matches, not confirmed shows', () => {

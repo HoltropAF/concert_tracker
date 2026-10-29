@@ -12,6 +12,11 @@ export function safeTicketUrl(value, event) {
   } catch { return '' }
 }
 export function isSameWish(concert, event) {
+  if (concert.discovery?.id) {
+    const saved = concert.discovery;
+    if ([event.id,...(event.listingIds || [])].some(id => [saved.id,...(saved.listingIds || [])].includes(id))) return true;
+    return (saved.date || concert.date) === event.date && normalize(saved.artist || concert.artist) === normalize(event.artist) && !!normalize(saved.venue || concert.venue) && normalize(saved.venue || concert.venue) === normalize(event.venue);
+  }
   if (concert.discovery?.id === event.id || event.listingIds?.includes(concert.discovery?.id)) return true
   return validDate(concert.date) && concert.date === event.date &&
     normalize(concert.artist) === normalize(event.artist) &&
@@ -39,13 +44,34 @@ export function applyWishUpdates(concert, event, selected) {
     discovery: {
       ...concert.discovery, id: event.id, source: event.source, url: safeTicketUrl(event.url,event),
       status: event.status, checkedAt: event.checkedAt, venueWebsite: !!event.venueWebsite,
+      accepted: true, listingIds: event.listingIds || [event.id], artist: event.artist, date: event.date, venue: event.venue,
+      snapshot: eventSnapshot(event),
     },
   }
+}
+// Ignore fetch timestamps and source ordering when deciding whether information is new.
+export function eventSnapshot(event) {
+  return JSON.stringify([
+    ...['artist','date','venue','city','country','saleStart','ticketSaleAt','url','status','startTime'].map(key=>event[key] || ''),
+    (event.ticketOptions || []).map(option=>JSON.stringify([option.id,option.label,option.url,option.status,option.description,option.priceRange?.currency,option.priceRange?.min,option.priceRange?.max])).sort(),
+  ])
+}
+export function summarizeWishCheck(concert, result, previous) {
+  const seen = {...previous?.seen};
+  for (const event of previous?.events || []) if (!seen[event.id]) seen[event.id] = eventSnapshot(event);
+  if (concert.discovery?.snapshot && !seen[concert.discovery.id]) seen[concert.discovery.id] = concert.discovery.snapshot;
+  const repeat = !!(previous?.checkedAt || concert.discovery?.checkedAt);
+  const newCount = result.events.filter(event => seen[event.id] !== eventSnapshot(event)).length;
+  for (const event of result.events) seen[event.id] = eventSnapshot(event);
+  return {...result, repeat, newCount, seen};
 }
 export async function checkWish(concert, { fetcher = fetch, signal, sources = ['ticketmaster', 'mojo'], venues = [], now = new Date(), budgetMs = 15000, sourceMs = 10000, onProgress = () => {} } = {}) {
   if (!String(concert.artist || '').trim()) throw Error('Add an artist before checking.')
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-  const queue = [...sources,...[...venues].sort((a,b)=>Number(normalize(b.name)===normalize(concert.venue))-Number(normalize(a.name)===normalize(concert.venue)))]
+  const locked = !!concert.discovery?.id;
+  const venueName = concert.discovery?.venue || concert.venue;
+  const relevantVenues = locked ? venues.filter(venue=>normalize(venue.name)===normalize(venueName)) : venues;
+  const queue = [...sources,...[...relevantVenues].sort((a,b)=>Number(normalize(b.name)===normalize(concert.venue))-Number(normalize(a.name)===normalize(concert.venue)))]
   if(!queue.length)throw Error('Enable a concert search source in Settings → Integrations.')
   const deadline=Date.now()+budgetMs, events=new Map(),reports=new Array(queue.length)
   let next=0,completed=0
@@ -79,5 +105,6 @@ export async function checkWish(concert, { fetcher = fetch, signal, sources = ['
   await Promise.all(Array.from({length:Math.min(4,queue.length)},worker))
   const candidates=groupTicketEvents([...events.values()]),exact=candidates.filter(event=>isSameWish(concert,event))
   const incomplete=reports.some(r=>r.error||r.warning),checked=reports.filter(r=>r.pages>0).length
-  return {events:exact.length?exact:candidates,exact:exact.length===1,checkedAt:new Date().toISOString(),limited:incomplete,reports,checkedSources:checked,totalSources:queue.length,status:candidates.length?'found':incomplete?(checked?'partial':'error'):reports.every(r=>r.skipped)?'skipped':'empty',message:reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ')}
+  const matches=locked?exact:exact.length?exact:candidates;
+  return {events:matches,locked,exact:exact.length===1,checkedAt:new Date().toISOString(),limited:incomplete,reports,checkedSources:checked,totalSources:queue.length,status:matches.length?'found':incomplete?(checked?'partial':'error'):reports.every(r=>r.skipped)?'skipped':'empty',message:reports.filter(r=>r.error).map(r=>r.source+': '+r.error).join(' · ')}
 }

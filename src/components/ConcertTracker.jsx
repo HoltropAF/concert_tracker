@@ -1,4 +1,5 @@
 import ReferenceComparison from './ReferenceComparison'
+import ArtistPhotoSearch from './ArtistPhotoSearch'
 import {createBackStack} from '../lib/backStack'
 import {NavigationMemory,useRememberedState,useChangedValue} from './NavigationMemory'
 import PerformanceDetails from './PerformanceDetails'
@@ -6243,13 +6244,26 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
     const spotifyInfo = (settings.artistSpotifyInfo || {})[selectedArtist] || null;
     const bannerPhotoPath = (settings.artistPhotos || {})[selectedArtist] || null;
     const bannerPos = (settings.artistPhotoPos || {})[selectedArtist] || { x: 50, y: 50 };
+    const bannerCredit = (settings.artistPhotoCredits || {})[selectedArtist];
+    const saveBanner = async (file, credit = null) => {
+      setArtistPhotoUploading(true);
+      try {
+        const path = await uploadArtistPhoto(selectedArtist, file);
+        const changes = {
+          artistPhotos: { ...(settings.artistPhotos || {}), [selectedArtist]: path },
+          artistPhotoCredits: { ...(settings.artistPhotoCredits || {}), [selectedArtist]: credit },
+          artistPhotoPos: { ...(settings.artistPhotoPos || {}), [selectedArtist]: { x: 50, y: 50 } },
+        };
+        if (onUpdateSettings) await onUpdateSettings({ ...settings, ...changes });
+        else Object.entries(changes).forEach(([key, value]) => onUpdateSetting(key, value));
+        setReframingArtistPhoto(true);
+      } finally { setArtistPhotoUploading(false); }
+    };
     const handleBannerPick = e => {
       const file = e.target.files?.[0];
       e.target.value = '';
       if (!file) return;
-      setArtistPhotoUploading(true);
-      uploadArtistPhoto(selectedArtist, file)
-        .then(path => { onUpdateSetting('artistPhotos', { ...(settings.artistPhotos || {}), [selectedArtist]: path }); setReframingArtistPhoto(true); })
+      saveBanner(file)
         .catch(err => onNotify(err?.message || 'Could not upload photo', 'error'))
         .finally(() => setArtistPhotoUploading(false));
     };
@@ -6261,6 +6275,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       delete nextPhotos[selectedArtist];
       delete nextPos[selectedArtist];
       onUpdateSetting('artistPhotos', nextPhotos);
+      onUpdateSetting('artistPhotoCredits', { ...(settings.artistPhotoCredits || {}), [selectedArtist]: null });
       onUpdateSetting('artistPhotoPos', nextPos);
       setReframingArtistPhoto(false);
       // * Also drop the file itself — nothing else references it, and leaving it
@@ -6318,6 +6333,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </div>
           </div>
         )}
+        {bannerEditMode && <ArtistPhotoSearch key={selectedArtist} artist={selectedArtist} onChoose={saveBanner} disabled={artistPhotoUploading} />}
+        {bannerPhotoPath && bannerCredit?.source?.startsWith('https://commons.wikimedia.org/') && <a href={bannerCredit.source} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'5px 18px',fontSize:10,color:'#9491b8'}}>Photo: {bannerCredit.author || 'Wikimedia Commons'} · {bannerCredit.license} · cropped/resized ↗</a>}
         {reframingPolaroid && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setReframingPolaroid(null)}>
             <div onClick={e => e.stopPropagation()} style={{ background: "#13131f", border: "1px solid #2e2e50", borderRadius: 14, padding: 14, maxWidth: 320, width: "100%" }}>

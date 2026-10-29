@@ -63,7 +63,10 @@ export function summarizeWishCheck(concert, result, previous) {
   const repeat = !!(previous?.checkedAt || concert.discovery?.checkedAt);
   const newCount = result.events.filter(event => seen[event.id] !== eventSnapshot(event)).length;
   for (const event of result.events) seen[event.id] = eventSnapshot(event);
-  return {...result, repeat, newCount, seen};
+  const unread = newCount > 0 || !!previous?.unread;
+  return {...result, repeat, newCount, seen, unread,
+    events: result.events.length ? result.events : unread ? previous?.events || [] : [],
+  };
 }
 export async function checkWish(concert, { fetcher = fetch, signal, sources = ['ticketmaster', 'mojo'], venues = [], now = new Date(), budgetMs = 15000, sourceMs = 10000, onProgress = () => {} } = {}) {
   if (!String(concert.artist || '').trim()) throw Error('Add an artist before checking.')

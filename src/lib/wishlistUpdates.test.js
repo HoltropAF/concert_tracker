@@ -8,6 +8,12 @@ test('repeat checks ignore timestamps but detect ticket status changes once', ()
   assert.equal(first.repeat,false);
   const second=summarizeWishCheck({}, {...result,events:[{...event,checkedAt:'later'}]}, first);
   assert.equal(second.newCount,0);
+  assert.equal(second.unread,true);
+  const failed=summarizeWishCheck({}, {...result,events:[],status:'error'},second);
+  assert.equal(failed.unread,true);
+  assert.equal(failed.events.length,1);
+  const accepted=summarizeWishCheck({},result,{...second,unread:false,status:'saved'});
+  assert.equal(accepted.unread,false);
   const changed=summarizeWishCheck({}, {...result,events:[{...event,status:'Sold out'}]}, second);
   assert.equal(changed.newCount,1);
   assert.equal(summarizeWishCheck({},changed,changed).newCount,0);

@@ -6323,7 +6323,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           </div>
         )}
 
-        {bannerPhotoPath && bannerCredit?.source?.startsWith('https://commons.wikimedia.org/') && <a href={bannerCredit.source} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'5px 18px',fontSize:10,color:'#9491b8'}}>Photo: {bannerCredit.author || 'Wikimedia Commons'} · {bannerCredit.license} · cropped/resized ↗</a>}
+        {bannerPhotoPath && bannerCredit?.source?.startsWith('https://') && <a href={bannerCredit.source} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'5px 18px',fontSize:10,color:'#9491b8'}}>Photo source{bannerCredit.author ? ': '+bannerCredit.author : ''}{bannerCredit.license ? ' · '+bannerCredit.license : ''} · cropped/resized ↗</a>}
         {reframingPolaroid && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setReframingPolaroid(null)}>
             <div onClick={e => e.stopPropagation()} style={{ background: "#13131f", border: "1px solid #2e2e50", borderRadius: 14, padding: 14, maxWidth: 320, width: "100%" }}>

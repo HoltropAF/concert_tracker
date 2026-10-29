@@ -1,0 +1,42 @@
+.artist-photo-sheet{--photo-accent:var(--accent,#a78bfa);position:fixed;inset:auto 0 0;margin:0 auto;width:min(480px,100vw);max-width:100vw;max-height:88dvh;box-sizing:border-box;padding:0;background:#13131f;color:#e2e0ff;border:1px solid #343048;border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 -12px 60px #0005;font-family:'DM Sans',sans-serif;overflow:hidden}
+.artist-photo-sheet[open]{display:flex;flex-direction:column}
+.artist-photo-sheet::backdrop{background:#05050bb3;backdrop-filter:blur(3px)}
+.artist-photo-sheet button,.artist-photo-sheet a,.artist-photo-sheet input{font:inherit}
+.artist-photo-sheet button{cursor:pointer}
+.artist-photo-sheet button:disabled{opacity:.5;cursor:wait}
+.artist-photo-sheet :focus-visible{outline:2px solid var(--photo-accent);outline-offset:3px}
+.artist-photo-handle{width:34px;height:4px;background:#504a65;border-radius:10px;margin:10px auto 6px;flex-shrink:0}
+.artist-photo-header{display:flex;align-items:center;gap:8px;padding:6px 12px 14px 20px;flex-shrink:0;border-bottom:1px solid #ffffff0c}
+.artist-photo-header>div{flex:1;min-width:0}
+.artist-photo-header h2{font-family:'Syne',sans-serif;font-size:19px;margin:0 0 4px;font-weight:700}
+.artist-photo-header p{font-size:12px;color:#a39db8;margin:0;overflow-wrap:anywhere}
+.artist-photo-icon{width:44px;height:44px;flex-shrink:0;border:0;background:transparent;color:#c5bfd7;border-radius:50%;font-size:24px!important}
+.artist-photo-content{padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain;min-height:0}
+.artist-photo-options{display:grid;gap:10px}
+.artist-photo-options button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:16px 12px;border-radius:14px;background:#1e1b2c;border:1px solid #ffffff0d;color:#e2e0ff}
+.artist-photo-options button>span:nth-child(2){flex:1}
+.artist-photo-options strong{display:block;font-size:14px;font-weight:600}
+.artist-photo-options small{display:block;color:#a39db8;font-size:11px;line-height:1.5;margin-top:4px}
+.artist-photo-option-icon{width:38px;height:38px;display:grid;place-items:center;background:#a78bfa15;color:var(--photo-accent);border-radius:12px;font-size:24px}
+.artist-photo-search{display:flex;gap:8px}
+.artist-photo-search input{flex:1;min-width:0;width:100%;border:1px solid #39334d;border-radius:12px;background:#0d0c16;color:#e2e0ff;padding:12px;font-size:16px}
+.artist-photo-search button,.artist-photo-primary{border:0;border-radius:12px;background:var(--photo-accent);color:#141020;min-height:46px;padding:10px 16px;font-weight:700!important}
+.artist-photo-note{color:#a39db8;font-size:11px;line-height:1.5;margin:12px 0}
+.artist-photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.artist-photo-grid button{padding:0;border:1px solid #ffffff12;border-radius:12px;background:#211e2f;overflow:hidden;color:#bfb9d3;text-align:left}
+.artist-photo-grid img{display:block;width:100%;aspect-ratio:1.3;object-fit:cover}
+.artist-photo-grid span{display:block;font-size:10px;padding:7px 9px}
+.artist-photo-more{width:100%;border:1px solid #39334d;border-radius:12px;color:var(--photo-accent);background:transparent;min-height:46px;margin-top:14px;font-size:12px!important}
+.artist-photo-preview{background:#090810;border-radius:14px;overflow:hidden}
+.artist-photo-preview img{display:block;width:100%;max-height:36dvh;object-fit:contain}
+.artist-photo-title{font-size:12px;line-height:1.5;overflow-wrap:anywhere;margin:12px 0 4px}
+.artist-photo-source{display:inline-flex;align-items:center;min-height:44px;color:var(--photo-accent);font-size:12px!important;text-decoration:none}
+.artist-photo-footer{flex-shrink:0;padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid #ffffff0c;background:#171422}
+.artist-photo-primary{width:100%}
+.artist-photo-footer small{display:block;text-align:center;font-size:10px;color:#a39db8;margin-top:8px}
+.artist-photo-empty,.artist-photo-loading{padding:28px 8px;text-align:center;font-size:13px;color:#bfb9d3}
+.artist-photo-empty small{display:block;margin-top:8px;font-size:12px;color:#a39db8}
+.artist-photo-error{padding:12px;background:#fda4af0d;border-radius:10px;color:#fda4af;font-size:12px;line-height:1.5}
+.artist-photo-spinner{display:inline-block;width:14px;height:14px;border:2px solid #504a65;border-top-color:var(--photo-accent);border-radius:50%;margin-right:9px;vertical-align:middle;animation:artist-photo-spin 1s linear infinite}
+@keyframes artist-photo-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.artist-photo-spinner{animation:none}}

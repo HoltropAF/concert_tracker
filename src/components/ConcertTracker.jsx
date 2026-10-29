@@ -6259,14 +6259,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         setReframingArtistPhoto(true);
       } finally { setArtistPhotoUploading(false); }
     };
-    const handleBannerPick = e => {
-      const file = e.target.files?.[0];
-      e.target.value = '';
-      if (!file) return;
-      saveBanner(file)
-        .catch(err => onNotify(err?.message || 'Could not upload photo', 'error'))
-        .finally(() => setArtistPhotoUploading(false));
-    };
     const handleBannerRemove = () => {
       if (!bannerPhotoPath) return;
       if (!window.confirm(`Remove the photo for ${selectedArtist}?`)) return;
@@ -6306,10 +6298,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 <button onClick={() => setReframingArtistPhoto(true)} title="Move photo" style={{ background: "#0c0c14aa", border: "none", borderRadius: 99, color: "#fff", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>↕↔</button>
               )}
               {bannerEditMode && (
-                <label style={{ background: bannerPhotoPath ? "#0c0c14aa" : "#a78bfa", borderRadius: 99, color: bannerPhotoPath ? "#fff" : "#0c0c14", fontSize: 12, fontWeight: bannerPhotoPath ? 400 : 700, padding: bannerPhotoPath ? "4px 9px" : "5px 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }} title={bannerPhotoPath ? "Change photo" : "Add photo"}>
-                  <input type="file" accept="image/*" onChange={handleBannerPick} style={{ display: "none" }} />
-                  {artistPhotoUploading ? "···" : bannerPhotoPath ? "↑" : <>📷 Add photo</>}
-                </label>
+                <ArtistPhotoSearch key={selectedArtist} artist={selectedArtist} onChoose={saveBanner} disabled={artistPhotoUploading} hasPhoto={!!bannerPhotoPath} />
               )}
               {bannerEditMode && bannerPhotoPath && (
                 <button onClick={handleBannerRemove} title="Remove photo" style={{ background: "#0c0c14aa", border: "none", borderRadius: 99, color: "#f87171", fontSize: 12, padding: "4px 9px", cursor: "pointer" }}>✕</button>
@@ -6333,7 +6322,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
             </div>
           </div>
         )}
-        {bannerEditMode && <ArtistPhotoSearch key={selectedArtist} artist={selectedArtist} onChoose={saveBanner} disabled={artistPhotoUploading} />}
+
         {bannerPhotoPath && bannerCredit?.source?.startsWith('https://commons.wikimedia.org/') && <a href={bannerCredit.source} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'5px 18px',fontSize:10,color:'#9491b8'}}>Photo: {bannerCredit.author || 'Wikimedia Commons'} · {bannerCredit.license} · cropped/resized ↗</a>}
         {reframingPolaroid && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setReframingPolaroid(null)}>

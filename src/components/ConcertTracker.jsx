@@ -336,9 +336,9 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 
 // ! Bump this and add a matching "## <version> — <date>" heading to
 // ! public/changelog.md in every release. The two are read together: What's new
-// ! shows the releases listed above whichever version you last opened, so a
-// ! mismatch between them means either nothing is shown or everything is.
-const APP_VERSION = '1.1.0'
+// ! shows only the installed release, so a
+// ! mismatch between them means the current release notes cannot be shown.
+const APP_VERSION = '1.1.1'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -9567,18 +9567,17 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   // * "What's new" used to render the whole changelog every time, which is why it
-  // * never felt like news. It now shows only the releases above the version you
-  // * last opened, and goes quiet once you've read them.
+  // * never felt like news. It now shows only the installed release; the version you
+  // * last opened controls the unread indicator only.
   const [releases, setReleases] = useState(null);
   const [lastSeenVersion, setLastSeenVersion] = useState(() => {
     try { return localStorage.getItem(LAST_SEEN_VERSION_KEY) } catch { return null }
   });
-  const [showAllReleases, setShowAllReleases] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   useEffect(() => {
     fetch(`/changelog.md?v=${APP_VERSION}`, { cache: 'no-store' })
       .then(r => r.ok ? r.text() : '')
-      .then(t => setReleases(parseChangelog(t)))
+      .then(t => setReleases(parseChangelog(t).filter(release => release.version === APP_VERSION).slice(0, 1)))
       .catch(() => setReleases([]));
   }, []);
   // * Version is per-installed-build, so it belongs on the device rather than in the
@@ -10297,7 +10296,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           {swUpdate.pending ? 'Update now' : swUpdate.checking ? 'Checking…' : 'Check updates'}
         </button>
         {releases !== null && releases.length > 0 && (
-          <button onClick={() => { setShowAllReleases(false); setWhatsNewOpen(true); }} style={{
+          <button onClick={() => { setWhatsNewOpen(true); }} style={{
             background: unseenReleases.length > 0 ? "#30284d" : "none",
             border: `1px solid ${unseenReleases.length > 0 ? "#5e4c8f" : "transparent"}`,
             borderRadius: 99, color: unseenReleases.length > 0 ? "#a78bfa" : "#6b6a8f",
@@ -10315,14 +10314,14 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
       </div>
 
       {whatsNewOpen && releases !== null && releases.length > 0 && (() => {
-        const shown = showAllReleases || unseenReleases.length === 0 ? releases : unseenReleases;
-        const close = () => { markReleasesSeen(); setWhatsNewOpen(false); setShowAllReleases(false); };
+        const shown = releases;
+        const close = () => { markReleasesSeen(); setWhatsNewOpen(false); };
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "#000000cc", display: "flex", alignItems: "flex-end" }} onClick={close}>
             <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 34px", boxSizing: "border-box", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexShrink: 0 }}>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
-                  {shown === releases ? "All changes" : "What's new"}
+                  What's new
                 </div>
                 <button onClick={close} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
               </div>
@@ -10342,11 +10341,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
-                {shown !== releases && (
-                  <button onClick={() => setShowAllReleases(true)} style={{ flex: 1, background: "none", border: "1px solid #2e2e50", borderRadius: 10, color: "#6b6a8f", fontSize: 12, padding: "10px", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>
-                    All versions
-                  </button>
-                )}
+                <a href="https://github.com/HoltropAF/concert_tracker/commits/main/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, border: "1px solid #2e2e50", borderRadius: 10, color: "#9491b8", fontSize: 12, padding: "10px", textAlign: "center", textDecoration: "none", fontFamily: "'DM Mono', monospace" }}>Full history on GitHub ↗</a>
                 <button onClick={close} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 13, fontWeight: 700, padding: "10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                   Got it
                 </button>
@@ -11388,6 +11383,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   // * through props, because it's read from stylesheet rules as well as inline styles.
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', ACCENT_PRESETS[themed.accentColor]?.hex || ACCENT_PRESETS.violet.hex)
+    document.documentElement.style.setProperty('--settracker-accent', ACCENT_PRESETS[themed.accentColor]?.hex || ACCENT_PRESETS.violet.hex)
   }, [themed.accentColor])
   useEffect(() => {
     const pastCount = concerts.filter(c => !isWish(c) && isPast(c.date)).length
@@ -11740,6 +11736,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
 
   const appShell = { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0c0c14', maxWidth: 480, margin: '0 auto', fontFamily: "'DM Sans', sans-serif", filter: combinedFilter || undefined, overflow: 'hidden' }
   useEffect(() => {
+    document.documentElement.style.setProperty('--settracker-display-filter', combinedFilter || 'none')
     const id = 'theme-img-counter'
     let el = document.getElementById(id)
     if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el) }

@@ -38,7 +38,7 @@ export default function ArtistPhotoSearch({artist,onChoose,disabled,hasPhoto}) {
   }
   return <>
     <button type="button" disabled={busy||disabled} onClick={()=>{setError('');setOnline(false);setSelected(null);dialog.current.showModal()}} style={{background:hasPhoto?'#0c0c14aa':'#a78bfa',border:0,borderRadius:99,color:hasPhoto?'#fff':'#0c0c14',fontSize:12,padding:'5px 12px',cursor:'pointer'}}>{busy?'Saving…':hasPhoto?'Change photo':'📷 Add photo'}</button>
-    {createPortal(<dialog className="artist-photo-sheet" ref={dialog} aria-label={'Photo for '+artist} onCancel={e=>{if(busy)e.preventDefault()}}>
+    {createPortal(<dialog className="artist-photo-sheet" data-theme-shell ref={dialog} aria-label={'Photo for '+artist} onCancel={e=>{if(busy)e.preventDefault()}}>
       <div className="artist-photo-handle" aria-hidden="true"/>
       <header className="artist-photo-header">
         {online&&<button type="button" className="artist-photo-icon" aria-label={selected?'Back to photos':'Back to photo options'} disabled={busy} onClick={()=>{setError('');if(selected)setSelected(null);else setOnline(false)}}>←</button>}

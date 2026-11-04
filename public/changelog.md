@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4 — 4 November 2026
+- The show-type dropdown now matches the rounded controls, typography and theme colours on the Shows page.
+
 ## 1.1.3 — 4 November 2026
 - Shows filters use simple labelled rows with dropdowns and switches; sorting uses a matching list with the selected choice marked.
 - Fixed the Done button to follow the app colour scheme.

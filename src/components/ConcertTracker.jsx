@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.3'
+const APP_VERSION = '1.1.4'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -11931,7 +11931,10 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         {/* Type pills + compact/calendar/add */}
         {view === 'home' && (
           <div style={{ display: 'flex', gap: 6, padding: '10px 16px 0', alignItems: 'center' }}>
-            <select aria-label="Show type" value={filterType} onChange={e=>setFilterType(e.target.value)} style={{background:'#13131f',border:'1px solid #2e2e50',borderRadius:8,padding:'8px 10px',color:'#c4c2f0',fontFamily:"'DM Mono',monospace",fontSize:12}}><option value="all">All</option><option value="concerts">Shows</option><option value="festivals">Festivals</option><option value="online">Online</option></select>
+            <div style={{position:'relative',flexShrink:0,display:'inline-flex',alignItems:'center'}}>
+              <select aria-label="Show type" value={filterType} onChange={e=>setFilterType(e.target.value)} style={{appearance:'none',WebkitAppearance:'none',background:filterType==='all'?'none':'#1a1a30',border:'1px solid '+(filterType==='all'?'#1f1f35':'#a78bfa'),borderRadius:99,padding:'5px 27px 5px 11px',color:filterType==='all'?'#6b6a8f':'#a78bfa',fontFamily:"'DM Mono', monospace",fontSize:12,fontWeight:filterType==='all'?400:700,cursor:'pointer'}}><option style={{background:'#13131f',color:'#c4c2f0'}} value="all">All</option><option style={{background:'#13131f',color:'#c4c2f0'}} value="concerts">Shows</option><option style={{background:'#13131f',color:'#c4c2f0'}} value="festivals">Festivals</option><option style={{background:'#13131f',color:'#c4c2f0'}} value="online">Online</option></select>
+              <span aria-hidden="true" style={{position:'absolute',right:11,pointerEvents:'none',color:filterType==='all'?'#6b6a8f':'#a78bfa',fontSize:11}}>▾</span>
+            </div>
             <div style={{ flex: 1 }} />
             <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
               {compact ? '▤' : '☰'}

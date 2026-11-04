@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.6'
+const APP_VERSION = '1.1.7'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -1555,16 +1555,16 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
         width: "100%", textAlign: "left", background: past ? "#17172a" : concert.wishlist ? "#0d1f16" : "#0f1638",
         border: `1px solid ${past ? "#1f1f35" : concert.wishlist ? "#1e3a2a" : "#33397a"}`,
         borderLeft: `3px solid ${accentColor}`,
-        borderRadius: 12, padding: "14px 16px", cursor: "pointer",
+        borderRadius: 12, padding: "10px 14px", cursor: "pointer",
         transition: "all 0.15s ease", marginBottom: 8, position: "relative"
       }}
     >
       <WishlistUpdateBadge concert={concert} />
       {hasPhotoDivider && (
         <>
-          <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="list" style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
-          <div style={{ position: "absolute", left: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
-          <div style={{ position: "absolute", right: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
+          <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="list" style={{ width: "100%", height: 105, borderRadius: "8px 8px 0 0", marginBottom: 10 }} />
+          <div style={{ position: "absolute", left: -9, top: 125, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
+          <div style={{ position: "absolute", right: -9, top: 125, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
         </>
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -1590,7 +1590,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
               {concert.tour}
             </div>
           )}
-          <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
+          <div style={{ display: showVenue ? "block" : "none", fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", lineHeight: 1.45 }}>
             {online ? (
               <>
                 <div>{formatDate(concert.date)}</div>
@@ -1605,7 +1605,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
             )}
           </div>
           {!showVenue && (
-            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
+            <div style={{ fontSize: 12, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", lineHeight: 1.45 }}>
               <div>{formatDate(concert.date)}</div>
               {concert.city && <div>{concert.city}</div>}
             </div>

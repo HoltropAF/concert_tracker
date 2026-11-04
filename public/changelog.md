@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.7 — 4 November 2026
+- Expanded show cards are shorter, with a smaller photo banner and tighter padding and detail spacing.
+
 ## 1.1.6 — 4 November 2026
 - Expanded show-card photos now start loading immediately instead of waiting for scroll visibility detection.
 

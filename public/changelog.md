@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.5 — 4 November 2026
+- Restored saved photos on expanded show cards, including upcoming shows with photos. Removed the conflicting list-photo visibility switch.
+
 ## 1.1.4 — 4 November 2026
 - The show-type dropdown now matches the rounded controls, typography and theme colours on the Shows page.
 

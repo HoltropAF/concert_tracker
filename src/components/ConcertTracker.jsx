@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.4'
+const APP_VERSION = '1.1.5'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -1468,7 +1468,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
   const saleTime = concert.ticketSaleAt ? new Date(concert.ticketSaleAt).getTime() : NaN;
   const saleStarted = saleTime <= Date.now();
   const past = isPast(concert.date) && !concert.wishlist;
-  const effectiveCompact = compact || !past;
+  const effectiveCompact = compact || (!past && !concert.photo);
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
   const accentColor = online ? ONLINE_COLOR : isFestival ? "#f472b6" : past ? "#a78bfa" : concert.wishlist ? "#34d399" : "#818cf8";
@@ -1547,7 +1547,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
     );
   }
 
-  const hasPhotoDivider = showPhoto && concert.photo && past;
+  const hasPhotoDivider = !!concert.photo;
   return (
     <button
       onClick={() => onOpen(concert)}
@@ -11988,7 +11988,6 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
                 {toggle('Favourites only',filterFavorite,setFilterFavorite)}
                 {toggle('Solo only',filterSolo,setFilterSolo)}
                 {toggle('Only with photos',filterHasPhoto,setFilterHasPhoto)}
-                {toggle('Show photos in list',settings.showListPhotos!==false,v=>onUpdateSetting('showListPhotos',v))}
                 {(settings.showTags||['Cried']).map(t=>toggle(t,filterTags.includes(t),v=>setFilterTags(old=>v?[...new Set([...old,t])]:old.filter(x=>x!==t))))}
               </>;
             })()}

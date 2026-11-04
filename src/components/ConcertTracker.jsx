@@ -1,3 +1,5 @@
+import ShowControlSheet from './ShowControlSheet'
+import {yearShowCounts} from '../lib/yearShowCounts'
 import ReferenceComparison from './ReferenceComparison'
 import ArtistPhotoSearch from './ArtistPhotoSearch'
 import {createBackStack} from '../lib/backStack'
@@ -338,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.1'
+const APP_VERSION = '1.1.2'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -3986,13 +3988,13 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
 
           {/* Year scope toggle */}
           {(() => {
-            const allDataYears = [...new Set(pastAll.map(c => c.date.slice(0,4)).filter(Boolean))].sort();
+            const allDataYears = [...new Set(concerts.filter(c=>!isWish(c) && c.date && c.date !== '9999-12-31').map(c => c.date.slice(0,4)))].sort();
             const curYear = String(new Date().getFullYear());
-            const recentYears = [curYear, String(curYear - 1), String(curYear - 2)].filter(y => allDataYears.includes(y));
+            const recentYears = [String(Number(curYear) + 1), curYear, String(Number(curYear) - 1)];
             const olderYears = allDataYears.filter(y => !recentYears.includes(y)).reverse();
             const pills = [{ id: 'all', label: 'All' }, ...recentYears.map(y => ({ id: y, label: y }))];
             return (
-              <div style={{ display: "flex", gap: 4, marginBottom: 10, alignItems: "center" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10, alignItems: "center" }}>
                 {pills.map(({ id, label }) => {
                   const active = summaryYear === id && !summaryFavOnly;
                   return (
@@ -4072,19 +4074,22 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
           })()}
 
           {!summaryFavOnly && summaryYear === 'all' && (() => {
-            const yearCounts = {};
-            concerts.filter(c => !isWish(c) && isPast(c.date) && c.date !== '9999-12-31').forEach(c => { const y = c.date.slice(0,4); yearCounts[y] = (yearCounts[y] || 0) + 1; });
+            const yearCounts = yearShowCounts(concerts.filter(c=>!isWish(c)),isPast);
             const years = Object.keys(yearCounts).sort();
-            if (years.length < 2) return null;
-            const maxCount = Math.max(...years.map(y => yearCounts[y]), 1);
+            if (!years.length) return null;
+            const maxCount = Math.max(...years.map(y => yearCounts[y].past + yearCounts[y].upcoming), 1);
             return (
               <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "14px", marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Shows per year</div>
+                <div style={{display:"flex",gap:14,fontSize:11,color:"#9491b8",marginBottom:10}}><span><span style={{color:"#a78bfa"}}>●</span> Attended</span><span><span style={{color:"#514078"}}>●</span> Upcoming</span></div>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
                   {years.map(y => (
                     <div key={y} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                      <div style={{ fontSize: 9, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>{yearCounts[y]}</div>
-                      <div style={{ width: "100%", maxWidth: 30, borderRadius: "3px 3px 0 0", background: "#a78bfa", height: `${Math.max(3, (yearCounts[y] / maxCount) * 44)}px` }} />
+                      <div style={{ fontSize: 9, color: "#9491b8", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>{yearCounts[y].past}{yearCounts[y].upcoming ? ` +${yearCounts[y].upcoming}` : ''}</div>
+                      <div role="img" aria-label={`${y}: ${yearCounts[y].past} attended, ${yearCounts[y].upcoming} upcoming`} style={{width:'100%',maxWidth:30,borderRadius:'3px 3px 0 0',overflow:'hidden'}}>
+                        <div style={{background:'#514078',height:`${yearCounts[y].upcoming/maxCount*44}px`}} />
+                        <div style={{background:'#a78bfa',height:`${yearCounts[y].past/maxCount*44}px`}} />
+                      </div>
                       <div style={{ fontSize: 9, color: "#4a4870", fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{y}</div>
                     </div>
                   ))}
@@ -5731,49 +5736,6 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           everything down. Same three figures now read as boxes, in the same style
           used on shows, artists and friends, and they sit under the controls so the
           page starts with something you can act on. */}
-      {/* Inner circle — the three you've seen most. */}
-      {podium.length === 3 && (() => {
-        const [first, second, third] = podium;
-        const plinth = (f, rank) => {
-          const size = rank === 1 ? 58 : 44;
-          const hue = friendColor(displayName(f.name));
-          const color = rank === 1 ? 'var(--accent)' : rank === 2 ? '#818cf8' : '#f472b6';
-          return (
-            <button onClick={() => setSelectedFriend(f.name)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center', flex: rank === 1 ? 1.22 : 1, minWidth: 0 }}>
-              <div style={{
-                width: size, height: size, borderRadius: '50%', flexShrink: 0,
-                background: `hsl(${hue}, 55%, 22%)`,
-                border: rank === 1 ? `2px solid hsl(${hue}, 60%, 52%)` : `1px solid hsl(${hue}, 55%, 40%)`,
-                color: `hsl(${hue}, ${rank === 1 ? 75 : 70}%, ${rank === 1 ? 82 : 78}%)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: size * 0.36,
-                boxShadow: rank === 1 ? '0 0 22px rgba(167,139,250,0.28)' : 'none',
-              }}>{friendInitials(displayName(f.name))}</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: rank === 1 ? 14 : 12.5, fontWeight: 800, color: '#e2e0ff', lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(f.name)}</div>
-              <div style={{ fontSize: 9.5, color: rank === 1 ? 'var(--accent)' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{f.shows.length} shows</div>
-              <div style={{
-                width: '100%', height: rank === 1 ? 52 : rank === 2 ? 34 : 24,
-                borderRadius: '7px 7px 0 0',
-                background: rank === 1 ? 'linear-gradient(180deg,#241d47,#141028)' : 'linear-gradient(180deg,#191830,#101020)',
-                border: `1px solid ${rank === 1 ? '#3a2f66' : '#1f1f35'}`, borderBottom: 'none',
-                display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 5,
-                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, color,
-              }}>{rank}</div>
-            </button>
-          );
-        };
-        return (
-          <>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '16px 16px 0' }}>
-              {plinth(second, 2)}
-              {plinth(first, 1)}
-              {plinth(third, 3)}
-            </div>
-            <div style={{ height: 1, background: '#1f1f35', margin: '0 16px' }} />
-          </>
-        );
-      })()}
-
       {/* Search + sort + filters + add */}
       {friendScope&&<div style={{padding:'10px 16px',fontSize:12,color:'var(--accent)'}}>Friends at this show · {friendScope.join(', ')} <button onClick={()=>setFriendScope(null)} style={{background:'none',border:0,color:'inherit',cursor:'pointer'}}>Show all</button></div>}
       <div style={{ padding: "12px 16px 0", position: "relative", zIndex: 10 }}>
@@ -5885,6 +5847,50 @@ function FriendsView({ concerts, onOpen, settings = {}, onUpdateSetting, onSaveC
           </div>
         )}
       </div>
+
+      {/* Inner circle — the three you've seen most. */}
+      {podium.length === 3 && (() => {
+        const [first, second, third] = podium;
+        const plinth = (f, rank) => {
+          const size = rank === 1 ? 58 : 44;
+          const hue = friendColor(displayName(f.name));
+          const color = rank === 1 ? 'var(--accent)' : rank === 2 ? '#818cf8' : '#f472b6';
+          return (
+            <button onClick={() => setSelectedFriend(f.name)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center', flex: rank === 1 ? 1.22 : 1, minWidth: 0 }}>
+              <div style={{
+                width: size, height: size, borderRadius: '50%', flexShrink: 0,
+                background: `hsl(${hue}, 55%, 22%)`,
+                border: rank === 1 ? `2px solid hsl(${hue}, 60%, 52%)` : `1px solid hsl(${hue}, 55%, 40%)`,
+                color: `hsl(${hue}, ${rank === 1 ? 75 : 70}%, ${rank === 1 ? 82 : 78}%)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: size * 0.36,
+                boxShadow: rank === 1 ? '0 0 22px rgba(167,139,250,0.28)' : 'none',
+              }}>{friendInitials(displayName(f.name))}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: rank === 1 ? 14 : 12.5, fontWeight: 800, color: '#e2e0ff', lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(f.name)}</div>
+              <div style={{ fontSize: 9.5, color: rank === 1 ? 'var(--accent)' : '#6b6a8f', fontFamily: "'DM Mono', monospace" }}>{f.shows.length} shows</div>
+              <div style={{
+                width: '100%', height: rank === 1 ? 52 : rank === 2 ? 34 : 24,
+                borderRadius: '7px 7px 0 0',
+                background: rank === 1 ? 'linear-gradient(180deg,#241d47,#141028)' : 'linear-gradient(180deg,#191830,#101020)',
+                border: `1px solid ${rank === 1 ? '#3a2f66' : '#1f1f35'}`, borderBottom: 'none',
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 5,
+                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13, color,
+              }}>{rank}</div>
+            </button>
+          );
+        };
+        return (
+          <>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '16px 16px 0' }}>
+              {plinth(second, 2)}
+              {plinth(first, 1)}
+              {plinth(third, 3)}
+            </div>
+            <div style={{ height: 1, background: '#1f1f35', margin: '0 16px' }} />
+          </>
+        );
+      })()}
+
 
       {/* Friend list */}
       <div style={{ padding: "0 16px" }}>
@@ -7076,9 +7082,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
         <button onClick={() => onUpdateSetting('artistsCompactView', !artistsCompact)} style={{ background: artistsCompact ? '#1a1a30' : 'none', border: `1px solid ${artistsCompact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: artistsCompact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={artistsCompact ? 'Switch to expanded view' : 'Switch to compact view'}>
           {artistsCompact ? '▤' : '☰'}
         </button>
-        <button onClick={() => onUpdateSetting('artistsBubbleView', !settings.artistsBubbleView)} style={{ background: settings.artistsBubbleView ? '#1a1a30' : 'none', border: `1px solid ${settings.artistsBubbleView ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: settings.artistsBubbleView ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={settings.artistsBubbleView ? 'Switch to list view' : 'Switch to bubble view'}>
-          ●
-        </button>
         <button onClick={() => { setAddArtistInput(''); setShowAddArtistForm(true); }} aria-label="Add an artist you want to see" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
       </div>
 
@@ -7184,27 +7187,6 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       </div>
 
       {/* Artist list */}
-      {settings.artistsBubbleView ? (
-        <div style={{ padding: "10px 16px 0", display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-          {sorted.map(({ name, pastCount, supportCount, guestCount, festivalCount }, bi) => {
-            const total = pastCount + supportCount + guestCount + festivalCount;
-            const maxTotal = Math.max(...sorted.map(a => a.pastCount + a.supportCount + a.guestCount + a.festivalCount), 1);
-            const size = 34 + Math.sqrt(total / maxTotal) * 76;
-            const bubbleColors = ['#a78bfa', '#f472b6', '#38bdf8', '#facc15', '#34d399'];
-            return (
-              <button key={name} onClick={() => setSelectedArtist(name)} style={{
-                width: size, height: size, borderRadius: "50%", border: "none", cursor: "pointer",
-                background: bubbleColors[bi % bubbleColors.length], opacity: 0.85,
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                color: "#0c0c14", fontFamily: "'Syne', sans-serif", fontWeight: 800, textAlign: "center", padding: 4
-              }}>
-                <span style={{ fontSize: Math.max(9, Math.min(13, size / 8)), lineHeight: 1.1, overflow: "hidden", maxHeight: size * 0.6 }}>{name}</span>
-                <span style={{ fontSize: 9, fontWeight: 400, fontFamily: "'DM Mono', monospace", opacity: 0.75 }}>{total}×</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
       <div className="stagger-list" style={{ padding: "0 16px" }}>
         {sorted.map(({ name, pastCount, pastShows, upcomingShows, upcomingSupportApps, firstShow, lastShow, avgRating, topGenre, supportCount, guestCount, festivalCount, supportApps, wantToSee }) => {
           const total = pastCount + supportCount + guestCount + festivalCount;
@@ -7275,7 +7257,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           <EmptyState icon="🎤" title="No artists found" detail="Try another search or filter." />
         )}
       </div>
-      )}
+
     </div>
   );
 }
@@ -11417,6 +11399,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [filterType, setFilterType] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [showSort, setShowSort] = useState(false)
+  useBackButton(() => {setShowFilters(false);setShowSort(false)}, showFilters || showSort)
   const [openFilterSection, setOpenFilterSection] = useState(null) // accordion: only one filter category open at a time
   const [filterFriend, setFilterFriend] = useState('all')
   const [filterStatus, setFilterStatus] = useState([]) // subset of 'want' | 'upcoming' | 'past'
@@ -11461,9 +11444,6 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
-  const [showCalendar, setShowCalendar] = useState(false)
-  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })
-  const [selectedDate, setSelectedDate] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   const [spotifyPrompt, setSpotifyPrompt] = useState(null) // concert awaiting Spotify link prompt
@@ -11951,15 +11931,10 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         {/* Type pills + compact/calendar/add */}
         {view === 'home' && (
           <div style={{ display: 'flex', gap: 6, padding: '10px 16px 0', alignItems: 'center' }}>
-            {[['all','All'],['concerts','Shows'],['festivals','Fest']].map(([id,label]) => (
-              <button key={id} onClick={() => setFilterType(id)} style={{ background:filterType===id?'#a78bfa':'none', border:`1px solid ${filterType===id?'#a78bfa':'#1f1f35'}`, borderRadius:99, padding:'5px 11px', cursor:'pointer', color:filterType===id?'#0c0c14':'#6b6a8f', fontSize:12, fontFamily:"'DM Mono', monospace", fontWeight:filterType===id?700:400, flexShrink:0 }}>{label}</button>
-            ))}
+            <select aria-label="Show type" value={filterType} onChange={e=>setFilterType(e.target.value)} style={{background:'#13131f',border:'1px solid #2e2e50',borderRadius:8,padding:'8px 10px',color:'#c4c2f0',fontFamily:"'DM Mono',monospace",fontSize:12}}><option value="all">All</option><option value="concerts">Shows</option><option value="festivals">Festivals</option><option value="online">Online</option></select>
             <div style={{ flex: 1 }} />
             <button onClick={() => setCompact(c => !c)} style={{ background: compact ? '#1a1a30' : 'none', border: `1px solid ${compact ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: compact ? '#a78bfa' : '#6b6a8f', fontSize: 13, flexShrink: 0, lineHeight: 1 }} title={compact ? 'Switch to expanded view' : 'Switch to compact view'}>
               {compact ? '▤' : '☰'}
-            </button>
-            <button onClick={() => setShowCalendar(c => !c)} style={{ background: showCalendar ? '#1a1a30' : 'none', border: `1px solid ${showCalendar ? '#a78bfa' : '#1f1f35'}`, borderRadius: 99, padding: '5px 11px', cursor: 'pointer', color: showCalendar ? '#a78bfa' : '#6b6a8f', display: 'inline-flex', alignItems: 'center', flexShrink: 0, lineHeight: 1 }} title={showCalendar ? 'Switch to list view' : 'Switch to calendar view'}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
             </button>
             <button onClick={() => { setAddFlowStep('type'); }} aria-label="Add a show" style={{ background: 'none', border: '1px solid #1f1f35', borderRadius: 99, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#a78bfa', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>+</button>
           </div>
@@ -11983,32 +11958,31 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         )}
 
         {view === 'home' && showSort && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', margin: '0 16px 10px' }}>
+          <ShowControlSheet title="Sort shows" onClose={()=>setShowSort(false)}>
             {sortOrder !== defaultSortId && <button onClick={resetSort} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {[{id:'newest',label:'Newest'},{id:'oldest',label:'Oldest'},{id:'alpha',label:'A→Z'},{id:'price',label:'Price ↓'},{id:'rating',label:'Rating ↓'}].map(s => (
-                <button key={s.id} onClick={() => setSortOrder(s.id)} style={{ padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortOrder === s.id ? '#a78bfa' : '#0c0c14', color: sortOrder === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortOrder === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+                <button key={s.id} onClick={() => setSortOrder(s.id)} style={{ minHeight: 44, padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortOrder === s.id ? '#a78bfa' : '#0c0c14', color: sortOrder === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortOrder === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
               ))}
             </div>
-          </div>
+          </ShowControlSheet>
         )}
 
         {view === 'home' && showFilters && (
-          <div style={{ background: '#13131f', border: '1px solid #1f1f35', borderRadius: 12, padding: '14px', margin: '0 16px 10px' }}>
-            <button onClick={() => { resetFilters(); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
+          <ShowControlSheet title="Filter shows" onClose={()=>setShowFilters(false)}>
+            <button onClick={() => { resetFilters(); setFilterYears([]); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
             {(() => {
               const Row = (label, children) => (
-                <div key={label} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{label}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{children}</div>
-                </div>
+                <details key={label} open={openFilterSection === label} style={{borderBottom:'1px solid #25243a'}}>
+                  <summary onClick={e=>{e.preventDefault();setOpenFilterSection(openFilterSection===label?null:label)}} style={{minHeight:46,padding:'12px 0',cursor:'pointer',fontSize:13,color:'#c4c2f0'}}>{label}</summary>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingBottom:12 }}>{children}</div>
+                </details>
               );
               const pill = (active, label, onClick, color = '#a78bfa') => (
-                <button key={label} onClick={onClick} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: active ? color : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? color : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
+                <button key={label} onClick={onClick} style={{ minHeight: 44, padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: active ? color : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? color : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
               );
               return (
                 <>
-                  {Row('Type', [['all','All'],['concerts','Concerts'],['festivals','Festivals'],['online','Online']].map(([id, label]) => pill(filterType === id, label, () => setFilterType(id))))}
 
                   {Row('Year', [pill(filterYears.length === 0, 'All years', () => setFilterYears([])), ...years.map(y => pill(filterYears.includes(y), y, () => setFilterYears(f => f.includes(y) ? f.filter(x => x !== y) : [...f, y])))])}
 
@@ -12043,7 +12017,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
                 </>
               );
             })()}
-          </div>
+          </ShowControlSheet>
         )}
 
             {/* * The scroll container already insets everything by 16px, but the header,
@@ -12051,20 +12025,10 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
                 * below has to match or the cards hang 16px wider than the search box
                 * they sit under — which is exactly how Artists is laid out. */}
             <div style={{ padding: '0 16px' }}>
-            {concerts.length > 0 && showCalendar && (
-              <CalendarMode
-                concerts={concerts}
-                month={calendarMonth}
-                onMonthChange={setCalendarMonth}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-                onOpen={handleOpenConcert}
-              />
-            )}
-            {concerts.length > 0 && !showCalendar && combinedShows.length === 0 && (
+            {concerts.length > 0 && combinedShows.length === 0 && (
               <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
-            {!showCalendar && combinedShows.length > 0 && (
+            {combinedShows.length > 0 && (
               <div style={{ marginTop: 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
                   <div style={{ marginBottom: 6 }}>

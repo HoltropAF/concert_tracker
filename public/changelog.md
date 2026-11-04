@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 — 4 November 2026
+- Shows: matching filter and sort sheets, grouped filters, and a compact show-type dropdown. Removed calendar view.
+- Artists: simplified to the list view. Friends: controls and summary cards now sit above the leaderboard.
+- Stats: upcoming shows appear as darker segments in the all-years chart, with next year available in the year filters. Attended totals stay unchanged.
+- Reduced the gap between show notes and Sources & comparison.
+
 ## 1.1.1 — 30 October 2026
 - Artist photos: search online, preview eight photos at a time, and import your choice with its source link.
 - The photo picker now follows your app theme and light mode, with matching buttons and spacing.

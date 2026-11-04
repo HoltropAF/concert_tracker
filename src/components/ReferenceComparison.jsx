@@ -9,7 +9,7 @@ export default function ReferenceComparison({concert,onSave}){
   const report=draft?compareReference(concert,draft):null
   const changes=report?[...report.fields,...report.additions]:[]
   const update=(key,value)=>{setDraft(prev=>({...prev,[key]:value}));setSelected([]);setConfirmed(false);setMessage('')}
-  return <section style={{margin:'14px 0',color:'#c4c2f0',borderTop:'1px solid #29233c',paddingTop:12}}>
+  return <section style={{margin:'-8px 0 0',color:'#c4c2f0',borderTop:'1px solid #29233c',paddingTop:8}}>
     <div style={{fontSize:10,color:'#9491b8',fontFamily:"'DM Mono', monospace",textTransform:'uppercase',letterSpacing:'.08em'}}>Sources & comparison</div>
     <details><summary style={{...button,fontFamily:"'DM Mono', monospace"}}>Compare or add source details</summary>
     <p style={{fontSize:12,color:'#9491b8',marginBottom:10}}>Paste details you have copied or received in an authorised export. Links are saved as references; this does not fetch Concert Archives. Compare one artist’s setlist at a time.</p>

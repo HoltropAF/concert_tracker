@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.6 — 4 November 2026
+- Expanded show-card photos now start loading immediately instead of waiting for scroll visibility detection.
+
 ## 1.1.5 — 4 November 2026
 - Restored saved photos on expanded show cards, including upcoming shows with photos. Removed the conflicting list-photo visibility switch.
 

@@ -204,7 +204,7 @@ function resolveCropPos(pos, variant) {
   if (pos._legacy) return { x: pos._legacy.x ?? 50, y: pos._legacy.y ?? 50, zoom: pos._legacy.zoom ?? 1 }
   return { x: 50, y: 50, zoom: 1 }
 }
-function PhotoImg({ path, style, pos, variant = 'list' }) {
+function PhotoImg({ path, style, pos, variant = 'list', eager = false }) {
   const [url, setUrl] = useState(null)
   const container = useRef(null)
   const [loaded, setLoaded] = useState(false)
@@ -216,7 +216,7 @@ function PhotoImg({ path, style, pos, variant = 'list' }) {
     const load = () => getPhotoUrl(path, attempt > 0).then(u => {
       if (active) { setUrl(u); setFailed(!u) }
     }).catch(() => { if (active) setFailed(true) })
-    if (attempt > 0 || !('IntersectionObserver' in window)) { load(); return () => { active = false } }
+    if (eager || attempt > 0 || !('IntersectionObserver' in window)) { load(); return () => { active = false } }
     // Load several screens ahead, including horizontal photo strips. Once a URL
     // is ready, eager image loading starts the actual download immediately.
     let scrollRoot = container.current?.parentElement
@@ -226,7 +226,7 @@ function PhotoImg({ path, style, pos, variant = 'list' }) {
     }, {root:scrollRoot, rootMargin:'1600px 800px'})
     if (container.current) observer.observe(container.current)
     return () => { active = false; observer.disconnect() }
-  }, [path, attempt])
+  }, [path, attempt, eager])
   const { x, y, zoom } = resolveCropPos(pos, variant)
   return (
     <div ref={container} className={!loaded && !failed ? 'skeleton' : undefined} style={{ ...style, overflow: 'hidden', position: style?.position || 'relative' }}>
@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.5'
+const APP_VERSION = '1.1.6'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -1562,7 +1562,7 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
       <WishlistUpdateBadge concert={concert} />
       {hasPhotoDivider && (
         <>
-          <PhotoImg path={concert.photo} pos={concert.photoPos} variant="list" style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
+          <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="list" style={{ width: "100%", height: 130, borderRadius: "8px 8px 0 0", marginBottom: 14 }} />
           <div style={{ position: "absolute", left: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
           <div style={{ position: "absolute", right: -9, top: 158, width: 18, height: 18, borderRadius: "50%", background: "#0c0c14" }} />
         </>

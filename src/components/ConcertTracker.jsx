@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.2'
+const APP_VERSION = '1.1.3'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -4001,7 +4001,7 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     <button key={id} onClick={() => { if (summaryFavOnly) setSummaryFavOnly(false); onUpdateSetting('summaryYear', id); }} style={{
                       background: active ? "#a78bfa" : "none",
                       border: `1px solid ${active ? "#a78bfa" : "#1f1f35"}`,
-                      borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
+                      borderRadius: 99, cursor: "pointer", padding: "3px 8px", flexShrink: 0,
                       fontSize: 11, fontFamily: "'DM Mono', monospace",
                       color: active ? "#0c0c14" : "#4a4870",
                       fontWeight: active ? 700 : 400,
@@ -4015,24 +4015,24 @@ function StatsView({ concerts, settings = {}, onNavigate = () => {}, onUpdateSet
                     style={{
                       background: olderYears.includes(summaryYear) && !summaryFavOnly ? "#a78bfa" : "#0c0c14",
                       border: `1px solid ${olderYears.includes(summaryYear) && !summaryFavOnly ? "#a78bfa" : "#1f1f35"}`,
-                      borderRadius: 99, cursor: "pointer", padding: "3px 10px",
+                      borderRadius: 99, cursor: "pointer", padding: "3px 8px",
                       fontSize: 11, fontFamily: "'DM Mono', monospace",
                       color: olderYears.includes(summaryYear) && !summaryFavOnly ? "#0c0c14" : "#4a4870",
                       WebkitAppearance: "none", appearance: "none",
                     }}
                   >
-                    <option value="">older ▾</option>
+                    <option value="">older</option>
                     {olderYears.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 )}
                 <button onClick={() => { setSummaryFavOnly(f => { if (!f) onUpdateSetting('summaryYear', 'all'); return !f; }); }} style={{
                   background: summaryFavOnly ? "#facc15" : "none",
                   border: `1px solid ${summaryFavOnly ? "#facc15" : "#1f1f35"}`,
-                  borderRadius: 99, cursor: "pointer", padding: "3px 10px", flexShrink: 0,
+                  borderRadius: 99, cursor: "pointer", padding: "3px 8px", flexShrink: 0,
                   fontSize: 11, fontFamily: "'DM Mono', monospace",
                   color: summaryFavOnly ? "#0c0c14" : "#4a4870",
                   fontWeight: summaryFavOnly ? 700 : 400,
-                }}>★ ATF</button>
+                }}>ATF</button>
               </div>
             );
           })()}
@@ -11960,9 +11960,9 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         {view === 'home' && showSort && (
           <ShowControlSheet title="Sort shows" onClose={()=>setShowSort(false)}>
             {sortOrder !== defaultSortId && <button onClick={resetSort} style={{ marginBottom: 10, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {[{id:'newest',label:'Newest'},{id:'oldest',label:'Oldest'},{id:'alpha',label:'A→Z'},{id:'price',label:'Price ↓'},{id:'rating',label:'Rating ↓'}].map(s => (
-                <button key={s.id} onClick={() => setSortOrder(s.id)} style={{ minHeight: 44, padding: '5px 11px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: sortOrder === s.id ? '#a78bfa' : '#0c0c14', color: sortOrder === s.id ? '#0c0c14' : '#6b6a8f', border: `1px solid ${sortOrder === s.id ? '#a78bfa' : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{s.label}</button>
+                <button key={s.id} onClick={() => setSortOrder(s.id)} aria-pressed={sortOrder===s.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',width:'100%',minHeight:52,padding:'10px 0',background:'none',border:0,borderBottom:'1px solid #25243a',color:'#c4c2f0',fontSize:14,textAlign:'left'}}>{s.label}<span style={{color:'#a78bfa'}}>{sortOrder===s.id?'✓':''}</span></button>
               ))}
             </div>
           </ShowControlSheet>
@@ -11970,52 +11970,24 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
 
         {view === 'home' && showFilters && (
           <ShowControlSheet title="Filter shows" onClose={()=>setShowFilters(false)}>
-            <button onClick={() => { resetFilters(); setFilterYears([]); setOpenFilterSection(null); }} style={{ marginBottom: 10, background: 'none', border: 'none', color: activeFilterCount > 0 ? '#a78bfa' : '#4a4870', fontSize: 11, cursor: 'pointer', fontFamily: "'DM Mono', monospace", padding: 0 }}>↩ back to default</button>
+            <button onClick={() => { resetFilters(); setFilterYears([]); }} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Reset filters</button>
             {(() => {
-              const Row = (label, children) => (
-                <details key={label} open={openFilterSection === label} style={{borderBottom:'1px solid #25243a'}}>
-                  <summary onClick={e=>{e.preventDefault();setOpenFilterSection(openFilterSection===label?null:label)}} style={{minHeight:46,padding:'12px 0',cursor:'pointer',fontSize:13,color:'#c4c2f0'}}>{label}</summary>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingBottom:12 }}>{children}</div>
-                </details>
-              );
-              const pill = (active, label, onClick, color = '#a78bfa') => (
-                <button key={label} onClick={onClick} style={{ minHeight: 44, padding: '4px 10px', borderRadius: 99, fontSize: 11, cursor: 'pointer', background: active ? color : '#0c0c14', color: active ? '#0c0c14' : '#6b6a8f', border: `1px solid ${active ? color : '#1f1f35'}`, fontFamily: "'DM Mono', monospace" }}>{label}</button>
-              );
-              return (
-                <>
-
-                  {Row('Year', [pill(filterYears.length === 0, 'All years', () => setFilterYears([])), ...years.map(y => pill(filterYears.includes(y), y, () => setFilterYears(f => f.includes(y) ? f.filter(x => x !== y) : [...f, y])))])}
-
-                  {Row('Rating', [pill(filterRating === 0, 'Any', () => setFilterRating(0)), ...Array.from({ length: settings.ratingSystem || 5 }, (_, i) => i + 1).map(n => pill(filterRating === n, `${n}★`, () => setFilterRating(filterRating === n ? 0 : n)))])}
-
-                  {Row('Photos', [
-                    pill(settings.showListPhotos !== false, 'Show in list', () => onUpdateSetting('showListPhotos', settings.showListPhotos === false)),
-                    pill(filterHasPhoto, 'Only with photo', () => setFilterHasPhoto(f => !f)),
-                  ])}
-
-                  {Row('Solo', [pill(filterSolo, 'Solo only', () => setFilterSolo(s => !s))])}
-
-                  {Row('Moments', [
-                    pill(filterFavorite, '★ All-time fave', () => setFilterFavorite(f => !f)),
-                    ...(settings.showTags || ['Cried']).map(t => pill(filterTags.includes(t), t, () => setFilterTags(f => f.includes(t) ? f.filter(x => x !== t) : [...f, t]), '#f472b6')),
-                  ])}
-
-                  {(settings.genres||[]).length > 0 && (() => {
-                    const _g = settings.genres||[]; const _top = _g.slice(0,3); const _rest = _g.slice(3);
-                    return Row('Genre', [
-                      pill(filterGenre === 'all', 'All', () => setFilterGenre('all')),
-                      ..._top.map(g => pill(filterGenre === g, g, () => setFilterGenre(filterGenre===g?'all':g))),
-                      _rest.length > 0 && (
-                        <select key="more" value={_rest.includes(filterGenre)?filterGenre:''} onChange={e => e.target.value && setFilterGenre(e.target.value)} style={{ background:_rest.includes(filterGenre)?'#a78bfa':'#0c0c14', border:`1px solid ${_rest.includes(filterGenre)?'#a78bfa':'#1f1f35'}`, borderRadius:99, color:_rest.includes(filterGenre)?'#0c0c14':'#6b6a8f', fontFamily:"'DM Mono', monospace", fontSize:11, padding:'4px 8px', cursor:'pointer', WebkitAppearance:'none', appearance:'none' }}><option value=''>more ▾</option>{_rest.map(g => <option key={g} value={g}>{g}</option>)}</select>
-                      ),
-                    ]);
-                  })()}
-
-                  {(settings.subgenres||[]).length > 0 && Row('Subgenre', [pill(filterSubgenre === 'all', 'All', () => setFilterSubgenre('all'), '#38bdf8'), ...(settings.subgenres||[]).map(g => pill(filterSubgenre === g, g, () => setFilterSubgenre(filterSubgenre === g ? 'all' : g), '#38bdf8'))])}
-
-                  {allCountries.length > 1 && Row('Country', [pill(filterCountry === 'all', 'All', () => setFilterCountry('all')), ...allCountries.map(c => pill(filterCountry === c, c, () => setFilterCountry(filterCountry === c ? 'all' : c)))])}
-                </>
-              );
+              const rowStyle={display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,minHeight:52,borderBottom:'1px solid #25243a',fontSize:13,color:'#c4c2f0'};
+              const selectStyle={background:'#13131f',color:'#a78bfa',border:0,minHeight:44,maxWidth:'60%',fontSize:16,textAlign:'right'};
+              const select=(label,value,change,choices)=><label key={label} style={rowStyle}>{label}<select aria-label={label} value={value} onChange={e=>change(e.target.value)} style={selectStyle}>{choices.map(([id,text])=><option key={id} value={id}>{text}</option>)}</select></label>;
+              const toggle=(label,checked,change)=><label key={label} style={rowStyle}>{label}<input type="checkbox" checked={checked} onChange={e=>change(e.target.checked)} style={{width:20,height:20,accentColor:'#a78bfa'}} /></label>;
+              return <>
+                {select('Year',filterYears.length===1?filterYears[0]:filterYears.length?'multiple':'all',v=>setFilterYears(v==='all'?[]:v==='multiple'?filterYears:[v]),[['all','All years'],...(filterYears.length>1?[['multiple',filterYears.join(', ')]]:[]),...years.map(y=>[y,y])])}
+                {select('Rating',filterRating,v=>setFilterRating(Number(v)),[[0,'Any rating'],...Array.from({length:settings.ratingSystem||5},(_,i)=>[i+1,(i+1)+' stars'])])}
+                {allCountries.length>1&&select('Country',filterCountry,setFilterCountry,[['all','Anywhere'],...allCountries.map(c=>[c,c])])}
+                {(settings.genres||[]).length>0&&select('Genre',filterGenre,setFilterGenre,[['all','Any genre'],...settings.genres.map(g=>[g,g])])}
+                {(settings.subgenres||[]).length>0&&select('Subgenre',filterSubgenre,setFilterSubgenre,[['all','Any subgenre'],...settings.subgenres.map(g=>[g,g])])}
+                {toggle('Favourites only',filterFavorite,setFilterFavorite)}
+                {toggle('Solo only',filterSolo,setFilterSolo)}
+                {toggle('Only with photos',filterHasPhoto,setFilterHasPhoto)}
+                {toggle('Show photos in list',settings.showListPhotos!==false,v=>onUpdateSetting('showListPhotos',v))}
+                {(settings.showTags||['Cried']).map(t=>toggle(t,filterTags.includes(t),v=>setFilterTags(old=>v?[...new Set([...old,t])]:old.filter(x=>x!==t))))}
+              </>;
             })()}
           </ShowControlSheet>
         )}

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.8 — 4 November 2026
+- Expanded show cards use the Tight details layout: a 108px inset photo, condensed tour text, date and venue together, and city and friends on one line.
+
 ## 1.1.7 — 4 November 2026
 - Expanded show cards are shorter, with a smaller photo banner and tighter padding and detail spacing.
 

@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.9'
+const APP_VERSION = '1.1.10'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2056,7 +2056,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [receiptSections, setReceiptSections] = useState(['general', 'setlist']);
   const [receiptSort, setReceiptSort] = useState('performed');
   const receiptSongs = () => {
-    const songs = [...getSongList(concert.setlist)];
+    let pendingLabel = '';
+    const songs = normalizeSetlistRows(concert.setlist).flatMap(row => {
+      if (isSectionRow(row)) { pendingLabel = row.label; return []; }
+      const song = typeof row === 'string' ? {name:row} : {...row};
+      if (pendingLabel) { song.sectionLabel = pendingLabel; pendingLabel = ''; }
+      return [song];
+    });
     if (receiptSort === 'album') songs.sort((a,b) => (a?.albumName || 'Unknown album').localeCompare(b?.albumName || 'Unknown album') || getSongName(a).localeCompare(getSongName(b)));
     if (receiptSort === 'alpha') songs.sort((a,b) => getSongName(a).localeCompare(getSongName(b)));
     return songs;
@@ -2182,7 +2188,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       genres.length > 0 ? `🎵 ${genres.join(', ')}` : null,
       getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
       concert.rating ? `${'★'.repeat(concert.rating)}${'☆'.repeat((settings.ratingSystem || 5) - concert.rating)}` : null,
-      songs.length > 0 ? `${songs.length} song${songs.length !== 1 ? 's' : ''} heard live` : null,
       concert.favorite ? '★ all-time fave' : null,
       concert.type === 'festival' && (concert.acts || []).length > 0 ? `🎪 Lineup: ${concert.acts.map(a => a.name).filter(Boolean).join(', ')}` : null,
     ];
@@ -2198,7 +2203,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         const label = typeof s === 'object' ? s?.sectionLabel : null;
         const line = `  ${i + 1}. ${getSongName(s)}${cover ? ` (${typeof cover === 'string' ? `${cover} cover` : 'cover'})` : ''}${info ? ` — ${info}` : ''}`;
         const album = receiptSort === 'album' && s?.albumName && s.albumName !== songs[i-1]?.albumName ? [`  — ${s.albumName} —`] : [];
-        return [...album, ...(receiptSort === 'performed' && label ? [`  — ${label} —`] : []), line];
+        const parts = s?.type === 'medley' ? (s.parts || []).map(p => '      · '+getSongName(p)+(getSongInfo(p) ? ' — '+getSongInfo(p) : '')) : [];
+        return [...album, ...(receiptSort === 'performed' && label ? [`  — ${label} —`] : []), s?.type === 'medley' ? `  ${i + 1}. Mashup of` : line, ...parts];
       }),
     ] : [];
 
@@ -2804,7 +2810,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               {genres.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Genre</span><span>{genres.join(', ')}</span></div>}
               {(concert.friends || []).length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>With</span><span>{concert.friends.join(", ")}</span></div>}
               {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
-              {songs.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Songs performed</span><span>{songs.length}</span></div>}
               {lineup.length > 0 && <div style={{ marginTop: 6 }}><div style={{ marginBottom: 2 }}>Lineup:</div><div style={{ color: "#555" }}>{lineup.join(', ')}</div></div>}
               {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
             </Section>
@@ -2849,12 +2854,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                         — {label.toLowerCase()} —
                       </div>
                     )}
-                    <div style={{ marginBottom: 4 }}>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <span style={{ color: "#999", width: 16, flexShrink: 0 }}>{i + 1}.</span>
-                        <span>{getSongName(s)}{cover && <span style={{ color: "#a06a2a" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
+                    <div style={{ marginBottom: 6, lineHeight: 1.5, textAlign: "left" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <span style={{ color: "#999", width: 24, flexShrink: 0, textAlign: "right" }}>{i + 1}.</span>
+                        <span style={{minWidth:0,flex:1,overflowWrap:"anywhere",textAlign:"left"}}>{s?.type === 'medley' ? 'Mashup of' : getSongName(s)}{cover && <span style={{ color: "#a06a2a" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
                       </div>
-                      {info && <div style={{ paddingLeft: 24, color: "#777", fontSize: 11, fontStyle: "italic" }}>"{info}"</div>}
+                      {s?.type === 'medley' && (s.parts || []).map((part,pi)=><div key={pi} style={{marginLeft:32,minWidth:0,fontSize:11,lineHeight:1.5,overflowWrap:'anywhere',textAlign:'left'}}>{getSongName(part)}{getSongInfo(part) && <span style={{color:'#777',fontStyle:'italic'}}> — {getSongInfo(part)}</span>}</div>)}
+                      {info && <div style={{ paddingLeft: 32, color: "#777", fontSize: 11, fontStyle: "italic" }}>"{info}"</div>}
                     </div>
                   </div>
                 );
@@ -2872,9 +2878,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 {receiptSections.includes('setlist') && songs.length > 0 && <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',color:'#f4f1e8',fontSize:12,marginBottom:10}}>Setlist order<select value={receiptSort} onChange={e=>setReceiptSort(e.target.value)} style={{background:'#13131f',color:'#e2e0ff',border:'1px solid #2e2e50',borderRadius:8,padding:8,fontSize:16}}><option value="performed">Performed order</option><option value="album">By album</option><option value="alpha">A–Z</option></select></label>}
                 <div style={{maxHeight:'60dvh',overflowY:'auto'}}>
                 <div ref={receiptRef} data-show-receipt style={{
-                  background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px", fontFamily: "'DM Mono', monospace", fontSize: 12,
+                  background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px 32px", fontFamily: "'DM Mono', monospace", fontSize: 12,
                   width: "100%", overflowWrap: "anywhere",
-                  clipPath: "polygon(0 0,100% 0,100% 96%,95% 100%,90% 96%,85% 100%,80% 96%,75% 100%,70% 96%,65% 100%,60% 96%,55% 100%,50% 96%,45% 100%,40% 96%,35% 100%,30% 96%,25% 100%,20% 96%,15% 100%,10% 96%,5% 100%,0 96%)"
+                  clipPath: "polygon(0 0,100% 0,100% calc(100% - 8px),95% 100%,90% calc(100% - 8px),85% 100%,80% calc(100% - 8px),75% 100%,70% calc(100% - 8px),65% 100%,60% calc(100% - 8px),55% 100%,50% calc(100% - 8px),45% 100%,40% calc(100% - 8px),35% 100%,30% calc(100% - 8px),25% 100%,20% calc(100% - 8px),15% 100%,10% calc(100% - 8px),5% 100%,0 calc(100% - 8px))"
                 }}>
                   <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 4 }}>★ {concert.artist?.toUpperCase()} ★</div>
                   <div style={{ textAlign: "center", fontSize: 10, color: "#666" }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>

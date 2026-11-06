@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.10 — 6 November 2026
+- Receipt footer stays clear of the torn edge, including long setlists.
+- General no longer includes the song count. Medleys stay grouped with their component songs in text and image exports.
+- Long song titles wrap within a fixed number column and consistent row spacing.
+
 ## 1.1.9 — 6 November 2026
 - Share a show with any combination of General, Setlist, Financial and Notes. General and Setlist are selected by default.
 - Image exports include the whole receipt, including long setlists beyond the preview.

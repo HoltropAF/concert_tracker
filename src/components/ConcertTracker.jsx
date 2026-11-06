@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.8'
+const APP_VERSION = '1.1.9'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2053,7 +2053,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [editing, setEditing] = useState(false);
   const [editorTab, setEditorTab] = useState('show');
   const [showReceipt, setShowReceipt] = useState(false);
-  const [receiptTab, setReceiptTab] = useState('general');
+  const [receiptSections, setReceiptSections] = useState(['general', 'setlist']);
+  const [receiptSort, setReceiptSort] = useState('performed');
+  const receiptSongs = () => {
+    const songs = [...getSongList(concert.setlist)];
+    if (receiptSort === 'album') songs.sort((a,b) => (a?.albumName || 'Unknown album').localeCompare(b?.albumName || 'Unknown album') || getSongName(a).localeCompare(getSongName(b)));
+    if (receiptSort === 'alpha') songs.sort((a,b) => getSongName(a).localeCompare(getSongName(b)));
+    return songs;
+  };
   const receiptRef = useRef(null);
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
@@ -2151,8 +2158,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   };
   const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => getSupportName(x) !== getSupportName(s)) }));
 
-  const handleShare = async (mode = 'general') => {
-    const songs = getSongList(concert.setlist);
+  const handleShare = async () => {
+    const songs = receiptSongs();
     const genres = getGenres(concert);
     const ticketItems = (concert.tickets && concert.tickets.length > 0)
       ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
@@ -2183,8 +2190,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       moneyLines.length > 0 ? '💶 Costs:' : null,
       ...moneyLines.map(([label, amount]) => `  ${label}: €${amount.toFixed(2)}`),
       moneyLines.length > 0 ? `  Total: €${total.toFixed(2)}` : null,
-      concert.criedSong ? `💧 Cried: ${concert.criedSong}` : null,
-      concert.notes ? `📝 ${concert.notes}` : null,
     ];
     const setlistLines = songs.length > 0 ? [
       '🎶 Setlist:',
@@ -2192,15 +2197,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         const info = getSongInfo(s), cover = getSongCover(s);
         const label = typeof s === 'object' ? s?.sectionLabel : null;
         const line = `  ${i + 1}. ${getSongName(s)}${cover ? ` (${typeof cover === 'string' ? `${cover} cover` : 'cover'})` : ''}${info ? ` — ${info}` : ''}`;
-        return label ? [`  — ${label} —`, line] : [line];
+        const album = receiptSort === 'album' && s?.albumName && s.albumName !== songs[i-1]?.albumName ? [`  — ${s.albumName} —`] : [];
+        return [...album, ...(receiptSort === 'performed' && label ? [`  — ${label} —`] : []), line];
       }),
     ] : [];
 
-    let lines;
-    if (mode === 'financial') lines = [...header, ...financialLines];
-    else if (mode === 'setlist') lines = [...header, ...setlistLines];
-    else if (mode === 'all') lines = [...header, ...generalLines, '', ...financialLines, '', ...setlistLines];
-    else lines = [...header, ...generalLines];
+    const sections = {general: generalLines, financial: financialLines, setlist: setlistLines, notes: [concert.criedSong ? 'Cried: '+concert.criedSong : null, concert.notes || null]};
+    const lines = [...header, ...['general','financial','setlist','notes'].filter(id=>receiptSections.includes(id)).flatMap(id=>['',...sections[id]])];
 
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
@@ -2214,7 +2217,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const handleCopyImage = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { backgroundColor: '#f4f1e8', scale: 2 });
+      await document.fonts?.ready;
+      const node = receiptRef.current;
+      const canvas = await html2canvas(node, { backgroundColor: '#f4f1e8', scale: 2, height: node.scrollHeight, windowHeight: Math.max(window.innerHeight,node.scrollHeight), onclone: doc => {
+        const copy = doc.querySelector('[data-show-receipt]');
+        if (!copy) return;
+        copy.style.clipPath = 'none';
+        for (let parent=copy.parentElement; parent; parent=parent.parentElement) { parent.style.overflow='visible'; parent.style.maxHeight='none'; }
+      } });
       canvas.toBlob(async blob => {
         if (!blob) { onNotify('Could not create image', 'error'); return; }
         try {
@@ -2333,7 +2343,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
-          <button onClick={() => { setReceiptTab('general'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
+          <button onClick={() => { setReceiptSections(['general','setlist']); setReceiptSort('performed'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
           <button onClick={() => {setForm(normalizeConcertForm(concert));setEditing(true)}} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
@@ -2783,10 +2793,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
           const moneyLines = [...ticketItems, ...merchItems, ...otherCostItems, ...travelItems];
           const total = moneyLines.reduce((s, [, v]) => s + v, 0);
-          const songs = getSongList(concert.setlist);
+          const songs = receiptSongs();
           const genres = getGenres(concert);
           const lineup = concert.type === 'festival' ? (concert.acts || []).map(a => a.name).filter(Boolean) : [];
-          const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : []), ['all', 'All']];
+          const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : []), ['notes', 'Notes']];
           const Section = ({ children }) => <div style={{ borderTop: "1px dashed #999", paddingTop: 8, marginTop: 8 }}>{children}</div>;
           const generalContent = (
             <Section>
@@ -2813,8 +2823,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   </div>
                 </>
               ) : <div style={{ textAlign: "center", color: "#999", padding: "10px 0" }}>no costs logged</div>}
-              {concert.criedSong && <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}><span>Cried</span><span>💧 {concert.criedSong}</span></div>}
-              {concert.notes && <div style={{ marginTop: 8, borderTop: "1px dashed #999", paddingTop: 8, fontStyle: "italic" }}>{concert.notes}</div>}
             </Section>
           );
           const setlistTotalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
@@ -2830,13 +2838,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 const info = getSongInfo(s), cover = getSongCover(s), label = getSongSectionLabel ? getSongSectionLabel(s) : (typeof s === 'object' && s?.sectionLabel);
                 const album = typeof s === 'object' ? (s?.albumName || null) : null;
                 const prevAlbum = i > 0 && typeof songs[i - 1] === 'object' ? (songs[i - 1]?.albumName || null) : null;
-                const showAlbum = album && album !== prevAlbum;
+                const showAlbum = receiptSort === 'album' && album && album !== prevAlbum;
                 return (
                   <div key={i}>
                     {showAlbum && (
                       <div style={{ fontSize: 9, letterSpacing: "0.08em", color: "#999", margin: i === 0 ? "0 0 4px" : "8px 0 4px", textTransform: "uppercase" }}>{album}</div>
                     )}
-                    {label && (
+                    {receiptSort === 'performed' && label && (
                       <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.1em", color: "#a06a2a", margin: i === 0 ? "0 0 6px" : "10px 0 6px", textTransform: "uppercase" }}>
                         — {label.toLowerCase()} —
                       </div>
@@ -2856,28 +2864,31 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           return (
             <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,12,0.9)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowReceipt(false)}>
               <div onClick={e => e.stopPropagation()} style={{ maxWidth: 320, width: "100%" }}>
-                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                   {tabs.map(([id, label]) => (
-                    <button key={id} onClick={() => setReceiptTab(id)} style={{ flex: 1, background: receiptTab === id ? "#f4f1e8" : "rgba(244,241,232,0.15)", color: receiptTab === id ? "#2a2a2a" : "#f4f1e8", border: "none", borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>{label}</button>
+                    <button key={id} aria-pressed={receiptSections.includes(id)} onClick={() => setReceiptSections(old => old.includes(id) ? old.length > 1 ? old.filter(x=>x!==id) : old : [...old,id])} style={{ flex: 1, background: receiptSections.includes(id) ? "#f4f1e8" : "rgba(244,241,232,0.15)", color: receiptSections.includes(id) ? "#2a2a2a" : "#f4f1e8", border: "none", borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>{label}</button>
                   ))}
                 </div>
-                <div ref={receiptRef} style={{
+                {receiptSections.includes('setlist') && songs.length > 0 && <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',color:'#f4f1e8',fontSize:12,marginBottom:10}}>Setlist order<select value={receiptSort} onChange={e=>setReceiptSort(e.target.value)} style={{background:'#13131f',color:'#e2e0ff',border:'1px solid #2e2e50',borderRadius:8,padding:8,fontSize:16}}><option value="performed">Performed order</option><option value="album">By album</option><option value="alpha">A–Z</option></select></label>}
+                <div style={{maxHeight:'60dvh',overflowY:'auto'}}>
+                <div ref={receiptRef} data-show-receipt style={{
                   background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px", fontFamily: "'DM Mono', monospace", fontSize: 12,
-                  width: "100%", maxHeight: "70vh", overflowY: "auto",
+                  width: "100%", overflowWrap: "anywhere",
                   clipPath: "polygon(0 0,100% 0,100% 96%,95% 100%,90% 96%,85% 100%,80% 96%,75% 100%,70% 96%,65% 100%,60% 96%,55% 100%,50% 96%,45% 100%,40% 96%,35% 100%,30% 96%,25% 100%,20% 96%,15% 100%,10% 96%,5% 100%,0 96%)"
                 }}>
                   <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 4 }}>★ {concert.artist?.toUpperCase()} ★</div>
                   <div style={{ textAlign: "center", fontSize: 10, color: "#666" }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
 
-                  {receiptTab === 'general' && generalContent}
-                  {receiptTab === 'financial' && financialContent}
-                  {receiptTab === 'setlist' && setlistContent}
-                  {receiptTab === 'all' && (<>{generalContent}{financialContent}{songs.length > 0 && setlistContent}</>)}
+                  {receiptSections.includes('general') && generalContent}
+                  {receiptSections.includes('financial') && financialContent}
+                  {receiptSections.includes('setlist') && setlistContent}
+                  {receiptSections.includes('notes') && <Section>{concert.criedSong && <div>Cried: {concert.criedSong}</div>}{concert.notes && <div style={{whiteSpace:'pre-wrap'}}>{concert.notes}</div>}{!concert.notes && !concert.criedSong && <div>No notes logged</div>}</Section>}
 
                   <div style={{ textAlign: "center", fontSize: 9, color: "#999", marginTop: 12 }}>· · · THANK YOU · · ·</div>
                 </div>
+                </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <button onClick={() => handleShare(receiptTab)} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
+                  <button onClick={() => handleShare()} style={{ flex: 1, background: "none", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as text</button>
                   <button onClick={handleCopyImage} style={{ flex: 1, background: "rgba(244,241,232,0.15)", border: "1px solid rgba(244,241,232,0.3)", color: "#f4f1e8", borderRadius: 8, padding: "8px 0", fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>Copy as image</button>
                 </div>
               </div>

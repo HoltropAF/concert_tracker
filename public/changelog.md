@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.9 — 6 November 2026
+- Share a show with any combination of General, Setlist, Financial and Notes. General and Setlist are selected by default.
+- Image exports include the whole receipt, including long setlists beyond the preview.
+- Shared setlists default to performed order; choose album grouping or alphabetical order for both text and image.
+
 ## 1.1.8 — 4 November 2026
 - Expanded show cards use the Tight details layout: a 108px inset photo, condensed tour text, date and venue together, and city and friends on one line.
 

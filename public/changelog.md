@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.14 — 6 November 2026
+- Choose Light, Dark, Purple or Blue colours for shared receipt images, with a matching live preview. Text sharing keeps its existing format.
+
 ## 1.1.13 — 6 November 2026
 - A floating Today button opens your show-day panel for confirmed shows happening today, including multi-day festivals.
 - Uses your saved artist photo, venue, friends, directions and an optional checklist. Reopens on launch or after a minute in the background.

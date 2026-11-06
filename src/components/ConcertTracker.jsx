@@ -341,7 +341,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.13'
+const APP_VERSION = '1.1.14'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2057,6 +2057,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [receiptSections, setReceiptSections] = useState(['general', 'setlist']);
   const [receiptSort, setReceiptSort] = useState('performed');
   const [receiptCosts, setReceiptCosts] = useState(['tickets']);
+  const [receiptColour,setReceiptColour]=useState('light');
+  const receiptPalette={light:{bg:'#f4f1e8',text:'#2a2a2a',muted:'#706b62',line:'#aaa396',accent:'#85521c'},dark:{bg:'#17172a',text:'#e2e0ff',muted:'#a5a0bf',line:'#514a66',accent:'#c4a7ff'},purple:{bg:'#eee7fa',text:'#30213f',muted:'#766184',line:'#b9a4ca',accent:'#7b3fac'},blue:{bg:'#e5effa',text:'#192f49',muted:'#536e88',line:'#99b2ce',accent:'#245e9b'}}[receiptColour];
   const receiptSongs = () => {
     let pendingLabel = '';
     const songs = normalizeSetlistRows(concert.setlist).flatMap(row => {
@@ -2228,11 +2230,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     try {
       await document.fonts?.ready;
       const node = receiptRef.current;
-      const canvas = await html2canvas(node, { backgroundColor: '#f4f1e8', scale: 2, height: node.scrollHeight, windowHeight: Math.max(window.innerHeight,node.scrollHeight), onclone: doc => {
+      const canvas = await html2canvas(node, { backgroundColor: receiptPalette.bg, scale: 2, height: node.scrollHeight, windowHeight: Math.max(window.innerHeight,node.scrollHeight), onclone: doc => {
         const copy = doc.querySelector('[data-show-receipt]');
         if (!copy) return;
         copy.style.clipPath = 'none';
-        for (let parent=copy.parentElement; parent; parent=parent.parentElement) { parent.style.overflow='visible'; parent.style.maxHeight='none'; }
+        copy.style.setProperty('filter','none','important');
+        for (let parent=copy.parentElement; parent; parent=parent.parentElement) { parent.style.overflow='visible'; parent.style.maxHeight='none'; parent.style.filter='none'; }
       } });
       canvas.toBlob(async blob => {
         if (!blob) { onNotify('Could not create image', 'error'); return; }
@@ -2806,7 +2809,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const genres = getGenres(concert);
           const lineup = concert.type === 'festival' ? (concert.acts || []).map(a => a.name).filter(Boolean) : [];
           const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : []), ['notes', 'Notes']];
-          const Section = ({ children }) => <div style={{ borderTop: "1px dashed #999", paddingTop: 8, marginTop: 8 }}>{children}</div>;
+          const Section = ({ children }) => <div style={{ borderTop: "1px dashed var(--receipt-line)", paddingTop: 8, marginTop: 8 }}>{children}</div>;
           const costRows = moneyLines.map(([label,amount],i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:12,marginBottom:3}}><span style={{minWidth:0,flex:1}}>{label}</span><span style={{whiteSpace:'nowrap'}}>€{amount.toFixed(2)}</span></div>);
           const generalContent = (
             <Section>
@@ -2815,13 +2818,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               {(concert.friends || []).length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>With</span><span>{concert.friends.join(", ")}</span></div>}
               {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
               {receiptSections.includes('financial') && receiptCosts.length===1 && costRows}
-              {lineup.length > 0 && <div style={{ marginTop: 6 }}><div style={{ marginBottom: 2 }}>Lineup:</div><div style={{ color: "#555" }}>{lineup.join(', ')}</div></div>}
+              {lineup.length > 0 && <div style={{ marginTop: 6 }}><div style={{ marginBottom: 2 }}>Lineup:</div><div style={{ color: "var(--receipt-muted)" }}>{lineup.join(', ')}</div></div>}
               {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
             </Section>
           );
           const financialContent = receiptCosts.length > 1 ? (
             <Section>
-              {moneyLines.length > 0 ? <>{costRows}<div style={{borderTop:'1px dashed #999',marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontWeight:700}}><span>TOTAL</span><span>€{total.toFixed(2)}</span></div></> : <div>No costs logged</div>}
+              {moneyLines.length > 0 ? <>{costRows}<div style={{borderTop:'1px dashed var(--receipt-line)',marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontWeight:700}}><span>TOTAL</span><span>€{total.toFixed(2)}</span></div></> : <div>No costs logged</div>}
             </Section>
           ) : <div style={{marginTop:3}}>{costRows}</div>;
           const setlistTotalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
@@ -2829,7 +2832,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const setlistContent = (
             <Section>
               {setlistTotalMs > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#999", marginBottom: 8, paddingBottom: 6, borderBottom: "1px dashed #ccc" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--receipt-muted)", marginBottom: 8, paddingBottom: 6, borderBottom: "1px dashed var(--receipt-line)" }}>
                   <span>{songs.length} songs</span><span>{formatSetlistLength(setlistTotalMs)}</span>
                 </div>
               )}
@@ -2841,20 +2844,20 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 return (
                   <div key={i}>
                     {showAlbum && (
-                      <div style={{ fontSize: 9, letterSpacing: "0.08em", color: "#999", margin: i === 0 ? "0 0 4px" : "8px 0 4px", textTransform: "uppercase" }}>{album}</div>
+                      <div style={{ fontSize: 9, letterSpacing: "0.08em", color: "var(--receipt-muted)", margin: i === 0 ? "0 0 4px" : "8px 0 4px", textTransform: "uppercase" }}>{album}</div>
                     )}
                     {receiptSort === 'performed' && label && (
-                      <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.1em", color: "#a06a2a", margin: i === 0 ? "0 0 6px" : "10px 0 6px", textTransform: "uppercase" }}>
+                      <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.1em", color: "var(--receipt-accent)", margin: i === 0 ? "0 0 6px" : "10px 0 6px", textTransform: "uppercase" }}>
                         — {label.toLowerCase()} —
                       </div>
                     )}
                     <div style={{ marginBottom: 6, lineHeight: 1.5, textAlign: "left" }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                        <span style={{ color: "#999", width: 24, flexShrink: 0, textAlign: "right" }}>{i + 1}.</span>
-                        <span style={{minWidth:0,flex:1,overflowWrap:"anywhere",textAlign:"left"}}>{s?.type === 'medley' ? 'Mashup of' : getSongName(s)}{cover && <span style={{ color: "#a06a2a" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
+                        <span style={{ color: "var(--receipt-muted)", width: 24, flexShrink: 0, textAlign: "right" }}>{i + 1}.</span>
+                        <span style={{minWidth:0,flex:1,overflowWrap:"anywhere",textAlign:"left"}}>{s?.type === 'medley' ? 'Mashup of' : getSongName(s)}{cover && <span style={{ color: "var(--receipt-accent)" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
                       </div>
                       {s?.type === 'medley' && (s.parts || []).map((part,pi)=><div key={pi} style={{marginLeft:32,minWidth:0,fontSize:11,lineHeight:1.5,overflowWrap:'anywhere',textAlign:'left'}}>{getSongName(part)}{getSongInfo(part) && <span style={{color:'#777',fontStyle:'italic'}}> — {getSongInfo(part)}</span>}</div>)}
-                      {info && <div style={{ paddingLeft: 32, color: "#777", fontSize: 11, fontStyle: "italic" }}>"{info}"</div>}
+                      {info && <div style={{ paddingLeft: 32, color: "var(--receipt-muted)", fontSize: 11, fontStyle: "italic" }}>"{info}"</div>}
                     </div>
                   </div>
                 );
@@ -2864,6 +2867,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           return (
             <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,12,0.9)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowReceipt(false)}>
               <div onClick={e => e.stopPropagation()} style={{ maxWidth: 360, width: "100%", maxHeight: "calc(100dvh - 48px)", overflowY: "auto" }}>
+                <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'4px 0 12px',color:'#c4c2f0',fontSize:13}}>Image colours<select aria-label="Image colours" value={receiptColour} onChange={e=>setReceiptColour(e.target.value)} style={{background:'#13131f',color:'#a78bfa',border:'1px solid #2e2e50',borderRadius:8,padding:8,fontSize:16}}><option value="light">Light</option><option value="dark">Dark</option><option value="purple">Purple</option><option value="blue">Blue</option></select></label>
                 <details style={{background:'#13131f',border:'1px solid #2e2e50',borderRadius:12,marginBottom:12,color:'#c4c2f0'}}>
                   <summary style={{padding:'12px 14px',minHeight:44,cursor:'pointer',fontFamily:"'DM Sans', sans-serif",fontSize:13}}>Customize export · {receiptSections.length} sections</summary>
                   <div style={{padding:'0 14px 10px',maxHeight:'35dvh',overflowY:'auto'}}>
@@ -2876,19 +2880,20 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 </details>
                 <div style={{maxHeight:'50dvh',overflowY:'auto'}}>
                 <div ref={receiptRef} data-show-receipt style={{
-                  background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px 32px", fontFamily: "'DM Mono', monospace", fontSize: 12,
+                  '--receipt-muted':receiptPalette.muted,'--receipt-line':receiptPalette.line,'--receipt-accent':receiptPalette.accent,
+                  background: receiptPalette.bg, color: receiptPalette.text, padding: "20px 18px 32px", fontFamily: "'DM Mono', monospace", fontSize: 12,
                   width: "100%", overflowWrap: "anywhere",
                   clipPath: "polygon(0 0,100% 0,100% calc(100% - 8px),95% 100%,90% calc(100% - 8px),85% 100%,80% calc(100% - 8px),75% 100%,70% calc(100% - 8px),65% 100%,60% calc(100% - 8px),55% 100%,50% calc(100% - 8px),45% 100%,40% calc(100% - 8px),35% 100%,30% calc(100% - 8px),25% 100%,20% calc(100% - 8px),15% 100%,10% calc(100% - 8px),5% 100%,0 calc(100% - 8px))"
                 }}>
                   <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 4 }}>★ {concert.artist?.toUpperCase()} ★</div>
-                  <div style={{ textAlign: "center", fontSize: 10, color: "#666" }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
+                  <div style={{ textAlign: "center", fontSize: 10, color: receiptPalette.muted }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
 
                   {receiptSections.includes('general') && generalContent}
                   {receiptSections.includes('financial') && !(receiptSections.includes('general') && receiptCosts.length===1) && financialContent}
                   {receiptSections.includes('setlist') && setlistContent}
                   {receiptSections.includes('notes') && <Section>{concert.criedSong && <div>Cried: {concert.criedSong}</div>}{concert.notes && <div style={{whiteSpace:'pre-wrap'}}>{concert.notes}</div>}{!concert.notes && !concert.criedSong && <div>No notes logged</div>}</Section>}
 
-                  <div style={{ textAlign: "center", fontSize: 9, color: "#999", marginTop: 12 }}>· · · THANK YOU · · ·</div>
+                  <div style={{ textAlign: "center", fontSize: 9, color: receiptPalette.muted, marginTop: 12 }}>· · · THANK YOU · · ·</div>
                 </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -11766,7 +11771,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     const imgFilter = [themeInv, lightMode ? LIGHT_FILTER : ''].filter(Boolean).join(' ')
     const rules = []
     if (imgFilter) {
-      rules.push(`[data-theme-shell] img { filter: ${imgFilter} !important; }`)
+      rules.push(`[data-theme-shell] img, [data-theme-shell] [data-show-receipt] { filter: ${imgFilter} !important; }`)
       // Leaflet's own UI chrome (attribution strip, zoom buttons) isn't an
       // <img>, but reads just as wrong once the whole page is hue-rotated —
       // exclude it from the theme filter too so it stays legible.

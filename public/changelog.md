@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.11 — 6 November 2026
+- Share options now live together in a compact Customize export panel, with setlist order directly below Setlist.
+- Financial exports let you choose ticket price, merch, travel and other costs independently; totals include only selected categories. Ticket price is the default.
+
 ## 1.1.10 — 6 November 2026
 - Receipt footer stays clear of the torn edge, including long setlists.
 - General no longer includes the song count. Medleys stay grouped with their component songs in text and image exports.

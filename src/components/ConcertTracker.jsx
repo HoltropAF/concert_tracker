@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.10'
+const APP_VERSION = '1.1.11'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2055,6 +2055,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptSections, setReceiptSections] = useState(['general', 'setlist']);
   const [receiptSort, setReceiptSort] = useState('performed');
+  const [receiptCosts, setReceiptCosts] = useState(['tickets']);
   const receiptSongs = () => {
     let pendingLabel = '';
     const songs = normalizeSetlistRows(concert.setlist).flatMap(row => {
@@ -2173,7 +2174,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
     const otherCostItems = (concert.otherCosts || []).filter(c => c.price).map(c => [c.name || "Other", parseFloat(c.price) || 0]);
     const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
-    const moneyLines = [...ticketItems, ...merchItems, ...otherCostItems, ...travelItems];
+    const moneyLines = [...(receiptCosts.includes('tickets') ? ticketItems : []), ...(receiptCosts.includes('merch') ? merchItems : []), ...(receiptCosts.includes('other') ? otherCostItems : []), ...(receiptCosts.includes('travel') ? travelItems : [])];
     const total = moneyLines.reduce((s, [, v]) => s + v, 0);
 
     const header = [
@@ -2349,7 +2350,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
-          <button onClick={() => { setReceiptSections(['general','setlist']); setReceiptSort('performed'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
+          <button onClick={() => { setReceiptSections(['general','setlist']); setReceiptCosts(['tickets']); setReceiptSort('performed'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
           <button onClick={() => {setForm(normalizeConcertForm(concert));setEditing(true)}} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
@@ -2797,7 +2798,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const merchItems = (concert.merch || []).filter(m => m.price).map(m => [m.item || "Item", parseFloat(m.price) || 0]);
           const otherCostItems = (concert.otherCosts || []).filter(c => c.price).map(c => [c.name || "Other", parseFloat(c.price) || 0]);
           const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
-          const moneyLines = [...ticketItems, ...merchItems, ...otherCostItems, ...travelItems];
+          const moneyLines = [...(receiptCosts.includes('tickets') ? ticketItems : []), ...(receiptCosts.includes('merch') ? merchItems : []), ...(receiptCosts.includes('other') ? otherCostItems : []), ...(receiptCosts.includes('travel') ? travelItems : [])];
           const total = moneyLines.reduce((s, [, v]) => s + v, 0);
           const songs = receiptSongs();
           const genres = getGenres(concert);
@@ -2869,14 +2870,18 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           );
           return (
             <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,12,0.9)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setShowReceipt(false)}>
-              <div onClick={e => e.stopPropagation()} style={{ maxWidth: 320, width: "100%" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-                  {tabs.map(([id, label]) => (
-                    <button key={id} aria-pressed={receiptSections.includes(id)} onClick={() => setReceiptSections(old => old.includes(id) ? old.length > 1 ? old.filter(x=>x!==id) : old : [...old,id])} style={{ flex: 1, background: receiptSections.includes(id) ? "#f4f1e8" : "rgba(244,241,232,0.15)", color: receiptSections.includes(id) ? "#2a2a2a" : "#f4f1e8", border: "none", borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", cursor: "pointer" }}>{label}</button>
-                  ))}
-                </div>
-                {receiptSections.includes('setlist') && songs.length > 0 && <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',color:'#f4f1e8',fontSize:12,marginBottom:10}}>Setlist order<select value={receiptSort} onChange={e=>setReceiptSort(e.target.value)} style={{background:'#13131f',color:'#e2e0ff',border:'1px solid #2e2e50',borderRadius:8,padding:8,fontSize:16}}><option value="performed">Performed order</option><option value="album">By album</option><option value="alpha">A–Z</option></select></label>}
-                <div style={{maxHeight:'60dvh',overflowY:'auto'}}>
+              <div onClick={e => e.stopPropagation()} style={{ maxWidth: 360, width: "100%", maxHeight: "calc(100dvh - 48px)", overflowY: "auto" }}>
+                <details style={{background:'#13131f',border:'1px solid #2e2e50',borderRadius:12,marginBottom:12,color:'#c4c2f0'}}>
+                  <summary style={{padding:'12px 14px',minHeight:44,cursor:'pointer',fontFamily:"'DM Sans', sans-serif",fontSize:13}}>Customize export · {receiptSections.length} sections</summary>
+                  <div style={{padding:'0 14px 10px',maxHeight:'35dvh',overflowY:'auto'}}>
+                    {tabs.map(([id,label])=><div key={id}>
+                      <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:46,borderTop:'1px solid #25243a',fontSize:13}}>{label}<input type="checkbox" checked={receiptSections.includes(id)} onChange={e=>setReceiptSections(old=>e.target.checked?[...old,id]:old.length>1?old.filter(x=>x!==id):old)} style={{accentColor:'#a78bfa',width:18,height:18}} /></label>
+                      {id==='setlist' && receiptSections.includes(id) && <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44,paddingLeft:12,fontSize:12,color:'#9491b8'}}>Order<select value={receiptSort} onChange={e=>setReceiptSort(e.target.value)} style={{background:'#13131f',color:'#a78bfa',border:0,maxWidth:'65%',padding:'8px 0',fontSize:16}}><option value="performed">Performed order</option><option value="album">By album</option><option value="alpha">A–Z</option></select></label>}
+                      {id==='financial' && receiptSections.includes(id) && [['tickets','Ticket price'],['merch','Merch'],['travel','Travel'],['other','Other costs']].map(([key,text])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44,paddingLeft:12,fontSize:12,color:'#9491b8'}}>{text}<input type="checkbox" checked={receiptCosts.includes(key)} onChange={e=>setReceiptCosts(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))} style={{accentColor:'#a78bfa',width:18,height:18}} /></label>)}
+                    </div>)}
+                  </div>
+                </details>
+                <div style={{maxHeight:'50dvh',overflowY:'auto'}}>
                 <div ref={receiptRef} data-show-receipt style={{
                   background: "#f4f1e8", color: "#2a2a2a", padding: "20px 18px 32px", fontFamily: "'DM Mono', monospace", fontSize: 12,
                   width: "100%", overflowWrap: "anywhere",

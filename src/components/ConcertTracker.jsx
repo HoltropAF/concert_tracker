@@ -343,7 +343,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.19'
+const APP_VERSION = '1.1.20'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2456,11 +2456,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {!concert.wishlist && !past && detailTab==='general' && <>
             {concert.photo && <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="detail" style={{width:'100%',aspectRatio:'16 / 9',borderRadius:12}} />}
-            <div style={detailCard}>{sec('Show details')}<div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{formatDate(concert.date)}{concert.endDate && concert.endDate!==concert.date?' – '+formatDate(concert.endDate):''}<br />{online?formatOnlineLocation(concert):[concert.venue,concert.city,concert.country].filter(Boolean).join(' · ')}</div></div>
-            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Going')}<button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit</button></div><div style={{color:'#c4c2f0',fontSize:13}}>{getFriends(concert).length?getFriends(concert).join(', '):concert.solo?'Going solo':'Not added yet'}</div></div>
-            <div style={detailCard}>{sec('Getting ready')}{!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Directions ↗</a>}<ShowPreparationChecklist key={concert.id} concert={concert} /></div>
+            <section>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44}}><span style={{fontFamily:"'Syne', sans-serif",fontSize:16,fontWeight:700,color:'#e2e0ff'}}>Your plans</span><button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44,fontSize:12}}>Edit plans</button></div>
+              <div style={{padding:'12px 0',borderBottom:'1px solid #25243a'}}><div style={{fontSize:11,color:'#6b6a8f',marginBottom:6}}>Going with</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{getFriends(concert).length?getFriends(concert).map(name=><span key={name} style={{display:'inline-flex',alignItems:'center',gap:7,fontSize:13,color:'#c4c2f0'}}><FriendAvatar name={name} size={26} />{name}</span>):<span style={{fontSize:13,color:'#9491b8'}}>{concert.solo?'Going solo':'Add your companions or choose solo'}</span>}</div></div>
+              {!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:48,borderBottom:'1px solid #25243a',color:'#a78bfa',fontSize:13,textDecoration:'none'}}><span>Directions to {concert.venue}</span><span aria-hidden="true">↗</span></a>}
+              <div style={{padding:'6px 0 12px',borderBottom:'1px solid #25243a'}}><ShowPreparationChecklist key={concert.id} concert={concert} /></div>
+              <div style={{padding:'14px 0'}}><div style={{fontSize:11,color:'#6b6a8f',marginBottom:8}}>Notes for the day</div><div style={{fontSize:13,lineHeight:1.6,color:'#9491b8',whiteSpace:'pre-wrap'}}>{concert.notes||'Meeting point, travel plans, or anything to remember.'}</div></div>
+            </section>
           </>}
-          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} /></>}
+          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /></>}
           {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}</div></>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
@@ -2535,7 +2539,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           )}
 
           {/* Notes */}
-          {!concert.wishlist && detailTab === 'general' && concert.notes && (
+          {!concert.wishlist && past && detailTab === 'general' && concert.notes && (
             <div style={detailCard}>
               {sec("Notes")}
               <div style={{ color: "#c4c2f0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{concert.notes}</div>

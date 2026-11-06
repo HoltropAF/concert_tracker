@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.20 — 6 November 2026
+- Upcoming General is a quieter Your plans layout with companions, directions, preparation checklist and notes; duplicated show details are removed.
+- Timetable has two aligned actions: Check times and Open source (or Search online when there is no source).
+- Calendar export is removed from the upcoming Timetable page.
+
 ## 1.1.19 — 6 November 2026
 - Planning moves into Overview and upcoming edit tabs fit in one row.
 - Going with shows five recent companions plus Solo, with friend search and an explicit Create friend option.

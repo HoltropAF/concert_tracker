@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.18 — 6 November 2026
+- Upcoming show pages separate General, Timetable, Tickets and Costs. Getting ready stays on General.
+- Calendar export moves into Timetable with matching app styling.
+- Upcoming editing separates Show, Timetable, Tickets, Planning and Costs. Notes and companions live under Planning.
+
 ## 1.1.17 — 6 November 2026
 - Upcoming schedules check saved event pages for doors, VIP start, listed show start and expected end. Review and accept each detected time with its source.
 - Event source and search links provide a manual fallback when a site cannot be read. All four times remain manually editable.

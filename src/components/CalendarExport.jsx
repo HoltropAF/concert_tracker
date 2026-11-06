@@ -15,8 +15,9 @@ export default function CalendarExport({concert}) {
     } catch(e){setMessage(e.message)}
   }
   if(!showAvailable && !saleAvailable)return null
-  return <details><summary>Add to calendar</summary><div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-    {showAvailable&&<button onClick={()=>download('show')}>Download concert event (.ics)</button>}
-    {saleAvailable&&<button onClick={()=>download('sale')}>Download ticket-sale event (.ics)</button>}
-  </div><p style={{fontSize:12}}>Concerts are all-day events. Ticket-sale times use your calendar’s local timezone.</p>{message&&<p role="status">{message}</p>}</details>
+  const button={display:'flex',justifyContent:'space-between',alignItems:'center',width:'100%',minHeight:48,background:'none',border:0,borderBottom:'1px solid #25243a',padding:'10px 0',color:'#a78bfa',fontSize:13,textAlign:'left',cursor:'pointer'}
+  return <section style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:10,padding:14}}><div style={{fontSize:10,color:'#6b6a8f',fontFamily:"'DM Mono', monospace",textTransform:'uppercase',marginBottom:6}}>Calendar</div>
+    {showAvailable&&<button style={button} onClick={()=>download('show')}>Add concert to calendar<span aria-hidden="true">↓</span></button>}
+    {saleAvailable&&<button style={button} onClick={()=>download('sale')}>Add ticket sale to calendar<span aria-hidden="true">↓</span></button>}
+    <p style={{fontSize:11,lineHeight:1.6,color:'#9491b8',marginTop:10}}>Downloads an .ics file. Concerts are all-day events; check the timetable for exact times.</p>{message&&<p role="status" style={{fontSize:11,lineHeight:1.6,color:'#c4c2f0',marginTop:8}}>{message}</p>}</section>
 }

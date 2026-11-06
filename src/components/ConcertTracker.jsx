@@ -343,7 +343,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.17'
+const APP_VERSION = '1.1.18'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2381,7 +2381,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           {/* Tabs */}
           {!concert.wishlist && <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-            {(concert.wishlist ? [['general', 'Overview'], ['updates', 'Updates']] : [['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])]).map(([id, label]) => (
+            {(concert.wishlist ? [['general', 'Overview'], ['updates', 'Updates']] : !past ? [['general','General'],['timetable','Timetable'],['tickets','Tickets'],['financial','Costs']] : [['general', 'General'], ['financial', 'Financial'], ...(past && (!isFestival || (concert.acts || []).length > 0) ? [['setlist', isFestival ? 'Lineup' : 'Setlist']] : [])]).map(([id, label]) => (
               <button key={id} onClick={() => setDetailTab(id)} style={{ flex: 1, background: detailTab === id ? "#1a1a30" : "none", border: `1px solid ${detailTab === id ? "#a78bfa" : "#1f1f35"}`, borderRadius: 8, padding: "7px 0", fontSize: 12, fontWeight: detailTab === id ? 700 : 400, color: detailTab === id ? "#a78bfa" : "#6b6a8f", cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{label}</button>
             ))}
           </div>}
@@ -2452,12 +2452,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {!concert.wishlist && !past && detailTab==='general' && <>
             {concert.photo && <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="detail" style={{width:'100%',aspectRatio:'16 / 9',borderRadius:12}} />}
             <div style={detailCard}>{sec('Show details')}<div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{formatDate(concert.date)}{concert.endDate && concert.endDate!==concert.date?' – '+formatDate(concert.endDate):''}<br />{online?formatOnlineLocation(concert):[concert.venue,concert.city,concert.country].filter(Boolean).join(' · ')}</div></div>
-            <ShowSchedule key={concert.id} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('show');setEditing(true)}} />
-            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('costs');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}</div>
-            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Going')}<button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit</button></div><div style={{color:'#c4c2f0',fontSize:13}}>{getFriends(concert).length?getFriends(concert).join(', '):concert.solo?'Going solo':'Not added yet'}</div></div>
+            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Going')}<button onClick={()=>{setEditorTab('planning');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit</button></div><div style={{color:'#c4c2f0',fontSize:13}}>{getFriends(concert).length?getFriends(concert).join(', '):concert.solo?'Going solo':'Not added yet'}</div></div>
             <div style={detailCard}>{sec('Getting ready')}{!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Directions ↗</a>}<ShowPreparationChecklist key={concert.id} concert={concert} /></div>
           </>}
-          {!concert.wishlist && detailTab === 'general' && <CalendarExport concert={concert} />}
+          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} /></>}
+          {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}</div></>}
+          {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
             <div>
@@ -2954,7 +2954,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} upcoming={!past} />
       <div style={{ padding: "20px" }}>
 
-        {editorTab==='show' && !form.wishlist && form.date && form.date!=='9999-12-31' && (form.endDate || form.date)>=localDay() && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div>{Object.entries(showTimeFields).map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times are local to the venue; countdown currently uses your phone’s timezone. Leave unknown times empty. Expected end may be an estimate.</div><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Event-page link<input type="url" value={form.scheduleUrl||''} onChange={e=>update('scheduleUrl',e.target.value)} placeholder="https://venue.com/this-event" style={{...inputStyle,marginTop:6}} /></label></div>}
+        {editorTab==='timetable' && !form.wishlist && form.date && form.date!=='9999-12-31' && (form.endDate || form.date)>=localDay() && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div>{Object.entries(showTimeFields).map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times are local to the venue; countdown currently uses your phone’s timezone. Leave unknown times empty. Expected end may be an estimate.</div><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Event-page link<input type="url" value={form.scheduleUrl||''} onChange={e=>update('scheduleUrl',e.target.value)} placeholder="https://venue.com/this-event" style={{...inputStyle,marginTop:6}} /></label></div>}
 
         {/* Cards */}
         {[
@@ -3236,7 +3236,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           </> },
 
           /* ── FINANCIAL ── */
-          { title: 'Financial', content: <>
+          { title: 'Tickets', content: <>
             {!isFestival && (
               <>
                 <div style={labelStyle}>Ticket type</div>
@@ -3250,6 +3250,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               </>
             )}
             <TicketsFields value={form.tickets} onChange={v => update('tickets', v)} labelStyle={labelStyle} inputStyle={inputStyle} />
+            <label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Ticket website<input type="url" value={form.ticketSaleLink||''} onChange={e=>update('ticketSaleLink',e.target.value)} style={{...inputStyle,marginTop:6}} /></label>
+          </> },
+          { title: 'Financial', content: <>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8 }}>
               <div style={labelStyle}>Merch</div>
               <button onClick={addMerchItem} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"3px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>+ Add item</button>
@@ -3326,7 +3329,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           },
 
         ].filter(({title})=>past || title!=='Photo').map(({ title, content }) => (
-          <div key={title} hidden={(!past && ['Notes','Going'].includes(title) ? 'show' : editorSectionTab(title)) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
+          <div key={title} hidden={(!past && ['Notes','Going'].includes(title) ? 'planning' : !past && title==='Tickets' ? 'tickets' : editorSectionTab(title)) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff", marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #1a1a2e" }}>{title}</div>
             {content}
           </div>

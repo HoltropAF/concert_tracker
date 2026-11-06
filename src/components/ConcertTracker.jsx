@@ -341,7 +341,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.15'
+const APP_VERSION = '1.1.16'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2294,7 +2294,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
-  const past = isPast(concert.date);
+  const past = (concert.endDate || concert.date) < localDay();
 
   const labelStyle = { fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" };
 
@@ -2388,7 +2388,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {detailTab === 'general' && concert.photo && <PhotoImg path={concert.photo} pos={concert.photoPos} variant="detail" style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, marginBottom: 12 }} />}
             <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} onGotTickets={option => { setForm(normalizeConcertForm({...concert,wishlist:false,...(option?{ticketType:option.label,selectedTicketOption:option}: {})})); setEditorTab('show'); setEditing(true); }} />
           </>}
-          {!concert.wishlist && detailTab === 'general' && (
+          {!concert.wishlist && past && detailTab === 'general' && (
           <>
           {/* Photo */}
           {concert.photo && (
@@ -2447,6 +2447,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {!concert.wishlist && !past && detailTab==='general' && <>
+            {concert.photo && <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="detail" style={{width:'100%',aspectRatio:'16 / 9',borderRadius:12}} />}
+            <div style={detailCard}>{sec('Show details')}<div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{formatDate(concert.date)}{concert.endDate && concert.endDate!==concert.date?' – '+formatDate(concert.endDate):''}<br />{online?formatOnlineLocation(concert):[concert.venue,concert.city,concert.country].filter(Boolean).join(' · ')}</div></div>
+            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Schedule')}<button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit times</button></div>{[['Doors open',concert.doorsTime],['Show starts',concert.showTime]].map(([label,time])=><div key={label} style={{display:'flex',justifyContent:'space-between',padding:'9px 0',borderBottom:'1px solid #25243a',fontSize:13,color:'#9491b8'}}><span>{label}</span><span style={{color:time?'#c4c2f0':'#6b6a8f'}}>{time||'Unknown'}</span></div>)}</div>
+            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('costs');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}</div>
+            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Going')}<button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit</button></div><div style={{color:'#c4c2f0',fontSize:13}}>{getFriends(concert).length?getFriends(concert).join(', '):concert.solo?'Going solo':'Not added yet'}</div></div>
+            <div style={detailCard}>{sec('Getting ready')}{!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Directions ↗</a>}<ShowPreparationChecklist key={concert.id} concert={concert} /></div>
+          </>}
           {!concert.wishlist && detailTab === 'general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
@@ -2527,11 +2535,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             </div>
           )}
 
-          {!concert.wishlist && detailTab === 'general' && !concert.notes && (
+          {!concert.wishlist && past && detailTab === 'general' && !concert.notes && (
             <div style={{ textAlign: "center", color: "#2e2e4a", fontSize: 12, fontFamily: "'DM Mono', monospace", padding: "24px 0" }}>no notes added</div>
           )}
 
-          {detailTab === 'general' && <ReferenceComparison key={concert.id} concert={concert} onSave={onSave} />}
+          {past && detailTab === 'general' && <ReferenceComparison key={concert.id} concert={concert} onSave={onSave} />}
 
           {/* Acts — festivals */}
           {detailTab === 'setlist' && isFestival && (concert.acts || []).length > 0 && (
@@ -2941,7 +2949,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         }} disabled={photoBusy} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{photoBusy ? "Uploading…" : "Save"}</button>
       </div>
 
-      <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} />
+      <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} upcoming={!past} />
       <div style={{ padding: "20px" }}>
 
         {editorTab==='show' && !form.wishlist && form.date && form.date!=='9999-12-31' && (form.endDate || form.date)>=localDay() && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div>{[['doorsTime','Doors open'],['showTime','Show starts']].map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times use your phone’s local timezone. Leave unknown times empty.</div></div>}
@@ -3197,8 +3205,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           </> },
 
           /* ── YOUR EXPERIENCE ── */
-          { title: 'Your experience', content: <>
-            <div style={labelStyle}>Went with</div>
+          { title: past ? 'Your experience' : 'Going', content: <>
+            <div style={labelStyle}>{past?'Went with':'Going with'}</div>
             {(settings.friendGroups || []).length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                 {(settings.friendGroups || []).map((g, i) => {
@@ -3315,8 +3323,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <textarea value={form.notes || ""} onChange={e => update("notes", e.target.value)} rows={3} style={{ ...inputStyle, resize:"vertical" }} placeholder="Any notes..." />
           },
 
-        ].map(({ title, content }) => (
-          <div key={title} hidden={editorSectionTab(title) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
+        ].filter(({title})=>past || title!=='Photo').map(({ title, content }) => (
+          <div key={title} hidden={(!past && ['Notes','Going'].includes(title) ? 'show' : editorSectionTab(title)) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff", marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #1a1a2e" }}>{title}</div>
             {content}
           </div>
@@ -11327,17 +11335,24 @@ export default function ConcertTracker(props) {
   return <NavigationMemory key={props.userEmail||'local'}><WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded}><ConcertTrackerContent {...props} /></WishlistUpdateProvider></NavigationMemory>
 }
 
+function safeExternalUrl(value) {
+  try {const url=new URL(value);return ['https:','http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null}catch{return null}
+}
+function ShowPreparationChecklist({concert}) {
+  const key='showPreparation:'+concert.id;
+  const [checked,setChecked]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return {}}});
+  useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(checked))}catch{}},[key,checked]);
+  return <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{['Ticket ready','Travel planned','Power bank packed'].map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecked(old=>({...old,[label]:e.target.checked}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
+}
+
 function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
   useBackButton(onClose,true);
-  const [checks,setChecks]=useState(()=>{try{return JSON.parse(localStorage.getItem('showDayChecklist:'+localDay(now))||'{}')}catch{return {}}});
-  useEffect(()=>{try{localStorage.setItem('showDayChecklist:'+localDay(now),JSON.stringify(checks))}catch{}},[checks,now]);
   const [index,setIndex]=useState(0);
   const concert=concerts[Math.min(index,concerts.length-1)];
   if(!concert)return null;
   const photoKey=Object.keys(settings.artistPhotos||{}).find(name=>name.toLowerCase()===(concert.artist||'').toLowerCase());
   const photo=photoKey && settings.artistPhotos[photoKey];
   const countdown=showCountdown(concert,now);
-  const checked=checks[concert.id]||{};
   return <ShowControlSheet title="Today’s the day" onClose={onClose}>
     {concerts.length>1 && <select aria-label="Today's show" value={index} onChange={e=>setIndex(Number(e.target.value))} style={{background:"#13131f",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:"100%",marginBottom:12}}>{concerts.map((c,i)=><option key={c.id} value={i}>{c.artist}</option>)}</select>}
     {photo && <PhotoImg eager path={photo} pos={settings.artistPhotoPos?.[photoKey]} variant="detail" style={{width:'100%',height:130,borderRadius:10,marginBottom:14}} />}
@@ -11347,7 +11362,7 @@ function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
     {countdown && <div style={{fontFamily:"'Syne', sans-serif",fontSize:24,color:'#a78bfa',margin:'16px 0 8px'}}>{countdown}</div>}
     <div style={{color:'#9491b8',fontSize:12,margin:'10px 0'}}>{getFriends(concert).length?'With '+getFriends(concert).join(', '):concert.solo?'Going solo':''}</div>
     {[['Doors open',concert.doorsTime],['Show starts',concert.showTime]].filter(([,time])=>time).map(([label,time])=><div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #25243a',fontSize:13,color:'#c4c2f0'}}><span>{label}</span><strong style={{color:'#a78bfa'}}>{time}</strong></div>)}
-    <details style={{marginTop:12,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{['Ticket ready','Travel planned','Power bank packed'].map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecks(old=>({...old,[concert.id]:{...old[concert.id],[label]:e.target.checked}}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
+    <ShowPreparationChecklist key={concert.id} concert={concert} />
     <div style={{display:'flex',gap:8,marginTop:16}}><button onClick={()=>{onClose();onOpen(concert)}} style={{flex:1,minHeight:44,background:'#a78bfa',color:'#0c0c14',border:0,borderRadius:9,fontWeight:700}}>Open show</button>{!isOnline(concert) && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{flex:1,display:'grid',placeItems:'center',color:'#a78bfa',border:'1px solid #2e2e50',borderRadius:9,textDecoration:'none'}}>Directions ↗</a>}</div>
   </ShowControlSheet>
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.16 — 6 November 2026
+- Upcoming shows have preparation sections for details, schedule, tickets, companions and getting ready.
+- Upcoming edit screens show only Show and Costs; notes and companions stay editable under Show. Memories and Setlist return after the show.
+- The preparation checklist is shared with the Today panel on this device.
+
 ## 1.1.15 — 6 November 2026
 - Doors and start-time fields appear only for today’s and upcoming shows, including ongoing multi-day festivals. Past shows retain their saved times.
 

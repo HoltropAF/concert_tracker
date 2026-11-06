@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.15 — 6 November 2026
+- Doors and start-time fields appear only for today’s and upcoming shows, including ongoing multi-day festivals. Past shows retain their saved times.
+
 ## 1.1.14 — 6 November 2026
 - Choose Light, Dark, Purple or Blue colours for shared receipt images, with a matching live preview. Text sharing keeps its existing format.
 

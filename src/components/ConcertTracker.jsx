@@ -343,7 +343,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.18'
+const APP_VERSION = '1.1.19'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2124,8 +2124,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   };
 
   const addCustomFriend = () => {
-    const name = friendInput.trim();
-    if (!name || form.friends.includes(name)) return;
+    const entered = friendInput.trim();
+    if(!entered)return;
+    const name=[...friends,...form.friends,...concerts.flatMap(getFriends)].find(n=>n.toLowerCase()===entered.toLowerCase())||entered;
+    if(form.friends.includes(name)){setFriendInput('');return;}
     setForm(f => ({ ...f, friends: [...f.friends, name], solo: false }));
     setFriendInput('');
   };
@@ -2293,7 +2295,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     }
   };
 
-  const allFriendChoices = [...new Set([...friends, ...form.friends])].sort();
+  const allFriendChoices = [...new Set([...friends, ...form.friends,...concerts.flatMap(getFriends)])].sort();
+  const recentFriends=[...new Set([...concerts].filter(c=>c.id!==concert.id && !c.wishlist && (c.endDate||c.date)<localDay()).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).flatMap(getFriends))].slice(0,5);
+  const visibleFriends=friendInput.trim()?allFriendChoices.filter(name=>name.toLowerCase().includes(friendInput.trim().toLowerCase())):recentFriends;
+  const exactFriend=allFriendChoices.find(name=>name.toLowerCase()===friendInput.trim().toLowerCase());
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
   const past = (concert.endDate || concert.date) < localDay();
@@ -2452,10 +2457,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {!concert.wishlist && !past && detailTab==='general' && <>
             {concert.photo && <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="detail" style={{width:'100%',aspectRatio:'16 / 9',borderRadius:12}} />}
             <div style={detailCard}>{sec('Show details')}<div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{formatDate(concert.date)}{concert.endDate && concert.endDate!==concert.date?' – '+formatDate(concert.endDate):''}<br />{online?formatOnlineLocation(concert):[concert.venue,concert.city,concert.country].filter(Boolean).join(' · ')}</div></div>
-            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Going')}<button onClick={()=>{setEditorTab('planning');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit</button></div><div style={{color:'#c4c2f0',fontSize:13}}>{getFriends(concert).length?getFriends(concert).join(', '):concert.solo?'Going solo':'Not added yet'}</div></div>
+            <div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Going')}<button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit</button></div><div style={{color:'#c4c2f0',fontSize:13}}>{getFriends(concert).length?getFriends(concert).join(', '):concert.solo?'Going solo':'Not added yet'}</div></div>
             <div style={detailCard}>{sec('Getting ready')}{!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Directions ↗</a>}<ShowPreparationChecklist key={concert.id} concert={concert} /></div>
           </>}
-          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} /></>}
+          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} /></>}
           {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}</div></>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
@@ -3209,7 +3214,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           /* ── YOUR EXPERIENCE ── */
           { title: past ? 'Your experience' : 'Going', content: <>
             <div style={labelStyle}>{past?'Went with':'Going with'}</div>
-            {(settings.friendGroups || []).length > 0 && (
+            {past && (settings.friendGroups || []).length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                 {(settings.friendGroups || []).map((g, i) => {
                   const active = g.friends.every(f => form.friends.includes(f));
@@ -3217,17 +3222,18 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 })}
               </div>
             )}
-            {allFriendChoices.length > 0 && (
+            {visibleFriends.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-                {allFriendChoices.map(name => (
+                {visibleFriends.map(name => (
                   <button key={name} onClick={() => toggleFriend(name)} style={{ padding:"4px 10px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.friends.includes(name) ? "#a78bfa" : "#0c0c14", color: form.friends.includes(name) ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.friends.includes(name) ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.friends.includes(name) ? 700 : 400 }}>{name}</button>
                 ))}
               </div>
             )}
             <div style={{ display:"flex", gap:8, marginBottom: 8 }}>
-              <input value={friendInput} onChange={e=>setFriendInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomFriend()} placeholder="Add friend..." style={{ flex:1, background:"#0c0c14", border:"1px solid #2a4a3a", borderRadius:8, color:"#c4c2f0", padding:"6px 10px", fontFamily:"'DM Mono',monospace", fontSize:12 }} />
-              <button onClick={addCustomFriend} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
+              <input value={friendInput} onChange={e=>setFriendInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter" && exactFriend)addCustomFriend()}} placeholder="Search friend..." style={{ flex:1, background:"#0c0c14", border:"1px solid #2a4a3a", borderRadius:8, color:"#c4c2f0", padding:"6px 10px", fontFamily:"'DM Mono',monospace", fontSize:12 }} />
+              {friendInput.trim() && <button onClick={addCustomFriend} style={{background:'none',border:'1px solid #2e2e50',borderRadius:8,color:'#a78bfa',fontSize:12,padding:'8px 12px',cursor:'pointer'}}>{exactFriend?'Select':'Create friend'}</button>}
             </div>
+            {form.friends.length>0 && <div style={{fontSize:12,color:'#9491b8',margin:'6px 0 10px'}}>Selected: {form.friends.map(name=><button key={name} onClick={()=>toggleFriend(name)} style={{background:'none',border:0,color:'#a78bfa',padding:'6px'}}>{name} ×</button>)}</div>}
             <button onClick={()=>setForm(f=>({...f,solo:!f.solo,friends:[]}))} style={{ padding:"5px 12px", borderRadius:99, fontSize:12, cursor:"pointer", background: form.solo ? "#a78bfa" : "#0c0c14", color: form.solo ? "#0c0c14" : "#6b6a8f", border:`1px solid ${form.solo ? "#a78bfa" : "#2e2e50"}`, fontWeight: form.solo ? 700 : 400 }}>solo</button>
             {past && <div style={{ marginTop: 14 }}>
               <div style={labelStyle}>Rating</div>
@@ -3329,7 +3335,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           },
 
         ].filter(({title})=>past || title!=='Photo').map(({ title, content }) => (
-          <div key={title} hidden={(!past && ['Notes','Going'].includes(title) ? 'planning' : !past && title==='Tickets' ? 'tickets' : editorSectionTab(title)) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
+          <div key={title} hidden={(!past && ['Notes','Going'].includes(title) ? 'show' : !past && title==='Tickets' ? 'tickets' : editorSectionTab(title)) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 800, color: "#e2e0ff", marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #1a1a2e" }}>{title}</div>
             {content}
           </div>

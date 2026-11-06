@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.19 — 6 November 2026
+- Planning moves into Overview and upcoming edit tabs fit in one row.
+- Going with shows five recent companions plus Solo, with friend search and an explicit Create friend option.
+- Timetable automatically searches Ticketmaster, MOJO and a saved venue website without requiring an event link. Source results and failures remain visible; conflicting times require manual checking.
+
 ## 1.1.18 — 6 November 2026
 - Upcoming show pages separate General, Timetable, Tickets and Costs. Getting ready stays on General.
 - Calendar export moves into Timetable with matching app styling.

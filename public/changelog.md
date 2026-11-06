@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.12 — 6 November 2026
+- A single selected cost category appears below Rating without a divider or total. Totals appear only when multiple cost categories are selected, in text and image exports.
+
 ## 1.1.11 — 6 November 2026
 - Share options now live together in a compact Customize export panel, with setlist order directly below Setlist.
 - Financial exports let you choose ticket price, merch, travel and other costs independently; totals include only selected categories. Ticket price is the default.

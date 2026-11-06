@@ -340,7 +340,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.11'
+const APP_VERSION = '1.1.12'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2189,13 +2189,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       genres.length > 0 ? `🎵 ${genres.join(', ')}` : null,
       getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
       concert.rating ? `${'★'.repeat(concert.rating)}${'☆'.repeat((settings.ratingSystem || 5) - concert.rating)}` : null,
+      ...(receiptSections.includes('financial') && receiptCosts.length === 1 ? moneyLines.map(([label,amount])=>`${label}: €${amount.toFixed(2)}`) : []),
       concert.favorite ? '★ all-time fave' : null,
       concert.type === 'festival' && (concert.acts || []).length > 0 ? `🎪 Lineup: ${concert.acts.map(a => a.name).filter(Boolean).join(', ')}` : null,
     ];
     const financialLines = [
-      moneyLines.length > 0 ? '💶 Costs:' : null,
+      moneyLines.length > 0 && receiptCosts.length > 1 ? '💶 Costs:' : null,
       ...moneyLines.map(([label, amount]) => `  ${label}: €${amount.toFixed(2)}`),
-      moneyLines.length > 0 ? `  Total: €${total.toFixed(2)}` : null,
+      moneyLines.length > 0 && receiptCosts.length > 1 ? `  Total: €${total.toFixed(2)}` : null,
     ];
     const setlistLines = songs.length > 0 ? [
       '🎶 Setlist:',
@@ -2210,7 +2211,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     ] : [];
 
     const sections = {general: generalLines, financial: financialLines, setlist: setlistLines, notes: [concert.criedSong ? 'Cried: '+concert.criedSong : null, concert.notes || null]};
-    const lines = [...header, ...['general','financial','setlist','notes'].filter(id=>receiptSections.includes(id)).flatMap(id=>['',...sections[id]])];
+    const lines = [...header, ...['general','financial','setlist','notes'].filter(id=>receiptSections.includes(id) && !(id==='financial' && receiptSections.includes('general') && receiptCosts.length===1)).flatMap(id=>['',...sections[id]])];
 
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
@@ -2805,32 +2806,23 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const lineup = concert.type === 'festival' ? (concert.acts || []).map(a => a.name).filter(Boolean) : [];
           const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : []), ['notes', 'Notes']];
           const Section = ({ children }) => <div style={{ borderTop: "1px dashed #999", paddingTop: 8, marginTop: 8 }}>{children}</div>;
+          const costRows = moneyLines.map(([label,amount],i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:12,marginBottom:3}}><span style={{minWidth:0,flex:1}}>{label}</span><span style={{whiteSpace:'nowrap'}}>€{amount.toFixed(2)}</span></div>);
           const generalContent = (
             <Section>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Location</span><span>{isOnline(concert) ? formatOnlineLocation(concert) : `${concert.city}${concert.country ? `, ${concert.country}` : ''}`}</span></div>
               {genres.length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Genre</span><span>{genres.join(', ')}</span></div>}
               {(concert.friends || []).length > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>With</span><span>{concert.friends.join(", ")}</span></div>}
               {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
+              {receiptSections.includes('financial') && receiptCosts.length===1 && costRows}
               {lineup.length > 0 && <div style={{ marginTop: 6 }}><div style={{ marginBottom: 2 }}>Lineup:</div><div style={{ color: "#555" }}>{lineup.join(', ')}</div></div>}
               {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
             </Section>
           );
-          const financialContent = (
+          const financialContent = receiptCosts.length > 1 ? (
             <Section>
-              {moneyLines.length > 0 ? (
-                <>
-                  {moneyLines.map(([label, amount], i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                      <span>{label}</span><span>€{amount.toFixed(2)}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: "1px dashed #999", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
-                    <span>TOTAL</span><span>€{total.toFixed(2)}</span>
-                  </div>
-                </>
-              ) : <div style={{ textAlign: "center", color: "#999", padding: "10px 0" }}>no costs logged</div>}
+              {moneyLines.length > 0 ? <>{costRows}<div style={{borderTop:'1px dashed #999',marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontWeight:700}}><span>TOTAL</span><span>€{total.toFixed(2)}</span></div></> : <div>No costs logged</div>}
             </Section>
-          );
+          ) : <div style={{marginTop:3}}>{costRows}</div>;
           const setlistTotalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
           const formatSetlistLength = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `~${h}h ${m}m` : `~${m}m`; };
           const setlistContent = (
@@ -2891,7 +2883,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   <div style={{ textAlign: "center", fontSize: 10, color: "#666" }}>{formatDate(concert.date)}{concert.venue ? ` — ${concert.venue.toUpperCase()}` : ""}</div>
 
                   {receiptSections.includes('general') && generalContent}
-                  {receiptSections.includes('financial') && financialContent}
+                  {receiptSections.includes('financial') && !(receiptSections.includes('general') && receiptCosts.length===1) && financialContent}
                   {receiptSections.includes('setlist') && setlistContent}
                   {receiptSections.includes('notes') && <Section>{concert.criedSong && <div>Cried: {concert.criedSong}</div>}{concert.notes && <div style={{whiteSpace:'pre-wrap'}}>{concert.notes}</div>}{!concert.notes && !concert.criedSong && <div>No notes logged</div>}</Section>}
 

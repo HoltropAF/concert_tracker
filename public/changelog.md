@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.17 — 6 November 2026
+- Upcoming schedules check saved event pages for doors, VIP start, listed show start and expected end. Review and accept each detected time with its source.
+- Event source and search links provide a manual fallback when a site cannot be read. All four times remain manually editable.
+- Detection requires a matching artist and date; ambiguous events and conflicting labelled times are not guessed.
+
 ## 1.1.16 — 6 November 2026
 - Upcoming shows have preparation sections for details, schedule, tickets, companions and getting ready.
 - Upcoming edit screens show only Show and Costs; notes and companions stay editable under Show. Memories and Setlist return after the show.

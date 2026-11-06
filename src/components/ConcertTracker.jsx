@@ -1,3 +1,4 @@
+import {showsToday, showCountdown, localDay} from '../lib/showDay'
 import ShowControlSheet from './ShowControlSheet'
 import {yearShowCounts} from '../lib/yearShowCounts'
 import ReferenceComparison from './ReferenceComparison'
@@ -340,7 +341,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.12'
+const APP_VERSION = '1.1.13'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2937,6 +2938,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
       <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} />
       <div style={{ padding: "20px" }}>
+
+        {editorTab==='show' && !form.wishlist && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div>{[['doorsTime','Doors open'],['showTime','Show starts']].map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times use your phone’s local timezone. Leave unknown times empty.</div></div>}
 
         {/* Cards */}
         {[
@@ -11319,6 +11322,31 @@ export default function ConcertTracker(props) {
   return <NavigationMemory key={props.userEmail||'local'}><WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded}><ConcertTrackerContent {...props} /></WishlistUpdateProvider></NavigationMemory>
 }
 
+function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
+  useBackButton(onClose,true);
+  const [checks,setChecks]=useState(()=>{try{return JSON.parse(localStorage.getItem('showDayChecklist:'+localDay(now))||'{}')}catch{return {}}});
+  useEffect(()=>{try{localStorage.setItem('showDayChecklist:'+localDay(now),JSON.stringify(checks))}catch{}},[checks,now]);
+  const [index,setIndex]=useState(0);
+  const concert=concerts[Math.min(index,concerts.length-1)];
+  if(!concert)return null;
+  const photoKey=Object.keys(settings.artistPhotos||{}).find(name=>name.toLowerCase()===(concert.artist||'').toLowerCase());
+  const photo=photoKey && settings.artistPhotos[photoKey];
+  const countdown=showCountdown(concert,now);
+  const checked=checks[concert.id]||{};
+  return <ShowControlSheet title="Today’s the day" onClose={onClose}>
+    {concerts.length>1 && <select aria-label="Today's show" value={index} onChange={e=>setIndex(Number(e.target.value))} style={{background:"#13131f",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:"100%",marginBottom:12}}>{concerts.map((c,i)=><option key={c.id} value={i}>{c.artist}</option>)}</select>}
+    {photo && <PhotoImg eager path={photo} pos={settings.artistPhotoPos?.[photoKey]} variant="detail" style={{width:'100%',height:130,borderRadius:10,marginBottom:14}} />}
+    <h2 style={{fontFamily:"'Syne', sans-serif",fontSize:24,color:'#e2e0ff',marginBottom:4}}>{concert.artist}</h2>
+    {concert.tour && <div style={{color:'#a78bfa',fontSize:12,marginBottom:6}}>{concert.tour}</div>}
+    <div style={{color:'#9491b8',fontSize:13}}>{[concert.venue,concert.city].filter(Boolean).join(' · ')}</div>
+    {countdown && <div style={{fontFamily:"'Syne', sans-serif",fontSize:24,color:'#a78bfa',margin:'16px 0 8px'}}>{countdown}</div>}
+    <div style={{color:'#9491b8',fontSize:12,margin:'10px 0'}}>{getFriends(concert).length?'With '+getFriends(concert).join(', '):concert.solo?'Going solo':''}</div>
+    {[['Doors open',concert.doorsTime],['Show starts',concert.showTime]].filter(([,time])=>time).map(([label,time])=><div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #25243a',fontSize:13,color:'#c4c2f0'}}><span>{label}</span><strong style={{color:'#a78bfa'}}>{time}</strong></div>)}
+    <details style={{marginTop:12,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{['Ticket ready','Travel planned','Power bank packed'].map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecks(old=>({...old,[concert.id]:{...old[concert.id],[label]:e.target.checked}}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
+    <div style={{display:'flex',gap:8,marginTop:16}}><button onClick={()=>{onClose();onOpen(concert)}} style={{flex:1,minHeight:44,background:'#a78bfa',color:'#0c0c14',border:0,borderRadius:9,fontWeight:700}}>Open show</button>{!isOnline(concert) && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{flex:1,display:'grid',placeItems:'center',color:'#a78bfa',border:'1px solid #2e2e50',borderRadius:9,textDecoration:'none'}}>Directions ↗</a>}</div>
+  </ShowControlSheet>
+}
+
 function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
   const today = new Date()
   const isPastDate = (dateStr) => dateStr < todayStr
@@ -11437,6 +11465,18 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [artistDetailOpen, setArtistDetailOpen] = useState(false)
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
+  const [showDayNow,setShowDayNow]=useState(()=>new Date());
+  const [showToday,setShowToday]=useState(true);
+  useEffect(()=>{
+    let hiddenAt=0;
+    const refresh=()=>{const now=new Date();setShowDayNow(now);};
+    const visibility=()=>{if(document.hidden)hiddenAt=Date.now();else{refresh();if(hiddenAt && Date.now()-hiddenAt>60000)setShowToday(true)}};
+    const interval=window.setInterval(refresh,60000);
+    document.addEventListener('visibilitychange',visibility);
+    return()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',visibility)};
+  },[]);
+  const todaysShows=showsToday(concerts,showDayNow);
+
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   const [spotifyPrompt, setSpotifyPrompt] = useState(null) // concert awaiting Spotify link prompt
@@ -11850,6 +11890,11 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
 
   return (
     <div data-theme-shell="" style={appShell}>
+
+      {todaysShows.length>0 && <>
+        <button aria-label="Today's shows" title="Today's shows" onClick={()=>setShowToday(true)} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',left:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',height:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer'}}>♫ Today{todaysShows.length>1?' · '+todaysShows.length:''}</button>
+        {showToday && <TodayShowPanel concerts={todaysShows} settings={settings} now={showDayNow} onClose={()=>setShowToday(false)} onOpen={handleOpenConcert} />}
+      </>}
 
       {/* Header */}
       {!((view === 'venues' && venueDetailOpen) || (view === 'artists' && artistDetailOpen) || (view === 'songs' && songDetailOpen)) && (

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.13 — 6 November 2026
+- A floating Today button opens your show-day panel for confirmed shows happening today, including multi-day festivals.
+- Uses your saved artist photo, venue, friends, directions and an optional checklist. Reopens on launch or after a minute in the background.
+- Enter doors and show-start times in Edit → Show times. Unknown times stay hidden.
+
 ## 1.1.12 — 6 November 2026
 - A single selected cost category appears below Rating without a divider or total. Totals appear only when multiple cost categories are selected, in text and image exports.
 

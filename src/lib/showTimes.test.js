@@ -18,7 +18,7 @@ test('time lookup requires an unambiguous matching artist and date and keeps eve
 test('automatic lookup finds the exact show without a supplied link, preserves source and rejects conflicting times',async()=>{
  const q={artist:'Test Artist',date:'2026-11-10',venue:'Ziggo Dome',country:'Netherlands'}
  const match={artist:q.artist,date:q.date,venue:q.venue,url:'https://example.com/event',startTime:'20:00:00'}
- const deps={key:'test-only',venue:async()=>({events:[]}),tm:async()=>({events:[{...match,date:'2026-11-11'},match]}),mojo:async()=>({events:[]}),read:async url=>({url,html:page(event)+'Doors open 18:30'})}
+ const deps={key:'test-only',ziggo:async()=>null,venue:async()=>({events:[]}),tm:async()=>({events:[{...match,date:'2026-11-11'},match]}),mojo:async()=>({events:[]}),read:async url=>({url,html:page(event)+'Doors open 18:30'})}
  const result=await lookupShowTimes(q,deps)
  assert.equal(result.times.showTime.value,'20:00')
  assert.equal(result.times.doorsTime.value,'18:30')

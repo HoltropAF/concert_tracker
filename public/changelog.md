@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.21 — 8 November 2026
+- Today moves to the right and opens the next scheduled show first. Customize Ready to go under Settings → Show day.
+- Timetable groups source and manual controls, aligns its three actions, offers a VIP-row toggle and keeps calendar export to one line.
+- Ziggo Dome’s timetable now separates doors, support, headliner and expected end. Review found support acts before adding them.
+- Upcoming General adds direct Timetable and Tickets shortcuts. Tickets can store a personal link and note for finding your ticket.
+
 ## 1.1.20 — 6 November 2026
 - Upcoming General is a quieter Your plans layout with companions, directions, preparation checklist and notes; duplicated show details are removed.
 - Timetable has two aligned actions: Check times and Open source (or Search online when there is no source).

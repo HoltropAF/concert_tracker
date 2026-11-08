@@ -1,6 +1,6 @@
 import ShowSchedule from './ShowSchedule'
-import {showTimeFields} from '../lib/showTimes'
-import {showsToday, showCountdown, localDay} from '../lib/showDay'
+import {visibleShowTimeFields} from '../lib/showTimes'
+import {showsToday, showCountdown, localDay, preparationItems, defaultPreparationItems} from '../lib/showDay'
 import ShowControlSheet from './ShowControlSheet'
 import {yearShowCounts} from '../lib/yearShowCounts'
 import ReferenceComparison from './ReferenceComparison'
@@ -343,7 +343,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.20'
+const APP_VERSION = '1.1.21'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2456,16 +2456,19 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {!concert.wishlist && !past && detailTab==='general' && <>
             {concert.photo && <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="detail" style={{width:'100%',aspectRatio:'16 / 9',borderRadius:12}} />}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              {[['timetable','Timetable',concert.showTime?'Starts '+concert.showTime:concert.doorsTime?'Doors '+concert.doorsTime:'Show times'],['tickets','Tickets',concert.ticketAccessUrl||concert.ticketAccessNote?'Ticket location saved':concert.ticketType||'Ticket details']].map(([id,label,sub])=><button key={id} onClick={()=>setDetailTab(id)} style={{...detailCard,textAlign:'left',minWidth:0,cursor:'pointer',color:'#c4c2f0'}}><span style={{display:'flex',justifyContent:'space-between',gap:6,fontSize:13,fontWeight:700}}>{label}<span style={{color:'#a78bfa'}}>›</span></span><span style={{display:'block',marginTop:5,color:'#9491b8',fontSize:11,overflowWrap:'anywhere'}}>{sub}</span></button>)}
+            </div>
             <section>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44}}><span style={{fontFamily:"'Syne', sans-serif",fontSize:16,fontWeight:700,color:'#e2e0ff'}}>Your plans</span><button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44,fontSize:12}}>Edit plans</button></div>
               <div style={{padding:'12px 0',borderBottom:'1px solid #25243a'}}><div style={{fontSize:11,color:'#6b6a8f',marginBottom:6}}>Going with</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{getFriends(concert).length?getFriends(concert).map(name=><span key={name} style={{display:'inline-flex',alignItems:'center',gap:7,fontSize:13,color:'#c4c2f0'}}><FriendAvatar name={name} size={26} />{name}</span>):<span style={{fontSize:13,color:'#9491b8'}}>{concert.solo?'Going solo':'Add your companions or choose solo'}</span>}</div></div>
               {!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:48,borderBottom:'1px solid #25243a',color:'#a78bfa',fontSize:13,textDecoration:'none'}}><span>Directions to {concert.venue}</span><span aria-hidden="true">↗</span></a>}
-              <div style={{padding:'6px 0 12px',borderBottom:'1px solid #25243a'}}><ShowPreparationChecklist key={concert.id} concert={concert} /></div>
+              <div style={{padding:'6px 0 12px',borderBottom:'1px solid #25243a'}}><ShowPreparationChecklist key={concert.id} concert={concert} settings={settings} /></div>
               <div style={{padding:'14px 0'}}><div style={{fontSize:11,color:'#6b6a8f',marginBottom:8}}>Notes for the day</div><div style={{fontSize:13,lineHeight:1.6,color:'#9491b8',whiteSpace:'pre-wrap'}}>{concert.notes||'Meeting point, travel plans, or anything to remember.'}</div></div>
             </section>
           </>}
-          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /></>}
-          {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}</div></>}
+          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} compact /></>}
+          {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}<div style={{borderTop:'1px solid #25243a',marginTop:12,paddingTop:12}}>{sec('Where to find your ticket')}{safeExternalUrl(concert.ticketAccessUrl)&&<a href={safeExternalUrl(concert.ticketAccessUrl)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,color:'#a78bfa',fontSize:13}}>Open my ticket ↗</a>}{concert.ticketAccessNote&&<div style={{color:'#c4c2f0',fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{concert.ticketAccessNote}</div>}{!concert.ticketAccessUrl&&!concert.ticketAccessNote&&<div style={{color:'#9491b8',fontSize:12}}>Add a link or a note in Edit tickets.</div>}</div></div></>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
@@ -2963,7 +2966,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} upcoming={!past} />
       <div style={{ padding: "20px" }}>
 
-        {editorTab==='timetable' && !form.wishlist && form.date && form.date!=='9999-12-31' && (form.endDate || form.date)>=localDay() && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div>{Object.entries(showTimeFields).map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times are local to the venue; countdown currently uses your phone’s timezone. Leave unknown times empty. Expected end may be an estimate.</div><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Event-page link<input type="url" value={form.scheduleUrl||''} onChange={e=>update('scheduleUrl',e.target.value)} placeholder="https://venue.com/this-event" style={{...inputStyle,marginTop:6}} /></label></div>}
+        {editorTab==='timetable' && !form.wishlist && form.date && form.date!=='9999-12-31' && (form.endDate || form.date)>=localDay() && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div><label style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:44,fontSize:13,color:"#c4c2f0"}}>Show VIP time<input type="checkbox" checked={form.showVipTime??settings.showVipTime??true} onChange={e=>update("showVipTime",e.target.checked)} style={{accentColor:"#a78bfa"}} /></label>{visibleShowTimeFields(form,settings).map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times are local to the venue; countdown currently uses your phone’s timezone. Leave unknown times empty. Expected end may be an estimate.</div><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Event-page link<input type="url" value={form.scheduleUrl||''} onChange={e=>update('scheduleUrl',e.target.value)} placeholder="https://venue.com/this-event" style={{...inputStyle,marginTop:6}} /></label></div>}
 
         {/* Cards */}
         {[
@@ -3261,6 +3264,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             )}
             <TicketsFields value={form.tickets} onChange={v => update('tickets', v)} labelStyle={labelStyle} inputStyle={inputStyle} />
             <label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Ticket website<input type="url" value={form.ticketSaleLink||''} onChange={e=>update('ticketSaleLink',e.target.value)} style={{...inputStyle,marginTop:6}} /></label>
+            {!past && <><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>My ticket link<input type="url" value={form.ticketAccessUrl||''} onChange={e=>update('ticketAccessUrl',e.target.value)} style={{...inputStyle,marginTop:6}} /></label><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Where to find it<textarea rows={2} value={form.ticketAccessNote||''} onChange={e=>update('ticketAccessNote',e.target.value)} placeholder="e.g. In the Ticketmaster app" style={{...inputStyle,marginTop:6,resize:'vertical'}} /></label></>}
           </> },
           { title: 'Financial', content: <>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8 }}>
@@ -10401,6 +10405,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               </div>
             </Collapsible>
 
+            <Collapsible title="Show day" icon="sliders" defaultOpen={false} {...sec('g-show-day')}>
+              <div style={settingsCard}>
+                <SettingsRow label="Ready to go checklist" sub="One item per line. Used on the Today panel and upcoming shows.">
+                  <textarea aria-label="Ready to go checklist" value={local.showChecklistText??defaultPreparationItems.join('\n')} onChange={e=>lUpdate('showChecklistText',e.target.value)} rows={4} maxLength={1200} style={{width:'100%',background:'#13131f',border:'1px solid #2e2e50',borderRadius:8,color:'#c4c2f0',padding:10,fontSize:16,resize:'vertical'}} />
+                </SettingsRow>
+                <SettingsRow label="VIP time" sub="Show a VIP start row by default. You can override it for a show."><SettingsToggle checked={local.showVipTime!==false} onChange={v=>lUpdate('showVipTime',v)} /></SettingsRow>
+              </div>
+            </Collapsible>
+
             <Collapsible title="App" icon="sliders" defaultOpen={false} {...sec('g-app')}
               subtitle={{ label: `${local.ratingSystem || 5} stars`, color: '#6b6a8f' }}>
               <div style={settingsCard}>
@@ -11353,31 +11366,33 @@ export default function ConcertTracker(props) {
 function safeExternalUrl(value) {
   try {const url=new URL(value);return ['https:','http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null}catch{return null}
 }
-function ShowPreparationChecklist({concert}) {
+function ShowPreparationChecklist({concert,settings}) {
   const key='showPreparation:'+concert.id;
   const [checked,setChecked]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return {}}});
   useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(checked))}catch{}},[key,checked]);
-  return <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{['Ticket ready','Travel planned','Power bank packed'].map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecked(old=>({...old,[label]:e.target.checked}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
+  const items=preparationItems(settings);
+  if(!items.length)return null;
+  return <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{items.map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecked(old=>({...old,[label]:e.target.checked}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
 }
 
 function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
   useBackButton(onClose,true);
-  const [index,setIndex]=useState(0);
-  const concert=concerts[Math.min(index,concerts.length-1)];
+  const [chosenId,setChosenId]=useState(null);
+  const concert=concerts.find(c=>c.id===chosenId)||concerts[0];
   if(!concert)return null;
   const photoKey=Object.keys(settings.artistPhotos||{}).find(name=>name.toLowerCase()===(concert.artist||'').toLowerCase());
   const photo=photoKey && settings.artistPhotos[photoKey];
   const countdown=showCountdown(concert,now);
   return <ShowControlSheet title="Today’s the day" onClose={onClose}>
-    {concerts.length>1 && <select aria-label="Today's show" value={index} onChange={e=>setIndex(Number(e.target.value))} style={{background:"#13131f",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:"100%",marginBottom:12}}>{concerts.map((c,i)=><option key={c.id} value={i}>{c.artist}</option>)}</select>}
+    {concerts.length>1 && <select aria-label="Today's show" value={String(concert.id)} onChange={e=>setChosenId(concerts.find(c=>String(c.id)===e.target.value)?.id||null)} style={{background:"#13131f",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:"100%",marginBottom:12}}>{concerts.map(c=><option key={c.id} value={String(c.id)}>{c.artist}{c.showTime?` · ${c.showTime}`:""}</option>)}</select>}
     {photo && <PhotoImg eager path={photo} pos={settings.artistPhotoPos?.[photoKey]} variant="detail" style={{width:'100%',height:130,borderRadius:10,marginBottom:14}} />}
     <h2 style={{fontFamily:"'Syne', sans-serif",fontSize:24,color:'#e2e0ff',marginBottom:4}}>{concert.artist}</h2>
     {concert.tour && <div style={{color:'#a78bfa',fontSize:12,marginBottom:6}}>{concert.tour}</div>}
     <div style={{color:'#9491b8',fontSize:13}}>{[concert.venue,concert.city].filter(Boolean).join(' · ')}</div>
     {countdown && <div style={{fontFamily:"'Syne', sans-serif",fontSize:24,color:'#a78bfa',margin:'16px 0 8px'}}>{countdown}</div>}
     <div style={{color:'#9491b8',fontSize:12,margin:'10px 0'}}>{getFriends(concert).length?'With '+getFriends(concert).join(', '):concert.solo?'Going solo':''}</div>
-    {Object.entries(showTimeFields).map(([key,label])=>[label,concert[key]]).filter(([,time])=>time).map(([label,time])=><div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #25243a',fontSize:13,color:'#c4c2f0'}}><span>{label}</span><strong style={{color:'#a78bfa'}}>{time}</strong></div>)}
-    <ShowPreparationChecklist key={concert.id} concert={concert} />
+    {visibleShowTimeFields(concert,settings).map(([key,label])=>[label,concert[key]]).filter(([,time])=>time).map(([label,time])=><div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #25243a',fontSize:13,color:'#c4c2f0'}}><span>{label}</span><strong style={{color:'#a78bfa'}}>{time}</strong></div>)}
+    <ShowPreparationChecklist key={concert.id} concert={concert} settings={settings} />
     <div style={{display:'flex',gap:8,marginTop:16}}><button onClick={()=>{onClose();onOpen(concert)}} style={{flex:1,minHeight:44,background:'#a78bfa',color:'#0c0c14',border:0,borderRadius:9,fontWeight:700}}>Open show</button>{!isOnline(concert) && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{flex:1,display:'grid',placeItems:'center',color:'#a78bfa',border:'1px solid #2e2e50',borderRadius:9,textDecoration:'none'}}>Directions ↗</a>}</div>
   </ShowControlSheet>
 }
@@ -11927,7 +11942,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     <div data-theme-shell="" style={appShell}>
 
       {todaysShows.length>0 && <>
-        <button aria-label="Today's shows" title="Today's shows" onClick={()=>setShowToday(true)} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',left:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',height:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer'}}>♫ Today{todaysShows.length>1?' · '+todaysShows.length:''}</button>
+        <button aria-label="Today's shows" title="Today's shows" onClick={()=>setShowToday(true)} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',right:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',height:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer'}}>♫ Today{todaysShows.length>1?' · '+todaysShows.length:''}</button>
         {showToday && <TodayShowPanel concerts={todaysShows} settings={settings} now={showDayNow} onClose={()=>setShowToday(false)} onOpen={handleOpenConcert} />}
       </>}
 

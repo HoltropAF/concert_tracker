@@ -1,6 +1,6 @@
 import {useState} from 'react'
 import {concertCalendar,validDate} from '../lib/calendar'
-export default function CalendarExport({concert}) {
+export default function CalendarExport({concert,compact=false}) {
   const [message,setMessage]=useState('')
   const now = new Date()
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
@@ -15,6 +15,7 @@ export default function CalendarExport({concert}) {
     } catch(e){setMessage(e.message)}
   }
   if(!showAvailable && !saleAvailable)return null
+  if(compact)return <div style={{borderTop:'1px solid #25243a'}}><button type="button" onClick={()=>download('show')} disabled={!showAvailable} style={{display:'flex',justifyContent:'space-between',alignItems:'center',width:'100%',minHeight:48,background:'none',border:0,padding:'8px 0',color:'#a78bfa',fontSize:13}}>Add to calendar<span aria-hidden="true">↓</span></button>{message&&<div role="status" style={{fontSize:11,color:'#9491b8'}}>{message}</div>}</div>
   const button={display:'flex',justifyContent:'space-between',alignItems:'center',width:'100%',minHeight:48,background:'none',border:0,borderBottom:'1px solid #25243a',padding:'10px 0',color:'#a78bfa',fontSize:13,textAlign:'left',cursor:'pointer'}
   return <section style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:10,padding:14}}><div style={{fontSize:10,color:'#6b6a8f',fontFamily:"'DM Mono', monospace",textTransform:'uppercase',marginBottom:6}}>Calendar</div>
     {showAvailable&&<button style={button} onClick={()=>download('show')}>Add concert to calendar<span aria-hidden="true">↓</span></button>}

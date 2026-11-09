@@ -345,7 +345,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.26'
+const APP_VERSION = '1.1.27'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2141,9 +2141,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const receiptRef = useRef(null);
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
-  useEffect(() => { setDetailTab('general'); }, [concert.id]);
+  const [ticketView, setTicketView] = useState(null);
+  useEffect(() => { setDetailTab('general'); setTicketView(null); }, [concert.id]);
   const goBackFromDetail = () => detailTab === 'general' ? onClose() : setDetailTab('general');
   useBackButton(goBackFromDetail, detailTab !== 'general');
+  useBackButton(() => setTicketView(null), detailTab === 'tickets' && ticketView !== null && !editing);
   const [setlistView, setSetlistViewState] = useState(() => ({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(settings.setlistView || {}) }));
   const setSetlistView = updater => setSetlistViewState(prev => {
     const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -2383,6 +2385,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const online = isOnline(concert);
   const past = (concert.endDate || concert.date) < localDay();
   useEffect(() => {
+    if (detailTab !== 'tickets' || past) setTicketView(null);
     if (past && (detailTab === 'tickets' || detailTab === 'timetable')) setDetailTab('general');
   }, [past, detailTab]);
 
@@ -2399,9 +2402,14 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   );
   const detailCard = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "14px" };
   const editTimetable = () => { setForm(normalizeConcertForm(concert)); setEditorTab('timetable'); setEditing(true); };
+  const editTickets = () => { setForm(normalizeConcertForm(concert)); setEditorTab('tickets'); setEditing(true); };
 
   if (!editing) {
     const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
+    const artistPhotoKey = !concert.wishlist && !past && Object.keys(settings.artistPhotos || {}).find(name => name.toLowerCase() === (concert.artist || '').toLowerCase());
+    const artistPhoto = settings.artistPhotos?.[artistPhotoKey];
+    const upcomingPhoto = artistPhoto || concert.photo;
+    const upcomingPhotoPosition = artistPhoto ? settings.artistPhotoPos?.[artistPhotoKey] : concert.photoPos;
     const merchTotal = (concert.merch || []).reduce((s, m) => s + (parseFloat(m.price) || 0), 0);
     const otherCostsTotal = (concert.otherCosts || []).reduce((s, c) => s + (parseFloat(c.price) || 0), 0);
     const totalCost = ticketTotal(concert) + merchTotal + otherCostsTotal + (parseFloat(concert.travelCost) || 0);
@@ -2452,12 +2460,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
         {/* Venue + tour hero */}
         <div style={{ padding: "20px 20px 0" }}>
-          {!concert.wishlist && !past && detailTab === 'general' && (() => {
-            const photoKey = Object.keys(settings.artistPhotos || {}).find(name => name.toLowerCase() === (concert.artist || '').toLowerCase());
-            const artistPhoto = settings.artistPhotos?.[photoKey];
-            const path = artistPhoto || concert.photo;
-            return path && <PhotoImg eager path={path} pos={artistPhoto ? settings.artistPhotoPos?.[photoKey] : concert.photoPos} variant="detail" style={{width:'100%',height:116,borderRadius:10,marginBottom:14}} />;
-          })()}
+          {!concert.wishlist && !past && upcomingPhoto && <PhotoImg eager path={upcomingPhoto} pos={upcomingPhotoPosition} variant="detail" style={{width:'100%',height:116,borderRadius:10,marginBottom:14}} />}
           <div style={{ marginBottom: 14 }}>
             {online ? (
               <>
@@ -2556,7 +2559,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <CalendarExport concert={concert} compact />
             </>
           )}
-          {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setForm(normalizeConcertForm(concert));setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}<div style={{borderTop:'1px solid #25243a',marginTop:12,paddingTop:12}}>{sec('Where to find your ticket')}{safeExternalUrl(concert.ticketAccessUrl)&&<a href={safeExternalUrl(concert.ticketAccessUrl)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,color:'#a78bfa',fontSize:13}}>Open my ticket ↗</a>}{concert.ticketAccessNote&&<div style={{color:'#c4c2f0',fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{concert.ticketAccessNote}</div>}{!concert.ticketAccessUrl&&!concert.ticketAccessNote&&<div style={{color:'#9491b8',fontSize:12}}>Add a link or a note in Edit tickets.</div>}</div><TicketFiles account={ticketAccount} concert={concert} /></div></>}
+          {!concert.wishlist && !past && detailTab === 'tickets' && (
+            <div style={detailCard}>
+              <TicketFiles account={ticketAccount} concert={concert} view={ticketView} onChangeView={setTicketView} onEdit={editTickets}
+                artwork={upcomingPhoto ? <PhotoImg path={upcomingPhoto} pos={upcomingPhotoPosition} style={{width:52,height:64,borderRadius:6}} /> : null}
+                ticketLabel={(concert.tickets || []).map(t => t.name).filter(Boolean).join(' · ') || concert.ticketType}
+                price={ticketTotal(concert) > 0 ? '€' + ticketTotal(concert).toFixed(2) : ''}
+                shopUrl={safeExternalUrl(concert.ticketSaleLink)} accessUrl={safeExternalUrl(concert.ticketAccessUrl)} />
+            </div>
+          )}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
@@ -12029,7 +12040,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     const imgFilter = [themeInv, lightMode ? LIGHT_FILTER : ''].filter(Boolean).join(' ')
     const rules = []
     if (imgFilter) {
-      rules.push(`[data-theme-shell] img, [data-theme-shell] [data-show-receipt] { filter: ${imgFilter} !important; }`)
+      rules.push(`[data-theme-shell] img, [data-theme-shell] [data-ticket-preview], [data-theme-shell] [data-show-receipt] { filter: ${imgFilter} !important; }`)
       // Leaflet's own UI chrome (attribution strip, zoom buttons) isn't an
       // <img>, but reads just as wrong once the whole page is hue-rotated —
       // exclude it from the theme filter too so it stays legible.

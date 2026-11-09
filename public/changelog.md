@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.27 — 9 November 2026
+- Upcoming shows keep the artist photo and location visible on all four tabs.
+- Open saved tickets from a single pass. Choose, swipe through, and download saved photos and PDFs.
+
 ## 1.1.26 — 9 November 2026
 - Choose the last song for a location note and see location notes aligned with the song numbers.
 

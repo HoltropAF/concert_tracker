@@ -1,19 +1,68 @@
 import { useEffect, useRef, useState } from 'react'
 import { listTicketFiles, updateTicketFiles, validateTicketFile } from '../lib/ticketFiles'
+import ShowControlSheet from './ShowControlSheet'
+import PdfTicketPreview from './PdfTicketPreview'
 
 const buttonStyle = { background: 'none', border: 0, color: '#a78bfa', cursor: 'pointer', minHeight: 44, padding: 0, fontSize: 12 }
+const small = { color: '#9491b8', fontSize: 12, lineHeight: 1.5 }
+const row = { display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid #25243a' }
+const arrow = { ...buttonStyle, width: 44, border: '1px solid #2e2e50', background: '#211b33', borderRadius: 8, fontSize: 20 }
 const isPdf = ({ file, name }) => file.type === 'application/pdf' || /\.pdf$/i.test(name)
 
-export default function TicketFiles({ account, concert }) {
+function TicketFileViewer({ item, index, total, onStep, onList }) {
+  const [url, setUrl] = useState('')
+  const [imageError, setImageError] = useState(false)
+  const swipeStart = useRef(null)
+  const pdf = isPdf(item)
+  useEffect(() => {
+    const type = pdf ? 'application/pdf' : /\.svg$/i.test(item.name) ? 'image/svg+xml' : item.file.type
+    const blob = type === item.file.type ? item.file : new Blob([item.file], { type })
+    const source = URL.createObjectURL(blob)
+    setUrl(source)
+    return () => URL.revokeObjectURL(source)
+  }, [item, pdf])
+
+  return <div onKeyDown={event => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    event.preventDefault()
+    onStep(event.key === 'ArrowLeft' ? -1 : 1)
+  }}>
+    <div style={{ ...small, overflowWrap: 'anywhere' }}>{item.name}</div>
+    <div style={{ touchAction: 'pan-y pinch-zoom' }} onPointerDown={event => {
+      if (total < 2 || !event.isPrimary || event.target.closest('button, a')) return
+      swipeStart.current = { x: event.clientX, y: event.clientY }
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }} onPointerCancel={() => { swipeStart.current = null }} onPointerUp={event => {
+      const start = swipeStart.current
+      swipeStart.current = null
+      if (!start) return
+      const dx = event.clientX - start.x, dy = event.clientY - start.y
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) onStep(dx < 0 ? 1 : -1)
+    }}>
+      {pdf ? <PdfTicketPreview file={item.file} url={url} /> : <>
+        <div style={{ ...small, padding: '8px 0' }}>Photo</div>
+        {imageError ? <p role="status" style={small}>This image format can be opened after downloading it.</p>
+          : url && <img src={url} alt={item.name} draggable={false} onError={() => setImageError(true)} style={{ display: 'block', width: '100%', maxHeight: '45dvh', objectFit: 'contain' }} />}
+      </>}
+    </div>
+    {total > 1 && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10 }}>
+      <button type="button" aria-label="Previous ticket" disabled={index === 0} onClick={() => onStep(-1)} style={{ ...arrow, opacity: index === 0 ? .4 : 1 }}>‹</button>
+      <div style={{ ...small, textAlign: 'center' }}><strong aria-live="polite" style={{ color: '#e2e0ff' }}>{index + 1} of {total}</strong><br />Swipe or use arrows</div>
+      <button type="button" aria-label="Next ticket" disabled={index === total - 1} onClick={() => onStep(1)} style={{ ...arrow, opacity: index === total - 1 ? .4 : 1 }}>›</button>
+    </div>}
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: total > 1 ? 'space-between' : 'flex-end', gap: 10, marginTop: 8 }}>
+      {total > 1 && <button type="button" onClick={onList} style={buttonStyle}>All tickets</button>}
+      {url && <a href={url} download={item.name} style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center', textDecoration: 'none', fontWeight: 700 }}>Download {pdf ? 'PDF' : 'photo'} ↓</a>}
+    </div>
+  </div>
+}
+
+export default function TicketFiles({ account, concert, artwork, ticketLabel, price, shopUrl, accessUrl, onEdit, view, onChangeView }) {
   const picker = useRef(null)
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [preview, setPreview] = useState(null)
-  useEffect(() => () => {
-    if (preview) URL.revokeObjectURL(preview.url)
-  }, [preview])
   useEffect(() => {
     let active = true
     listTicketFiles(account, concert.id).then(items => {
@@ -48,43 +97,64 @@ export default function TicketFiles({ account, concert }) {
     save(current => [...current, ...added])
   }
 
-  const open = item => {
-    const { id, file, name } = item
-    if (isPdf(item)) {
-      const url = URL.createObjectURL(new Blob([file], { type: 'application/pdf' }))
-      window.open(url, '_blank', 'noopener,noreferrer')
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
-      return
-    }
-    setPreview({ id, name, url: URL.createObjectURL(file) })
-  }
+  const selected = typeof view === 'number' ? files[view] : null
+  const hasDetails = !!(accessUrl || concert.ticketAccessNote)
+  const accessDetails = <>
+    {accessUrl && <a href={accessUrl} target="_blank" rel="noopener noreferrer" style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center' }}>Open my ticket ↗</a>}
+    {concert.ticketAccessNote && <div style={{ ...small, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{concert.ticketAccessNote}</div>}
+  </>
 
-  return <section aria-label="Ticket files" style={{ borderTop: '1px solid #25243a', marginTop: 12, paddingTop: 12 }}>
-    <div style={{ fontSize: 10, color: '#9491b8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 6 }}>Ticket files</div>
+  return <section aria-label="Tickets">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: 10, color: '#9491b8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>Tickets</div>
+      <button type="button" onClick={onEdit} style={buttonStyle}>Edit tickets</button>
+    </div>
     <input ref={picker} type="file" accept="application/pdf,.pdf,image/*,.svg" multiple disabled={busy} onChange={add} hidden />
-    <p style={{ color: '#9491b8', fontSize: 11, lineHeight: 1.5, margin: '0 0 8px' }}>
-      {loading ? 'Loading saved tickets…' : files.length ? 'Saved on this device until the show has passed.' : 'Add a PDF or image up to 20 MB.'}
-    </p>
-    {files.map(item => <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid #25243a' }}>
-      <button type="button" onClick={() => open(item)} style={{ ...buttonStyle, display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, textAlign: 'left', paddingBlock: 7 }}>
-        <span aria-hidden="true" style={{ flexShrink: 0, color: '#c4b5fd', background: '#211b33', borderRadius: 5, padding: '4px 6px', fontSize: 9, fontFamily: "'DM Mono', monospace" }}>{isPdf(item) ? 'PDF' : 'IMG'}</span>
-        <span style={{ color: '#e2e0ff', overflowWrap: 'anywhere', minWidth: 0 }}>{item.name}</span>
-        <span aria-hidden="true">›</span>
-      </button>
-      <button type="button" aria-label={'Remove ' + item.name} disabled={busy} onClick={() => {
-        if (preview?.id === item.id) setPreview(null)
-        save(current => current.filter(file => file.id !== item.id))
-      }} style={{ ...buttonStyle, color: '#9491b8' }}>Remove</button>
-    </div>)}
-    {preview && <figure style={{ margin: 0, textAlign: 'right' }}>
-      <button type="button" onClick={() => setPreview(null)} style={buttonStyle}>Close preview</button>
-      <img src={preview.url} alt={preview.name} style={{ display: 'block', width: '100%', objectFit: 'contain' }} />
-      <a href={preview.url} download={preview.name} style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center' }}>Download image</a>
-    </figure>}
+    {loading ? <p style={small}>Loading saved tickets…</p> : files.length ? <>
+      <div style={{ border: '1px solid #2e2e50', borderRadius: 12, overflow: 'hidden', background: '#0c0c14' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1fr)', alignItems: 'center', gap: 12, padding: 14 }}>
+          {artwork || <div aria-hidden="true" style={{ display: 'grid', placeItems: 'center', height: 64, background: '#211b33', borderRadius: 6, color: '#a78bfa' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4V7Zm10 0v2m0 2v2m0 2v2" /></svg>
+          </div>}
+          <div style={{ overflowWrap: 'anywhere' }}>
+            <div style={{ ...small, color: '#a78bfa', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>Entry pass</div>
+            <strong style={{ display: 'block', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 17 }}>{ticketLabel || 'My tickets'}</strong>
+            <div style={small}>{files.length === 1 ? `1 saved ticket · ${isPdf(files[0]) ? 'PDF' : 'Photo'}` : `${files.length} saved tickets`}</div>
+          </div>
+        </div>
+        <button type="button" onClick={() => onChangeView(files.length === 1 ? 0 : 'list')} style={{ ...buttonStyle, width: '100%', paddingInline: 14, textAlign: 'left', fontWeight: 700, borderTop: '1px solid #2e2e50', background: '#211b33' }}>
+          {files.length === 1 ? 'Open ticket' : 'Open tickets'} ›
+        </button>
+      </div>
+      <details style={{ ...small, borderTop: '1px solid #25243a', marginTop: 4 }}>
+        <summary style={{ padding: '12px 0', cursor: 'pointer' }}>Ticket details</summary>
+        <div style={small}>Saved on this device until the show has passed.</div>
+        {price && <div style={small}>{price}</div>}
+        {accessDetails}
+        {files.map(item => <div key={item.id} style={row}>
+          <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{item.name}</span>
+          <button type="button" aria-label={'Remove ' + item.name} disabled={busy} onClick={() => save(current => current.filter(file => file.id !== item.id))} style={buttonStyle}>Remove</button>
+        </div>)}
+      </details>
+    </> : <>
+      {(ticketLabel || price) && <p style={small}>{[ticketLabel, price].filter(Boolean).join(' · ')}</p>}
+      {accessDetails}
+      {!hasDetails && shopUrl && <a href={shopUrl} target="_blank" rel="noopener noreferrer" style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center' }}>Ticket website ↗</a>}
+      <p style={small}>Add a PDF or image up to 20 MB.</p>
+    </>}
     {!loading && <button type="button" disabled={busy} onClick={() => picker.current?.click()}
       style={files.length ? buttonStyle : { ...buttonStyle, border: '1px solid #2e2e50', borderRadius: 8, paddingInline: 12 }}>
       {busy ? 'Saving…' : files.length ? '+ Add another' : '+ Add ticket file'}
     </button>}
     {error && <p role="alert" style={{ color: '#fda4af', fontSize: 12 }}>{error}</p>}
+    {(view === 'list' || selected) && <ShowControlSheet title={view === 'list' ? 'Choose a ticket' : 'Saved ticket'} onClose={() => onChangeView(null)} maxHeight="92dvh" showDone={false}>
+      {view === 'list' ? files.map((item, index) => (
+        <button key={item.id} type="button" onClick={() => onChangeView(index)} style={{ ...buttonStyle, ...row, width: '100%', minHeight: 48, textAlign: 'left' }}>
+          <span aria-hidden="true" style={{ background: '#211b33', color: '#a78bfa', borderRadius: 5, padding: '4px 6px', flexShrink: 0 }}>{isPdf(item) ? 'PDF' : 'IMG'}</span>
+          <span style={{ color: '#e2e0ff', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{item.name}</span><span aria-hidden="true">›</span>
+        </button>
+      )) : <TicketFileViewer key={selected.id} item={selected} index={view} total={files.length}
+        onStep={step => onChangeView(Math.min(files.length - 1, Math.max(0, view + step)))} onList={() => onChangeView('list')} />}
+    </ShowControlSheet>}
   </section>
 }

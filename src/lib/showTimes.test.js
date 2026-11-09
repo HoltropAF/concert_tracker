@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {parseShowTimes,timeValue,pendingShowTime} from './showTimes.js'
+import {parseShowTimes,timeValue,pendingShowTime,pendingSupportActs} from './showTimes.js'
 import {lookupShowTimes} from '../../server/showTimes.js'
 const event={ '@type':'MusicEvent',name:'Test Artist',startDate:'2026-11-10T20:00:00+01:00',endDate:'2026-11-10T22:30:00+01:00'}
 const page=e=>`<script type="application/ld+json">${JSON.stringify(e)}</script>`
@@ -9,6 +9,27 @@ test('a changed source cannot replace an accepted, manual, or deliberately clear
  assert.equal(pendingShowTime({}, 'doorsTime', found), found)
  assert.equal(pendingShowTime({doorsTime:'18:00', scheduleSources:{doorsTime:{url:'https://example.org'}}}, 'doorsTime', found), null)
  assert.equal(pendingShowTime({doorsTime:'', scheduleSources:{doorsTime:{manual:true}}}, 'doorsTime', found), null)
+})
+test('saved support and corrected source names suppress repeated suggestions', () => {
+ const saved = ['Opener', {name:'Corrected act', scheduleSourceName:'Listed act', time:'19:30'}, {name:'Guest artist', role:'guest'}]
+ const found = [{name:' opener ',time:'18:30'}, {name:'LISTED ACT',time:'20:00'}, {name:'Guest artist'}, {name:'Second opener'}]
+ assert.deepEqual(pendingSupportActs(saved, found), [{name:'Second opener'}])
+})
+test('support names and start times come from timetable rows and lineup buttons', () => {
+ const html = page(event) + '<button>Support act <span>J. Artist</span></button><h3>Opener: J. Artist</h3><div>19:15</div>' +
+   '<li>20:10 Support act | 두 번째</li><button>Special guest Third &amp; Fourth</button><h3>Voorprogramma: TBA</h3>' +
+   '<p>Opener: J. Artist en Support act: 두 번째</p>'
+ const result = parseShowTimes(html,{artist:'Test Artist',date:'2026-11-10'})
+ assert.deepEqual(result.supportActs,[{name:'J. Artist',time:'19:15'},{name:'두 번째',time:'20:10'},{name:'Third & Fourth'}])
+})
+test('lookup fills a missing support time and leaves conflicting support times for review',async()=>{
+ const q={artist:'Test Artist',date:'2026-11-10',venue:'Ziggo Dome',url:'https://example.com/event'}
+ const deps={key:'test-only',tm:async()=>({events:[]}),mojo:async()=>({events:[]}),ziggo:async()=>({times:{},supportActs:[{name:'Opener'}],source:'https://www.ziggodome.nl/'}),
+   read:async url=>({url,html:page(event)+'<h3>Support act | Opener</h3><p>19:00</p>'})}
+ assert.equal((await lookupShowTimes(q,deps)).supportActs[0].time,'19:00')
+ const conflict = await lookupShowTimes(q,{...deps,ziggo:async()=>({times:{},supportActs:[{name:'Opener',time:'19:30'}]})})
+ assert.equal(conflict.supportActs[0].time,undefined)
+ assert.match(conflict.notice,/disagree/)
 })
 test('time lookup requires an unambiguous matching artist and date and keeps event start distinct from doors',()=>{
  const query={artist:'Test Artist',date:'2026-11-10'}

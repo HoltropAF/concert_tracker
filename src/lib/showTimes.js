@@ -3,6 +3,61 @@ export const visibleShowTimeFields=(concert,settings={})=>Object.entries(showTim
 export const pendingShowTime = (concert, key, found) => found?.value && !concert[key] && !concert.scheduleSources?.[key]?.manual ? found : null
 export function timeValue(value){const m=String(value||'').match(/(?:T|^)([01]\d|2[0-3]):([0-5]\d)/);return m?`${m[1]}:${m[2]}`:''}
 const norm=s=>String(s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
+
+export function supportActName(label, allowSpace = false) {
+ const match = label.trim().match(/^(?:support act|opening act|opener|voorprogramma|special guest)(?:\s*[:|–—-]\s*|(\s+))(.{1,100})$/i)
+ if (!match || (match[1] && !allowSpace)) return ''
+ const name = match[2].replace(/&amp;/gi,'&').replace(/&(?:nbsp|#160);/gi,' ').replace(/&#(?:39|x27);|&apos;/gi,"'").trim()
+ return /^(?:tba|tbc|tbd|to be announced|nog niet bekend|nader bekend te maken)$/i.test(name) ? '' : name
+}
+
+export function supportNameKey(name) {
+ return String(name || '').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase()
+}
+
+export function pendingSupportActs(saved, found) {
+ const covered = new Set(saved.flatMap(act => [
+   supportNameKey(typeof act === 'string' ? act : act?.name),
+   supportNameKey(act?.scheduleSourceName),
+ ]))
+ return found.filter(act => !covered.has(supportNameKey(act.name)))
+}
+
+function readSupportActs(description, html) {
+ const acts = new Map()
+ const conflicts = new Set()
+ const clock = '[0-2]?\\d[:.][0-5]\\d'
+ const clockOnly = new RegExp('^' + clock + '$')
+ const timedLabel = new RegExp('^(' + clock + ')\\s+(.+)$|^(.+?)\\s+(?:at\\s+|om\\s+)?(' + clock + ')$', 'i')
+ const normalizeTime = value => timeValue(value?.replace('.',':').padStart(5,'0'))
+ const add = (name,time) => {
+   if (!name) return
+   const key = supportNameKey(name)
+   const previous = acts.get(key)
+   if (previous?.time && time && previous.time !== time) conflicts.add(key)
+   const accepted = conflicts.has(key) ? '' : previous?.time || time
+   acts.set(key, { name: previous?.name || name, ...(accepted ? {time:accepted} : {}) })
+ }
+ const addLabels = (label,time,allowSpace = false) => {
+   const labels = label.split(/(?:\s+(?:en|and|&(?:amp;)?)\s+|\s*[;,]\s*)(?=(?:support act|opening act|opener|voorprogramma|special guest)(?:\s|[:|–—-]))/i)
+   const names = labels.map(part => supportActName(part,allowSpace))
+   if (!names[0]) return
+   for (const name of names) add(name,names.length === 1 ? time : '')
+ }
+ const stripped = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'')
+ const lines = (description + '\n' + stripped).replace(/<\/(?:p|li|div|h[1-6]|button|time|td)>|<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,' ').replace(/&(?:nbsp|#160);/gi,' ').split(/\r?\n/).map(line=>line.trim().replace(/\s+/g,' ')).filter(Boolean)
+ for (let i = 0; i < lines.length; i++) {
+   const parts = lines[i].match(timedLabel)
+   const time = parts?.[1] || parts?.[4] || (clockOnly.test(lines[i+1] || '') ? lines[i+1] : '')
+   addLabels(parts?.[2] || parts?.[3] || lines[i],normalizeTime(time))
+ }
+ for (const match of stripped.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/gi)) {
+   const label = match[1].replace(/<[^>]+>/g,' ').replace(/&(?:nbsp|#160);/gi,' ').replace(/\s+/g,' ')
+   addLabels(label,'',true)
+ }
+ return [...acts.values()]
+}
+
 export function parseShowTimes(html,{artist,date,verifiedEvent=false}){
  const candidates=[]
  const visit=node=>{if(!node||typeof node!=='object')return;if([].concat(node['@type']||[]).some(t=>/^(MusicEvent|Event|Festival)$/.test(t))&&String(node.startDate||'').slice(0,10)===date&&norm(artist).split(' ').filter(Boolean).every(w=>norm(node.name).split(' ').includes(w)))candidates.push(node);for(const value of Object.values(node)){if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value)}}
@@ -18,10 +73,6 @@ export function parseShowTimes(html,{artist,date,verifiedEvent=false}){
  const allEvents=(html.match(/"@type"\s*:\s*"(?:MusicEvent|Event|Festival)"/g)||[]).length
  const readLabels=allEvents===1||(verifiedEvent&&allEvents===0)
  if(readLabels){for(const [key,pattern] of Object.entries({doorsTime:/(?:doors(?:\s+open)?|deuren(?:\s+open)?|zaal\s+open)\s*[:–-]?\s*([0-2]?\d[:.][0-5]\d)/ig,vipTime:/(?:VIP\s*(?:check[ -]?in|starts?|start|entry|inloop|doors))\s*[:–-]?\s*([0-2]?\d[:.][0-5]\d)/ig,showTime:/(?:show\s*(?:starts?|start)|aanvang(?:\s+show)?)\s*[:–-]?\s*([0-2]?\d[:.][0-5]\d)/ig,endTime:/(?:expected\s+end|verwacht(?:e)?\s+eind(?:e|tijd)?|eindtijd)\s*[:–-]?\s*([0-2]?\d[:.][0-5]\d)/ig})){const found=[...text.matchAll(pattern)].map(m=>timeValue(m[1].replace('.',':'))).filter(Boolean);if(new Set(found).size===1)times[key]={value:found[0],label:showTimeFields[key],confirmed:true}}}
- const supportActs=[]
- if(readLabels){
-   const lines=(String(event.description||'')+'\n'+html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'')).replace(/<\/(?:p|li|div|h[1-6])>|<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,' ').split(/\r?\n/)
-   for(const line of lines){const match=line.trim().match(/^(?:support act|opening act|voorprogramma)\s*[:|–-]\s*([^.!?;]{1,90})$/i);if(match){const name=match[1].replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').trim();if(name&&!supportActs.some(a=>norm(a.name)===norm(name)))supportActs.push({name})}}
- }
+ const supportActs = readLabels ? readSupportActs(String(event.description || ''),html) : []
  return {times,supportActs,notice:Object.keys(times).length||supportActs.length?'Review the source and accept the details. Times are local to the venue.':'The event matched, but no readable times were found. Check the source manually.'}
 }

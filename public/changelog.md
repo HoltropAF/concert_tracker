@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.29 — 9 November 2026
+- Add support acts and edit their times from Timetable. Detected acts can be used or edited, and saved entries replace their suggestions.
+- Timetable reads support names and times from more venue and promoter page formats.
+
 ## 1.1.28 — 9 November 2026
 - Saved tickets open from a ticket stub. Add another and Edit tickets are inside Ticket details.
 - Your evening includes the expected end from Timetable.

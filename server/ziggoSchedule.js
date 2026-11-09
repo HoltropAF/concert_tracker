@@ -1,4 +1,4 @@
-import {timeValue,showTimeFields} from '../src/lib/showTimes.js'
+import {timeValue,showTimeFields,supportActName} from '../src/lib/showTimes.js'
 const host='https://www.ziggodome.nl'
 const norm=s=>String(s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
 const matches=(event,q)=>String(event?.showDate||'').slice(0,10)===q.date && norm(event?.performerName)===norm(q.artist)
@@ -9,8 +9,8 @@ export function parseZiggoSchedule(payload,q){
  const source=`${host}/events/${event.id}/`
  for(const row of (payload.program||[]).flatMap(p=>p.program||[])){
    const label=String(row.title_en||row.title||'').trim(),value=timeValue(row.time)
-   const support=label.match(/^(?:support act|voorprogramma|opening act)\s*[|:–-]\s*(.{1,100})$/i)
-   if(support){supportActs.push({name:support[1].trim(),time:value,source});continue}
+   const support=supportActName(label,true)
+   if(support){supportActs.push({name:support,time:value,source});continue}
    const name=norm(label)
    const key=/^(doors open|deuren open|zaal open)$/.test(name)?'doorsTime':/^(expected end(?:ing)?|verwachte eindtijd|eindtijd)$/.test(name)?'endTime':/^(vip (?:starts?|check in|inloop|entry|doors open))$/.test(name)?'vipTime':name===norm(event.performerName)||/^(show starts?|aanvang show)$/.test(name)?'showTime':null
    if(!key||!value||conflicts.has(key))continue

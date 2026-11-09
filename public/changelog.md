@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.25 — 9 November 2026
+- Your evening is back on General, with each time to the left of its dot and the plan to the right.
+- Tickets shows saved files in the app and opens the file picker when you add one.
+
 ## 1.1.24 — 9 November 2026
 - Your evening and its editing controls are now in Timetable.
 

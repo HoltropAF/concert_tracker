@@ -345,7 +345,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.24'
+const APP_VERSION = '1.1.25'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2535,11 +2535,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {!concert.wishlist && !past && detailTab === 'general' && (
-            <UpcomingShowOverview concert={concert} settings={settings} />
+            <>
+              <UpcomingEvening concert={concert} online={online} onEdit={editTimetable} />
+              <UpcomingShowOverview concert={concert} settings={settings} />
+            </>
           )}
           {!concert.wishlist && !past && detailTab === 'timetable' && (
             <>
-              <UpcomingEvening concert={concert} online={online} onEdit={editTimetable} />
               <ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={editTimetable} />
               <CalendarExport concert={concert} compact />
             </>
@@ -11515,12 +11517,14 @@ function UpcomingEvening({concert,online,onEdit}) {
         <h2 style={{fontFamily:"'Syne', sans-serif",fontSize:16,color:'#e2e0ff'}}>Your evening</h2>
         <button type="button" onClick={onEdit} style={{background:'none',border:0,color:'#a78bfa',minHeight:44,fontSize:12}}>Edit plans</button>
       </div>
-      {stops.length > 0 && <ol style={{listStyle:'none',margin:'4px 0 12px 18px',padding:'0 0 0 14px',borderLeft:'1px solid #594782'}}>
+      {stops.length > 0 && <ol style={{listStyle:'none',margin:'4px 0 0 12px',padding:0}}>
         {stops.map(stop => (
-          <li key={stop.key} style={{position:'relative',display:'grid',gridTemplateColumns:'46px minmax(0, 1fr)',gap:10,padding:'7px 0',color:'#c4c2f0',fontSize:13}}>
-            <span aria-hidden="true" style={{position:'absolute',left:-19,top:13,width:9,height:9,borderRadius:'50%',background:'#a78bfa',border:'2px solid #0c0c14'}} />
-            <span style={{fontFamily:"'DM Mono', monospace",color:'#a78bfa',fontSize:12,lineHeight:'22px'}}>{stop.time}</span>
-            <div style={{minWidth:0,overflowWrap:'anywhere'}}>
+          <li key={stop.key} style={{display:'grid',gridTemplateColumns:'44px 16px minmax(0, 1fr)',columnGap:8,color:'#c4c2f0',fontSize:13}}>
+            <span style={{padding:'7px 0',textAlign:'right',fontFamily:"'DM Mono', monospace",color:'#a78bfa',fontSize:12,lineHeight:'22px'}}>{stop.time}</span>
+            <span aria-hidden="true" style={{position:'relative',justifySelf:'center',width:1,background:'#594782'}}>
+              <span style={{position:'absolute',left:'50%',top:18,transform:'translate(-50%, -50%)',width:9,height:9,borderRadius:'50%',background:'#a78bfa',border:'2px solid #0c0c14'}} />
+            </span>
+            <div style={{minWidth:0,padding:'7px 0',overflowWrap:'anywhere'}}>
               <div style={{lineHeight:'22px'}}>{stop.label}</div>
               {stop.note && <div style={{color:'#9491b8',fontSize:12,whiteSpace:'pre-wrap'}}>{stop.note}</div>}
               {safeExternalUrl(stop.link) && <a href={safeExternalUrl(stop.link)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:32,color:'#a78bfa',fontSize:12,textDecoration:'none'}}>{stop.linkText?.trim() || 'Open link'} ↗</a>}

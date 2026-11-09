@@ -1,7 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {normalizeSetlistRows, setlistSongs, mergeSetlistSongs, moveSetlistRow, performanceSongs, mapSetlistSongs, releaseNote, toMedley, matchesSongLinkFilter} from './setlistRows.js'
-import {placeLegacyGuests, songGuestNames, filterSetlistPerformers, receiptSetlistRows} from './setlistRows.js'
+import {placeLegacyGuests, songGuestNames, filterSetlistPerformers, receiptSetlistRows, locationNoteRange, setLocationNoteEnd, SECTION_END} from './setlistRows.js'
+
+test('a location note can set, move and clear its end before the next section', () => {
+  const location = { type: 'section', label: 'On the stairs', sectionCategory: 'location' }
+  const encore = { type: 'section', label: 'Encore' }
+  const end = { type: 'section', label: SECTION_END }
+  const rows = [location, 'One', 'Two', 'Three', encore, 'Four', end]
+
+  const set = setLocationNoteEnd(rows, 0, 1)
+  assert.deepEqual(set, [location, 'One', end, 'Two', 'Three', encore, 'Four', end])
+  assert.deepEqual(locationNoteRange(set, 0).songIndexes, [1, 3, 4])
+  assert.equal(locationNoteRange(set, 0).endAfter, 1)
+  assert.deepEqual(setLocationNoteEnd(set, 0, 4), [location, 'One', 'Two', 'Three', end, encore, 'Four', end])
+  assert.deepEqual(setLocationNoteEnd(set, 0, null), rows)
+  assert.equal(setLocationNoteEnd(rows, 0, 5), rows)
+})
 
 test('performer filters keep support sets separate and include guest songs only once', () => {
   const section = {type:'section', label:'Encore'}

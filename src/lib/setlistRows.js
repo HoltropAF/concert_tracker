@@ -2,6 +2,33 @@ export const isSectionRow = row => row?.type === 'section'
 export const SECTION_END = '__SECTION_END__'
 export const isSectionEnd = row => isSectionRow(row) && row.label === SECTION_END
 
+export function locationNoteRange(rows, sectionIndex) {
+  const songIndexes = []
+  const endMarkers = []
+  let endAfter
+  for (let index = sectionIndex + 1; index < rows.length; index++) {
+    const row = rows[index]
+    if (isSectionEnd(row)) {
+      if (!endMarkers.length) endAfter = songIndexes.at(-1)
+      endMarkers.push(index)
+    }
+    else if (isSectionRow(row)) break
+    else songIndexes.push(index)
+  }
+  return { songIndexes, endMarkers, endAfter }
+}
+
+export function setLocationNoteEnd(rows, sectionIndex, songIndex) {
+  const heading = rows[sectionIndex]
+  if (!isSectionRow(heading) || heading.sectionCategory !== 'location') return rows
+  const { songIndexes, endMarkers } = locationNoteRange(rows, sectionIndex)
+  if (songIndex !== null && !songIndexes.includes(songIndex)) return rows
+  return rows.flatMap((row, index) => {
+    if (endMarkers.includes(index)) return []
+    return index === songIndex ? [row, { type: 'section', label: SECTION_END }] : [row]
+  })
+}
+
 // Expand legacy song-attached labels without changing or dropping song metadata.
 export function normalizeSetlistRows(value) {
   return (Array.isArray(value) ? value : []).filter(Boolean).flatMap(row => {

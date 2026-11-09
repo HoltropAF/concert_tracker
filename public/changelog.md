@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.26 — 9 November 2026
+- Choose the last song for a location note and see location notes aligned with the song numbers.
+
 ## 1.1.25 — 9 November 2026
 - Your evening is back on General, with each time to the left of its dot and the plan to the right.
 - Tickets shows saved files in the app and opens the file picker when you add one.

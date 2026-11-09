@@ -39,7 +39,7 @@ import { withCriedTag } from '../lib/criedTag'
 // ! (useSupabase.js) or by localStorage (guest mode).
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ConcertEditorTabs, { editorSectionTab } from './ConcertEditorTabs'
-import { isSectionRow, isSectionEnd, SECTION_END, normalizeSetlistRows, setlistSongs, moveSetlistRow, placeLegacyGuests, songGuestNames, uniqueGuestNames, filterSetlistPerformers, receiptSetlistRows } from '../lib/setlistRows'
+import { isSectionRow, isSectionEnd, SECTION_END, locationNoteRange, setLocationNoteEnd, normalizeSetlistRows, setlistSongs, moveSetlistRow, placeLegacyGuests, songGuestNames, uniqueGuestNames, filterSetlistPerformers, receiptSetlistRows } from '../lib/setlistRows'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { geocodeVenue } from '../lib/geocode'
@@ -345,7 +345,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.25'
+const APP_VERSION = '1.1.26'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -1853,9 +1853,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 </div>;
               const isMent = sectionLabelCategory(song.label, song.sectionCategory) === 'ments';
               const isLocation = song.sectionCategory === 'location';
+              const locationRange = !readOnly && isLocation ? locationNoteRange(songs, i) : null;
               if (readOnly && setlistView[sectionLabelCategory(song.label, song.sectionCategory)] === false) return null;
               const plain = isLocation || (readOnly && isMent);
-              return <div key={`section-${i}`} onDragOver={e => { if (!readOnly) e.preventDefault(); }} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: isMent ? 2 : 6, flexWrap: 'wrap', padding: plain ? '0 0 0 26px' : '8px', margin: '14px 0 8px', borderRadius: 8, background: plain ? 'transparent' : '#211b33', color: plain ? '#aaa4c5' : '#c4b5fd' }}>
+              return <div key={`section-${i}`} onDragOver={e => { if (!readOnly) e.preventDefault(); }} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: isMent ? 2 : 6, flexWrap: 'wrap', padding: isLocation ? 0 : plain ? '0 0 0 26px' : '8px', margin: '14px 0 8px', borderRadius: 8, background: plain ? 'transparent' : '#211b33', color: plain ? '#aaa4c5' : '#c4b5fd' }}>
                 {!readOnly && rowButtons(i)}
                 {readOnly ? <strong style={{ fontFamily: "'Syne', sans-serif", fontSize: 13 }}>{song.label}</strong> : <>
                   <input aria-label={`Section heading ${i + 1}`} defaultValue={song.label} key={`${i}-${song.label}`} onBlur={e => { const label = e.target.value.trim(); if (label && label !== song.label) save(songs.map((s, j) => j === i ? { ...s, label } : s)); else e.target.value = song.label; }} style={{ ...inputStyle, minWidth: 80, width: 0, fontSize: 13 }} />
@@ -1864,6 +1865,15 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 </>}
                 {!readOnly && <label style={{ flexBasis: '100%', fontSize: 12, color: '#aaa4c5', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input type="checkbox" checked={isLocation} onChange={e => save(songs.map((row, index) => index === i ? { ...row, sectionCategory: e.target.checked ? 'location' : undefined } : row))} style={{ accentColor: '#a78bfa' }} /> Location note
+                </label>}
+                {locationRange && <label style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                  End after
+                  <select aria-label={`End location note ${song.label} after`} value={locationRange.endAfter ?? ''} disabled={!locationRange.songIndexes.length}
+                    onChange={e => save(setLocationNoteEnd(songs, i, e.target.value === '' ? null : Number(e.target.value)))}
+                    style={{ ...inputStyle, minWidth: 0, minHeight: 44, fontSize: 16 }}>
+                    <option value="">{locationRange.songIndexes.length ? 'No explicit end' : 'Add a song after this note'}</option>
+                    {locationRange.songIndexes.map(index => <option key={index} value={index}>{index + 1 - songs.slice(0, index).filter(isSectionRow).length}. {getSongName(songs[index])}</option>)}
+                  </select>
                 </label>}
                 {readOnly && song.cried && <span title="I cried" aria-label="I cried">💧</span>}
                 {isMent && (readOnly
@@ -2905,7 +2915,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                     if (isSectionEnd(s)) return <div key={i} style={{ height: 12 }} />;
                     if (isSectionRow(s)) return (
                       <div key={i} style={{ color: 'var(--receipt-accent)', margin: '8px 0 6px', fontSize: 10 }}>
-                        {s.sectionCategory === 'location' ? <div style={{ paddingLeft: 32 }}>{s.label}</div> : <div style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em' }}>— {s.label} —</div>}
+                        {s.sectionCategory === 'location' ? <div>{s.label}</div> : <div style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em' }}>— {s.label} —</div>}
                         {s.sectionNote && <div style={{ paddingLeft: 32, color: 'var(--receipt-muted)', fontStyle: 'italic' }}>{s.sectionNote}</div>}
                       </div>
                     );

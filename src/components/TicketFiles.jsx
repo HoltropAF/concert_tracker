@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { listTicketFiles, updateTicketFiles, validateTicketFile } from '../lib/ticketFiles'
 import ShowControlSheet from './ShowControlSheet'
 import PdfTicketPreview from './PdfTicketPreview'
+import './TicketFiles.css'
 
 const buttonStyle = { background: 'none', border: 0, color: '#a78bfa', cursor: 'pointer', minHeight: 44, padding: 0, fontSize: 12 }
 const small = { color: '#9491b8', fontSize: 12, lineHeight: 1.5 }
@@ -57,7 +58,7 @@ function TicketFileViewer({ item, index, total, onStep, onList }) {
   </div>
 }
 
-export default function TicketFiles({ account, concert, artwork, ticketLabel, price, shopUrl, accessUrl, onEdit, view, onChangeView }) {
+export default function TicketFiles({ account, concert, ticketDate, ticketLabel, price, shopUrl, accessUrl, onEdit, view, onChangeView }) {
   const picker = useRef(null)
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -99,53 +100,53 @@ export default function TicketFiles({ account, concert, artwork, ticketLabel, pr
 
   const selected = typeof view === 'number' ? files[view] : null
   const hasDetails = !!(accessUrl || concert.ticketAccessNote)
+  const countLabel = files.length === 1 ? (isPdf(files[0]) ? 'Saved PDF' : 'Saved photo') : `${files.length} saved tickets`
+  const addButton = <button type="button" disabled={busy} onClick={() => picker.current?.click()}
+    style={files.length ? buttonStyle : { ...buttonStyle, border: '1px solid #2e2e50', borderRadius: 8, paddingInline: 12 }}>
+    {busy ? 'Saving…' : files.length ? '+ Add another' : '+ Add ticket file'}
+  </button>
   const accessDetails = <>
     {accessUrl && <a href={accessUrl} target="_blank" rel="noopener noreferrer" style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center' }}>Open my ticket ↗</a>}
     {concert.ticketAccessNote && <div style={{ ...small, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{concert.ticketAccessNote}</div>}
   </>
 
   return <section aria-label="Tickets">
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ fontSize: 10, color: '#9491b8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>Tickets</div>
-      <button type="button" onClick={onEdit} style={buttonStyle}>Edit tickets</button>
-    </div>
+    <div style={{ fontSize: 10, color: '#9491b8', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 10 }}>Tickets</div>
     <input ref={picker} type="file" accept="application/pdf,.pdf,image/*,.svg" multiple disabled={busy} onChange={add} hidden />
-    {loading ? <p style={small}>Loading saved tickets…</p> : files.length ? <>
-      <div style={{ border: '1px solid #2e2e50', borderRadius: 12, overflow: 'hidden', background: '#0c0c14' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0,1fr)', alignItems: 'center', gap: 12, padding: 14 }}>
-          {artwork || <div aria-hidden="true" style={{ display: 'grid', placeItems: 'center', height: 64, background: '#211b33', borderRadius: 6, color: '#a78bfa' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4V7Zm10 0v2m0 2v2m0 2v2" /></svg>
-          </div>}
-          <div style={{ overflowWrap: 'anywhere' }}>
-            <div style={{ ...small, color: '#a78bfa', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>Entry pass</div>
-            <strong style={{ display: 'block', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 17 }}>{ticketLabel || 'My tickets'}</strong>
-            <div style={small}>{files.length === 1 ? `1 saved ticket · ${isPdf(files[0]) ? 'PDF' : 'Photo'}` : `${files.length} saved tickets`}</div>
-          </div>
-        </div>
-        <button type="button" onClick={() => onChangeView(files.length === 1 ? 0 : 'list')} style={{ ...buttonStyle, width: '100%', paddingInline: 14, textAlign: 'left', fontWeight: 700, borderTop: '1px solid #2e2e50', background: '#211b33' }}>
-          {files.length === 1 ? 'Open ticket' : 'Open tickets'} ›
-        </button>
-      </div>
-      <details style={{ ...small, borderTop: '1px solid #25243a', marginTop: 4 }}>
-        <summary style={{ padding: '12px 0', cursor: 'pointer' }}>Ticket details</summary>
-        <div style={small}>Saved on this device until the show has passed.</div>
-        {price && <div style={small}>{price}</div>}
-        {accessDetails}
-        {files.map(item => <div key={item.id} style={row}>
-          <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{item.name}</span>
-          <button type="button" aria-label={'Remove ' + item.name} disabled={busy} onClick={() => save(current => current.filter(file => file.id !== item.id))} style={buttonStyle}>Remove</button>
-        </div>)}
-      </details>
-    </> : <>
+    {loading ? <p style={small}>Loading saved tickets…</p> : files.length ? (
+      <button type="button" className="saved-ticket-stub" onClick={() => onChangeView(files.length === 1 ? 0 : 'list')}>
+        <span className="saved-ticket-stub-body">
+          <span className="saved-ticket-stub-top"><span>{ticketLabel || 'Admission'}</span><span className="saved-ticket-stub-stamp">You’re in!</span></span>
+          <strong>{files.length === 1 ? 'My ticket' : 'My tickets'}</strong>
+          <span>{[ticketDate, concert.venue].filter(Boolean).join(' · ') || concert.artist}</span>
+        </span>
+        <span className="saved-ticket-stub-foot"><span>{countLabel}</span><b>{files.length === 1 ? 'Open ticket' : 'Open tickets'} ›</b></span>
+      </button>
+    ) : <>
       {(ticketLabel || price) && <p style={small}>{[ticketLabel, price].filter(Boolean).join(' · ')}</p>}
       {accessDetails}
       {!hasDetails && shopUrl && <a href={shopUrl} target="_blank" rel="noopener noreferrer" style={{ ...buttonStyle, display: 'inline-flex', alignItems: 'center' }}>Ticket website ↗</a>}
       <p style={small}>Add a PDF or image up to 20 MB.</p>
+      {addButton}
     </>}
-    {!loading && <button type="button" disabled={busy} onClick={() => picker.current?.click()}
-      style={files.length ? buttonStyle : { ...buttonStyle, border: '1px solid #2e2e50', borderRadius: 8, paddingInline: 12 }}>
-      {busy ? 'Saving…' : files.length ? '+ Add another' : '+ Add ticket file'}
-    </button>}
+    {!loading && (
+      <details style={{ ...small, borderTop: '1px solid #25243a', marginTop: 4 }}>
+        <summary style={{ padding: '12px 0', cursor: 'pointer' }}>Ticket details</summary>
+        {files.length > 0 && <>
+          <div style={small}>Saved on this device until the show has passed.</div>
+          {price && <div style={small}>{price}</div>}
+          {accessDetails}
+        </>}
+        {files.map(item => <div key={item.id} style={row}>
+          <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{item.name}</span>
+          <button type="button" aria-label={'Remove ' + item.name} disabled={busy} onClick={() => save(current => current.filter(file => file.id !== item.id))} style={buttonStyle}>Remove</button>
+        </div>)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <button type="button" onClick={onEdit} style={buttonStyle}>Edit tickets</button>
+          {files.length > 0 && addButton}
+        </div>
+      </details>
+    )}
     {error && <p role="alert" style={{ color: '#fda4af', fontSize: 12 }}>{error}</p>}
     {(view === 'list' || selected) && <ShowControlSheet title={view === 'list' ? 'Choose a ticket' : 'Saved ticket'} onClose={() => onChangeView(null)} maxHeight="92dvh" showDone={false}>
       {view === 'list' ? files.map((item, index) => (

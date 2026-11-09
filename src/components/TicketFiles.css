@@ -1,0 +1,47 @@
+.saved-ticket-stub {
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #cab8f8;
+  color: #2c1e48;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.saved-ticket-stub-body { display: block; padding: 16px; overflow-wrap: anywhere; }
+.saved-ticket-stub-body strong { display: block; margin: 7px 0 3px; font: 800 22px 'Syne', sans-serif; }
+.saved-ticket-stub-top,
+.saved-ticket-stub-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.saved-ticket-stub-top { font: 11px 'DM Mono', monospace; text-transform: uppercase; }
+.saved-ticket-stub-stamp {
+  flex-shrink: 0;
+  transform: rotate(7deg);
+  padding: 4px 6px;
+  border: 1px solid #72519d;
+  border-radius: 5px;
+  font: 700 11px 'DM Sans', sans-serif;
+  text-transform: none;
+}
+.saved-ticket-stub-foot {
+  position: relative;
+  min-height: 46px;
+  padding: 10px 16px;
+  border-top: 1px dashed #72519d;
+  font-size: 12px;
+}
+.saved-ticket-stub-foot::before,
+.saved-ticket-stub-foot::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  position: absolute;
+  top: -7px;
+  border-radius: 50%;
+  background: #13131f;
+}
+.saved-ticket-stub-foot::before { left: -7px; }
+.saved-ticket-stub-foot::after { right: -7px; }

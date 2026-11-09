@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.28 — 9 November 2026
+- Saved tickets open from a ticket stub. Add another and Edit tickets are inside Ticket details.
+- Your evening includes the expected end from Timetable.
+
 ## 1.1.27 — 9 November 2026
 - Upcoming shows keep the artist photo and location visible on all four tabs.
 - Open saved tickets from a single pass. Choose, swipe through, and download saved photos and PDFs.

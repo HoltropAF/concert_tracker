@@ -24,14 +24,19 @@ export function eveningPlanRows(concert, online) {
 
 export function eveningStops(concert, online) {
   const plans = eveningPlanRows(concert, online).filter(row => row.label?.trim() || row.time || row.note?.trim() || row.link?.trim())
+  const end = concert.endTime ? { key: 'end', time: concert.endTime, label: 'Expected end' } : null
+  const startsAt = concert.showTime || concert.doorsTime
+  const endsNextDay = end && startsAt && end.time < startsAt
   const stops = [
     ...plans.map(row => ({ ...row, key: 'plan-' + row.id })),
     ...(concert.doorsTime ? [{ key: 'doors', time: concert.doorsTime, label: 'Doors open' }] : []),
     ...(concert.showTime ? [{ key: 'show', time: concert.showTime, label: 'Show starts' }] : []),
+    ...(end && !endsNextDay ? [end] : []),
   ]
   const timed = stops.filter(stop => stop.time).sort((a, b) => a.time.localeCompare(b.time))
   let index = 0
-  return stops.map(stop => stop.time ? timed[index++] : stop)
+  const ordered = stops.map(stop => stop.time ? timed[index++] : stop)
+  return endsNextDay ? [...ordered, end] : ordered
 }
 export function preparationItems(settings={}){
  if (Array.isArray(settings.showChecklistItems)) {

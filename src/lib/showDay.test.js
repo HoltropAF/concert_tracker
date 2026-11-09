@@ -13,6 +13,14 @@ test('evening plans preserve the old meetup and interleave timed rows with the s
  assert.equal(stops[1].linkText, 'Train times')
  assert.deepEqual(eveningStops({...concert, eveningPlans:[]}, false).map(row => row.key), ['doors', 'show'])
 })
+test('expected end appears in the evening and an after-midnight end follows the show', () => {
+ const concert = { eveningPlans:[], doorsTime:'19:00', showTime:'20:00', endTime:'22:30' }
+ const later = { id:'train', time:'23:00', label:'Train home' }
+ assert.deepEqual(eveningStops({...concert, eveningPlans:[later]}, false).map(row => row.label),
+   ['Doors open', 'Show starts', 'Expected end', 'Train home'])
+ assert.deepEqual(eveningStops({...concert, endTime:'00:30'}, false).at(-1),
+   { key:'end', time:'00:30', label:'Expected end' })
+})
 test('show day uses local dates, includes festival days and excludes wishes and unknown dates',()=>{
  const now=new Date(2026,10,6,15)
  const shows=[{id:1,date:'2026-11-06'},{id:2,date:'2026-11-05',endDate:'2026-11-07'},{id:3,date:'2026-11-06',wishlist:true},{id:4,date:'2026-11-07'},{id:5,date:'9999-12-31'}]

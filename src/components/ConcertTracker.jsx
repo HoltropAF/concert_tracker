@@ -345,7 +345,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.27'
+const APP_VERSION = '1.1.28'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2562,7 +2562,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {!concert.wishlist && !past && detailTab === 'tickets' && (
             <div style={detailCard}>
               <TicketFiles account={ticketAccount} concert={concert} view={ticketView} onChangeView={setTicketView} onEdit={editTickets}
-                artwork={upcomingPhoto ? <PhotoImg path={upcomingPhoto} pos={upcomingPhotoPosition} style={{width:52,height:64,borderRadius:6}} /> : null}
+                ticketDate={concert.date && concert.date !== '9999-12-31' ? formatDate(concert.date) : ''}
                 ticketLabel={(concert.tickets || []).map(t => t.name).filter(Boolean).join(' · ') || concert.ticketType}
                 price={ticketTotal(concert) > 0 ? '€' + ticketTotal(concert).toFixed(2) : ''}
                 shopUrl={safeExternalUrl(concert.ticketSaleLink)} accessUrl={safeExternalUrl(concert.ticketAccessUrl)} />

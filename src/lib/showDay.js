@@ -27,7 +27,7 @@ export function eveningStops(concert, online) {
   const stops = [
     ...plans.map(row => ({ ...row, key: 'plan-' + row.id })),
     ...(concert.doorsTime ? [{ key: 'doors', time: concert.doorsTime, label: 'Doors open' }] : []),
-    { key: 'show', time: concert.showTime, label: concert.showTime ? 'Show starts' : 'Timetable' },
+    ...(concert.showTime ? [{ key: 'show', time: concert.showTime, label: 'Show starts' }] : []),
   ]
   const timed = stops.filter(stop => stop.time).sort((a, b) => a.time.localeCompare(b.time))
   let index = 0

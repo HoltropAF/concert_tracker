@@ -345,7 +345,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.23'
+const APP_VERSION = '1.1.24'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2388,6 +2388,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{label}</div>
   );
   const detailCard = { background: "#13131f", border: "1px solid #1f1f35", borderRadius: 10, padding: "14px" };
+  const editTimetable = () => { setForm(normalizeConcertForm(concert)); setEditorTab('timetable'); setEditing(true); };
 
   if (!editing) {
     const langs = Array.isArray(concert.language) ? concert.language : concert.language ? [concert.language] : [];
@@ -2436,7 +2437,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
           <button onClick={() => { setReceiptSections(hasHeadlinerSongs || hasSupportSongs ? ['general','setlist'] : ['general']); setReceiptCosts(['tickets']); setReceiptSort(setlistSort === 'album' ? 'album' : 'performed'); setReceiptFilter(exportFilter); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
-          <button onClick={() => {setForm(normalizeConcertForm(concert));setEditing(true)}} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
+          <button onClick={detailTab === 'timetable' ? editTimetable : () => { setForm(normalizeConcertForm(concert)); if (detailTab === 'general') setEditorTab('show'); setEditing(true); }} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
         {/* Venue + tour hero */}
@@ -2534,15 +2535,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
           {!concert.wishlist && !past && detailTab === 'general' && (
-            <UpcomingNightRoute
-              concert={concert}
-              settings={settings}
-              online={online}
-              onTimetable={() => setDetailTab('timetable')}
-              onEdit={() => { setForm(normalizeConcertForm(concert)); setEditorTab('show'); setEditing(true); }}
-            />
+            <UpcomingShowOverview concert={concert} settings={settings} />
           )}
-          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setForm(normalizeConcertForm(concert));setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} compact /></>}
+          {!concert.wishlist && !past && detailTab === 'timetable' && (
+            <>
+              <UpcomingEvening concert={concert} online={online} onEdit={editTimetable} />
+              <ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={editTimetable} />
+              <CalendarExport concert={concert} compact />
+            </>
+          )}
           {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setForm(normalizeConcertForm(concert));setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}<div style={{borderTop:'1px solid #25243a',marginTop:12,paddingTop:12}}>{sec('Where to find your ticket')}{safeExternalUrl(concert.ticketAccessUrl)&&<a href={safeExternalUrl(concert.ticketAccessUrl)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,color:'#a78bfa',fontSize:13}}>Open my ticket ↗</a>}{concert.ticketAccessNote&&<div style={{color:'#c4c2f0',fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{concert.ticketAccessNote}</div>}{!concert.ticketAccessUrl&&!concert.ticketAccessNote&&<div style={{color:'#9491b8',fontSize:12}}>Add a link or a note in Edit tickets.</div>}</div><TicketFiles account={ticketAccount} concert={concert} /></div></>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
@@ -3005,6 +3006,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} upcoming={!past} />
       <div style={{ padding: "20px" }}>
 
+        {editorTab === 'timetable' && !past && !form.wishlist && (
+          <div style={{ ...detailCard, padding: 16, marginBottom: 12 }}>
+            <EveningPlanFields concert={form} inputStyle={inputStyle} onChange={rows => update('eveningPlans', rows)} />
+          </div>
+        )}
         {editorTab === 'timetable' && !form.wishlist && form.date && form.date !== '9999-12-31' && (form.endDate || form.date) >= localDay() && (
           <div style={{ ...detailCard, padding: 16, marginBottom: 12 }}>
             {sec('Show times')}
@@ -3424,7 +3430,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           /* ── NOTES ── */
           { title: 'Notes', content: <>
-            {!past && !form.wishlist && <EveningPlanFields concert={form} inputStyle={inputStyle} onChange={rows => update('eveningPlans', rows)} />}
             <textarea aria-label="Notes for the day" value={form.notes || ''} onChange={e => update('notes', e.target.value)} rows={3} style={{...inputStyle,resize:'vertical'}} placeholder="Any notes..." />
           </> },
 
@@ -11501,32 +11506,37 @@ function EveningPlanFields({ concert, inputStyle, onChange }) {
   </div>;
 }
 
-function UpcomingNightRoute({concert,settings,online,onTimetable,onEdit}) {
-  const companions = getFriends(concert);
-  const notes = concert.notes?.trim();
+function UpcomingEvening({concert,online,onEdit}) {
   const stops = eveningStops(concert, online);
 
   return (
-    <section aria-label="Night route">
+    <section aria-label="Your evening">
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginLeft:12}}>
         <h2 style={{fontFamily:"'Syne', sans-serif",fontSize:16,color:'#e2e0ff'}}>Your evening</h2>
         <button type="button" onClick={onEdit} style={{background:'none',border:0,color:'#a78bfa',minHeight:44,fontSize:12}}>Edit plans</button>
       </div>
-      <ol style={{listStyle:'none',margin:'4px 0 12px 18px',padding:'0 0 0 14px',borderLeft:'1px solid #594782'}}>
+      {stops.length > 0 && <ol style={{listStyle:'none',margin:'4px 0 12px 18px',padding:'0 0 0 14px',borderLeft:'1px solid #594782'}}>
         {stops.map(stop => (
           <li key={stop.key} style={{position:'relative',display:'grid',gridTemplateColumns:'46px minmax(0, 1fr)',gap:10,padding:'7px 0',color:'#c4c2f0',fontSize:13}}>
             <span aria-hidden="true" style={{position:'absolute',left:-19,top:13,width:9,height:9,borderRadius:'50%',background:'#a78bfa',border:'2px solid #0c0c14'}} />
             <span style={{fontFamily:"'DM Mono', monospace",color:'#a78bfa',fontSize:12,lineHeight:'22px'}}>{stop.time}</span>
             <div style={{minWidth:0,overflowWrap:'anywhere'}}>
-              {stop.key === 'show' ? (
-                <button type="button" onClick={onTimetable} style={{padding:0,minHeight:22,lineHeight:'22px',background:'none',border:0,color:'#c4c2f0',fontSize:13,textAlign:'left'}}>{stop.label} <span style={{color:'#a78bfa'}}>›</span></button>
-              ) : <div style={{lineHeight:'22px'}}>{stop.label}</div>}
+              <div style={{lineHeight:'22px'}}>{stop.label}</div>
               {stop.note && <div style={{color:'#9491b8',fontSize:12,whiteSpace:'pre-wrap'}}>{stop.note}</div>}
               {safeExternalUrl(stop.link) && <a href={safeExternalUrl(stop.link)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:32,color:'#a78bfa',fontSize:12,textDecoration:'none'}}>{stop.linkText?.trim() || 'Open link'} ↗</a>}
             </div>
           </li>
         ))}
-      </ol>
+      </ol>}
+    </section>
+  );
+}
+
+function UpcomingShowOverview({concert,settings}) {
+  const companions = getFriends(concert);
+  const notes = concert.notes?.trim();
+  return (
+    <section aria-label="Show plans">
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',padding:'12px 0',borderTop:'1px solid #25243a',borderBottom:'1px solid #25243a'}}>
         <span style={{fontSize:12,color:'#9491b8'}}>Going with</span>
         <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10}}>

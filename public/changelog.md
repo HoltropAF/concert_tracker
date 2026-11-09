@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.24 — 9 November 2026
+- Your evening and its editing controls are now in Timetable.
+
 ## 1.1.23 — 9 November 2026
 - End setlist sections with a blank row and mark headings as plain location notes.
 - Find shows with guests or support acts from the main Shows filters.

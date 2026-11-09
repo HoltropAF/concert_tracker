@@ -1,6 +1,8 @@
 import ShowSchedule from './ShowSchedule'
 import {visibleShowTimeFields} from '../lib/showTimes'
-import {showsToday, showCountdown, localDay, preparationItems, defaultPreparationItems} from '../lib/showDay'
+import {showsToday, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
+import TicketFiles from './TicketFiles'
+import {pruneExpiredTickets} from '../lib/ticketFiles'
 import ShowControlSheet from './ShowControlSheet'
 import {yearShowCounts} from '../lib/yearShowCounts'
 import ReferenceComparison from './ReferenceComparison'
@@ -37,7 +39,7 @@ import { withCriedTag } from '../lib/criedTag'
 // ! (useSupabase.js) or by localStorage (guest mode).
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ConcertEditorTabs, { editorSectionTab } from './ConcertEditorTabs'
-import { isSectionRow, normalizeSetlistRows, setlistSongs, moveSetlistRow, placeLegacyGuests, songGuestNames, uniqueGuestNames, filterSetlistPerformers, receiptSetlistRows } from '../lib/setlistRows'
+import { isSectionRow, isSectionEnd, SECTION_END, normalizeSetlistRows, setlistSongs, moveSetlistRow, placeLegacyGuests, songGuestNames, uniqueGuestNames, filterSetlistPerformers, receiptSetlistRows } from '../lib/setlistRows'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { geocodeVenue } from '../lib/geocode'
@@ -343,7 +345,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.22'
+const APP_VERSION = '1.1.23'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -413,7 +415,10 @@ function scheduleBackPop() {
     backPopTimer = null;
     const n = pendingBackPops;
     pendingBackPops = 0;
-    if (n > 0) history.go(-n);
+    if (n > 0) {
+      backStack.discardNextPop();
+      history.go(-n);
+    }
   }, 0);
 }
 function claimPendingBackPop() {
@@ -437,11 +442,11 @@ function useBackButton(onBack, enabled = true) {
     if (!claimPendingBackPop()) history.pushState({ appBack: true }, '');
     pushed.current = true;
     const handler = () => { pushed.current = false; cb.current(); };
-    if(!backStack.size)window.addEventListener('popstate',dispatchAppBack);
+    // Keep one listener so cleanup pops are consumed even after the last overlay closes.
+    window.addEventListener('popstate',dispatchAppBack);
     const removeBack=backStack.add(handler);
     return () => {
       removeBack();
-      if(!backStack.size)window.removeEventListener('popstate',dispatchAppBack);
       // If this closed via a button/tab-switch rather than the actual back
       // gesture, the pushed history entry is still sitting there — pop it
       // ourselves so the browser history stack stays in sync with app state.
@@ -623,6 +628,8 @@ const getSongSectionCategory = s => typeof s === 'string' || !s ? null : (s.sect
 // An explicit sectionCategory (set via the label editor) always wins over guessing from
 // the text — e.g. "Acoustic Session" doesn't contain the word "surprise" but is one.
 const sectionLabelCategory = (label, explicitCategory) => {
+  if (label === SECTION_END) return null;
+  if (explicitCategory === 'location') return 'headers';
   if (explicitCategory) return explicitCategory;
   if (!label) return null;
   const l = label.toLowerCase();
@@ -1699,12 +1706,16 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     onSaveSetlist?.(next);
   };
 
+  const insertRow = row => {
+    const next = [...songs];
+    next.splice(insertAt === 'end' ? next.length : Math.min(Number(insertAt), next.length), 0, row);
+    save(next);
+  };
+
   const addSong = () => {
     const t = songInput.trim();
     if (!t) return;
-    const next = [...songs];
-    next.splice(insertAt === 'end' ? next.length : Math.min(Number(insertAt), next.length), 0, newRowType === 'section' ? { type: 'section', label: t } : newRowType === 'medley' ? {type:'medley',name:t,parts:[]} : t);
-    save(next);
+    insertRow(newRowType === 'section' ? { type: 'section', label: t } : newRowType === 'medley' ? {type:'medley',name:t,parts:[]} : t);
     setSongInput('');
   };
 
@@ -1749,7 +1760,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     }));
   };
 
-  const SECTION_END = '__SECTION_END__';
   const toggleGuest = (idx, artist) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
@@ -1822,8 +1832,12 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   // For each displayed song, the nearest section label at or before it (so we know
   // when a labeled run — e.g. 2 encore songs — actually ends and plain songs resume).
   let runningSection = null;
-  const activeSectionAt = displayList.map(({ song: s }) => { const l = getSongSectionLabel(s); if (l) runningSection = l; return runningSection; });
-  const isLastOfSection = pos => activeSectionAt[pos] && activeSectionAt[pos] !== (activeSectionAt[pos + 1] ?? null);
+  const activeSectionAt = displayList.map(({ song: s }) => {
+    const label = getSongSectionLabel(s);
+    if (label) runningSection = label === SECTION_END ? null : label;
+    return runningSection;
+  });
+  const isLastOfSection = pos => activeSectionAt[pos] && !isSectionEnd(displayList[pos + 1]?.song) && activeSectionAt[pos] !== (activeSectionAt[pos + 1] ?? null);
 
   return (
     <div>
@@ -1831,15 +1845,26 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
         <div style={{ marginBottom: 12 }}>
           {displayList.map(({ song, origIdx: i }, displayPos) => {
             if (isSectionRow(song)) {
+              if (isSectionEnd(song)) return readOnly
+                ? <div key={i} aria-hidden="true" style={{ height: 14 }} />
+                : <div key={i} onDragOver={e => e.preventDefault()} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', color: '#9491b8', fontSize: 12 }}>
+                  {rowButtons(i)}<span style={{ flex: 1 }}>End section</span>
+                  <button type="button" aria-label="Remove section end" onClick={() => save(songs.filter((_, index) => index !== i))} style={{ color: '#fda4af', background: 'none', border: 0, padding: 8 }}>×</button>
+                </div>;
               const isMent = sectionLabelCategory(song.label, song.sectionCategory) === 'ments';
-              if (readOnly && (song.label === '__SECTION_END__' || setlistView[sectionLabelCategory(song.label, song.sectionCategory)] === false)) return null;
-              return <div key={`section-${i}`} onDragOver={e => { if (!readOnly) e.preventDefault(); }} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: isMent ? 2 : 6, flexWrap: 'wrap', padding: readOnly && isMent ? '0 0 0 26px' : '8px', margin: '14px 0 8px', borderRadius: 8, background: readOnly && isMent ? 'transparent' : '#211b33', color: isMent ? '#aaa4c5' : '#c4b5fd' }}>
+              const isLocation = song.sectionCategory === 'location';
+              if (readOnly && setlistView[sectionLabelCategory(song.label, song.sectionCategory)] === false) return null;
+              const plain = isLocation || (readOnly && isMent);
+              return <div key={`section-${i}`} onDragOver={e => { if (!readOnly) e.preventDefault(); }} onDrop={e => dropRow(e, i)} style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: isMent ? 2 : 6, flexWrap: 'wrap', padding: plain ? '0 0 0 26px' : '8px', margin: '14px 0 8px', borderRadius: 8, background: plain ? 'transparent' : '#211b33', color: plain ? '#aaa4c5' : '#c4b5fd' }}>
                 {!readOnly && rowButtons(i)}
                 {readOnly ? <strong style={{ fontFamily: "'Syne', sans-serif", fontSize: 13 }}>{song.label}</strong> : <>
                   <input aria-label={`Section heading ${i + 1}`} defaultValue={song.label} key={`${i}-${song.label}`} onBlur={e => { const label = e.target.value.trim(); if (label && label !== song.label) save(songs.map((s, j) => j === i ? { ...s, label } : s)); else e.target.value = song.label; }} style={{ ...inputStyle, minWidth: 80, width: 0, fontSize: 13 }} />
                   <button type="button" aria-label={`I cried during ${song.label}`} aria-pressed={song.cried === true} title="I cried" onClick={() => save(songs.map((s, j) => j === i ? { ...s, cried: !s.cried } : s))} style={{ flexShrink: 0, color: song.cried ? '#93c5fd' : '#9491b8', background: song.cried ? '#25334a' : 'none', border: '1px solid currentColor', borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>💧</button>
                   <button type="button" aria-label={`Delete section ${song.label}`} onClick={() => save(songs.filter((_, j) => j !== i))} style={{ color: '#fda4af', background: 'none', border: 0, padding: 8 }}>×</button>
                 </>}
+                {!readOnly && <label style={{ flexBasis: '100%', fontSize: 12, color: '#aaa4c5', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="checkbox" checked={isLocation} onChange={e => save(songs.map((row, index) => index === i ? { ...row, sectionCategory: e.target.checked ? 'location' : undefined } : row))} style={{ accentColor: '#a78bfa' }} /> Location note
+                </label>}
                 {readOnly && song.cried && <span title="I cried" aria-label="I cried">💧</span>}
                 {isMent && (readOnly
                   ? song.sectionNote && <div style={{ flexBasis: '100%', fontSize: 12, lineHeight: 1.5, fontStyle: 'italic', color: '#a5a3b1', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{song.sectionNote}</div>
@@ -2024,10 +2049,13 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
           <div role="group" aria-label="New setlist row" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             {['song', 'section', 'medley'].map(type => <button key={type} type="button" aria-pressed={newRowType === type} onClick={() => setNewRowType(type)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid #51416e', background: newRowType === type ? '#a78bfa' : '#13131f', color: newRowType === type ? '#0c0c14' : '#c4b5fd' }}>+ {type === 'song' ? 'Song' : type === 'medley' ? 'Medley' : 'Section'}</button>)}
           </div>
-          <select aria-label="Insert setlist row position" value={insertAt} onChange={e => setInsertAt(e.target.value)} style={{ ...inputStyle, width: '100%', marginBottom: 8 }}>
-            <option value="end">At the end</option><option value="0">At the beginning</option>
-            {songs.map((s, i) => <option key={i} value={String(i + 1)}>After {isSectionRow(s) ? s.label : getSongName(s)}</option>)}
-          </select>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <select aria-label="Insert setlist row position" value={insertAt} onChange={e => setInsertAt(e.target.value)} style={{ ...inputStyle, minWidth: 0 }}>
+              <option value="end">At the end</option><option value="0">At the beginning</option>
+              {songs.map((s, i) => <option key={i} value={String(i + 1)}>After {isSectionEnd(s) ? 'section end' : isSectionRow(s) ? s.label : getSongName(s)}</option>)}
+            </select>
+            <button type="button" onClick={() => insertRow({ type: 'section', label: SECTION_END })} style={{ ...inputStyle, flex: 'none', color: '#a78bfa' }}>End section</button>
+          </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input aria-label={newRowType === 'section' ? 'New section label' : 'New song title'} value={songInput} onChange={e => setSongInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSong(); } }} placeholder={newRowType === 'section' ? 'e.g. Act II, Acoustic, Encore…' : 'Song title…'} style={{ ...inputStyle, minWidth: 0 }} />
             <button type="button" onClick={addSong} disabled={!songInput.trim()} style={{ background: 'none', border: '1px solid #51416e', borderRadius: 6, color: '#a78bfa', fontSize: 12, padding: '0 12px', cursor: 'pointer' }}>Add</button>
@@ -2073,7 +2101,7 @@ function normalizeConcertForm(concert) {
 // * this artist — which can't be computed from one row.
 // * `onNavigate` / `onOpenOther` hand control back up to ConcertTracker so tapping
 // * an artist, venue or friend here can switch tabs; this component never routes.
-function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, onNavigate = () => {}, onOpenOther = null }) {
+function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, ticketAccount = 'guest', performerScope = 'all', onNavigate = () => {}, onOpenOther = null }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -2082,7 +2110,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [receiptSections, setReceiptSections] = useState(['general', 'setlist']);
   const [receiptSort, setReceiptSort] = useState('performed');
   const [receiptFilter, setReceiptFilter] = useState('all');
-  const [setlistFilter, setSetlistFilter] = useState('all');
   const [receiptCosts, setReceiptCosts] = useState(['tickets']);
   const [receiptColour,setReceiptColour]=useState('light');
   const receiptPalette={light:{bg:'#f4f1e8',text:'#2a2a2a',muted:'#706b62',line:'#aaa396',accent:'#85521c'},dark:{bg:'#17172a',text:'#e2e0ff',muted:'#a5a0bf',line:'#514a66',accent:'#c4a7ff'},purple:{bg:'#eee7fa',text:'#30213f',muted:'#766184',line:'#b9a4ca',accent:'#7b3fac'},blue:{bg:'#e5effa',text:'#192f49',muted:'#536e88',line:'#99b2ce',accent:'#245e9b'}}[receiptColour];
@@ -2095,7 +2122,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     guests: hasGuestSongs, 'support-guests': hasSupportSongs && hasGuestSongs,
   };
   const setlistScopes = SETLIST_SCOPES.filter(([id]) => availableSetlistScopes[id]);
-  const activeSetlistFilter = setlistScopes.some(([id]) => id === setlistFilter) ? setlistFilter : 'all';
+  const exportFilter = availableSetlistScopes[performerScope] ? performerScope : 'all';
   const activeReceiptFilter = setlistScopes.some(([id]) => id === receiptFilter) ? receiptFilter : 'all';
   const receiptGroups = showReceipt ? filterSetlistPerformers(setlistPerformers, activeReceiptFilter)
     .filter(p => p.songs.some(row => !isSectionRow(row)))
@@ -2104,7 +2131,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const receiptRef = useRef(null);
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
-  useEffect(() => { setDetailTab('general'); setSetlistFilter('all'); }, [concert.id]);
+  useEffect(() => { setDetailTab('general'); }, [concert.id]);
   const goBackFromDetail = () => detailTab === 'general' ? onClose() : setDetailTab('general');
   useBackButton(goBackFromDetail, detailTab !== 'general');
   const [setlistView, setSetlistViewState] = useState(() => ({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(settings.setlistView || {}) }));
@@ -2246,7 +2273,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         return [
           ...(showReceiptPerformers ? [name] : []),
           ...songs.flatMap(song => {
-            if (isSectionRow(song)) return ['  — ' + song.label + ' —', ...(song.sectionNote ? ['  ' + song.sectionNote] : [])];
+            if (isSectionEnd(song)) return [''];
+            if (isSectionRow(song)) return [song.sectionCategory === 'location' ? '  ' + song.label : '  — ' + song.label + ' —', ...(song.sectionNote ? ['  ' + song.sectionNote] : [])];
             const info = getSongInfo(song), cover = getSongCover(song);
             const title = song?.type === 'medley' ? 'Mashup of' : getSongName(song);
             const guests = songGuestNames(song);
@@ -2344,6 +2372,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const isFestival = concert.type === "festival";
   const online = isOnline(concert);
   const past = (concert.endDate || concert.date) < localDay();
+  useEffect(() => {
+    if (past && (detailTab === 'tickets' || detailTab === 'timetable')) setDetailTab('general');
+  }, [past, detailTab]);
 
   const labelStyle = { fontSize: 11, color: "#6b6a8f", marginBottom: 4, fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" };
 
@@ -2404,7 +2435,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
-          <button onClick={() => { setReceiptSections(hasHeadlinerSongs || hasSupportSongs ? ['general','setlist'] : ['general']); setReceiptCosts(['tickets']); setReceiptSort(setlistSort === 'album' ? 'album' : 'performed'); setReceiptFilter(activeSetlistFilter); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
+          <button onClick={() => { setReceiptSections(hasHeadlinerSongs || hasSupportSongs ? ['general','setlist'] : ['general']); setReceiptCosts(['tickets']); setReceiptSort(setlistSort === 'album' ? 'album' : 'performed'); setReceiptFilter(exportFilter); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
           <button onClick={() => {setForm(normalizeConcertForm(concert));setEditing(true)}} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
@@ -2512,7 +2543,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             />
           )}
           {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setForm(normalizeConcertForm(concert));setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} compact /></>}
-          {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}<div style={{borderTop:'1px solid #25243a',marginTop:12,paddingTop:12}}>{sec('Where to find your ticket')}{safeExternalUrl(concert.ticketAccessUrl)&&<a href={safeExternalUrl(concert.ticketAccessUrl)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,color:'#a78bfa',fontSize:13}}>Open my ticket ↗</a>}{concert.ticketAccessNote&&<div style={{color:'#c4c2f0',fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{concert.ticketAccessNote}</div>}{!concert.ticketAccessUrl&&!concert.ticketAccessNote&&<div style={{color:'#9491b8',fontSize:12}}>Add a link or a note in Edit tickets.</div>}</div></div></>}
+          {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setForm(normalizeConcertForm(concert));setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}<div style={{borderTop:'1px solid #25243a',marginTop:12,paddingTop:12}}>{sec('Where to find your ticket')}{safeExternalUrl(concert.ticketAccessUrl)&&<a href={safeExternalUrl(concert.ticketAccessUrl)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,color:'#a78bfa',fontSize:13}}>Open my ticket ↗</a>}{concert.ticketAccessNote&&<div style={{color:'#c4c2f0',fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{concert.ticketAccessNote}</div>}{!concert.ticketAccessUrl&&!concert.ticketAccessNote&&<div style={{color:'#9491b8',fontSize:12}}>Add a link or a note in Edit tickets.</div>}</div><TicketFiles account={ticketAccount} concert={concert} /></div></>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
@@ -2657,7 +2688,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             };
             const guestNames = featuredGuests(concert);
             const openSetlistArtist = guest => onNavigate({ view: 'artists', artist: guestNames.find(name => name.toLowerCase() === guest.toLowerCase()) || guest });
-            const performers = filterSetlistPerformers(setlistPerformers, activeSetlistFilter);
+            const performers = setlistPerformers;
+            const playlistPerformers = filterSetlistPerformers(performers, exportFilter);
             const allSongsFlat = performers.flatMap(p => p.songs);
             // Excludes intro-like entries (e.g. SKZ Anthem) from the counted stats —
             // iconic, but not really "a song" in the sense of songs played/length.
@@ -2704,12 +2736,12 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                         {Object.values(setlistView).some(v => !v) && <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#a78bfa' }} />}
                       </button>
                     )}
-                    {settings.spotifyAccessToken && performers.some(p => getSongList(p.songs).some(s => s?.spotifyId)) && (
+                    {settings.spotifyAccessToken && playlistPerformers.some(p => getSongList(p.songs).some(s => s?.spotifyId)) && (
                       <button
                         disabled={exportingPlaylist}
                         onClick={() => {
-                          const songs = performers.flatMap(p => getSongList(receiptSetlistRows(p.songs, setlistSort === 'album' ? 'album' : 'performed')));
-                          handleExportPlaylist(songs, performers.length === 1 ? performers[0].name : concert.artist);
+                          const songs = playlistPerformers.flatMap(p => getSongList(receiptSetlistRows(p.songs, setlistSort === 'album' ? 'album' : 'performed')));
+                          handleExportPlaylist(songs, playlistPerformers.length === 1 ? playlistPerformers[0].name : concert.artist);
                         }}
                         aria-label="Save to Spotify" title={exportingPlaylist ? 'Saving…' : 'Save to Spotify'}
                         style={{ background: 'none', border: 'none', padding: 4, color: '#1DB954', cursor: exportingPlaylist ? 'default' : 'pointer', lineHeight: 1, display: 'flex', opacity: exportingPlaylist ? 0.5 : 1 }}
@@ -2734,7 +2766,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                     </>
                   )}
                 </div>
-                {setlistScopes.length > 1 && <SetlistScopeSelect options={setlistScopes} value={activeSetlistFilter} onChange={setSetlistFilter} style={{ width: '100%', margin: '0 0 12px' }} />}
                 {(() => {
                   const formatMs = ms => { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; };
                   // A partial sum is only useful as a lower bound if most of the show
@@ -2868,9 +2899,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 return <div key={key} style={{ marginTop: 8 }}>
                   {showReceiptPerformers && <div style={{ fontWeight: 700, marginBottom: 6 }}>{name}</div>}
                   {rows.map((s, i) => {
+                    if (isSectionEnd(s)) return <div key={i} style={{ height: 12 }} />;
                     if (isSectionRow(s)) return (
                       <div key={i} style={{ color: 'var(--receipt-accent)', margin: '8px 0 6px', fontSize: 10 }}>
-                        <div style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em' }}>— {s.label} —</div>
+                        {s.sectionCategory === 'location' ? <div style={{ paddingLeft: 32 }}>{s.label}</div> : <div style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em' }}>— {s.label} —</div>}
                         {s.sectionNote && <div style={{ paddingLeft: 32, color: 'var(--receipt-muted)', fontStyle: 'italic' }}>{s.sectionNote}</div>}
                       </div>
                     );
@@ -3392,18 +3424,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           /* ── NOTES ── */
           { title: 'Notes', content: <>
-            {!past && !form.wishlist && form.attendanceMode !== 'online' && (
-              <div style={{display:'grid',gap:10,marginBottom:12}}>
-                <label style={{...labelStyle,margin:0}}>
-                  Meet at
-                  <input type="time" value={form.meetupTime || ''} onChange={e => update('meetupTime', e.target.value)} style={{...inputStyle,marginTop:5}} />
-                </label>
-                <label style={{...labelStyle,margin:0}}>
-                  Meeting point
-                  <input value={form.meetupLocation || ''} onChange={e => update('meetupLocation', e.target.value)} placeholder="Venue entrance or another address" style={{...inputStyle,marginTop:5}} />
-                </label>
-              </div>
-            )}
+            {!past && !form.wishlist && <EveningPlanFields concert={form} inputStyle={inputStyle} onChange={rows => update('eveningPlans', rows)} />}
             <textarea aria-label="Notes for the day" value={form.notes || ''} onChange={e => update('notes', e.target.value)} rows={3} style={{...inputStyle,resize:'vertical'}} placeholder="Any notes..." />
           </> },
 
@@ -11451,25 +11472,39 @@ export default function ConcertTracker(props) {
 function safeExternalUrl(value) {
   try {const url=new URL(value);return ['https:','http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null}catch{return null}
 }
+
+function EveningPlanFields({ concert, inputStyle, onChange }) {
+  const rows = eveningPlanRows(concert, isOnline(concert));
+  const fieldStyle = { ...inputStyle, marginTop: 4, minWidth: 0, fontSize: 16 };
+  const buttonStyle = { background: 'none', border: 0, color: '#a78bfa', minHeight: 44, cursor: 'pointer', padding: 0, fontSize: 12 };
+  const update = (id, key, value) => onChange(rows.map(row => row.id === id ? { ...row, [key]: value } : row));
+  return <div style={{ marginBottom: 14, color: '#c4c2f0', fontSize: 13 }}>
+    <strong>Your evening</strong>
+    {rows.map((row, index) => <div key={row.id} style={{ padding: '10px 0', borderBottom: '1px solid #25243a' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 1fr) minmax(0, 2fr)', gap: 8 }}>
+        <label>Time<input type="time" value={row.time || ''} onChange={e => update(row.id, 'time', e.target.value)} style={{ ...fieldStyle, paddingInline: 6 }} /></label>
+        <label>Plan<input value={row.label || ''} onChange={e => update(row.id, 'label', e.target.value)} placeholder="e.g. Meet at the entrance" style={fieldStyle} /></label>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <details style={{ flex: 1, minWidth: 0 }}>
+          <summary style={{ cursor: 'pointer', padding: '13px 0', color: '#a78bfa', fontSize: 12 }}>Advanced options</summary>
+          <div style={{ display: 'grid', gap: 8, paddingBottom: 4 }}>
+            <label>Notes<textarea rows={2} value={row.note || ''} onChange={e => update(row.id, 'note', e.target.value)} style={{ ...fieldStyle, resize: 'vertical' }} /></label>
+            <label>Link<input type="url" value={row.link || ''} onChange={e => update(row.id, 'link', e.target.value)} placeholder="https://…" style={fieldStyle} /></label>
+            <label>Link text<input value={row.linkText || ''} onChange={e => update(row.id, 'linkText', e.target.value)} placeholder="e.g. Directions" style={fieldStyle} /></label>
+          </div>
+        </details>
+        <button type="button" aria-label={`Remove evening row ${index + 1}`} onClick={() => onChange(rows.filter(item => item.id !== row.id))} style={buttonStyle}>Remove</button>
+      </div>
+    </div>)}
+    <button type="button" onClick={() => onChange([...rows, { id: window.crypto.randomUUID(), time: '', label: '' }])} style={buttonStyle}>+ Add row</button>
+  </div>;
+}
+
 function UpcomingNightRoute({concert,settings,online,onTimetable,onEdit}) {
   const companions = getFriends(concert);
-  const meetingPoint = concert.meetupLocation?.trim();
-  const destination = [meetingPoint || concert.venue, concert.city, concert.country].filter(Boolean).join(', ');
-  const directions = !online && (meetingPoint || concert.venue)
-    ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination)
-    : '';
   const notes = concert.notes?.trim();
-  const stops = [];
-  if (!online && (concert.meetupTime || meetingPoint || concert.venue)) {
-    stops.push({
-      key: 'meet',
-      time: concert.meetupTime,
-      label: meetingPoint ? 'Meet at ' + meetingPoint : 'Meet at the entrance',
-      link: directions,
-    });
-  }
-  if (concert.doorsTime) stops.push({key:'doors',time:concert.doorsTime,label:'Doors open'});
-  stops.push({key:'show',time:concert.showTime,label:concert.showTime?'Show starts':'Timetable'});
+  const stops = eveningStops(concert, online);
 
   return (
     <section aria-label="Night route">
@@ -11480,13 +11515,14 @@ function UpcomingNightRoute({concert,settings,online,onTimetable,onEdit}) {
       <ol style={{listStyle:'none',margin:'4px 0 12px 18px',padding:'0 0 0 14px',borderLeft:'1px solid #594782'}}>
         {stops.map(stop => (
           <li key={stop.key} style={{position:'relative',display:'grid',gridTemplateColumns:'46px minmax(0, 1fr)',gap:10,padding:'7px 0',color:'#c4c2f0',fontSize:13}}>
-            <span aria-hidden="true" style={{position:'absolute',left:-19,top:12,width:9,height:9,borderRadius:'50%',background:'#a78bfa',border:'2px solid #0c0c14'}} />
+            <span aria-hidden="true" style={{position:'absolute',left:-19,top:13,width:9,height:9,borderRadius:'50%',background:'#a78bfa',border:'2px solid #0c0c14'}} />
             <span style={{fontFamily:"'DM Mono', monospace",color:'#a78bfa',fontSize:12,lineHeight:'22px'}}>{stop.time}</span>
             <div style={{minWidth:0,overflowWrap:'anywhere'}}>
               {stop.key === 'show' ? (
-                <button type="button" onClick={onTimetable} style={{padding:0,minHeight:44,marginTop:-11,background:'none',border:0,color:'#c4c2f0',fontSize:13,textAlign:'left'}}>{stop.label} <span style={{color:'#a78bfa'}}>›</span></button>
+                <button type="button" onClick={onTimetable} style={{padding:0,minHeight:22,lineHeight:'22px',background:'none',border:0,color:'#c4c2f0',fontSize:13,textAlign:'left'}}>{stop.label} <span style={{color:'#a78bfa'}}>›</span></button>
               ) : <div style={{lineHeight:'22px'}}>{stop.label}</div>}
-              {stop.link && <a href={stop.link} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:32,color:'#a78bfa',fontSize:12,textDecoration:'none'}}>Directions ↗</a>}
+              {stop.note && <div style={{color:'#9491b8',fontSize:12,whiteSpace:'pre-wrap'}}>{stop.note}</div>}
+              {safeExternalUrl(stop.link) && <a href={safeExternalUrl(stop.link)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:32,color:'#a78bfa',fontSize:12,textDecoration:'none'}}>{stop.linkText?.trim() || 'Open link'} ↗</a>}
             </div>
           </li>
         ))}
@@ -11610,6 +11646,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [search, setSearch] = useState('')
   const [filterYears, setFilterYears] = useState([])
   const [filterType, setFilterType] = useState('all')
+  const [performerScope, setPerformerScope] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [showSort, setShowSort] = useState(false)
   useBackButton(() => {setShowFilters(false);setShowSort(false)}, showFilters || showSort)
@@ -11668,6 +11705,11 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     return()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',visibility)};
   },[]);
   const todaysShows=showsToday(concerts,showDayNow);
+  const ticketAccount = userEmail || 'guest';
+  const ticketDay = localDay(showDayNow);
+  useEffect(() => {
+    pruneExpiredTickets(ticketAccount, ticketDay, concerts).catch(() => {});
+  }, [ticketAccount, ticketDay, concerts]);
 
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -11794,9 +11836,9 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const activeFilterCount = [
     filterFriend !== 'all', filterVenue !== 'all',
     filterRating !== 0, filterSolo, filterGenre !== 'all', filterSubgenre !== 'all', filterCountry !== 'all', filterHasPhoto,
-    filterType !== 'all', filterStatus.length > 0, filterFavorite, filterTags.length > 0
+    filterType !== 'all', performerScope !== 'all', filterStatus.length > 0, filterFavorite, filterTags.length > 0
   ].filter(Boolean).length
-  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus([]); setFilterFavorite(false); setFilterTags([]); }
+  const resetFilters = () => { setFilterFriend('all'); setFilterVenue('all'); setFilterRating(0); setFilterSolo(false); setFilterGenre('all'); setFilterSubgenre('all'); setFilterCountry('all'); setFilterType('all'); setFilterHasPhoto(false); setFilterStatus([]); setFilterFavorite(false); setFilterTags([]); setPerformerScope('all'); }
   const resetSort = () => setSortOrder(settings.defaultSort || 'newest')
 
   // Shared with both the past/upcoming list and the wishlist, so picking "Online"
@@ -11812,6 +11854,11 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const matchingShows = concerts.filter(c => {
     if (!matchesYear(c)) return false
     if (!matchesType(c)) return false
+    if (performerScope !== 'all') {
+      const hasSupport = (c.support || []).some(act => getSupportRole(act) !== 'guest' && getSupportName(act));
+      const hasGuests = featuredGuests(c).length > 0;
+      if (!(performerScope === 'support' ? hasSupport : performerScope === 'guests' ? hasGuests : hasSupport || hasGuests)) return false;
+    }
     if (filterFriend !== 'all' && !getFriends(c).includes(filterFriend)) return false
     if (filterVenue !== 'all' && c.venue !== filterVenue) return false
     if (filterRating !== 0 && (c.rating || 0) < filterRating) return false
@@ -12068,7 +12115,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <div className={selectedExiting ? "slide-out-detail" : "slide-in-detail"} key={displaySelected.id}>
-        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -12215,6 +12262,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
                 {allCountries.length>1&&select('Country',filterCountry,setFilterCountry,[['all','Anywhere'],...allCountries.map(c=>[c,c])])}
                 {(settings.genres||[]).length>0&&select('Genre',filterGenre,setFilterGenre,[['all','Any genre'],...settings.genres.map(g=>[g,g])])}
                 {(settings.subgenres||[]).length>0&&select('Subgenre',filterSubgenre,setFilterSubgenre,[['all','Any subgenre'],...settings.subgenres.map(g=>[g,g])])}
+                {select('Performers',performerScope,setPerformerScope,[['all','All shows'],['support','With support acts'],['guests','With guests'],['support-guests','With either']])}
                 {toggle('Favourites only',filterFavorite,setFilterFavorite)}
                 {toggle('Solo only',filterSolo,setFilterSolo)}
                 {toggle('Only with photos',filterHasPhoto,setFilterHasPhoto)}

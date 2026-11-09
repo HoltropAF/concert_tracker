@@ -1,6 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createBackStack} from './backStack.js'
+test('programmatic tab cleanup does not close the underlying show', () => {
+ const stack = createBackStack(), calls = []
+ stack.add(() => calls.push('close show'))
+ const closeTab = stack.add(() => calls.push('general'))
+ closeTab()
+ stack.discardNextPop()
+ stack.back()
+ assert.deepEqual(calls, [])
+ stack.back()
+ assert.deepEqual(calls, ['close show'])
+})
 test('back closes only the top layer and cleanup reveals the previous page',()=>{
  const stack=createBackStack(),calls=[]
  const removeList=stack.add(()=>calls.push('list'))

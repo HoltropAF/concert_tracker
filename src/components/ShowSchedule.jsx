@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react'
-import {visibleShowTimeFields} from '../lib/showTimes.js'
+import {pendingShowTime,visibleShowTimeFields} from '../lib/showTimes.js'
 
 const link=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:''}catch{return ''}}
 const nameOf=act=>typeof act==='string'?act:act?.name||''
@@ -32,7 +32,7 @@ export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
  const accept=(key,found)=>persist(key,{[key]:found.value,scheduleUrl:link(concert.scheduleUrl)||link(found.source)||link(url),scheduleSources:{...concert.scheduleSources,[key]:{url:found.source||proposal.source,label:found.label,checkedAt:new Date().toISOString()}}})
  const confirmedSupport=(concert.support||[]).filter(a=>typeof a==='string'||a?.role!=='guest')
  const pendingSupport=(proposal?.supportActs||[]).filter(act=>!confirmedSupport.some(saved=>
-   sameName(nameOf(saved),act.name) && (saved.timeManuallySet || !act.time || saved.time===act.time)
+   sameName(nameOf(saved),act.name) && (saved.timeManuallySet || saved.time || !act.time)
  ))
  const acceptSupport=act=>{
    const existing=concert.support||[],i=existing.findIndex(a=>sameName(nameOf(a),act.name))
@@ -42,15 +42,17 @@ export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
  }
  const source=link(proposal?.source)||link(url)||link(website)||link(proposal?.sources?.find(s=>link(s.url))?.url)
  const search='https://www.google.com/search?q='+encodeURIComponent([concert.artist,concert.venue,concert.date,'timetable doors support act'].filter(Boolean).join(' '))
+ const fields=visibleShowTimeFields(concert,settings)
+ const hasPending=pendingSupport.length>0||fields.some(([key])=>pendingShowTime(concert,key,proposal?.times?.[key]))
+ const hadMatches=Object.keys(proposal?.times||{}).length>0||proposal?.supportActs?.length>0
+ const notice=hasPending||!hadMatches?proposal?.notice:null
  return <section style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:10,padding:14}}>
    <div style={{fontSize:10,color:'#9491b8',fontFamily:"'DM Mono', monospace",textTransform:'uppercase',marginBottom:6}}>Schedule</div>
-   {visibleShowTimeFields(concert,settings).map(([key,label])=>{
-     const found=proposal?.times?.[key];
-     const savedSource=concert.scheduleSources?.[key];
-     const manuallySet=savedSource?.manual || (concert[key] && !savedSource?.url);
+   {fields.map(([key,label])=>{
+     const found=pendingShowTime(concert,key,proposal?.times?.[key]);
      return <div key={key} style={{padding:'10px 0',borderBottom:'1px solid #25243a'}}>
        <div style={row}><span>{label}</span><span style={{color:concert[key]?'#e2e0ff':'#9491b8'}}>{concert[key]||'Unknown'}</span></div>
-       {!manuallySet && found && found.value!==concert[key] && <div style={{...row,...muted}}>
+       {found && <div style={{...row,...muted}}>
          <span>{found.label===label?'Found in the timetable':found.label}</span>
          <button disabled={!!saving} onClick={()=>accept(key,found)} style={{...button,whiteSpace:'nowrap'}}>{saving===key?'Saving…':'Use '+found.value}</button>
        </div>}
@@ -64,6 +66,6 @@ export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
      <label style={{...muted,display:'block',marginTop:10}}>Event-page link<input type="url" value={url} onChange={e=>{setUrl(e.target.value);setProposal(null)}} placeholder="https://venue.com/this-event" style={{width:'100%',background:'#0c0c14',border:'1px solid #2e2e50',borderRadius:8,color:'#c4c2f0',padding:10,fontSize:16,marginTop:5}} /></label>
      <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>{link(url)&&url!==saved&&<button disabled={!!saving} style={button} onClick={()=>persist('source',{scheduleUrl:link(url)})}>Save source</button>}<button onClick={onEdit} style={button}>Enter times manually</button></div>
    </details>
-   {(busy||error||proposal?.notice)&&<div aria-live="polite" style={{...muted,color:error?'#f87171':muted.color}}>{error||(busy?'Checking show sources…':proposal.notice)}</div>}
+   {(busy||error||notice)&&<div aria-live="polite" style={{...muted,color:error?'#f87171':muted.color}}>{error||(busy?'Checking show sources…':notice)}</div>}
  </section>
 }

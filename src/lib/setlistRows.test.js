@@ -24,7 +24,7 @@ test('receipt order retains independent headings, guest credits and whole medley
   const medley = {type:'medley', name:'Mix', albumName:'First', parts:['One', 'Two']}
   const rows = ['Acoustic song', ment, one, end, medley]
 
-  assert.deepEqual(receiptSetlistRows(rows, 'performed'), ['Acoustic song', ment, one, medley])
+  assert.deepEqual(receiptSetlistRows(rows, 'performed'), rows)
   assert.deepEqual(receiptSetlistRows(rows, 'alpha'), ['Acoustic song', medley, one])
   assert.deepEqual(receiptSetlistRows(rows, 'album'), [{type:'section', label:'First'}, one, medley, 'Acoustic song'])
 })

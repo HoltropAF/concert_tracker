@@ -1,6 +1,18 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {showsToday,showCountdown,preparationItems} from './showDay.js'
+import {showsToday,showCountdown,preparationItems,eveningPlanRows,eveningStops} from './showDay.js'
+
+test('evening plans preserve the old meetup and interleave timed rows with the schedule', () => {
+ const concert = {venue:'Venue', city:'Amsterdam', meetupTime:'17:00', meetupLocation:'North entrance', doorsTime:'19:00', showTime:'20:00'}
+ assert.equal(eveningPlanRows(concert, false)[0].label, 'Meet at North entrance')
+ assert.match(eveningPlanRows(concert, false)[0].link, /North%20entrance/)
+ assert.deepEqual(eveningPlanRows(concert, true), [])
+ const eveningPlans = [{id:'train', label:'Train', time:'19:30', note:'Platform 2', link:'https://example.org', linkText:'Train times'}]
+ const stops = eveningStops({...concert, eveningPlans}, false)
+ assert.deepEqual(stops.map(row => row.label), ['Doors open', 'Train', 'Show starts'])
+ assert.equal(stops[1].linkText, 'Train times')
+ assert.deepEqual(eveningStops({...concert, eveningPlans:[]}, false).map(row => row.key), ['doors', 'show'])
+})
 test('show day uses local dates, includes festival days and excludes wishes and unknown dates',()=>{
  const now=new Date(2026,10,6,15)
  const shows=[{id:1,date:'2026-11-06'},{id:2,date:'2026-11-05',endDate:'2026-11-07'},{id:3,date:'2026-11-06',wishlist:true},{id:4,date:'2026-11-07'},{id:5,date:'9999-12-31'}]

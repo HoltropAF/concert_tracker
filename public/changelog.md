@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.23 — 9 November 2026
+- End setlist sections with a blank row and mark headings as plain location notes.
+- Find shows with guests or support acts from the main Shows filters.
+- Your evening has aligned times and editable rows with optional notes and links.
+- Saved times take precedence over timetable suggestions, and switching to General keeps the show open.
+- Save ticket PDFs and images on this device until the show has passed.
+
 ## 1.1.22 — 8 November 2026
 - Filter a setlist by headliner, support acts or guest songs and use the same selection when sharing it.
 - Select guests from Overview on individual setlist songs. Their names open their artist pages directly from the song.

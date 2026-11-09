@@ -1,9 +1,15 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {parseShowTimes,timeValue} from './showTimes.js'
+import {parseShowTimes,timeValue,pendingShowTime} from './showTimes.js'
 import {lookupShowTimes} from '../../server/showTimes.js'
 const event={ '@type':'MusicEvent',name:'Test Artist',startDate:'2026-11-10T20:00:00+01:00',endDate:'2026-11-10T22:30:00+01:00'}
 const page=e=>`<script type="application/ld+json">${JSON.stringify(e)}</script>`
+test('a changed source cannot replace an accepted, manual, or deliberately cleared time', () => {
+ const found = {value:'19:00'}
+ assert.equal(pendingShowTime({}, 'doorsTime', found), found)
+ assert.equal(pendingShowTime({doorsTime:'18:00', scheduleSources:{doorsTime:{url:'https://example.org'}}}, 'doorsTime', found), null)
+ assert.equal(pendingShowTime({doorsTime:'', scheduleSources:{doorsTime:{manual:true}}}, 'doorsTime', found), null)
+})
 test('time lookup requires an unambiguous matching artist and date and keeps event start distinct from doors',()=>{
  const query={artist:'Test Artist',date:'2026-11-10'}
  assert.equal(parseShowTimes(page(event),query).times.showTime.value,'20:00')

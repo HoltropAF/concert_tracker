@@ -1,4 +1,6 @@
 export const isSectionRow = row => row?.type === 'section'
+export const SECTION_END = '__SECTION_END__'
+export const isSectionEnd = row => isSectionRow(row) && row.label === SECTION_END
 
 // Expand legacy song-attached labels without changing or dropping song metadata.
 export function normalizeSetlistRows(value) {
@@ -37,9 +39,10 @@ export function filterSetlistPerformers(performers, filter) {
     let section
     for (const row of songs) {
       if (isSectionRow(row)) {
+        if (isSectionEnd(row) && !section && matching.length) matching.push(row)
         section = row
       } else if (songGuestNames(row).length) {
-        if (section && section.label !== '__SECTION_END__') matching.push(section)
+        if (section && !isSectionEnd(section)) matching.push(section)
         matching.push(row)
         section = undefined
       }
@@ -51,7 +54,7 @@ export function filterSetlistPerformers(performers, filter) {
 export function receiptSetlistRows(rows, sort) {
   const name = song => typeof song === 'string' ? song : song.name || ''
   const album = song => song?.albumName || ''
-  if (sort === 'performed') return rows.filter(row => row.label !== '__SECTION_END__')
+  if (sort === 'performed') return rows
   const songs = rows.filter(row => !isSectionRow(row))
   if (sort === 'alpha') return songs.sort((a, b) => name(a).localeCompare(name(b)))
   songs.sort((a, b) => album(a) && album(b) ? album(a).localeCompare(album(b)) : Number(!album(a)) - Number(!album(b)))

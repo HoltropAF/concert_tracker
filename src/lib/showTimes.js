@@ -1,5 +1,6 @@
 export const showTimeFields={doorsTime:'Doors open',vipTime:'VIP starts',showTime:'Show starts',endTime:'Expected end'}
 export const visibleShowTimeFields=(concert,settings={})=>Object.entries(showTimeFields).filter(([key])=>key!=='vipTime'||(concert.showVipTime??settings.showVipTime??true))
+export const pendingShowTime = (concert, key, found) => found?.value && !concert[key] && !concert.scheduleSources?.[key]?.manual ? found : null
 export function timeValue(value){const m=String(value||'').match(/(?:T|^)([01]\d|2[0-3]):([0-5]\d)/);return m?`${m[1]}:${m[2]}`:''}
 const norm=s=>String(s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
 export function parseShowTimes(html,{artist,date,verifiedEvent=false}){

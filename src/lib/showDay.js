@@ -8,6 +8,31 @@ export function showsToday(concerts, now = new Date()) {
   return concerts.filter(c=>!c.wishlist && /^\d{4}-\d{2}-\d{2}$/.test(c.date||'') && c.date<=day && (c.endDate || c.date)>=day && c.date!=='9999-12-31').sort((a,b)=>rank(a)-rank(b)||(rank(a)===2?start(b)-start(a):start(a)-start(b)))
 }
 export const defaultPreparationItems = ['Ticket ready', 'Travel planned', 'Power bank packed', 'Water bottle', 'Earplugs']
+
+export function eveningPlanRows(concert, online) {
+  if (Array.isArray(concert.eveningPlans)) return concert.eveningPlans
+  const meetingPoint = concert.meetupLocation?.trim()
+  if (online || !(concert.meetupTime || meetingPoint || concert.venue)) return []
+  const destination = [meetingPoint || concert.venue, concert.city, concert.country].filter(Boolean).join(', ')
+  return [{
+    id: 'meet', time: concert.meetupTime || '',
+    label: meetingPoint ? 'Meet at ' + meetingPoint : 'Meet at the entrance',
+    link: destination ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination) : '',
+    linkText: 'Directions',
+  }]
+}
+
+export function eveningStops(concert, online) {
+  const plans = eveningPlanRows(concert, online).filter(row => row.label?.trim() || row.time || row.note?.trim() || row.link?.trim())
+  const stops = [
+    ...plans.map(row => ({ ...row, key: 'plan-' + row.id })),
+    ...(concert.doorsTime ? [{ key: 'doors', time: concert.doorsTime, label: 'Doors open' }] : []),
+    { key: 'show', time: concert.showTime, label: concert.showTime ? 'Show starts' : 'Timetable' },
+  ]
+  const timed = stops.filter(stop => stop.time).sort((a, b) => a.time.localeCompare(b.time))
+  let index = 0
+  return stops.map(stop => stop.time ? timed[index++] : stop)
+}
 export function preparationItems(settings={}){
  if (Array.isArray(settings.showChecklistItems)) {
    return [...new Set(settings.showChecklistItems.filter(item => typeof item === 'string' && item.trim()))]

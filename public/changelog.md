@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.22 — 8 November 2026
+- Filter a setlist by headliner, support acts or guest songs and use the same selection when sharing it.
+- Select guests from Overview on individual setlist songs. Their names open their artist pages directly from the song.
+- Back returns from a show tab to General before closing the show.
+- Manually overridden times stay in the timetable without conflicting suggestions.
+- Add support acts and edit their start times directly in Timetable.
+- Upcoming General uses Night route, with directions beside your meetup and notes when saved.
+- Ready to go has individual checklist switches in Settings.
+
 ## 1.1.21 — 8 November 2026
 - Today moves to the right and opens the next scheduled show first. Customize Ready to go under Settings → Show day.
 - Timetable groups source and manual controls, aligns its three actions, offers a VIP-row toggle and keeps calendar export to one line.

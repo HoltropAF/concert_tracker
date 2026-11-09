@@ -11,6 +11,93 @@ export function normalizeSetlistRows(value) {
 
 export const setlistSongs = value => (Array.isArray(value) ? value : []).filter(row => row && !isSectionRow(row)).flatMap(row=>row.type==='medley'?row.parts||[]:[row])
 
+const guestKey = name => name.trim().toLowerCase()
+
+export function uniqueGuestNames(names) {
+  const unique = new Map()
+  for (const value of names) {
+    if (typeof value !== 'string' || !value.trim()) continue
+    const name = value.trim()
+    if (!unique.has(guestKey(name))) unique.set(guestKey(name), name)
+  }
+  return [...unique.values()]
+}
+
+export function songGuestNames(song) {
+  return uniqueGuestNames(Array.isArray(song?.guests) ? song.guests : [song?.feat])
+}
+
+export function filterSetlistPerformers(performers, filter) {
+  if (filter === 'all') return performers
+  return performers.flatMap(performer => {
+    const { role, songs } = performer
+    if (filter === 'headliner' || filter === 'support') return role === filter ? [performer] : []
+    if (filter === 'support-guests' && role === 'support') return [performer]
+    const matching = []
+    let section
+    for (const row of songs) {
+      if (isSectionRow(row)) {
+        section = row
+      } else if (songGuestNames(row).length) {
+        if (section && section.label !== '__SECTION_END__') matching.push(section)
+        matching.push(row)
+        section = undefined
+      }
+    }
+    return matching.length ? [{ ...performer, songs: matching }] : []
+  })
+}
+
+export function receiptSetlistRows(rows, sort) {
+  const name = song => typeof song === 'string' ? song : song.name || ''
+  const album = song => song?.albumName || ''
+  if (sort === 'performed') return rows.filter(row => row.label !== '__SECTION_END__')
+  const songs = rows.filter(row => !isSectionRow(row))
+  if (sort === 'alpha') return songs.sort((a, b) => name(a).localeCompare(name(b)))
+  songs.sort((a, b) => album(a) && album(b) ? album(a).localeCompare(album(b)) : Number(!album(a)) - Number(!album(b)))
+  return songs.flatMap((song, index) => {
+    const title = album(song)
+    return title && title !== album(songs[index - 1]) ? [{ type: 'section', label: title }, song] : [song]
+  })
+}
+
+// The old editor copied songs into a separate guest setlist. Match a copy only
+// when its title identifies a single row. An explicit guest list wins, even empty.
+export function placeLegacyGuests(setlist, supportSetlists, guests) {
+  const rows = normalizeSetlistRows(setlist)
+  const title = row => typeof row === 'string' ? row : row?.name || ''
+  const positions = new Map()
+  rows.forEach((row, index) => {
+    if (isSectionRow(row) || !title(row).trim()) return
+    const key = guestKey(title(row))
+    positions.set(key, positions.has(key) ? null : index)
+  })
+
+  const matches = new Map()
+  const unassigned = []
+  for (const guest of guests) {
+    for (const song of normalizeSetlistRows(supportSetlists?.[guest])) {
+      if (isSectionRow(song) || !title(song).trim()) continue
+      const index = positions.get(guestKey(title(song)))
+      if (index == null) {
+        if (!rows.some(row => guestKey(title(row)) === guestKey(title(song)) &&
+          songGuestNames(row).some(name => guestKey(name) === guestKey(guest)))) {
+          unassigned.push({ guest, song: title(song) })
+        }
+      } else if (!Array.isArray(rows[index]?.guests)) {
+        if (!matches.has(index)) matches.set(index, [])
+        matches.get(index).push(guest)
+      }
+    }
+  }
+  for (const [index, names] of matches) {
+    const row = rows[index]
+    const { feat, ...song } = typeof row === 'string' ? { name: row } : row
+    rows[index] = { ...song, guests: uniqueGuestNames([...names, feat]) }
+  }
+  return { rows, unassigned }
+}
+
 export function mapSetlistSongs(rows,update){
   return normalizeSetlistRows(rows).map(row=>isSectionRow(row)?row:row.type==='medley'?{...row,parts:(row.parts||[]).map(update)}:update(row))
 }

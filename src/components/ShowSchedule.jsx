@@ -31,7 +31,9 @@ export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
  const persist=async(key,changes)=>{setSaving(key);setError('');try{const result=await onSave({...concert,...changes});if(result?.error)throw Error('Could not save. Try again.')}catch(e){setError(e.message)}finally{setSaving('')}}
  const accept=(key,found)=>persist(key,{[key]:found.value,scheduleUrl:link(concert.scheduleUrl)||link(found.source)||link(url),scheduleSources:{...concert.scheduleSources,[key]:{url:found.source||proposal.source,label:found.label,checkedAt:new Date().toISOString()}}})
  const confirmedSupport=(concert.support||[]).filter(a=>typeof a==='string'||a?.role!=='guest')
- const pendingSupport=(proposal?.supportActs||[]).filter(a=>!confirmedSupport.some(saved=>sameName(nameOf(saved),a.name)&&(!a.time||saved.time===a.time)))
+ const pendingSupport=(proposal?.supportActs||[]).filter(act=>!confirmedSupport.some(saved=>
+   sameName(nameOf(saved),act.name) && (saved.timeManuallySet || !act.time || saved.time===act.time)
+ ))
  const acceptSupport=act=>{
    const existing=concert.support||[],i=existing.findIndex(a=>sameName(nameOf(a),act.name))
    const row={...(typeof existing[i]==='object'?existing[i]:{}),name:act.name,role:'support',...(act.time?{time:act.time}:{}),...(link(act.source)?{sourceUrl:link(act.source)}:{})}
@@ -42,7 +44,18 @@ export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
  const search='https://www.google.com/search?q='+encodeURIComponent([concert.artist,concert.venue,concert.date,'timetable doors support act'].filter(Boolean).join(' '))
  return <section style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:10,padding:14}}>
    <div style={{fontSize:10,color:'#9491b8',fontFamily:"'DM Mono', monospace",textTransform:'uppercase',marginBottom:6}}>Schedule</div>
-   {visibleShowTimeFields(concert,settings).map(([key,label])=>{const found=proposal?.times?.[key];return <div key={key} style={{padding:'10px 0',borderBottom:'1px solid #25243a'}}><div style={row}><span>{label}</span><span style={{color:concert[key]?'#e2e0ff':'#9491b8'}}>{concert[key]||'Unknown'}</span></div>{found&&found.value!==concert[key]&&<div style={{...row,...muted}}><span>{found.label}</span><button disabled={!!saving} onClick={()=>accept(key,found)} style={{...button,whiteSpace:'nowrap'}}>{saving===key?'Saving…':'Use '+found.value}</button></div>}</div>})}
+   {visibleShowTimeFields(concert,settings).map(([key,label])=>{
+     const found=proposal?.times?.[key];
+     const savedSource=concert.scheduleSources?.[key];
+     const manuallySet=savedSource?.manual || (concert[key] && !savedSource?.url);
+     return <div key={key} style={{padding:'10px 0',borderBottom:'1px solid #25243a'}}>
+       <div style={row}><span>{label}</span><span style={{color:concert[key]?'#e2e0ff':'#9491b8'}}>{concert[key]||'Unknown'}</span></div>
+       {!manuallySet && found && found.value!==concert[key] && <div style={{...row,...muted}}>
+         <span>{found.label===label?'Found in the timetable':found.label}</span>
+         <button disabled={!!saving} onClick={()=>accept(key,found)} style={{...button,whiteSpace:'nowrap'}}>{saving===key?'Saving…':'Use '+found.value}</button>
+       </div>}
+     </div>
+   })}
    {(confirmedSupport.length>0||pendingSupport.length>0)&&<div style={{padding:'10px 0',borderBottom:'1px solid #25243a'}}><div style={{...muted,marginBottom:6}}>Support acts</div>{confirmedSupport.map((a,i)=><div key={i} style={{...row,padding:'5px 0'}}><span>{nameOf(a)}</span>{a.time&&<span>{a.time}</span>}</div>)}{pendingSupport.map(a=><div key={a.name} style={row}><span>{a.name}{a.time?' · '+a.time:''}</span><button disabled={!!saving} onClick={()=>acceptSupport(a)} style={button}>{saving===a.name?'Saving…':'Add support'}</button></div>)}</div>}
    <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}>
      <summary style={{padding:'12px 0',minHeight:44,cursor:'pointer'}}>Sources & manual times</summary>

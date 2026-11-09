@@ -37,7 +37,7 @@ import { withCriedTag } from '../lib/criedTag'
 // ! (useSupabase.js) or by localStorage (guest mode).
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ConcertEditorTabs, { editorSectionTab } from './ConcertEditorTabs'
-import { isSectionRow, normalizeSetlistRows, setlistSongs, moveSetlistRow } from '../lib/setlistRows'
+import { isSectionRow, normalizeSetlistRows, setlistSongs, moveSetlistRow, placeLegacyGuests, songGuestNames, uniqueGuestNames, filterSetlistPerformers, receiptSetlistRows } from '../lib/setlistRows'
 import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos } from '../lib/photos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { geocodeVenue } from '../lib/geocode'
@@ -343,7 +343,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.21'
+const APP_VERSION = '1.1.22'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -534,7 +534,13 @@ const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.g
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);
-const getSongFeat = s => typeof s === 'string' || !s ? null : (s.feat || null); // guest who joined for this one song
+const overviewGuests = concert => uniqueGuestNames((concert.support || []).filter(s => getSupportRole(s) === 'guest').map(getSupportName));
+const featuredGuests = concert => uniqueGuestNames([
+  ...overviewGuests(concert),
+  ...normalizeSetlistRows(concert.setlist).flatMap(songGuestNames),
+  ...(concert.support || []).filter(s => getSupportRole(s) !== 'guest').flatMap(s =>
+    normalizeSetlistRows(concert.supportSetlists?.[getSupportName(s)]).flatMap(songGuestNames)),
+]);
 const getSongVaries = s => typeof s === 'string' || !s ? false : !!s.varies; // song changes every night, regardless of encore status
 const getSongKnown = s => typeof s === 'string' || !s ? null : (s.known ?? null); // true=knew it, false=discovered live, null/undefined=unmarked
 // --- Color math for the display filter ---
@@ -1639,18 +1645,37 @@ function ConcertCard({ concert, onOpen, compact = false, showPhoto = true, showV
 // Which optional parts of a setlist are visible. Toggled per-user in Settings and
 // threaded down as `setlistView`; every key defaults to shown except album names.
 const DEFAULT_SETLIST_VIEW = { notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true };
+const SETLIST_SCOPES = [
+  ['all', 'All performers'],
+  ['headliner', 'Headliner only'],
+  ['support', 'Support acts only'],
+  ['guests', 'Songs with guests'],
+  ['support-guests', 'Support acts + guest songs'],
+];
+
+function concertSetlistPerformers(concert) {
+  const headliner = { key: '__headliner__', name: concert.artist, role: 'headliner',
+    songs: placeLegacyGuests(concert.setlist, concert.supportSetlists, overviewGuests(concert)).rows };
+  if (concert.type === 'festival') return [headliner];
+  const support = (concert.support || []).filter(act => getSupportRole(act) !== 'guest').map(act => {
+    const name = getSupportName(act);
+    return { key: name, name, role: 'support', songs: normalizeSetlistRows(concert.supportSetlists?.[name]) };
+  });
+  return [...support, headliner];
+}
+
+function SetlistScopeSelect({ options, value, onChange, style }) {
+  return <select aria-label="Setlist performers" value={value} onChange={e => onChange(e.target.value)}
+    style={{ background: '#13131f', color: '#c4c2f0', border: '1px solid #2e2e50', borderRadius: 8, minHeight: 44, maxWidth: '100%', padding: '6px 8px', fontSize: 16, ...style }}>
+    {options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+  </select>;
+}
 // The setlist editor + reader, used once for the headliner and once per support act
 // on the same concert.
 // * `overrideSongs` / `overrideArtist` are how support acts reuse this component:
 // * when set, it edits concert.supportSetlists[overrideArtist] instead of
 // * concert.setlist, and `onSaveSetlist` is expected to route the write accordingly.
-// * `headlinerSongs` is passed to a support act's list purely to warn about songs
-// * that appear in both — not to edit them.
-// ! Songs are held in local state seeded from props and re-synced by an effect keyed
-// ! on concert.id + overrideArtist. A save that doesn't change that key will not
-// ! re-seed, which is intentional (avoids clobbering an in-progress edit) but means
-// ! external mutations to the same setlist are not picked up while it's open.
-function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, headlinerSongs = [], allArtists = [], setlistView = DEFAULT_SETLIST_VIEW, sortMode = 'night', onSetCriedSong = null, criedSong = undefined }) {
+function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null, overrideArtist = null, readOnly = false, onArtistClick, allArtists = [], setlistView = DEFAULT_SETLIST_VIEW, sortMode = 'night', onSetCriedSong = null, criedSong = undefined }) {
   const effectKey = concert.id + (overrideArtist || '');
   const sourceSongs = overrideSongs ?? concert.setlist;
   const [songs, setSongs] = useState(() => normalizeSetlistRows(sourceSongs));
@@ -1664,7 +1689,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   const [coverInput, setCoverInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [editPanelIdx, setEditPanelIdx] = useState(null);
-  const [featInput, setFeatInput] = useState('');
+  const guestOptions = readOnly ? [] : featuredGuests(concert);
 
   useEffect(() => { setSongs(normalizeSetlistRows(sourceSongs)); }, [effectKey, overrideSongs, concert.setlist]);
 
@@ -1725,13 +1750,14 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
   };
 
   const SECTION_END = '__SECTION_END__';
-  const applyFeat = (idx, feat) => {
+  const toggleGuest = (idx, artist) => {
     save(songs.map((s, i) => {
       if (i !== idx) return s;
       const base = typeof s === 'string' ? { name: s } : { ...s };
-      const trimmed = (feat || '').trim();
-      if (trimmed) base.feat = trimmed;
-      else delete base.feat;
+      const guests = songGuestNames(s);
+      const remaining = guests.filter(name => name.toLowerCase() !== artist.toLowerCase());
+      base.guests = remaining.length === guests.length ? [...guests, artist] : remaining;
+      delete base.feat;
       return base;
     }));
   };
@@ -1827,7 +1853,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
             const info = getSongInfo(song);
             const cover = getSongCover(song);
             const known = getSongKnown(song);
-            const feat = getSongFeat(song);
+            const guests = songGuestNames(song);
+            const guestChoices = !readOnly && editPanelIdx === i ? uniqueGuestNames([...guestOptions, ...guests]) : [];
             const varies = getSongVaries(song);
             const sectionLabel = getSongSectionLabel(song);
             const isIntroLike = sectionLabel === 'INTRO'; // e.g. SKZ Anthem — iconic, but not really "a song" in the counted sense
@@ -1870,8 +1897,8 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   {!readOnly && rowButtons(i)}
                   <span style={{ color: '#9491b8', fontSize: 10, fontFamily: "'DM Mono', monospace", width: 18, textAlign: 'right', flexShrink: 0, paddingTop: 2 }}>{isIntroLike ? '' : songs.slice(0, i + 1).filter(row=>!isSectionRow(row)).length}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
                       <span style={{ color: isIntroLike ? '#6b6a8f' : '#c4c2f0', fontSize: isIntroLike ? 11 : 13, fontStyle: isIntroLike ? 'italic' : 'normal', fontWeight: varies ? 700 : 400, ...(song?.type === 'medley' ? {fontFamily: "'DM Mono', monospace",fontSize:9,fontWeight:500,color:'#9491b8',letterSpacing:'0.1em',textTransform:'uppercase',lineHeight:1.5} : {}) }}>{song?.type === 'medley' ? 'Mashup of' : name}</span>
                       {song?.type !== 'medley' && song?.spotifyId && <span title="Linked to Spotify" style={{ color: '#1DB954', fontSize: 9, lineHeight: 1 }}>●</span>}
                       {(criedSong !== undefined ? criedSong : concert.criedSong) === name && <span title="Cried during this song" style={{ fontSize: 11, lineHeight: 1 }}>💧</span>}
@@ -1879,7 +1906,18 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     {readOnly&&<PerformanceDetails song={song} readOnly />}
                     {info && (!readOnly || setlistView.notes) && <div style={{ color: '#8b89ab', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 1 }}>"{info}"</div>}
                     {cover && (!readOnly || setlistView.covers) && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>♺</span>{typeof cover === 'string' ? `${cover} cover` : 'cover'}</div>}
-                    {feat && <div style={{ color: '#22d3ee', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}><span>🤝</span>with {feat}</div>}
+                    {guests.length > 0 && (
+                      <div style={{ color: '#22d3ee', fontSize: 11, marginTop: 2 }}>
+                        with {guests.map((guest, index) => (
+                          <span key={guest}>
+                            {index > 0 && ', '}
+                            {onArtistClick
+                              ? <button type="button" onClick={() => onArtistClick(guest)} style={{ background: 'none', border: 0, color: 'inherit', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', maxWidth: '100%', overflowWrap: 'anywhere' }}>{guest}</button>
+                              : guest}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {settings.showKnownMarkers && known !== null && (
                       <div style={{ color: known ? '#34d399' : '#a78bfa', fontSize: 10, fontFamily: "'DM Mono', monospace", marginTop: 1 }}>{known ? '✓ knew it' : '✨ discovered live'}</div>
                     )}
@@ -1890,10 +1928,10 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                         if (editPanelIdx === i) { setEditPanelIdx(null); }
                         else {
                           setEditPanelIdx(i);
-                          setNoteInput(info || ''); setCoverInput(cover || ''); setFeatInput(feat || '');
+                          setNoteInput(info || ''); setCoverInput(typeof cover === 'string' ? cover : '');
                         }
                       }}
-                      style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: (info || cover || sectionLabel || feat || varies || editPanelIdx === i) ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 10, padding: '3px 8px', fontFamily: "'DM Mono', monospace" }}
+                      style={{ background: 'none', border: '1px solid #2e2e50', borderRadius: 6, color: (info || cover || sectionLabel || guests.length || varies || editPanelIdx === i) ? '#a78bfa' : '#4a4870', cursor: 'pointer', fontSize: 10, padding: '3px 8px', fontFamily: "'DM Mono', monospace" }}
                     >{editPanelIdx === i ? 'Done' : 'Edit'}</button>
                   )}
                   {!readOnly && <button onClick={() => save(songs.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#4a4870', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1, paddingTop: 2 }}>×</button>}
@@ -1912,25 +1950,31 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
                     <div style={{ position: 'relative' }}>
                       <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Cover of</div>
                       <input
-                        value={coverInput} onChange={e => setCoverInput(e.target.value)} onBlur={() => setTimeout(() => applyCover(i, coverInput.trim() || null), 150)}
+                        value={coverInput} onChange={e => setCoverInput(e.target.value)} onBlur={() => { if (coverInput.trim() !== (typeof cover === 'string' ? cover : '')) applyCover(i, coverInput.trim() || null); }}
                         placeholder="Original artist, if this is a cover…"
                         style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
                       />
                       {coverSuggestions.length > 0 && (
                         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#13131f', border: '1px solid #2e2e50', borderRadius: 8, zIndex: 20, overflow: 'hidden', marginTop: 2 }}>
                           {coverSuggestions.map(a => (
-                            <button key={a} onMouseDown={() => applyCover(i, a)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid #1a1a2e', color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Sans', sans-serif", fontSize: 12, cursor: 'pointer' }}>{a}</button>
+                            <button key={a} onMouseDown={e => e.preventDefault()} onClick={() => { setCoverInput(a); applyCover(i, a); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid #1a1a2e', color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Sans', sans-serif", fontSize: 12, cursor: 'pointer' }}>{a}</button>
                           ))}
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div role="group" aria-label="Guest featured on this song">
                       <div style={{ fontSize: 9, color: '#6b6a8f', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Guest featured on this song</div>
-                      <input
-                        value={featInput} onChange={e => setFeatInput(e.target.value)} onBlur={() => applyFeat(i, featInput)}
-                        placeholder="Who joined for this one…"
-                        style={{ width: '100%', background: '#13131f', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: '7px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, boxSizing: 'border-box' }}
-                      />
+                      {guestChoices.length ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {guestChoices.map(guest => {
+                            const selected = guests.some(name => name.toLowerCase() === guest.toLowerCase());
+                            return <button key={guest} type="button" aria-pressed={selected} onClick={() => toggleGuest(i, guest)}
+                              style={{ border: `1px solid ${selected ? '#a78bfa' : '#2e2e50'}`, borderRadius: 99, padding: '6px 11px', minHeight: 32, background: selected ? '#2a1f48' : '#13131f', color: selected ? '#ddd6fe' : '#c4c2f0', fontSize: 12, cursor: 'pointer' }}>
+                              {selected && <span aria-hidden="true">✓ </span>}{guest}
+                            </button>;
+                          })}
+                        </div>
+                      ) : <div style={{ color: '#9491b8', fontSize: 11 }}>Add a guest in Overview to select them here.</div>}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, paddingTop: 2 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b89ab', cursor: 'pointer' }}>
@@ -1960,28 +2004,6 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
               </div>
             );
           })}
-        </div>
-      )}
-
-      {!readOnly && headlinerSongs.length > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: '#4a4870', fontFamily: "'DM Mono', monospace", marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pick from headliner setlist</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-            {headlinerSongs.map(s => {
-              const name = getSongName(s);
-              const active = songs.some(x => getSongName(x) === name);
-              return (
-                <button key={name} onClick={() => save(active ? songs.filter(x => getSongName(x) !== name) : [...songs, s])}
-                  style={{ padding: '3px 9px', borderRadius: 99, fontSize: 11, cursor: 'pointer',
-                    background: active ? '#f472b6' : '#13131f',
-                    color: active ? '#0c0c14' : '#6b6a8f',
-                    border: `1px solid ${active ? '#f472b6' : '#2e2e50'}`,
-                    fontWeight: active ? 700 : 400, fontFamily: "'DM Mono', monospace" }}>
-                  {name}
-                </button>
-              );
-            })}
-          </div>
         </div>
       )}
 
@@ -2031,6 +2053,7 @@ function normalizeConcertForm(concert) {
   const tickets = hasItemizedTickets ? concert.tickets : (concert.ticketPrice ? [{ name: 'Ticket', price: concert.ticketPrice }] : []);
   return {
     ...concert,
+    setlist: concert.type === 'festival' ? concert.setlist : placeLegacyGuests(concert.setlist, concert.supportSetlists, overviewGuests(concert)).rows,
     friends: Array.isArray(concert.friends) ? concert.friends : [],
     support: Array.isArray(concert.support) ? concert.support : [],
     merch: Array.isArray(concert.merch) ? concert.merch : [],
@@ -2058,25 +2081,32 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptSections, setReceiptSections] = useState(['general', 'setlist']);
   const [receiptSort, setReceiptSort] = useState('performed');
+  const [receiptFilter, setReceiptFilter] = useState('all');
+  const [setlistFilter, setSetlistFilter] = useState('all');
   const [receiptCosts, setReceiptCosts] = useState(['tickets']);
   const [receiptColour,setReceiptColour]=useState('light');
   const receiptPalette={light:{bg:'#f4f1e8',text:'#2a2a2a',muted:'#706b62',line:'#aaa396',accent:'#85521c'},dark:{bg:'#17172a',text:'#e2e0ff',muted:'#a5a0bf',line:'#514a66',accent:'#c4a7ff'},purple:{bg:'#eee7fa',text:'#30213f',muted:'#766184',line:'#b9a4ca',accent:'#7b3fac'},blue:{bg:'#e5effa',text:'#192f49',muted:'#536e88',line:'#99b2ce',accent:'#245e9b'}}[receiptColour];
-  const receiptSongs = () => {
-    let pendingLabel = '';
-    const songs = normalizeSetlistRows(concert.setlist).flatMap(row => {
-      if (isSectionRow(row)) { pendingLabel = row.label; return []; }
-      const song = typeof row === 'string' ? {name:row} : {...row};
-      if (pendingLabel) { song.sectionLabel = pendingLabel; pendingLabel = ''; }
-      return [song];
-    });
-    if (receiptSort === 'album') songs.sort((a,b) => (a?.albumName || 'Unknown album').localeCompare(b?.albumName || 'Unknown album') || getSongName(a).localeCompare(getSongName(b)));
-    if (receiptSort === 'alpha') songs.sort((a,b) => getSongName(a).localeCompare(getSongName(b)));
-    return songs;
+  const setlistPerformers = useMemo(() => concertSetlistPerformers(concert), [concert]);
+  const hasSupportSongs = setlistPerformers.some(p => p.role === 'support' && p.songs.some(row => !isSectionRow(row)));
+  const hasGuestSongs = setlistPerformers.some(p => p.songs.some(row => songGuestNames(row).length > 0));
+  const hasHeadlinerSongs = setlistPerformers.some(p => p.role === 'headliner' && p.songs.some(row => !isSectionRow(row)));
+  const availableSetlistScopes = {
+    all: true, headliner: hasHeadlinerSongs && hasSupportSongs, support: hasSupportSongs,
+    guests: hasGuestSongs, 'support-guests': hasSupportSongs && hasGuestSongs,
   };
+  const setlistScopes = SETLIST_SCOPES.filter(([id]) => availableSetlistScopes[id]);
+  const activeSetlistFilter = setlistScopes.some(([id]) => id === setlistFilter) ? setlistFilter : 'all';
+  const activeReceiptFilter = setlistScopes.some(([id]) => id === receiptFilter) ? receiptFilter : 'all';
+  const receiptGroups = showReceipt ? filterSetlistPerformers(setlistPerformers, activeReceiptFilter)
+    .filter(p => p.songs.some(row => !isSectionRow(row)))
+    .map(p => ({ ...p, songs: receiptSetlistRows(p.songs, receiptSort) })) : [];
+  const showReceiptPerformers = receiptGroups.length > 1 || receiptGroups[0]?.role === 'support';
   const receiptRef = useRef(null);
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
-  useEffect(() => { setDetailTab('general'); }, [concert.id]);
+  useEffect(() => { setDetailTab('general'); setSetlistFilter('all'); }, [concert.id]);
+  const goBackFromDetail = () => detailTab === 'general' ? onClose() : setDetailTab('general');
+  useBackButton(goBackFromDetail, detailTab !== 'general');
   const [setlistView, setSetlistViewState] = useState(() => ({ notes: true, albums: false, ments: true, encore: true, surprise: true, headers: true, covers: true, ...(settings.setlistView || {}) }));
   const setSetlistView = updater => setSetlistViewState(prev => {
     const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -2105,6 +2135,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   // * deterministic path (userId/concertId.jpg) with upsert, so the old file is
   // * overwritten rather than orphaned.
   const pendingPhotoDeletes = useRef([]);
+  const cancelEditing = () => {
+    pendingPhotoDeletes.current = [];
+    setEditing(false);
+  };
+  useBackButton(cancelEditing, editing);
   const [friendInput, setFriendInput] = useState('');
   const [supportInput, setSupportInput] = useState('');
   const [supportRole, setSupportRole] = useState('support');
@@ -2164,16 +2199,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
     setForm(f => ({ ...f, otherCosts: (f.otherCosts || []).filter((_, i) => i !== idx) }));
   };
 
-  const addSupport = () => {
+  const addSupport = (role = supportRole) => {
     const t = supportInput.trim();
-    if (!t || (form.support || []).some(x => getSupportName(x) === t)) return;
-    setForm(f => ({ ...f, support: [...(f.support || []), { name: t, role: supportRole }] }));
+    if (!t || form.support.some(act => getSupportName(act).toLowerCase() === t.toLowerCase())) return;
+    setForm(f => ({ ...f, support: [...f.support, { name: t, role }] }));
     setSupportInput('');
   };
   const removeSupport = (s) => setForm(f => ({ ...f, support: (f.support || []).filter(x => getSupportName(x) !== getSupportName(s)) }));
 
   const handleShare = async () => {
-    const songs = receiptSongs();
     const genres = getGenres(concert);
     const ticketItems = (concert.tickets && concert.tickets.length > 0)
       ? concert.tickets.filter(t => t.price).map(t => [t.name || "Ticket", parseFloat(t.price) || 0])
@@ -2205,15 +2239,23 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       ...moneyLines.map(([label, amount]) => `  ${label}: €${amount.toFixed(2)}`),
       moneyLines.length > 0 && receiptCosts.length > 1 ? `  Total: €${total.toFixed(2)}` : null,
     ];
-    const setlistLines = songs.length > 0 ? [
+    const setlistLines = receiptGroups.length ? [
       '🎶 Setlist:',
-      ...songs.flatMap((s, i) => {
-        const info = getSongInfo(s), cover = getSongCover(s);
-        const label = typeof s === 'object' ? s?.sectionLabel : null;
-        const line = `  ${i + 1}. ${getSongName(s)}${cover ? ` (${typeof cover === 'string' ? `${cover} cover` : 'cover'})` : ''}${info ? ` — ${info}` : ''}`;
-        const album = receiptSort === 'album' && s?.albumName && s.albumName !== songs[i-1]?.albumName ? [`  — ${s.albumName} —`] : [];
-        const parts = s?.type === 'medley' ? (s.parts || []).map(p => '      · '+getSongName(p)+(getSongInfo(p) ? ' — '+getSongInfo(p) : '')) : [];
-        return [...album, ...(receiptSort === 'performed' && label ? [`  — ${label} —`] : []), s?.type === 'medley' ? `  ${i + 1}. Mashup of` : line, ...parts];
+      ...receiptGroups.flatMap(({ name, songs }) => {
+        let position = 0;
+        return [
+          ...(showReceiptPerformers ? [name] : []),
+          ...songs.flatMap(song => {
+            if (isSectionRow(song)) return ['  — ' + song.label + ' —', ...(song.sectionNote ? ['  ' + song.sectionNote] : [])];
+            const info = getSongInfo(song), cover = getSongCover(song);
+            const title = song?.type === 'medley' ? 'Mashup of' : getSongName(song);
+            const guests = songGuestNames(song);
+            const credit = guests.length ? ' · with ' + guests.join(', ') : '';
+            const coverText = cover ? ' (' + (typeof cover === 'string' ? cover + ' cover' : 'cover') + ')' : '';
+            const parts = song?.type === 'medley' ? (song.parts || []).map(part => '      · ' + getSongName(part) + (getSongInfo(part) ? ' — ' + getSongInfo(part) : '')) : [];
+            return ['  ' + ++position + '. ' + title + coverText + credit + (info ? ' — ' + info : ''), ...parts];
+          }),
+        ];
       }),
     ] : [];
 
@@ -2357,17 +2399,23 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             ! translucent status bar — without the safe-area inset the Share/Edit
             ! buttons sit underneath the clock and battery icons. */}
         <div className={`glass-header${headerElevated ? ' header-elevated' : ''}`} style={{ position: "sticky", top: 0, borderBottom: "1px solid #1e3028", padding: "16px 20px", paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>←</button>
+          <button onClick={goBackFromDetail} aria-label={detailTab === 'general' ? 'Close show' : 'Back to General'} style={{ background: "none", border: "none", color: "#a78bfa", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <button onClick={() => onNavigate({ view: 'artists', artist: concert.artist })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", maxWidth: "100%" }}>{concert.artist} ›</button>
             <div style={{ fontSize: 11, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDate(concert.date)}{concert.endDate && concert.endDate !== concert.date ? ` – ${formatDate(concert.endDate)}` : ''} · {online ? formatOnlineLocation(concert) : concert.city}</div>
           </div>
-          <button onClick={() => { setReceiptSections(['general','setlist']); setReceiptCosts(['tickets']); setReceiptSort('performed'); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
+          <button onClick={() => { setReceiptSections(hasHeadlinerSongs || hasSupportSongs ? ['general','setlist'] : ['general']); setReceiptCosts(['tickets']); setReceiptSort(setlistSort === 'album' ? 'album' : 'performed'); setReceiptFilter(activeSetlistFilter); setShowReceipt(true); }} style={{ background: "none", border: "1px solid #1f1f35", color: "#6b6a8f", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Share</button>
           <button onClick={() => {setForm(normalizeConcertForm(concert));setEditing(true)}} style={{ background: "#1a1a30", border: "1px solid #2e2e50", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Edit</button>
         </div>
 
         {/* Venue + tour hero */}
         <div style={{ padding: "20px 20px 0" }}>
+          {!concert.wishlist && !past && detailTab === 'general' && (() => {
+            const photoKey = Object.keys(settings.artistPhotos || {}).find(name => name.toLowerCase() === (concert.artist || '').toLowerCase());
+            const artistPhoto = settings.artistPhotos?.[photoKey];
+            const path = artistPhoto || concert.photo;
+            return path && <PhotoImg eager path={path} pos={artistPhoto ? settings.artistPhotoPos?.[photoKey] : concert.photoPos} variant="detail" style={{width:'100%',height:116,borderRadius:10,marginBottom:14}} />;
+          })()}
           <div style={{ marginBottom: 14 }}>
             {online ? (
               <>
@@ -2454,20 +2502,16 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
-          {!concert.wishlist && !past && detailTab==='general' && <>
-            {concert.photo && <PhotoImg eager path={concert.photo} pos={concert.photoPos} variant="detail" style={{width:'100%',aspectRatio:'16 / 9',borderRadius:12}} />}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              {[['timetable','Timetable',concert.showTime?'Starts '+concert.showTime:concert.doorsTime?'Doors '+concert.doorsTime:'Show times'],['tickets','Tickets',concert.ticketAccessUrl||concert.ticketAccessNote?'Ticket location saved':concert.ticketType||'Ticket details']].map(([id,label,sub])=><button key={id} onClick={()=>setDetailTab(id)} style={{...detailCard,textAlign:'left',minWidth:0,cursor:'pointer',color:'#c4c2f0'}}><span style={{display:'flex',justifyContent:'space-between',gap:6,fontSize:13,fontWeight:700}}>{label}<span style={{color:'#a78bfa'}}>›</span></span><span style={{display:'block',marginTop:5,color:'#9491b8',fontSize:11,overflowWrap:'anywhere'}}>{sub}</span></button>)}
-            </div>
-            <section>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44}}><span style={{fontFamily:"'Syne', sans-serif",fontSize:16,fontWeight:700,color:'#e2e0ff'}}>Your plans</span><button onClick={()=>{setEditorTab('show');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44,fontSize:12}}>Edit plans</button></div>
-              <div style={{padding:'12px 0',borderBottom:'1px solid #25243a'}}><div style={{fontSize:11,color:'#6b6a8f',marginBottom:6}}>Going with</div><div style={{display:'flex',flexWrap:'wrap',gap:8}}>{getFriends(concert).length?getFriends(concert).map(name=><span key={name} style={{display:'inline-flex',alignItems:'center',gap:7,fontSize:13,color:'#c4c2f0'}}><FriendAvatar name={name} size={26} />{name}</span>):<span style={{fontSize:13,color:'#9491b8'}}>{concert.solo?'Going solo':'Add your companions or choose solo'}</span>}</div></div>
-              {!online && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:48,borderBottom:'1px solid #25243a',color:'#a78bfa',fontSize:13,textDecoration:'none'}}><span>Directions to {concert.venue}</span><span aria-hidden="true">↗</span></a>}
-              <div style={{padding:'6px 0 12px',borderBottom:'1px solid #25243a'}}><ShowPreparationChecklist key={concert.id} concert={concert} settings={settings} /></div>
-              <div style={{padding:'14px 0'}}><div style={{fontSize:11,color:'#6b6a8f',marginBottom:8}}>Notes for the day</div><div style={{fontSize:13,lineHeight:1.6,color:'#9491b8',whiteSpace:'pre-wrap'}}>{concert.notes||'Meeting point, travel plans, or anything to remember.'}</div></div>
-            </section>
-          </>}
-          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} compact /></>}
+          {!concert.wishlist && !past && detailTab === 'general' && (
+            <UpcomingNightRoute
+              concert={concert}
+              settings={settings}
+              online={online}
+              onTimetable={() => setDetailTab('timetable')}
+              onEdit={() => { setForm(normalizeConcertForm(concert)); setEditorTab('show'); setEditing(true); }}
+            />
+          )}
+          {!concert.wishlist && !past && detailTab==='timetable' && <><ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={()=>{setForm(normalizeConcertForm(concert));setEditorTab('timetable');setEditing(true)}} /><CalendarExport concert={concert} compact /></>}
           {!concert.wishlist && !past && detailTab==='tickets' && <><div style={detailCard}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>{sec('Tickets')}<button onClick={()=>{setEditorTab('tickets');setEditing(true)}} style={{background:'none',border:0,color:'#a78bfa',minHeight:44}}>Edit tickets</button></div><div style={{color:'#c4c2f0',fontSize:13,lineHeight:1.7}}>{(concert.tickets||[]).map(t=>t.name).filter(Boolean).join(' · ')||concert.ticketType||'Ticket details not added'}{ticketTotal(concert)>0?' · €'+ticketTotal(concert).toFixed(2):''}</div>{safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',padding:'10px 0',color:'#a78bfa',fontSize:13}}>Ticket website ↗</a>}<div style={{borderTop:'1px solid #25243a',marginTop:12,paddingTop:12}}>{sec('Where to find your ticket')}{safeExternalUrl(concert.ticketAccessUrl)&&<a href={safeExternalUrl(concert.ticketAccessUrl)} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,color:'#a78bfa',fontSize:13}}>Open my ticket ↗</a>}{concert.ticketAccessNote&&<div style={{color:'#c4c2f0',fontSize:13,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{concert.ticketAccessNote}</div>}{!concert.ticketAccessUrl&&!concert.ticketAccessNote&&<div style={{color:'#9491b8',fontSize:12}}>Add a link or a note in Edit tickets.</div>}</div></div></>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
@@ -2610,28 +2654,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             const roleConfig = {
               headliner: { color: '#a78bfa', bg: '#1a1a30' },
               support:   { color: '#818cf8', bg: '#131328' },
-              guest:     { color: '#f472b6', bg: '#1a1030' },
             };
-            const headlinerEntry = { key: '__headliner__', name: concert.artist, role: 'headliner',
-              songs: normalizeSetlistRows(concert.setlist),
-              onSaveSetlist: (s) => onSave({ ...concert, setlist: s }) };
-            const supportEntries = (concert.support || []).filter(s => getSupportRole(s) !== 'guest').map(s => {
-              const name = getSupportName(s); const role = getSupportRole(s);
-              return { key: name, name, role,
-                songs: normalizeSetlistRows((concert.supportSetlists || {})[name]),
-                onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
-            });
-            // Guests (brought out during someone else's set for a song or two) aren't
-            // their own timeslot — nested inside the headliner's card instead of
-            // getting equal billing as a separate card.
-            const guestEntries = (concert.support || []).filter(s => getSupportRole(s) === 'guest').map(s => {
-              const name = getSupportName(s);
-              return { key: name, name,
-                songs: normalizeSetlistRows((concert.supportSetlists || {})[name]),
-                onSaveSetlist: (ns) => onSave({ ...concert, supportSetlists: { ...(concert.supportSetlists || {}), [name]: ns } }) };
-            });
-            // Chronological order: openers/support play first, headliner closes the night.
-            const performers = [...supportEntries, headlinerEntry];
+            const guestNames = featuredGuests(concert);
+            const openSetlistArtist = guest => onNavigate({ view: 'artists', artist: guestNames.find(name => name.toLowerCase() === guest.toLowerCase()) || guest });
+            const performers = filterSetlistPerformers(setlistPerformers, activeSetlistFilter);
             const allSongsFlat = performers.flatMap(p => p.songs);
             // Excludes intro-like entries (e.g. SKZ Anthem) from the counted stats —
             // iconic, but not really "a song" in the sense of songs played/length.
@@ -2682,8 +2708,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                       <button
                         disabled={exportingPlaylist}
                         onClick={() => {
-                          const p = performers.length === 1 ? performers[0] : performers.reduce((a, b) => getSongList(a.songs).length >= getSongList(b.songs).length ? a : b);
-                          handleExportPlaylist(getSongList(p.songs), p.name);
+                          const songs = performers.flatMap(p => getSongList(receiptSetlistRows(p.songs, setlistSort === 'album' ? 'album' : 'performed')));
+                          handleExportPlaylist(songs, performers.length === 1 ? performers[0].name : concert.artist);
                         }}
                         aria-label="Save to Spotify" title={exportingPlaylist ? 'Saving…' : 'Save to Spotify'}
                         style={{ background: 'none', border: 'none', padding: 4, color: '#1DB954', cursor: exportingPlaylist ? 'default' : 'pointer', lineHeight: 1, display: 'flex', opacity: exportingPlaylist ? 0.5 : 1 }}
@@ -2708,6 +2734,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                     </>
                   )}
                 </div>
+                {setlistScopes.length > 1 && <SetlistScopeSelect options={setlistScopes} value={activeSetlistFilter} onChange={setSetlistFilter} style={{ width: '100%', margin: '0 0 12px' }} />}
                 {(() => {
                   const formatMs = ms => { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; };
                   // A partial sum is only useful as a lower bound if most of the show
@@ -2744,24 +2771,13 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                     </div>
                   ) : null;
                 })()}
-                {performers.length === 1 ? (
+                {performers.length === 1 && performers[0].role === 'headliner' ? (
                   <>
                     {performers[0].songs.length > 0
-                      ? <SetlistSection concert={concert} settings={settings} onSaveSetlist={performers[0].onSaveSetlist} readOnly setlistView={setlistView} sortMode={setlistSort} />
+                      ? <SetlistSection concert={concert} settings={settings} overrideSongs={performers[0].songs} onArtistClick={openSetlistArtist} readOnly setlistView={setlistView} sortMode={setlistSort} />
                       : <div style={{ fontSize: 12, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>}
-                    {guestEntries.map(g => (
-                      <div key={g.key} style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed #2e2e50' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: g.songs.length > 0 ? 6 : 0 }}>
-                          <span style={{ fontSize: 9, color: roleConfig.guest.color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: roleConfig.guest.bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>guest</span>
-                          <span onClick={() => onNavigate({ view: 'artists', artist: g.name })} style={{ color: '#c4c2f0', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{g.name}</span>
-                        </div>
-                        {g.songs.length > 0 && (
-                          <SetlistSection concert={concert} settings={settings} overrideSongs={g.songs} overrideArtist={g.name} onSaveSetlist={g.onSaveSetlist} readOnly setlistView={setlistView} />
-                        )}
-                      </div>
-                    ))}
                   </>
-                ) : performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
+                ) : performers.map(({ key, name, role, songs }) => {
                   const { color, bg } = roleConfig[role] || roleConfig.support;
                   return (
                     <div key={key} style={{ marginBottom: 6 }}>
@@ -2786,26 +2802,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                           {songs.length > 0
                             ? <SetlistSection
                                 concert={concert} settings={settings}
-                                overrideSongs={key === '__headliner__' ? undefined : songs}
+                                overrideSongs={songs}
+                                onArtistClick={openSetlistArtist}
                                 overrideArtist={key === '__headliner__' ? undefined : name}
-                                onSaveSetlist={save}
                                 readOnly
                                 setlistView={setlistView}
                                 sortMode={setlistSort}
                               />
                             : <div style={{ fontSize: 11, color: '#2e2e4a', fontFamily: "'DM Mono', monospace", padding: '8px 0' }}>no setlist logged</div>
                           }
-                          {key === '__headliner__' && guestEntries.map(g => (
-                            <div key={g.key} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #2e2e50' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: g.songs.length > 0 ? 6 : 0 }}>
-                                <span style={{ fontSize: 9, color: roleConfig.guest.color, fontFamily: "'DM Mono', monospace", padding: '1px 5px', background: roleConfig.guest.bg, borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>guest</span>
-                                <span onClick={() => onNavigate({ view: 'artists', artist: g.name })} style={{ color: '#c4c2f0', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{g.name}</span>
-                              </div>
-                              {g.songs.length > 0 && (
-                                <SetlistSection concert={concert} settings={settings} overrideSongs={g.songs} overrideArtist={g.name} onSaveSetlist={g.onSaveSetlist} readOnly setlistView={setlistView} />
-                              )}
-                            </div>
-                          ))}
                         </div>
                       )}
                     </div>
@@ -2827,7 +2832,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const travelItems = (concert.travelCost ? [["Travel", parseFloat(concert.travelCost) || 0]] : []);
           const moneyLines = [...(receiptCosts.includes('tickets') ? ticketItems : []), ...(receiptCosts.includes('merch') ? merchItems : []), ...(receiptCosts.includes('other') ? otherCostItems : []), ...(receiptCosts.includes('travel') ? travelItems : [])];
           const total = moneyLines.reduce((s, [, v]) => s + v, 0);
-          const songs = receiptSongs();
+          const songs = receiptGroups.flatMap(p => p.songs).filter(song => !isSectionRow(song));
           const genres = getGenres(concert);
           const lineup = concert.type === 'festival' ? (concert.acts || []).map(a => a.name).filter(Boolean) : [];
           const tabs = [['general', 'General'], ['financial', 'Financial'], ...(songs.length > 0 ? [['setlist', 'Setlist']] : []), ['notes', 'Notes']];
@@ -2858,31 +2863,32 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   <span>{songs.length} songs</span><span>{formatSetlistLength(setlistTotalMs)}</span>
                 </div>
               )}
-              {songs.map((s, i) => {
-                const info = getSongInfo(s), cover = getSongCover(s), label = getSongSectionLabel ? getSongSectionLabel(s) : (typeof s === 'object' && s?.sectionLabel);
-                const album = typeof s === 'object' ? (s?.albumName || null) : null;
-                const prevAlbum = i > 0 && typeof songs[i - 1] === 'object' ? (songs[i - 1]?.albumName || null) : null;
-                const showAlbum = receiptSort === 'album' && album && album !== prevAlbum;
-                return (
-                  <div key={i}>
-                    {showAlbum && (
-                      <div style={{ fontSize: 9, letterSpacing: "0.08em", color: "var(--receipt-muted)", margin: i === 0 ? "0 0 4px" : "8px 0 4px", textTransform: "uppercase" }}>{album}</div>
-                    )}
-                    {receiptSort === 'performed' && label && (
-                      <div style={{ textAlign: "center", fontSize: 10, letterSpacing: "0.1em", color: "var(--receipt-accent)", margin: i === 0 ? "0 0 6px" : "10px 0 6px", textTransform: "uppercase" }}>
-                        — {label.toLowerCase()} —
+              {receiptGroups.map(({ key, name, songs: rows }) => {
+                let position = 0;
+                return <div key={key} style={{ marginTop: 8 }}>
+                  {showReceiptPerformers && <div style={{ fontWeight: 700, marginBottom: 6 }}>{name}</div>}
+                  {rows.map((s, i) => {
+                    if (isSectionRow(s)) return (
+                      <div key={i} style={{ color: 'var(--receipt-accent)', margin: '8px 0 6px', fontSize: 10 }}>
+                        <div style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em' }}>— {s.label} —</div>
+                        {s.sectionNote && <div style={{ paddingLeft: 32, color: 'var(--receipt-muted)', fontStyle: 'italic' }}>{s.sectionNote}</div>}
                       </div>
-                    )}
-                    <div style={{ marginBottom: 6, lineHeight: 1.5, textAlign: "left" }}>
+                    );
+                    const info = getSongInfo(s), cover = getSongCover(s), guests = songGuestNames(s);
+                    const number = ++position;
+                    return (
+                    <div key={i} style={{ marginBottom: 6, lineHeight: 1.5, textAlign: "left" }}>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                        <span style={{ color: "var(--receipt-muted)", width: 24, flexShrink: 0, textAlign: "right" }}>{i + 1}.</span>
+                        <span style={{ color: "var(--receipt-muted)", width: 24, flexShrink: 0, textAlign: "right" }}>{number}.</span>
                         <span style={{minWidth:0,flex:1,overflowWrap:"anywhere",textAlign:"left"}}>{s?.type === 'medley' ? 'Mashup of' : getSongName(s)}{cover && <span style={{ color: "var(--receipt-accent)" }}> ↩ {typeof cover === 'string' ? cover : 'cover'}</span>}</span>
                       </div>
                       {s?.type === 'medley' && (s.parts || []).map((part,pi)=><div key={pi} style={{marginLeft:32,minWidth:0,fontSize:11,lineHeight:1.5,overflowWrap:'anywhere',textAlign:'left'}}>{getSongName(part)}{getSongInfo(part) && <span style={{color:'#777',fontStyle:'italic'}}> — {getSongInfo(part)}</span>}</div>)}
+                      {guests.length > 0 && <div style={{ paddingLeft: 32, color: 'var(--receipt-accent)', fontSize: 11 }}>with {guests.join(', ')}</div>}
                       {info && <div style={{ paddingLeft: 32, color: "var(--receipt-muted)", fontSize: 11, fontStyle: "italic" }}>"{info}"</div>}
                     </div>
-                  </div>
-                );
+                    );
+                  })}
+                </div>;
               })}
             </Section>
           );
@@ -2895,6 +2901,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                   <div style={{padding:'0 14px 10px',maxHeight:'35dvh',overflowY:'auto'}}>
                     {tabs.map(([id,label])=><div key={id}>
                       <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:46,borderTop:'1px solid #25243a',fontSize:13}}>{label}<input type="checkbox" checked={receiptSections.includes(id)} onChange={e=>setReceiptSections(old=>e.target.checked?[...old,id]:old.length>1?old.filter(x=>x!==id):old)} style={{accentColor:'#a78bfa',width:18,height:18}} /></label>
+                      {id==='setlist' && receiptSections.includes(id) && setlistScopes.length > 1 && <SetlistScopeSelect options={setlistScopes} value={activeReceiptFilter} onChange={setReceiptFilter} style={{ width: '100%', margin: '4px 0' }} />}
                       {id==='setlist' && receiptSections.includes(id) && <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44,paddingLeft:12,fontSize:12,color:'#9491b8'}}>Order<select value={receiptSort} onChange={e=>setReceiptSort(e.target.value)} style={{background:'#13131f',color:'#a78bfa',border:0,maxWidth:'65%',padding:'8px 0',fontSize:16}}><option value="performed">Performed order</option><option value="album">By album</option><option value="alpha">A–Z</option></select></label>}
                       {id==='financial' && receiptSections.includes(id) && [['tickets','Ticket price'],['merch','Merch'],['travel','Travel'],['other','Other costs']].map(([key,text])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44,paddingLeft:12,fontSize:12,color:'#9491b8'}}>{text}<input type="checkbox" checked={receiptCosts.includes(key)} onChange={e=>setReceiptCosts(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))} style={{accentColor:'#a78bfa',width:18,height:18}} /></label>)}
                     </div>)}
@@ -2941,7 +2948,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         borderBottom: "1px solid #1e3028", padding: "16px 20px",
         display: "flex", alignItems: "center", gap: 12, zIndex: 10
       }}>
-        <button onClick={() => { pendingPhotoDeletes.current = []; setEditing(false); }} style={{
+        <button onClick={cancelEditing} style={{
           background: "none", border: "none", color: "#a78bfa",
           fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1
         }}>←</button>
@@ -2966,7 +2973,53 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
       <ConcertEditorTabs value={editorTab} onChange={setEditorTab} festival={form.type === 'festival'} upcoming={!past} />
       <div style={{ padding: "20px" }}>
 
-        {editorTab==='timetable' && !form.wishlist && form.date && form.date!=='9999-12-31' && (form.endDate || form.date)>=localDay() && <div style={{background:'#13131f',border:'1px solid #1f1f35',borderRadius:12,padding:16,marginBottom:12}}><div style={{fontFamily:"'Syne', sans-serif",fontWeight:700,marginBottom:12,color:'#e2e0ff'}}>Show times</div><label style={{display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:44,fontSize:13,color:"#c4c2f0"}}>Show VIP time<input type="checkbox" checked={form.showVipTime??settings.showVipTime??true} onChange={e=>update("showVipTime",e.target.checked)} style={{accentColor:"#a78bfa"}} /></label>{visibleShowTimeFields(form,settings).map(([key,label])=><label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>{label}<input type="time" value={form[key]||''} onChange={e=>update(key,e.target.value)} style={{background:"#0c0c14",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:140,fontSize:16}} /></label>)}<div style={{fontSize:11,color:'#6b6a8f',marginTop:8}}>Times are local to the venue; countdown currently uses your phone’s timezone. Leave unknown times empty. Expected end may be an estimate.</div><label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>Event-page link<input type="url" value={form.scheduleUrl||''} onChange={e=>update('scheduleUrl',e.target.value)} placeholder="https://venue.com/this-event" style={{...inputStyle,marginTop:6}} /></label></div>}
+        {editorTab === 'timetable' && !form.wishlist && form.date && form.date !== '9999-12-31' && (form.endDate || form.date) >= localDay() && (
+          <div style={{ ...detailCard, padding: 16, marginBottom: 12 }}>
+            {sec('Show times')}
+            <label style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:44,fontSize:13,color:'#c4c2f0'}}>
+              Show VIP time
+              <input type="checkbox" checked={form.showVipTime ?? settings.showVipTime ?? true} onChange={e => update('showVipTime', e.target.checked)} style={{accentColor:'#a78bfa'}} />
+            </label>
+            {visibleShowTimeFields(form, settings).map(([key, label]) => (
+              <label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>
+                {label}
+                <input type="time" value={form[key] || ''} style={{ ...inputStyle, width: 140, fontSize: 16 }} onChange={e => {
+                  const value = e.target.value;
+                  setForm(current => ({
+                    ...current,
+                    [key]: value,
+                    scheduleSources: { ...current.scheduleSources, [key]: { manual: true } },
+                  }));
+                }} />
+              </label>
+            ))}
+            <div style={{borderTop:'1px solid #25243a',marginTop:10,paddingTop:12}}>
+              {sec('Support acts')}
+              {form.support.map((act, index) => getSupportRole(act) === 'guest' ? null : (
+                <label key={index} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:48,color:'#c4c2f0',fontSize:13}}>
+                  <span style={{overflowWrap:'anywhere'}}>{getSupportName(act)}</span>
+                  <input aria-label={getSupportName(act) + ' start time'} type="time" value={act.time || ''} style={{ ...inputStyle, width: 140, flexShrink: 0, fontSize: 16 }} onChange={e => {
+                    const time = e.target.value;
+                    setForm(current => ({ ...current, support: current.support.map((entry, i) => {
+                      if (i !== index) return entry;
+                      const details = typeof entry === 'string' ? { name: entry, role: 'support' } : entry;
+                      return { ...details, time, timeManuallySet: true };
+                    }) }));
+                  }} />
+                </label>
+              ))}
+              <div style={{display:'flex',gap:8,marginTop:8}}>
+                <input aria-label="Support act name" value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addSupport('support'); }} placeholder="Support act name" style={{...inputStyle, minWidth:0, fontSize:16}} />
+                <button type="button" onClick={() => addSupport('support')} style={{...inputStyle,width:'auto',minHeight:44,color:'#a78bfa'}}>Add</button>
+              </div>
+            </div>
+            <div style={{fontSize:11,color:'#9491b8',marginTop:12}}>Use venue-local times. Leave unknown times empty.</div>
+            <label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>
+              Event-page link
+              <input type="url" value={form.scheduleUrl || ''} onChange={e => update('scheduleUrl', e.target.value)} placeholder="https://venue.com/this-event" style={{...inputStyle,marginTop:6}} />
+            </label>
+          </div>
+        )}
 
         {/* Cards */}
         {[
@@ -3130,7 +3183,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
                 {(form.support || []).map(s => {
                   const name = getSupportName(s); const role = getSupportRole(s);
-                  const toggleRole = () => setForm(f => ({ ...f, support: f.support.map(x => getSupportName(x) === name ? { name, role: getSupportRole(x) === 'guest' ? 'support' : 'guest' } : x) }));
+                  const toggleRole = () => setForm(f => ({ ...f, support: f.support.map(x => getSupportName(x) === name ? { ...(typeof x === 'object' ? x : {}), name, role: getSupportRole(x) === 'guest' ? 'support' : 'guest' } : x) }));
                   return (
                     <span key={name} style={{ display:"flex", alignItems:"center", gap:4, background:"#1a1a30", border:"1px solid #2e2e50", borderRadius:99, padding:"3px 10px", fontSize:12, color:"#a78bfa" }}>
                       {name}
@@ -3148,7 +3201,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             </div>
             <div style={{ display:"flex", gap:8, marginBottom: 14 }}>
               <input value={supportInput} onChange={e=>setSupportInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSupport()} placeholder="Add support act..." style={{ ...inputStyle, flex:1 }} />
-              <button onClick={addSupport} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
+              <button onClick={() => addSupport()} style={{ background:"none", border:"1px solid #2a4a3a", borderRadius:6, color:"#a78bfa", fontSize:11, padding:"0 12px", cursor:"pointer" }}>+</button>
             </div>
             <div style={labelStyle}>Genre</div>
             <DropdownSelect
@@ -3338,9 +3391,22 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           </> },
 
           /* ── NOTES ── */
-          { title: 'Notes', content:
-            <textarea value={form.notes || ""} onChange={e => update("notes", e.target.value)} rows={3} style={{ ...inputStyle, resize:"vertical" }} placeholder="Any notes..." />
-          },
+          { title: 'Notes', content: <>
+            {!past && !form.wishlist && form.attendanceMode !== 'online' && (
+              <div style={{display:'grid',gap:10,marginBottom:12}}>
+                <label style={{...labelStyle,margin:0}}>
+                  Meet at
+                  <input type="time" value={form.meetupTime || ''} onChange={e => update('meetupTime', e.target.value)} style={{...inputStyle,marginTop:5}} />
+                </label>
+                <label style={{...labelStyle,margin:0}}>
+                  Meeting point
+                  <input value={form.meetupLocation || ''} onChange={e => update('meetupLocation', e.target.value)} placeholder="Venue entrance or another address" style={{...inputStyle,marginTop:5}} />
+                </label>
+              </div>
+            )}
+            <textarea aria-label="Notes for the day" value={form.notes || ''} onChange={e => update('notes', e.target.value)} rows={3} style={{...inputStyle,resize:'vertical'}} placeholder="Any notes..." />
+          </> },
+
 
         ].filter(({title})=>past || title!=='Photo').map(({ title, content }) => (
           <div key={title} hidden={(!past && ['Notes','Going'].includes(title) ? 'show' : !past && title==='Tickets' ? 'tickets' : editorSectionTab(title)) !== editorTab} style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
@@ -3369,10 +3435,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           const roleConfig = {
             headliner: { color: '#a78bfa', bg: '#1a1a30' },
             support:   { color: '#818cf8', bg: '#131328' },
-            guest:     { color: '#f472b6', bg: '#1a1030' },
           };
           const performers = [
-            ...(form.support || []).map(s => {
+            ...(form.support || []).filter(s => getSupportRole(s) !== 'guest').map(s => {
               const name = getSupportName(s); const role = getSupportRole(s);
               return { key: name, name, role,
                 songs: normalizeSetlistRows((form.supportSetlists || {})[name]),
@@ -3382,9 +3447,15 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               songs: normalizeSetlistRows(form.setlist),
               onSaveSetlist: (s) => update('setlist', s) },
           ];
+          const { unassigned } = placeLegacyGuests(form.setlist, form.supportSetlists, overviewGuests(form));
           return (
             <div style={{ marginBottom: 24 }}>
               <div style={labelStyle}>Setlist</div>
+              {unassigned.length > 0 && <details style={{ color: '#9491b8', fontSize: 12, marginBottom: 10 }}>
+                <summary>Guest songs to assign</summary>
+                <p>Add the song if needed, then open it and select its guest.</p>
+                <ul>{unassigned.map(({guest, song}, index) => <li key={index}>{song} · {guest}</li>)}</ul>
+              </details>}
               {performers.map(({ key, name, role, songs, onSaveSetlist: save }) => {
                 const { color, bg } = roleConfig[role] || roleConfig.support;
                 return (
@@ -3418,11 +3489,10 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                           </button>
                         )}
                         <SetlistSection
-                          concert={concert} settings={settings}
+                          concert={form} settings={settings}
                           overrideSongs={songs}
                           overrideArtist={key === '__headliner__' ? undefined : name}
                           onSaveSetlist={save}
-                          headlinerSongs={role === 'guest' && key !== '__headliner__' ? getSongList(form.setlist) : []}
                           allArtists={allArtists}
                           onSetCriedSong={name => update('criedSong', name)}
                           criedSong={form.criedSong}
@@ -6134,6 +6204,12 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
       if (!supportAppearancesMap[name]) supportAppearancesMap[name] = [];
       supportAppearancesMap[name].push({ concert: c, role });
     });
+    const lineupNames = new Set((c.support || []).map(s => getSupportName(s).trim().toLowerCase()));
+    featuredGuests(c).forEach(name => {
+      if (lineupNames.has(name.toLowerCase())) return;
+      if (!supportAppearancesMap[name]) supportAppearancesMap[name] = [];
+      supportAppearancesMap[name].push({ concert: c, role: 'guest' });
+    });
     (c.acts || []).forEach(act => {
       const name = (act.name || '').trim();
       if (!supportAppearancesMap[name]) supportAppearancesMap[name] = [];
@@ -8660,7 +8736,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
         <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1, display: showChoices ? 'none' : undefined }}>
         {editorTab === 'setlist' && form.type !== 'festival' && <div>
           <SetlistSection concert={{ ...form, id: draftId }} settings={settings} onSaveSetlist={v => update('setlist', v)} allArtists={allArtists} />
-          {form.support.map(s => { const name = getSupportName(s); return <details key={name} style={{ marginTop: 18 }}><summary style={{ color: '#c4b5fd', cursor: 'pointer', marginBottom: 12 }}>{name}</summary><SetlistSection concert={{ ...form, id: draftId }} settings={settings} overrideArtist={name} overrideSongs={form.supportSetlists?.[name] || []} onSaveSetlist={v => setForm(f => withCriedTag({ ...f, supportSetlists: { ...f.supportSetlists, [name]: v } }))} allArtists={allArtists} /></details>; })}
+          {form.support.filter(s => getSupportRole(s) !== 'guest').map(s => { const name = getSupportName(s); return <details key={name} style={{ marginTop: 18 }}><summary style={{ color: '#c4b5fd', cursor: 'pointer', marginBottom: 12 }}>{name}</summary><SetlistSection concert={{ ...form, id: draftId }} settings={settings} overrideArtist={name} overrideSongs={form.supportSetlists?.[name] || []} onSaveSetlist={v => setForm(f => withCriedTag({ ...f, supportSetlists: { ...f.supportSetlists, [name]: v } }))} allArtists={allArtists} /></details>; })}
         </div>}
         {editorTab === 'memories' && <div style={{ marginBottom: 18 }}>
           <div style={{ fontFamily: "'Syne', sans-serif", color: '#e2e0ff', marginBottom: 12 }}>Concert photo</div>
@@ -10407,9 +10483,18 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
             <Collapsible title="Show day" icon="sliders" defaultOpen={false} {...sec('g-show-day')}>
               <div style={settingsCard}>
-                <SettingsRow label="Ready to go checklist" sub="One item per line. Used on the Today panel and upcoming shows.">
-                  <textarea aria-label="Ready to go checklist" value={local.showChecklistText??defaultPreparationItems.join('\n')} onChange={e=>lUpdate('showChecklistText',e.target.value)} rows={4} maxLength={1200} style={{width:'100%',background:'#13131f',border:'1px solid #2e2e50',borderRadius:8,color:'#c4c2f0',padding:10,fontSize:16,resize:'vertical'}} />
-                </SettingsRow>
+                <div style={{padding:'12px 2px 3px',fontSize:13,fontWeight:600,color:'#e2e0ff'}}>Ready to go checklist</div>
+                <div style={{padding:'0 2px 6px',fontSize:11,color:'#9491b8'}}>Choose the items shown on upcoming shows and the Today panel.</div>
+                {[...new Set([...defaultPreparationItems, ...preparationItems({showChecklistText:local.showChecklistText}), ...preparationItems(local)])].map(item => {
+                  const selected = preparationItems(local);
+                  const checked = selected.includes(item);
+                  return (
+                    <label key={item} style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:44,gap:10,padding:'6px 2px',borderBottom:'1px solid #1a1a24',color:'#c4c2f0',fontSize:13,cursor:'pointer'}}>
+                      {item}
+                      <input type="checkbox" role="switch" checked={checked} onChange={e => lUpdate('showChecklistItems', e.target.checked ? [...selected, item] : selected.filter(label => label !== item))} style={{width:18,height:18,accentColor:'#a78bfa'}} />
+                    </label>
+                  );
+                })}
                 <SettingsRow label="VIP time" sub="Show a VIP start row by default. You can override it for a show."><SettingsToggle checked={local.showVipTime!==false} onChange={v=>lUpdate('showVipTime',v)} /></SettingsRow>
               </div>
             </Collapsible>
@@ -11366,6 +11451,63 @@ export default function ConcertTracker(props) {
 function safeExternalUrl(value) {
   try {const url=new URL(value);return ['https:','http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null}catch{return null}
 }
+function UpcomingNightRoute({concert,settings,online,onTimetable,onEdit}) {
+  const companions = getFriends(concert);
+  const meetingPoint = concert.meetupLocation?.trim();
+  const destination = [meetingPoint || concert.venue, concert.city, concert.country].filter(Boolean).join(', ');
+  const directions = !online && (meetingPoint || concert.venue)
+    ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination)
+    : '';
+  const notes = concert.notes?.trim();
+  const stops = [];
+  if (!online && (concert.meetupTime || meetingPoint || concert.venue)) {
+    stops.push({
+      key: 'meet',
+      time: concert.meetupTime,
+      label: meetingPoint ? 'Meet at ' + meetingPoint : 'Meet at the entrance',
+      link: directions,
+    });
+  }
+  if (concert.doorsTime) stops.push({key:'doors',time:concert.doorsTime,label:'Doors open'});
+  stops.push({key:'show',time:concert.showTime,label:concert.showTime?'Show starts':'Timetable'});
+
+  return (
+    <section aria-label="Night route">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginLeft:12}}>
+        <h2 style={{fontFamily:"'Syne', sans-serif",fontSize:16,color:'#e2e0ff'}}>Your evening</h2>
+        <button type="button" onClick={onEdit} style={{background:'none',border:0,color:'#a78bfa',minHeight:44,fontSize:12}}>Edit plans</button>
+      </div>
+      <ol style={{listStyle:'none',margin:'4px 0 12px 18px',padding:'0 0 0 14px',borderLeft:'1px solid #594782'}}>
+        {stops.map(stop => (
+          <li key={stop.key} style={{position:'relative',display:'grid',gridTemplateColumns:'46px minmax(0, 1fr)',gap:10,padding:'7px 0',color:'#c4c2f0',fontSize:13}}>
+            <span aria-hidden="true" style={{position:'absolute',left:-19,top:12,width:9,height:9,borderRadius:'50%',background:'#a78bfa',border:'2px solid #0c0c14'}} />
+            <span style={{fontFamily:"'DM Mono', monospace",color:'#a78bfa',fontSize:12,lineHeight:'22px'}}>{stop.time}</span>
+            <div style={{minWidth:0,overflowWrap:'anywhere'}}>
+              {stop.key === 'show' ? (
+                <button type="button" onClick={onTimetable} style={{padding:0,minHeight:44,marginTop:-11,background:'none',border:0,color:'#c4c2f0',fontSize:13,textAlign:'left'}}>{stop.label} <span style={{color:'#a78bfa'}}>›</span></button>
+              ) : <div style={{lineHeight:'22px'}}>{stop.label}</div>}
+              {stop.link && <a href={stop.link} target="_blank" rel="noopener noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:32,color:'#a78bfa',fontSize:12,textDecoration:'none'}}>Directions ↗</a>}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',padding:'12px 0',borderTop:'1px solid #25243a',borderBottom:'1px solid #25243a'}}>
+        <span style={{fontSize:12,color:'#9491b8'}}>Going with</span>
+        <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:10}}>
+          {companions.length ? companions.map(name => (
+            <span key={name} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'#c4c2f0'}}><FriendAvatar name={name} size={26} />{name}</span>
+          )) : <span style={{fontSize:13,color:'#9491b8'}}>{concert.solo ? 'Going solo' : 'Add companions or choose solo'}</span>}
+        </div>
+      </div>
+      {notes && <div style={{borderLeft:'3px solid #a78bfa',background:'#13131f',borderRadius:'0 9px 9px 0',padding:'12px 14px',marginTop:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:'#e2e0ff',marginBottom:5}}>Notes for the day</div>
+        <div style={{fontSize:13,lineHeight:1.6,color:'#9491b8',whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{notes}</div>
+      </div>}
+      <ShowPreparationChecklist key={concert.id} concert={concert} settings={settings} />
+    </section>
+  );
+}
+
 function ShowPreparationChecklist({concert,settings}) {
   const key='showPreparation:'+concert.id;
   const [checked,setChecked]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return {}}});

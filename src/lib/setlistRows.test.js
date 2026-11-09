@@ -1,6 +1,53 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {normalizeSetlistRows, setlistSongs, mergeSetlistSongs, moveSetlistRow, performanceSongs, mapSetlistSongs, releaseNote, toMedley, matchesSongLinkFilter} from './setlistRows.js'
+import {placeLegacyGuests, songGuestNames, filterSetlistPerformers, receiptSetlistRows} from './setlistRows.js'
+
+test('performer filters keep support sets separate and include guest songs only once', () => {
+  const section = {type:'section', label:'Encore'}
+  const withGuest = {name:'Finale', guests:['Kata']}
+  const support = {role:'support', songs:['Opening song', {name:'Duet', feat:'Kata'}]}
+  const headliner = {role:'headliner', songs:['Solo song', section, 'Solo encore', withGuest, {type:'section', label:'Bows'}]}
+  const sets = [support, headliner]
+
+  assert.equal(filterSetlistPerformers(sets, 'all'), sets)
+  assert.deepEqual(filterSetlistPerformers(sets, 'headliner'), [headliner])
+  assert.deepEqual(filterSetlistPerformers(sets, 'support'), [support])
+  assert.deepEqual(filterSetlistPerformers(sets, 'guests').map(set => set.songs), [[support.songs[1]], [section, withGuest]])
+  assert.deepEqual(filterSetlistPerformers(sets, 'support-guests'), [support, {...headliner, songs:[section, withGuest]}])
+})
+
+test('receipt order retains independent headings, guest credits and whole medleys', () => {
+  const ment = {type:'section', label:'MENT', sectionNote:'Thanked the crowd'}
+  const end = {type:'section', label:'__SECTION_END__'}
+  const one = {name:'Z title', albumName:'First', guests:['Kata']}
+  const medley = {type:'medley', name:'Mix', albumName:'First', parts:['One', 'Two']}
+  const rows = ['Acoustic song', ment, one, end, medley]
+
+  assert.deepEqual(receiptSetlistRows(rows, 'performed'), ['Acoustic song', ment, one, medley])
+  assert.deepEqual(receiptSetlistRows(rows, 'alpha'), ['Acoustic song', medley, one])
+  assert.deepEqual(receiptSetlistRows(rows, 'album'), [{type:'section', label:'First'}, one, medley, 'Acoustic song'])
+})
+
+test('legacy guest picks move inline when the song is unique', () => {
+  const song = {name:'One', feat:'Kata', spotifyId:'track'}
+  const legacy = {kata:['one'], Paul:['One'], Support:['One']}
+  const result = placeLegacyGuests([song, 'Two'], legacy, ['kata', 'Paul'])
+  assert.deepEqual(result.rows, [{name:'One', guests:['kata', 'Paul'], spotifyId:'track'}, 'Two'])
+  assert.deepEqual(result.unassigned, [])
+  assert.equal(song.feat, 'Kata')
+  assert.deepEqual(songGuestNames(song), ['Kata'])
+})
+
+test('repeated titles need assignment and removed guest picks stay removed', () => {
+  const legacy = {Kata:['One', 'Two', 'Missing']}
+  const rows = ['One', 'One', {name:'Two', guests:[]}]
+  const result = placeLegacyGuests(rows, legacy, ['Kata'])
+  assert.deepEqual(result.rows, rows)
+  assert.deepEqual(result.unassigned, [{guest:'Kata', song:'One'}, {guest:'Kata', song:'Missing'}])
+  rows[1] = {name:'One', guests:['Kata']}
+  assert.deepEqual(placeLegacyGuests(rows, legacy, ['Kata']).unassigned, [{guest:'Kata', song:'Missing'}])
+})
 
 test('explicit medley conversion splits slash titles without assigning one Spotify track to every part',()=>{
  const row={name:' One / Two// Three / ',spotifyId:'original',info:'Keep this note',unreleasedAtShow:true}

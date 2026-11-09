@@ -168,6 +168,7 @@ function extractSetlist(sl) {
       const out = { name: s.name };
       if (s.info) out.info = s.info;
       if (s.cover?.name) out.cover = s.cover.name;
+      if (s.with?.name) out.feat = s.with.name;
       // A set-level label (Encore, Act I, ...) takes priority on the first song of a
       // set; otherwise a pending Ment label (if one occurred right before this song).
       if (isFirstInSet && set.name) out.sectionLabel = set.name.toUpperCase();

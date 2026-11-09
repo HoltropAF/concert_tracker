@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {concertCalendar} from './calendar.js'
 import handler from '../../api/setlist.js'
+import {songGuestNames} from './setlistRows.js'
 test('calendar uses exclusive all-day end dates and escapes event text',()=>{
   const event=concertCalendar({id:'a',artist:'Band, X\nY',date:'2026-12-31',endDate:'2027-01-02'})
   assert.match(event,/DTSTART;VALUE=DATE:20261231/)
@@ -20,12 +21,14 @@ test('concert search returns choices, preserves pagination and rejects ambiguous
   const original=global.fetch,key=process.env.SETLISTFM_API_KEY
   process.env.SETLISTFM_API_KEY='test-only'
   let requested
-  global.fetch=async url=>{requested=String(url);return {ok:true,status:200,json:async()=>({page:2,total:40,itemsPerPage:20,setlist:[{artist:{name:'Band'},eventDate:'01-10-2026',venue:{name:'Room'},sets:{set:[]}},{artist:{name:'Band'},eventDate:'02-10-2026',sets:{set:[]}}]})}}
+  const set = [{song:[{name:'One',with:{name:'Kata'}}]}]
+  global.fetch=async url=>{requested=String(url);return {ok:true,status:200,json:async()=>({page:2,total:40,itemsPerPage:20,setlist:[{artist:{name:'Band'},eventDate:'01-10-2026',venue:{name:'Room'},sets:{set}},{artist:{name:'Band'},eventDate:'02-10-2026',sets:{set:[]}}]})}}
   async function call(query){let status,body;await handler({method:'GET',query},{setHeader(){},status(s){status=s;return this},json(b){body=b;return this}});return {status,body}}
   try {
     const found=await call({search:'1',artist:'Band',city:'Amsterdam',page:'2'})
     assert.equal(found.status,200);assert.equal(found.body.results.length,2);assert.equal(found.body.page,2)
     assert.ok(requested.includes('cityName=Amsterdam'));assert.equal(found.body.results[0].date,'2026-10-01')
+    assert.deepEqual(songGuestNames(found.body.results[0].songs[0]), ['Kata'])
     const past=await call({search:'1',artist:'Band',period:'past',today:'2026-10-02',country:'NL'})
     assert.equal(past.status,200);assert.equal(past.body.results.length,1)
     assert.equal(past.body.results[0].date,'2026-10-01')

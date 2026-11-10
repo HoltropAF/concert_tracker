@@ -1,5 +1,6 @@
 import {useRef,useState} from 'react'
 import {discoveryCountries,discoveryCountry,discoveryDuplicate,discoveryInvite,wishlistDraft} from '../lib/discovery'
+import {groupDiscoveryListings} from '../lib/ticketOptions'
 
 const field={width:'100%',minWidth:0,boxSizing:'border-box',padding:'9px 10px',borderRadius:8,border:'1px solid #3d3564',background:'#13131f',color:'#e2e0ff'}
 const button={...field,width:'auto',cursor:'pointer',color:'#c4b5fd'}
@@ -16,7 +17,7 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
     const filters=page===1?{artist:artist.trim(),venue:venue.trim(),city:city.trim(),country,today}:query.current
     query.current=filters
     try {
-      const response=await fetch(`/api/upcoming?${new URLSearchParams({...filters,page:String(page)})}`,{signal:AbortSignal.timeout(15000)})
+      const response=await fetch(`/api/upcoming?${new URLSearchParams({...filters,source:'combined',page:String(page)})}`,{signal:AbortSignal.timeout(15000)})
       const data=await response.json().catch(()=>null)
       if(!response.ok || !Array.isArray(data?.events))throw Error(data?.error || 'Upcoming search is unavailable here. Try again later.')
       setEvents(previous=>page===1?data.events:[...new Map([...previous,...data.events].map(e=>[e.id,e])).values()]);setReport(data)
@@ -27,7 +28,7 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
   const Container=standalone?'section':'details'
   return <Container open={standalone?undefined:defaultOpen || undefined} style={{margin:'8px 0 12px',color:'#c4c2f0'}}>
     {!standalone&&<summary style={{cursor:'pointer',color:'var(--accent, #a78bfa)',fontSize:12,fontFamily:"'DM Mono', monospace",padding:'6px 0'}}>{title || (initialVenue?'What’s coming up here?':'Discover upcoming shows')}</summary>}
-    <p style={{fontSize:12}}>Find upcoming shows on Ticketmaster and review their details before saving.</p>
+    <p style={{fontSize:12}}>Find upcoming shows from Ticketmaster and MOJO. Review the show before saving.</p>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
       <label>Artist or keyword<input style={field} value={artist} disabled={busy} onChange={e=>setArtist(e.target.value)}/></label>
       <label>Venue<input style={field} value={venue} disabled={busy} onChange={e=>setVenue(e.target.value)}/></label>
@@ -37,19 +38,21 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
     <button type="button" style={{...button,marginTop:10}} disabled={busy||(!artist.trim()&&!venue.trim())} onClick={()=>search()}>{busy?'Searching…':'Find upcoming shows'}</button>
     {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
     {report&&<p style={{fontSize:11}}>{report.notice}<br/>Checked {new Date(report.checkedAt).toLocaleString()}.</p>}
-    {events.map(event=><article key={event.id} style={{padding:'12px 0',borderTop:'1px solid #3d3564'}}>
-      <strong>{event.artist}</strong><div>{event.date} · {[event.venue,event.city,event.country].filter(Boolean).join(', ')}</div>
+    {groupDiscoveryListings(events,query.current?.artist).map(event=><article key={event.id} style={{padding:'12px 0',borderTop:'1px solid #3d3564'}}>
+      <strong>{event.artist}{event.tour ? ' · '+event.tour : ''}</strong><div>{event.date} · {[event.venue,event.city,event.country].filter(Boolean).join(', ')}</div>
       <div style={{fontSize:12}}>{event.status}{event.saleStart && !Number.isNaN(Date.parse(event.saleStart))?` · Sale starts ${new Date(event.saleStart).toLocaleString()}`:''}</div>
       {discoveryDuplicate(event,concerts)&&<p style={{fontSize:12}}>Possibly already in your library</p>}
       <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginTop:8}}>
-        <a href={event.url} target="_blank" rel="noopener noreferrer" style={{color:'#c4b5fd'}}>Ticketmaster ↗</a>
-        <button type="button" style={button} disabled={busy||event.status==='Cancelled'} onClick={()=>{setCandidate(event);setType('concert');setMessage('')}}>Review for wishlist</button>
+        <a href={event.url} target="_blank" rel="noopener noreferrer" style={{color:'#c4b5fd'}}>{event.source} ↗</a>
+        <button type="button" style={button} disabled={busy||event.status==='Cancelled'} onClick={()=>{setCandidate(event);setType('concert');setMessage('')}}>Review show</button>
         <button type="button" style={button} onClick={async()=>{try{await navigator.clipboard.writeText(discoveryInvite(event));setMessage('Invitation copied.')}catch{setError('Could not copy. You can open the ticket link and share it instead.')}}}>Copy invite</button>
       </div>
+      {event.ticketOptions.length>1&&<details><summary>{event.ticketOptions.length} ticket options</summary>{event.ticketOptions.map(option=><a key={option.id} href={option.url} target="_blank" rel="noopener noreferrer" style={{display:'block',padding:'6px 0',color:'#c4b5fd'}}>{option.label==='Event listing'?'Standard listing':option.label} ↗</a>)}</details>}
     </article>)}
     {report?.hasMore&&<button type="button" style={button} disabled={busy} onClick={()=>search(report.page+1)}>More results</button>}
     {candidate&&<section aria-label="Review upcoming show" style={{padding:12,border:'1px solid #a78bfa',borderRadius:8,marginTop:12}}>
-      <h4 style={{marginTop:0}}>Review: {candidate.artist}</h4><p>{candidate.date} · {candidate.venue} · {candidate.city}</p>
+      <h4 style={{marginTop:0}}>Review: {candidate.artist}</h4><p>{[candidate.date,candidate.venue,candidate.city].filter(Boolean).join(' · ')}</p>
+      {candidate.sourceLinks.filter(item=>item.url!==candidate.url).map(item=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{color:'#c4b5fd'}}>{item.source} listing ↗</a>)}
       {duplicate&&<p role="alert">A matching show may already be saved. Check your library before adding another copy.</p>}
       <label>Save as <select style={field} value={type} onChange={e=>setType(e.target.value)}><option value="concert">Concert</option><option value="festival">Festival</option></select></label>
       <p style={{fontSize:12}}>Check the event title and location in your draft, then press Save. Festival listings do not mark individual artists as seen.</p>

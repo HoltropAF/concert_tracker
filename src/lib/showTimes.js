@@ -1,5 +1,20 @@
 export const showTimeFields={doorsTime:'Doors open',vipTime:'VIP starts',showTime:'Show starts',endTime:'Expected end'}
 export const visibleShowTimeFields=(concert,settings={})=>Object.entries(showTimeFields).filter(([key])=>key!=='vipTime'||(concert.showVipTime??settings.showVipTime??true))
+export function timetableRows(concert,settings,ordered = true) {
+ const acts = (concert.support || []).flatMap((act,index) => {
+   const name = typeof act === 'string' ? act : act?.name
+   return name && act?.role !== 'guest' ? [{key:'support-'+index,label:name,time:act.time,supportIndex:index}] : []
+ })
+ const rows = visibleShowTimeFields(concert,settings).flatMap(([key,label]) => [
+   ...(key === 'showTime' ? acts : []), {key,label,time:concert[key]},
+ ])
+ if (!ordered) return rows
+ const start = concert.showTime || concert.doorsTime
+ const order = row => row.key === 'endTime' && start && row.time < start ? '24:' + row.time : row.time
+ const timed = rows.filter(row => /^([01]\d|2[0-3]):[0-5]\d$/.test(row.time || '')).sort((a,b)=>order(a).localeCompare(order(b)))
+ let index = 0
+ return rows.map(row => /^([01]\d|2[0-3]):[0-5]\d$/.test(row.time || '') ? timed[index++] : row)
+}
 export const pendingShowTime = (concert, key, found) => found?.value && !concert[key] && !concert.scheduleSources?.[key]?.manual ? found : null
 export function timeValue(value){const m=String(value||'').match(/(?:T|^)([01]\d|2[0-3]):([0-5]\d)/);return m?`${m[1]}:${m[2]}`:''}
 const norm=s=>String(s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()

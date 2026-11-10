@@ -22,7 +22,10 @@ export function wishlistDraft(event, type='concert') {
       ticketSaleAt=`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
     }
   }
-  return {artist:event.artist,date:event.date,venue:event.venue,city:event.city,country:event.country,type,wishlist:true,attendanceMode:'in_person',ticketSaleAt,ticketSaleLink:event.url,discovery:{id:event.id,source:event.source,url:event.url,status:event.status,checkedAt:event.checkedAt,saleStart:event.saleStart || null}}
+  return {artist:event.artist,date:event.date,venue:event.venue,city:event.city,country:event.country,type,wishlist:true,attendanceMode:'in_person',ticketSaleAt,ticketSaleLink:event.url,
+    ...(event.tour ? {tour:event.tour} : {}), ...(event.timeZone ? {timeZone:event.timeZone} : {}), ...(event.ticketOptions?.length ? {ticketOptions:event.ticketOptions} : {}),
+    discovery:{id:event.id,source:event.source,url:event.url,status:event.status,checkedAt:event.checkedAt,saleStart:event.saleStart || null,
+      ...(event.sourceLinks?.length ? {sources:event.sourceLinks} : {})}}
 }
 export function discoveryInvite(event) {
   return `Want to go to ${event.artist}?\n${event.date} · ${[event.venue,event.city].filter(Boolean).join(', ')}\n${event.url}`

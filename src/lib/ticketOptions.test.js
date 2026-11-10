@@ -1,8 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {groupTicketEvents,mergeTicketOptions,sellerLink,ticketSaleOpen,wishStepStates} from './ticketOptions.js'
+import {groupTicketEvents,groupDiscoveryListings,mergeTicketOptions,sellerLink,ticketSaleOpen,wishStepStates} from './ticketOptions.js'
 import {applyWishUpdates,proposedChanges} from './wishlistUpdates.js'
 const base={id:'standard',artist:'ENHYPEN',date:'2027-03-20',venue:'Arena',city:'Amsterdam',url:'https://ticketmaster.nl/event/1'}
+test('discovery fills a missing venue from the promoter and groups add-ons under the main concert',()=>{
+ const show={...base,artist:'Tove Lo: Estrus',venue:'',source:'Ticketmaster',country:'Netherlands'}
+ const premium={...show,id:'premium',artist:'Tove Lo | Premium Seats',venue:'AFAS Live Loge',url:'https://ticketmaster.nl/event/2'}
+ const promoter={...show,id:'mojo',artist:'Tove Lo',venue:'AFAS Live',source:'MOJO',url:'https://www.mojo.nl/concerten/tove-lo'}
+ const parking={...show,id:'parking',artist:'Parking permit Tove Lo'}
+ const [result,...others]=groupDiscoveryListings([show,premium,parking,promoter],'Tove Lo')
+ assert.equal(others.length,0)
+ assert.equal(result.id,'standard')
+ assert.equal(result.venue,'AFAS Live')
+ assert.equal(result.artist,'Tove Lo')
+ assert.equal(result.tour,'Estrus')
+ assert.deepEqual(result.ticketOptions.map(o=>o.id),['standard','premium'])
+ assert.equal(result.sourceLinks.length,2)
+})
 test('packages group only with same artist, date, venue and known time',()=>{
  const results=groupTicketEvents([base,{...base,id:'vip',artist:'ENHYPEN | VIP1',url:'https://ticketmaster.nl/event/2'},{...base,id:'other-night',date:'2027-03-21'},{...base,id:'other-venue',venue:'Other Arena'},{...base,id:'matinee',startTime:'14:00:00'}])
  assert.equal(results.length,4);assert.equal(results[0].ticketOptions.length,2);assert.equal(results[0].ticketOptions[1].label,'VIP1')

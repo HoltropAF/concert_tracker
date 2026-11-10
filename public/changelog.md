@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.30 — 10 November 2026
+- Upcoming search combines Ticketmaster and MOJO, fills missing details from matching listings, and groups ticket options.
+- Review timetable suggestions from General for shows in the next three days. Add support acts in Edit and see their saved times in order.
+- Log a recent show with a matching setlist, and reuse confirmed Spotify links for repeat songs.
+- Calendar exports use saved show times when available.
+
 ## 1.1.29 — 9 November 2026
 - Add support acts and edit their times from Timetable. Detected acts can be used or edited, and saved entries replace their suggestions.
 - Timetable reads support names and times from more venue and promoter page formats.

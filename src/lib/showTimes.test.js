@@ -1,6 +1,7 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {parseShowTimes,timeValue,pendingShowTime,pendingSupportActs} from './showTimes.js'
+import {parseShowTimes,timeValue,pendingShowTime,pendingSupportActs,timetableRows} from './showTimes.js'
+import {hasScheduleSuggestions,scheduleRequest,showsDueForSchedule} from './showScheduleLookup.js'
 import {lookupShowTimes} from '../../server/showTimes.js'
 const event={ '@type':'MusicEvent',name:'Test Artist',startDate:'2026-11-10T20:00:00+01:00',endDate:'2026-11-10T22:30:00+01:00'}
 const page=e=>`<script type="application/ld+json">${JSON.stringify(e)}</script>`
@@ -14,6 +15,19 @@ test('saved support and corrected source names suppress repeated suggestions', (
  const saved = ['Opener', {name:'Corrected act', scheduleSourceName:'Listed act', time:'19:30'}, {name:'Guest artist', role:'guest'}]
  const found = [{name:' opener ',time:'18:30'}, {name:'LISTED ACT',time:'20:00'}, {name:'Guest artist'}, {name:'Second opener'}]
  assert.deepEqual(pendingSupportActs(saved, found), [{name:'Second opener'}])
+})
+test('saved support appears among schedule times and never counts a guest as support', () => {
+ const concert={doorsTime:'18:30',vipTime:'17:00',showTime:'20:00',endTime:'00:15',
+   support:[{name:'Opener',time:'19:00'},{name:'Guest',role:'guest',time:'21:30'}]}
+ assert.deepEqual(timetableRows(concert,{}).map(row=>row.label),['VIP starts','Doors open','Opener','Show starts','Expected end'])
+})
+test('prechecks target the next three days and review ignores already-saved suggestions', () => {
+ const shows=['2026-11-09','2026-11-10','2026-11-13','2026-11-14'].map(date=>({id:date,date,artist:'Band'}))
+ assert.deepEqual(showsDueForSchedule([...shows,{...shows[1],wishlist:true}],new Date(2026,10,10)).map(c=>c.date),['2026-11-10','2026-11-13'])
+ const concert={...shows[1],showTime:'20:00',support:['Opener'],discovery:{sources:[{source:'MOJO',url:'https://www.mojo.nl/event'}]}}
+ assert.equal(scheduleRequest(concert).url,'https://www.mojo.nl/event')
+ assert.equal(hasScheduleSuggestions(concert,{}, {times:{showTime:{value:'21:00'}},supportActs:[{name:'Opener'}]}),false)
+ assert.equal(hasScheduleSuggestions(concert,{}, {times:{doorsTime:{value:'18:30'}}}),true)
 })
 test('support names and start times come from timetable rows and lineup buttons', () => {
  const html = page(event) + '<button>Support act <span>J. Artist</span></button><h3>Opener: J. Artist</h3><div>19:15</div>' +

@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { setlistSongs, mergeSetlistSongs } from '../lib/setlistRows'
 import { getValidSpotifyToken } from '../lib/spotify'
+import { applySpotifyChoice, indexSpotifyLinks, songArtist } from '../lib/spotifyReuse'
 
 // ! Duplicated from ConcertTracker.jsx rather than imported, to keep this component
 // ! independently lazy-loadable. If the song shape changes, both copies must change.
@@ -109,7 +110,7 @@ function ManualSearchPanel({ query, setQuery, onSearch, loading, results, onPick
 // *   removals.has(i)       existing link will be stripped on save
 // ! `songs` is read once into per-index state; the component assumes the array does
 // ! not change identity or length while it's mounted.
-export default function SpotifyMatcher({ artist, songs: rows, settings, saveSettings, onSave: saveRows, onClose }) {
+export default function SpotifyMatcher({ artist, songs: rows, concerts = [], settings, saveSettings, onSave: saveRows, onClose }) {
   const songs = setlistSongs(rows)
   const onSave = updated => saveRows(mergeSetlistSongs(rows, updated))
   const [results, setResults] = useState(() => new Array(songs.length).fill(null))
@@ -166,8 +167,7 @@ export default function SpotifyMatcher({ artist, songs: rows, settings, saveSett
   // * `cancelled` (set by the unmount cleanup) aborts the loop, so closing the sheet
   // * mid-search doesn't keep calling setState on an unmounted component.
   async function run() {
-    const token = await getToken()
-    if (!token) return
+    const lookup = indexSpotifyLinks(concerts)
     const res = new Array(songs.length).fill(null)
     const ch = {}
     for (let i = 0; i < songs.length; i++) {
@@ -179,8 +179,16 @@ export default function SpotifyMatcher({ artist, songs: rows, settings, saveSett
         setResults([...res])
         continue
       }
+      const previous = lookup(songs[i],artist)
+      if (previous) {
+        res[i] = { ...previous, confidence:'high', reused:true }
+        ch[i] = previous
+        setResults([...res])
+        setChoices({ ...ch })
+        continue
+      }
       const name = getSongName(songs[i])
-      const items = await searchSpotify(`track:${name} artist:${artist}`, 3)
+      const items = await searchSpotify(`track:${name} artist:${songArtist(songs[i],artist)}`, 3)
       if (!items.length) {
         res[i] = { notFound: true }
       } else {
@@ -237,10 +245,7 @@ export default function SpotifyMatcher({ artist, songs: rows, settings, saveSett
   const handleSave = () => {
     const updated = songs.map((song, i) => {
       const choice = choices[i]
-      if (choice) {
-        const base = typeof song === 'string' ? { name: song } : { ...song }
-        return { ...base, spotifyId: choice.id, spotifyName: choice.name, albumName: choice.albumName, albumId: choice.albumId, albumArt: choice.albumArt, durationMs: choice.durationMs, popularity: choice.popularity, trackNumber: choice.trackNumber, releaseDate:base.releaseDateManual ? base.releaseDate : choice.releaseDate || base.releaseDate }
-      }
+      if (choice) return applySpotifyChoice(song,choice)
       if (removals.has(i)) {
         if (typeof song === 'string') return song
         const { spotifyId, spotifyName, albumName, albumId, albumArt, durationMs, popularity, trackNumber, ...rest } = song

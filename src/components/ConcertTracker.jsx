@@ -1,5 +1,10 @@
 import ShowSchedule from './ShowSchedule'
-import {visibleShowTimeFields} from '../lib/showTimes'
+import PostShowLog from './PostShowLog'
+import {canLogPostShow,recentShowsToLog} from '../lib/postShowLog'
+import {mergeTicketOptions} from '../lib/ticketOptions'
+import {reuseSpotifyLinks} from '../lib/spotifyReuse'
+import {timetableRows,visibleShowTimeFields} from '../lib/showTimes'
+import {cachedSchedule,checkShowSchedule,hasScheduleSuggestions,scheduleRequest,scheduleUpdatedEvent,showsDueForSchedule} from '../lib/showScheduleLookup'
 import {showsToday, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
 import TicketFiles from './TicketFiles'
 import {pruneExpiredTickets} from '../lib/ticketFiles'
@@ -345,7 +350,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.29'
+const APP_VERSION = '1.1.30'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2111,7 +2116,7 @@ function normalizeConcertForm(concert) {
 // * this artist — which can't be computed from one row.
 // * `onNavigate` / `onOpenOther` hand control back up to ConcertTracker so tapping
 // * an artist, venue or friend here can switch tabs; this component never routes.
-function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, ticketAccount = 'guest', performerScope = 'all', onNavigate = () => {}, onOpenOther = null }) {
+function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, ticketAccount = 'guest', performerScope = 'all', startLog = false, onNavigate = () => {}, onOpenOther = null }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -2142,6 +2147,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const [headerElevated, setHeaderElevated] = useState(false);
   const [detailTab, setDetailTab] = useState('general');
   const [ticketView, setTicketView] = useState(null);
+  const [postShowOpen,setPostShowOpen] = useState(startLog);
+  useBackButton(() => setPostShowOpen(false),postShowOpen);
   useEffect(() => { setDetailTab('general'); setTicketView(null); }, [concert.id]);
   const goBackFromDetail = () => detailTab === 'general' ? onClose() : setDetailTab('general');
   useBackButton(goBackFromDetail, detailTab !== 'general');
@@ -2486,7 +2493,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
           {concert.wishlist && <>
             {detailTab === 'general' && concert.photo && <PhotoImg path={concert.photo} pos={concert.photoPos} variant="detail" style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 12, marginBottom: 12 }} />}
-            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} onGotTickets={option => { setForm(normalizeConcertForm({...concert,wishlist:false,...(option?{ticketType:option.label,selectedTicketOption:option}: {})})); setEditorTab('show'); setEditing(true); }} />
+            <WishlistUpdateDetails key={concert.id} concert={concert} onSave={async (...args) => { const result = await onSave(...args); if (!result?.error && !args[0].wishlist) setDetailTab('general'); return result }} onGotTickets={option => { setForm(normalizeConcertForm({...concert,wishlist:false,bookedAt:concert.bookedAt||new Date().toISOString(),...(option?{ticketType:option.label,selectedTicketOption:option}: {})})); setEditorTab('show'); setEditing(true); }} />
           </>}
           {!concert.wishlist && past && detailTab === 'general' && (
           <>
@@ -2550,6 +2557,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           {!concert.wishlist && !past && detailTab === 'general' && (
             <>
               <UpcomingEvening concert={concert} online={online} onEdit={editTimetable} />
+              <ScheduleReviewLink concert={concert} settings={settings} onOpen={() => setDetailTab('timetable')} />
               <UpcomingShowOverview concert={concert} settings={settings} />
             </>
           )}
@@ -2568,6 +2576,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
                 shopUrl={safeExternalUrl(concert.ticketSaleLink)} accessUrl={safeExternalUrl(concert.ticketAccessUrl)} />
             </div>
           )}
+          {past && detailTab==='general' && canLogPostShow(concert) && <button type="button" onClick={() => setPostShowOpen(true)} style={{...detailCard,minHeight:44,textAlign:'left',color:'#a78bfa',cursor:'pointer'}}>Log this show ›</button>}
           {!concert.wishlist && past && detailTab==='general' && <CalendarExport concert={concert} />}
           {/* Costs */}
           {detailTab === 'financial' && ((concert.tickets || []).length > 0 || concert.ticketPrice || merchTotal > 0) && (
@@ -2877,6 +2886,8 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
 
         </div>
 
+        {postShowOpen && canLogPostShow(concert) && <PostShowLog concert={concert} concerts={concerts} ratingMax={settings.ratingSystem||5} onSave={onSave} onClose={() => setPostShowOpen(false)} />}
+
         {/* Share / Receipt */}
         {showReceipt && (() => {
           const ticketItems = (concert.tickets && concert.tickets.length > 0)
@@ -3041,39 +3052,26 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               Show VIP time
               <input type="checkbox" checked={form.showVipTime ?? settings.showVipTime ?? true} onChange={e => update('showVipTime', e.target.checked)} style={{accentColor:'#a78bfa'}} />
             </label>
-            {visibleShowTimeFields(form, settings).map(([key, label]) => (
-              <label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:48,color:'#9491b8',fontSize:13}}>
-                {label}
-                <input type="time" value={form[key] || ''} style={{ ...inputStyle, width: 140, fontSize: 16 }} onChange={e => {
+            {timetableRows(form,settings,false).map(({key,label,time,supportIndex}) => (
+              <label key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:48,color:'#9491b8',fontSize:13}}>
+                <span style={{overflowWrap:'anywhere'}}>{label}{supportIndex!=null && <small style={{display:'block'}}>Support act</small>}</span>
+                <input type="time" aria-label={label + ' time'} value={time || ''} style={{ ...inputStyle, width:140, flexShrink:0, fontSize:16 }} onChange={e => {
                   const value = e.target.value;
-                  setForm(current => ({
-                    ...current,
-                    [key]: value,
-                    scheduleSources: { ...current.scheduleSources, [key]: { manual: true } },
-                  }));
+                  setForm(current => {
+                    if (supportIndex == null) return {...current,[key]:value,scheduleSources:{...current.scheduleSources,[key]:{manual:true}}};
+                    return {...current,support:current.support.map((entry,index) => index===supportIndex
+                      ? {...(typeof entry === 'string' ? {name:entry,role:'support'} : entry),time:value,timeManuallySet:true} : entry)};
+                  });
                 }} />
               </label>
             ))}
-            <div style={{borderTop:'1px solid #25243a',marginTop:10,paddingTop:12}}>
-              {sec('Support acts')}
-              {form.support.map((act, index) => getSupportRole(act) === 'guest' ? null : (
-                <label key={index} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:48,color:'#c4c2f0',fontSize:13}}>
-                  <span style={{overflowWrap:'anywhere'}}>{getSupportName(act)}</span>
-                  <input aria-label={getSupportName(act) + ' start time'} type="time" value={act.time || ''} style={{ ...inputStyle, width: 140, flexShrink: 0, fontSize: 16 }} onChange={e => {
-                    const time = e.target.value;
-                    setForm(current => ({ ...current, support: current.support.map((entry, i) => {
-                      if (i !== index) return entry;
-                      const details = typeof entry === 'string' ? { name: entry, role: 'support' } : entry;
-                      return { ...details, time, timeManuallySet: true };
-                    }) }));
-                  }} />
-                </label>
-              ))}
-              <div style={{display:'flex',gap:8,marginTop:8}}>
-                <input aria-label="Support act name" value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addSupport('support'); }} placeholder="Support act name" style={{...inputStyle, minWidth:0, fontSize:16}} />
-                <button type="button" onClick={() => addSupport('support')} style={{...inputStyle,width:'auto',minHeight:44,color:'#a78bfa'}}>Add</button>
+            <details style={{borderTop:'1px solid #25243a',marginTop:8}}>
+              <summary style={{color:'#a78bfa',cursor:'pointer',fontSize:12,padding:'12px 0'}}>+ Add support act</summary>
+              <div style={{display:'flex',gap:8}}>
+                <input aria-label="Support act name" value={supportInput} onChange={e => setSupportInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addSupport('support'); }} placeholder="Artist name" style={{...inputStyle,minWidth:0,fontSize:16}} />
+                <button type="button" disabled={!supportInput.trim()} onClick={() => addSupport('support')} style={{...inputStyle,width:'auto',minHeight:44,color:'#a78bfa'}}>Add</button>
               </div>
-            </div>
+            </details>
             <div style={{fontSize:11,color:'#9491b8',marginTop:12}}>Use venue-local times. Leave unknown times empty.</div>
             <label style={{display:'block',fontSize:12,color:'#9491b8',marginTop:12}}>
               Event-page link
@@ -3580,6 +3578,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <SpotifyMatcher
           artist={spotifyMatcher.artist}
           songs={spotifyMatcher.songs}
+          concerts={concerts}
           settings={settings}
           saveSettings={onUpdateSettings || (() => {})}
           onSave={spotifyMatcher.onSave}
@@ -7529,6 +7528,7 @@ function SongsView({ concerts, onOpen, settings, saveSettings, onLinkSong, onDet
   const renderSongMatcher = () => (songMatcher && (
         <SpotifyMatcher
           artist={songMatcher.artist}
+          concerts={concerts}
           songs={[{ name: songMatcher.name, spotifyId: songMatcher.spotifyId, spotifyName: songMatcher.spotifyName, albumName: songMatcher.albumName, albumId: songMatcher.albumId, albumArt: songMatcher.albumArt, durationMs: songMatcher.durationMs, popularity: songMatcher.popularity, trackNumber: songMatcher.trackNumber }]}
           settings={settings}
           saveSettings={saveSettings || (() => {})}
@@ -8902,7 +8902,13 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
           })();
           if (!isFest && !showDetails) return (
             <>
-              <ConcertSearch key={chosenStatus} mode={chosenStatus === 'past' ? 'past' : 'upcoming'} initialCountry={settings.defaultCountry || ''} concerts={concerts} onChoose={c=>setForm(f=>({...f,...(c.discovery ? {discovery:c.discovery,ticketSaleAt:c.ticketSaleAt,ticketSaleLink:c.ticketSaleLink,type:c.type} : {}),artist:c.artist||'',date:c.date||'',venue:c.venue||'',city:c.city||'',country:c.country||'',tour:c.tour||'',setlist:c.songs||[],setlistSource:c.url||'',attendanceMode:'in_person'}))} />
+              <ConcertSearch key={chosenStatus} mode={chosenStatus === 'past' ? 'past' : 'upcoming'} initialCountry={settings.defaultCountry || ''} concerts={concerts} onChoose={c=>setForm(f=>({
+                ...f,
+                ...Object.fromEntries(['artist','date','venue','city','country','tour','timeZone'].filter(key=>c[key]).map(key=>[key,c[key]])),
+                ...(c.discovery ? {discovery:c.discovery,ticketSaleAt:c.ticketSaleAt||f.ticketSaleAt,ticketSaleLink:c.ticketSaleLink||f.ticketSaleLink,ticketOptions:mergeTicketOptions(f.ticketOptions,c.ticketOptions),type:c.type} : {}),
+                ...(c.songs?.length && !f.setlist?.length ? {setlist:c.songs,setlistSource:c.url||''} : {}),
+                attendanceMode:'in_person',
+              }))} />
               {card(form.wishlist ? 'Want to go' : quickUpcoming ? 'Upcoming show' : 'Show details', <>
                 <button onClick={() => update('wishlist', !form.wishlist)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: `1px solid ${form.wishlist ? '#34d399' : '#1f1f35'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
                   <span style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.wishlist ? '#34d399' : '#3d3564'}`, background: form.wishlist ? '#34d399' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0c0c14', lineHeight: 1 }}>{form.wishlist ? '✓' : ''}</span>
@@ -11579,6 +11585,18 @@ function UpcomingShowOverview({concert,settings}) {
   );
 }
 
+function ScheduleReviewLink({ concert, settings, onOpen }) {
+  const [, refresh] = useState(0);
+  const { key } = scheduleRequest(concert,settings);
+  useEffect(() => {
+    const update = event => { if (event.detail === key) refresh(n => n + 1); };
+    window.addEventListener(scheduleUpdatedEvent,update);
+    return () => window.removeEventListener(scheduleUpdatedEvent,update);
+  }, [key]);
+  if (!hasScheduleSuggestions(concert,settings,cachedSchedule(key)?.result)) return null;
+  return <button type="button" onClick={onOpen} style={{ minHeight:44, textAlign:'left', padding:'8px 12px', background:'#13131f', border:'1px solid #2e2e50', borderRadius:8, color:'#a78bfa', cursor:'pointer' }}>Review found times and support acts ›</button>;
+}
+
 function ShowPreparationChecklist({concert,settings}) {
   const key='showPreparation:'+concert.id;
   const [checked,setChecked]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return {}}});
@@ -11612,7 +11630,8 @@ function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
 
 function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
   const today = new Date()
-  const isPastDate = (dateStr) => dateStr < todayStr
+  const todayDate = localDay(today)
+  const isPastDate = (dateStr) => dateStr < todayDate
 
   // * There is no router. `view` is the current tab; the four "shows-like" tabs are
   // * grouped so switching away and back restores the last one via `showsTab`.
@@ -11663,6 +11682,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   // * "is a detail page covering the list" flag. Holds the concert object, not an id,
   // * so it can go stale after a save — handleSave re-sets it with the new object.
   const [selected, setSelected] = useState(null)
+  const [logShowId,setLogShowId] = useState(null);
   // * showAdd* are the answers collected by the add-flow chooser below; they become
   // * AddConcertForm's initial* props once the flow completes.
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
@@ -11743,6 +11763,18 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const ticketAccount = userEmail || 'guest';
   const ticketDay = localDay(showDayNow);
   useEffect(() => {
+    if (!settingsLoaded) return;
+    let active = true;
+    const check = async () => {
+      for (const concert of showsDueForSchedule(concerts)) {
+        if (!active) return;
+        await checkShowSchedule(scheduleRequest(concert,settings),true).catch(() => {});
+      }
+    };
+    check();
+    return () => { active = false; };
+  }, [concerts,settings,settingsLoaded,ticketDay]);
+  useEffect(() => {
     pruneExpiredTickets(ticketAccount, ticketDay, concerts).catch(() => {});
   }, [ticketAccount, ticketDay, concerts]);
 
@@ -11781,6 +11813,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [displaySelected, selectedExiting] = useExitingValue(selected);
   const handleOpenConcert = (concert) => {
     savedScrollPos.current = document.getElementById('content-scroll')?.scrollTop || 0
+    setLogShowId(null)
     setSelected(concert)
   }
   useEffect(() => {
@@ -11925,6 +11958,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
 
   const filtered = matchingShows.filter(c => !isWish(c))
   const wishlist = matchingShows.filter(isWish)
+  const toLog = filterStatus.length === 0 || filterStatus.includes('past') ? recentShowsToLog(filtered,showDayNow).slice(0,3) : [];
   const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
   const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
   const combinedShows = filterStatus.length === 0
@@ -12107,7 +12141,11 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <AddConcertForm
-          onSave={async c => {
+          onSave={async draft => {
+            const c = {...draft,
+              ...(!draft.wishlist && draft.date >= localDay() ? {bookedAt:draft.bookedAt||new Date().toISOString()} : {}),
+              ...(draft.setlist?.length ? {setlist:reuseSpotifyLinks(draft.setlist,draft.artist,concerts)} : {}),
+            };
             const result = await onSaveConcert(c, {notify:true});
             notify(result?.error ? 'Could not save show' : 'Show saved', result?.error ? 'error' : 'success');
             if (result?.error) return;
@@ -12150,7 +12188,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <div className={selectedExiting ? "slide-out-detail" : "slide-in-detail"} key={displaySelected.id}>
-        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} startLog={logShowId===displaySelected.id} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -12315,6 +12353,9 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
             {concerts.length > 0 && combinedShows.length === 0 && (
               <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
+            {toLog.length > 0 && <div style={{margin:'0 0 10px',padding:'6px 12px',border:'1px solid #2e2e50',borderRadius:8,background:'#13131f'}}>
+              {toLog.map(concert=><button key={concert.id} type="button" onClick={()=>{handleOpenConcert(concert);setLogShowId(concert.id)}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,width:'100%',minHeight:44,textAlign:'left',color:'#c4c2f0',border:0,background:'none',cursor:'pointer'}}><span>{concert.artist}</span><span style={{color:'#a78bfa',flexShrink:0}}>Log this show ›</span></button>)}
+            </div>}
             {combinedShows.length > 0 && (
               <div style={{ marginTop: 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
@@ -12393,6 +12434,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         <SpotifyMatcher
           artist={spotifyMatcherConcert.artist}
           songs={normalizeSetlistRows(spotifyMatcherConcert.setlist)}
+          concerts={concerts}
           settings={settings}
           saveSettings={onUpdateSettings || (() => {})}
           onSave={async updatedSongs => {

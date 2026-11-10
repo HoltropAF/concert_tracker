@@ -17,6 +17,17 @@ test('sale events preserve entered local time and folded lines stay within 75 by
   assert.match(event,/DURATION:PT15M/)
   for(const line of event.split('\r\n'))assert.ok(Buffer.byteLength(line)<=75)
 })
+test('calendar uses saved venue times and advances an overnight end date',()=>{
+  const concert={id:'timed',artist:'Band',date:'2026-11-10',country:'Netherlands',showTime:'20:00',endTime:'00:30',doorsTime:'19:00'}
+  const event=concertCalendar(concert)
+  assert.match(event,/DTSTART:20261110T190000Z/)
+  assert.match(event,/DTEND:20261110T233000Z/)
+  assert.match(event,/Doors open: 19:00/)
+  const summer=concertCalendar({...concert,date:'2027-07-01',endTime:'23:00'})
+  assert.match(summer,/DTSTART:20270701T180000Z/)
+  assert.match(summer,/DTEND:20270701T210000Z/)
+  assert.match(concertCalendar({...concert,country:'',endTime:''}),/DTSTART:20261110T200000\r\n/)
+})
 test('concert search returns choices, preserves pagination and rejects ambiguous legacy auto-fill',async()=>{
   const original=global.fetch,key=process.env.SETLISTFM_API_KEY
   process.env.SETLISTFM_API_KEY='test-only'

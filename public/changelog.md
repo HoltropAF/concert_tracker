@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.35 — 11 November 2026
+- Make Settings categories plain, compact clickable rows and remove the extra General heading.
+
 ## 1.1.34 — 11 November 2026
 - Simplify show update labels and remove To review from Shows. Complete details skip automatic searches, including manually saved information.
 - After opening an On this day memory, reopen it from the floating button. A bell with a 2 badge groups memories and today's shows when both are available.

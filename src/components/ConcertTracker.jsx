@@ -361,7 +361,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.34'
+const APP_VERSION = '1.1.35'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -10508,17 +10508,16 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
         {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
       </div>
-        <h2 style={{ margin: '0 4px 14px', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 22 }}>General</h2>
-        <nav aria-label="Settings categories" style={{ display: 'grid', gap: 4 }}>
+        <nav aria-label="Settings categories" style={{ display: 'grid' }}>
           {settingsPages.map(({ id, label, description, icon }) => (
             <button key={id} type="button" title={description} data-settings-page={id} onClick={() => {
               previousSettingsPage.current = id;
               setActiveSettingsPage(id);
             }} style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 48, padding: '6px 10px',
-              background: '#13131f', border: '1px solid #25243a', borderRadius: 12, textAlign: 'left', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '4px 2px',
+              background: 'none', border: 0, textAlign: 'left', cursor: 'pointer',
             }}>
-              <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 26, height: 26, flexShrink: 0, background: 'rgba(167,139,250,0.1)', borderRadius: 7 }}>
+              <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, flexShrink: 0 }}>
                 <SettingsSectionIcon id={icon} />
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>

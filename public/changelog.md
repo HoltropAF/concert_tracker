@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.37 — 11 November 2026
+- Show Preferences as five rows using the same icon, label and separator layout as Help.
+
 ## 1.1.36 — 11 November 2026
 - Add subtle Settings group headers and compact section tabs, with a clear active-section underline.
 

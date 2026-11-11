@@ -361,7 +361,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.36'
+const APP_VERSION = '1.1.37'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -9766,11 +9766,11 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   );
 
   const settingsPages = [
-    { id: 'logging', label: 'Shows & logging', tab: 'Shows', group: 'Preferences', description: 'Show day, setlists, ratings and categories', icon: 'list' },
-    { id: 'appearance', label: 'Appearance & layout', tab: 'Display', group: 'Preferences', description: 'Theme, opening view, cards and stats', icon: 'layout' },
-    { id: 'connections', label: 'Connections', tab: 'Connections', group: 'App & account', description: 'Spotify and concert search sources', icon: 'plug' },
-    { id: 'offline', label: 'Offline & data', tab: 'Offline', group: 'App & account', description: 'Sync, saved tickets, photos and backups', icon: 'data' },
-    { id: 'account', label: 'Account', tab: 'Account', group: 'App & account', description: 'Profile and sign-in details', icon: 'person' },
+    { id: 'logging', label: 'Shows & logging', description: 'Show day, setlists, ratings and categories', icon: 'list' },
+    { id: 'appearance', label: 'Appearance & layout', description: 'Theme, opening view, cards and stats', icon: 'layout' },
+    { id: 'connections', label: 'Connections', description: 'Spotify and concert search sources', icon: 'plug' },
+    { id: 'offline', label: 'Offline & data', description: 'Sync, saved tickets, photos and backups', icon: 'data' },
+    { id: 'account', label: 'Account', description: 'Profile and sign-in details', icon: 'person' },
   ];
   const enabledConcertSources = ['venues', 'ticketmaster', 'mojo'].filter(source => local.concertSearchSources?.[source] !== false).length;
   const closeSettingsPage = () => {
@@ -10481,20 +10481,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           <h2 ref={settingsHeading} tabIndex={-1} style={{ margin: '0 2px 10px', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 20 }}>
             {settingsPages.find(page => page.id === activeSettingsPage)?.label}
           </h2>
-          <nav aria-label="Settings sections" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', borderBottom: '1px solid #25243a' }}>
-            {settingsPages.map(({ id, label, tab }) => (
-              <button key={id} type="button" aria-label={label} aria-current={id === activeSettingsPage ? 'page' : undefined} onClick={() => {
-                previousSettingsPage.current = id;
-                setOpenSection(null);
-                setActiveSettingsPage(id);
-              }} style={{
-                minHeight: 44, minWidth: 0, padding: '6px 1px', background: 'none', border: 0,
-                borderBottom: id === activeSettingsPage ? '2px solid var(--accent)' : '2px solid transparent',
-                color: id === activeSettingsPage ? 'var(--accent)' : '#9491b8', fontSize: 10.5,
-                fontWeight: id === activeSettingsPage ? 700 : 400, cursor: 'pointer',
-              }}>{tab}</button>
-            ))}
-          </nav>
+
         </div>
       ) : (
         <>
@@ -10522,35 +10509,32 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
         {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
       </div>
-        <nav aria-label="Settings categories" style={{ display: 'grid' }}>
-          {settingsPages.map(({ id, label, description, icon, group }, index) => (
-            <div key={id}>
-            {(index === 0 || group !== settingsPages[index - 1].group) && <h3 style={{
-              margin: index === 0 ? '8px 2px 2px' : '12px 2px 2px', paddingTop: index === 0 ? 0 : 8,
-              borderTop: index === 0 ? 0 : '1px solid #25243a', color: '#9491b8',
-              fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-            }}>{group}</h3>}
-            <button key={id} type="button" title={description} data-settings-page={id} onClick={() => {
-              previousSettingsPage.current = id;
-              setActiveSettingsPage(id);
-            }} style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '4px 2px',
-              background: 'none', border: 0, textAlign: 'left', cursor: 'pointer',
-            }}>
-              <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, flexShrink: 0 }}>
-                <SettingsSectionIcon id={icon} />
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#e2e0ff' }}>{label}</span>
-              </span>
-              <span aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 18 }}>›</span>
-            </button>
-            </div>
-          ))}
-        </nav>
+        <SettingsSection title="Preferences" icon="sliders">
+          <nav aria-label="Preferences">
+            {settingsPages.map(({ id, label, description, icon }, index) => (
+              <button key={id} type="button" title={description} data-settings-page={id} onClick={() => {
+                previousSettingsPage.current = id;
+                setOpenSection(null);
+                setActiveSettingsPage(id);
+              }} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minHeight: 44,
+                padding: '11px 2px', background: 'none', border: 0, borderBottom: index < settingsPages.length - 1 ? '1px solid #1a1a24' : 'none',
+                color: '#b6b3d7', fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textAlign: 'left', cursor: 'pointer',
+              }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.1)', flexShrink: 0 }}>
+                    <SettingsSectionIcon id={icon} />
+                  </span>
+                  <span>{label}</span>
+                </span>
+                <span aria-hidden="true" style={{ color: '#4a4870', fontSize: 13, flexShrink: 0 }}>›</span>
+              </button>
+            ))}
+          </nav>
+        </SettingsSection>
         {appInstall.available && <button type="button" onClick={() => appInstall.prompt?.()} style={{ minHeight: 44, padding: '6px 2px', marginTop: 6, background: 'none', border: 0, color: 'var(--accent)', fontSize: 12, cursor: 'pointer' }}>Install settracker on your device</button>}
 
-        <div style={{ marginTop: 18 }}>
+        <div>
 
 
             <SettingsSection title="Help" icon="help">

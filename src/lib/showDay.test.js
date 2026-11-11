@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {showsToday,showCountdown,preparationItems,eveningPlanRows,eveningStops} from './showDay.js'
+import {showsToday,anniversaryShows,showCountdown,preparationItems,eveningPlanRows,eveningStops} from './showDay.js'
 
 test('evening plans preserve the old meetup and interleave timed rows with the schedule', () => {
  const concert = {venue:'Venue', city:'Amsterdam', meetupTime:'17:00', meetupLocation:'North entrance', doorsTime:'19:00', showTime:'20:00'}
@@ -35,4 +35,10 @@ test('today prioritizes the next known start and retains custom preparation item
  assert.deepEqual(showsToday(shows,now).map(s=>s.id),['next','later','unknown','started'])
  assert.deepEqual(preparationItems({showChecklistText:'Pack earplugs\n\n Check train\nPack earplugs'}),['Pack earplugs','Check train'])
  assert.deepEqual(preparationItems({showChecklistText:''}),[])
+})
+
+test('On this day uses the local date and excludes wishlist and current-year shows',()=>{
+ const shows=[{id:'memory',date:'2025-11-11'},{id:'current',date:'2026-11-11'},{id:'wish',date:'2024-11-11',wishlist:true},{id:'other',date:'2025-11-10'}]
+ assert.deepEqual(anniversaryShows(shows,new Date(2026,10,11,0,5)).map(show=>show.id),['memory'])
+ assert.deepEqual(anniversaryShows(shows,new Date(2026,10,12)).map(show=>show.id),[])
 })

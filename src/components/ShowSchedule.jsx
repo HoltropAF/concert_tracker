@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react'
-import {pendingShowTime,pendingSupportActs,supportNameKey,timetableRows} from '../lib/showTimes.js'
+import {needsShowTimes,pendingShowTime,pendingSupportActs,supportNameKey,timetableRows} from '../lib/showTimes.js'
 import {cachedSchedule,checkShowSchedule,scheduleLink as link,scheduleRequest} from '../lib/showScheduleLookup.js'
 
 const nameOf=act=>typeof act==='string'?act:act?.name||''
@@ -11,6 +11,7 @@ const input={width:'100%',minWidth:0,boxSizing:'border-box',background:'#0c0c14'
 
 export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
  const request=scheduleRequest(concert,settings)
+ const missingTimes=needsShowTimes(concert,settings)
  const saved=request.url,website=request.website
  const [url,setUrl]=useState(saved),[proposal,setProposal]=useState(()=>cachedSchedule(request.key)?.result),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saving,setSaving]=useState('')
  const [supportDraft,setSupportDraft]=useState(null)
@@ -25,7 +26,7 @@ export default function ShowSchedule({concert,onSave,onEdit,settings={}}){
    }catch(e){if(isActive())setError(e.name==='TimeoutError'?'The source took too long. Open it manually or try again.':e.message||'Could not check times.')}
    finally{if(isActive())setBusy(false)}
  }
- useEffect(()=>{let active=true;setUrl(saved);if(concert.artist&&concert.date&&concert.date!=='9999-12-31')find(request,true,()=>active);return()=>{active=false}},[request.key])
+ useEffect(()=>{let active=true;setUrl(saved);setProposal(cachedSchedule(request.key)?.result);if(missingTimes&&concert.artist&&concert.date&&concert.date!=='9999-12-31')find(request,true,()=>active);return()=>{active=false}},[request.key,missingTimes])
 
  const persist=async(key,changes)=>{setSaving(key);setError('');try{const result=await onSave({...concert,...changes});if(result?.error)throw Error('Could not save. Try again.');return true}catch(e){setError(e.message);return false}finally{setSaving('')}}
  const accept=(key,found)=>persist(key,{[key]:found.value,scheduleSources:{...concert.scheduleSources,[key]:{url:found.source||proposal.source,label:found.label,checkedAt:new Date().toISOString()}}})

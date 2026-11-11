@@ -1,6 +1,11 @@
 export function localDay(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
 }
+export function anniversaryShows(concerts, now = new Date()) {
+  const today = localDay(now)
+  return concerts.filter(concert => !concert.wishlist && /^\d{4}-\d{2}-\d{2}$/.test(concert.date || '')
+    && concert.date < today && concert.date.slice(5) === today.slice(5))
+}
 export function showsToday(concerts, now = new Date()) {
   const day=localDay(now)
   const start=c=>/^([01]\d|2[0-3]):[0-5]\d$/.test(c.showTime||'')?new Date(`${day}T${c.showTime}:00`).getTime():null

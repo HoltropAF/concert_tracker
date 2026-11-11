@@ -4,6 +4,14 @@ import { validDate } from './calendar.js'
 
 const normalize = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 export const updateFields = { date: 'Show date', venue: 'Venue', city: 'City', country: 'Country', ticketSaleAt: 'Ticket sale (your local time)', ticketSaleLink: 'Ticket seller' }
+export function confirmWishDetails(before, after, fields) {
+  if (!before?.wishlist || !after.wishlist) return after
+  if (after.discovery?.snapshot !== before.discovery?.snapshot) return after
+  const keys = fields || ['artist', ...Object.keys(updateFields)].filter(key => before[key] !== after[key])
+  if (!keys.length) return after
+  return { ...after, wishConfirmedFields: { ...after.wishConfirmedFields,
+    ...Object.fromEntries(keys.map(key => [key, after[key]])) } }
+}
 export function safeTicketUrl(value, event) {
   try {
     const url = new URL(value)

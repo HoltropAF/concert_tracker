@@ -77,8 +77,18 @@ export function mergeTicketOptions(saved=[],found=[]){
   for(const option of found){const url=sellerLink(option.url);if(!url)continue;const old=options.get(url);options.set(url,{...old,...option,label:old?.label||option.label,url})}
   return [...options.values()]
 }
+export function knownWishDetails(concert) {
+  return [!!concert.artist?.trim(), !!concert.venue?.trim(), validDate(concert.date),
+    !!sellerLink(concert.ticketSaleLink) || Number.isFinite(new Date(concert.ticketSaleAt || '').getTime())]
+}
+export const needsWishDetails = concert => concert.wishlist && !knownWishDetails(concert).every(Boolean)
+
 export function wishStepStates(concert,events,changesFor){
-  const known=[!!concert.artist?.trim(),!!concert.venue?.trim(),validDate(concert.date),!!sellerLink(concert.ticketSaleLink)||Number.isFinite(new Date(concert.ticketSaleAt||'').getTime())]
+  const known=knownWishDetails(concert)
   const keys=[['artist'],['venue','city','country'],['date'],['ticketSaleAt','ticketSaleLink','ticketOptions']]
-  return known.map((saved,i)=>events.some(e=>changesFor(concert,e).some(c=>keys[i].includes(c.key)))?'pending':saved?'saved':'missing')
+  return known.map((saved,i)=>{
+    const manuallyConfirmed = saved && (!concert.discovery?.accepted || keys[i].some(key => concert.wishConfirmedFields?.[key] !== undefined && JSON.stringify(concert.wishConfirmedFields[key]) === JSON.stringify(concert[key])))
+    if (manuallyConfirmed) return 'saved'
+    return events.some(e=>changesFor(concert,e).some(c=>keys[i].includes(c.key)))?'pending':saved?'saved':'missing'
+  })
 }

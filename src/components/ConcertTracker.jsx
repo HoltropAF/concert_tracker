@@ -1,11 +1,12 @@
 import ShowSchedule from './ShowSchedule'
 import PostShowLog from './PostShowLog'
-import {canLogPostShow,recentShowsToLog} from '../lib/postShowLog'
+import {canLogPostShow} from '../lib/postShowLog'
 import {mergeTicketOptions} from '../lib/ticketOptions'
+import {confirmWishDetails} from '../lib/wishlistUpdates'
 import {reuseSpotifyLinks} from '../lib/spotifyReuse'
 import {timetableRows,visibleShowTimeFields} from '../lib/showTimes'
-import {cachedSchedule,checkShowSchedule,hasScheduleSuggestions,scheduleRequest,scheduleResults,scheduleUpdatedEvent,showsDueForSchedule} from '../lib/showScheduleLookup'
-import {showsToday, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
+import {cachedSchedule,checkShowSchedule,hasScheduleSuggestions,scheduleRequest,scheduleUpdatedEvent,showsDueForSchedule} from '../lib/showScheduleLookup'
+import {showsToday, anniversaryShows, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
 import TicketFiles, { OfflineTicketLibrary, TicketFileSheet } from './TicketFiles'
 import {clearOfflineTickets, listTicketFiles, pruneExpiredTickets} from '../lib/ticketFiles'
 import ShowControlSheet from './ShowControlSheet'
@@ -18,7 +19,7 @@ import PerformanceDetails from './PerformanceDetails'
 import {performanceSongs, mapSetlistSongs, releaseNote, matchesSongLinkFilter} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
-import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings, useWishlistResults } from './WishlistUpdates'
+import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
 import { withCriedTag } from '../lib/criedTag'
 // * The entire settracker UI lives in this one module. It is deliberately a single
 // * file: every view reads from the same `concerts` array and `settings` object
@@ -360,7 +361,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.33'
+const APP_VERSION = '1.1.34'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -11667,31 +11668,6 @@ function ScheduleReviewLink({ concert, settings, onOpen }) {
   return <button type="button" onClick={onOpen} style={{ minHeight:44, textAlign:'left', padding:'8px 12px', background:'#13131f', border:'1px solid #2e2e50', borderRadius:8, color:'#a78bfa', cursor:'pointer' }}>Review found times and support acts ›</button>;
 }
 
-function ShowReviewQueue({ concerts, settings, toLog, onOpen }) {
-  const results = useWishlistResults();
-  const [, refresh] = useState(0);
-  useEffect(() => {
-    const changed = () => refresh(value => value + 1);
-    window.addEventListener(scheduleUpdatedEvent, changed);
-    return () => window.removeEventListener(scheduleUpdatedEvent, changed);
-  }, []);
-  const items = toLog.map(concert => ({ concert, tab: 'log', label: 'Log this show' }));
-  const schedules = scheduleResults();
-  const today = localDay();
-  for (const concert of concerts) {
-    if (concert.wishlist && results?.[concert.id]?.unread) items.push({ concert, tab:'updates', label:'Wishlist update' });
-    else if (!concert.wishlist && schedules.size && (concert.endDate || concert.date) >= today) {
-      const schedule = schedules.get(scheduleRequest(concert, settings).key)?.result;
-      if (hasScheduleSuggestions(concert, settings, schedule)) items.push({ concert, tab:'timetable', label:'New timetable details' });
-    }
-  }
-  if (!items.length) return null;
-  return <details style={{marginBottom:10,padding:'0 12px',border:'1px solid #2e2e50',borderRadius:8,background:'#13131f'}}>
-    <summary style={{padding:'12px 0',color:'#e2e0ff',fontSize:13,cursor:'pointer'}}>To review <span style={{color:'#a78bfa',marginLeft:6}}>{items.length}</span></summary>
-    {items.map(({concert,tab,label}) => <button key={concert.id+tab} type="button" onClick={()=>onOpen(concert,tab)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,width:'100%',minHeight:44,textAlign:'left',color:'#c4c2f0',border:0,borderTop:'1px solid #25243a',background:'none',cursor:'pointer'}}><span>{concert.artist}</span><span style={{color:'#a78bfa',flexShrink:0}}>{label} ›</span></button>)}
-  </details>
-}
-
 function ShowPreparationChecklist({concert,settings}) {
   const key='showPreparation:'+concert.id;
   const [checked,setChecked]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return {}}});
@@ -11699,6 +11675,37 @@ function ShowPreparationChecklist({concert,settings}) {
   const items=preparationItems(settings);
   if(!items.length)return null;
   return <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{items.map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecked(old=>({...old,[label]:e.target.checked}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
+}
+
+function DayNotifications({ todayShows, memories, settings, ticketAccount, now, showToday, setShowToday, onOpen }) {
+  const [panel, setPanel] = useState(null);
+  const count = Number(todayShows.length > 0) + Number(memories.length > 0);
+  useBackButton(() => setPanel(null), count > 0 && panel !== null);
+  useEffect(() => { if (!count) setPanel(null); }, [count]);
+  if (!count) return null;
+  const openToday = () => { setPanel(null); setShowToday(true); };
+  const openMemory = concert => { setPanel(null); onOpen(concert); };
+  const choose = () => {
+    if (count === 2) setPanel('choose');
+    else if (todayShows.length) openToday();
+    else setPanel('memories');
+  };
+  return <>
+    <button type="button" aria-label={count === 2 ? 'Today and On this day' : todayShows.length ? "Today's shows" : 'On this day'}
+      onClick={choose} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',right:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',minHeight:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+      {count === 2 ? <><svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span style={{borderRadius:99,background:'#0c0c14',color:'#e2e0ff',fontSize:11,minWidth:20,padding:'2px 4px'}}>2</span></>
+        : todayShows.length ? '♫ Today' : '✧ On this day'}
+    </button>
+    {panel && <ShowControlSheet title={panel === 'choose' ? 'Today & memories' : 'On this day'} onClose={() => setPanel(null)}>
+      {panel === 'choose' && <button type="button" onClick={openToday} style={{width:'100%',minHeight:48,background:'none',border:0,borderBottom:'1px solid #25243a',color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>♫ Today’s show{todayShows.length > 1 ? 's' : ''} <span style={{float:'right'}}>›</span></button>}
+      {panel === 'choose' && <button type="button" onClick={() => setPanel('memories')} style={{width:'100%',minHeight:48,background:'none',border:0,color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>✧ On this day <span style={{float:'right'}}>›</span></button>}
+      {panel === 'memories' && memories.map(concert => <button key={concert.id} type="button" onClick={() => openMemory(concert)} style={{width:'100%',minHeight:54,background:'none',border:0,borderBottom:'1px solid #25243a',textAlign:'left',color:'#c4c2f0',cursor:'pointer'}}>
+        <strong style={{fontSize:14}}>{concert.artist}</strong>
+        <span style={{display:'block',marginTop:3,color:'#9491b8',fontSize:12}}>{now.getFullYear() - Number(concert.date.slice(0,4))} year{now.getFullYear() - Number(concert.date.slice(0,4)) === 1 ? '' : 's'} ago{concert.venue ? ' · ' + concert.venue : ''}</span>
+      </button>)}
+    </ShowControlSheet>}
+    {showToday && todayShows.length > 0 && <TodayShowPanel concerts={todayShows} settings={settings} ticketAccount={ticketAccount} now={now} onClose={() => setShowToday(false)} onOpen={onOpen} />}
+  </>;
 }
 
 function TodayShowPanel({concerts,settings,ticketAccount,onOpen,onClose,now}) {
@@ -11790,7 +11797,6 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   // * "is a detail page covering the list" flag. Holds the concert object, not an id,
   // * so it can go stale after a save — handleSave re-sets it with the new object.
   const [selected, setSelected] = useState(null)
-  const [logShowId,setLogShowId] = useState(null);
   // * showAdd* are the answers collected by the add-flow chooser below; they become
   // * AddConcertForm's initial* props once the flow completes.
   const [showAdd, setShowAdd] = useState(null) // null | 'concert' | 'festival'
@@ -11870,12 +11876,23 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const todaysShows=showsToday(concerts,showDayNow);
   const ticketAccount = userEmail || 'guest';
   const ticketDay = localDay(showDayNow);
+  const memoryKey = 'settracker:anniversary-collapsed:' + ticketAccount;
+  const [collapsedMemoryDay, setCollapsedMemoryDay] = useState(() => {
+    try { return localStorage.getItem(memoryKey) || ''; } catch { return ''; }
+  });
+  const anniversaryMemories = anniversaryShows(concerts, showDayNow);
+  const memoriesCollapsed = collapsedMemoryDay === ticketDay;
+  const collapseMemories = () => {
+    setCollapsedMemoryDay(ticketDay);
+    try { localStorage.setItem(memoryKey, ticketDay); } catch { /* session state remains available */ }
+  };
+
   const onlineForLookups = librarySync?.online ?? true;
   useEffect(() => {
     if (!settingsLoaded || !onlineForLookups || navigator.onLine === false) return;
     let active = true;
     const check = async () => {
-      for (const concert of showsDueForSchedule(concerts)) {
+      for (const concert of showsDueForSchedule(concerts, showDayNow, settings)) {
         if (!active) return;
         await checkShowSchedule(scheduleRequest(concert,settings),true).catch(() => {});
       }
@@ -11923,11 +11940,8 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [previousSelected, isSelectedExiting] = useExitingValue(currentSelected);
   const displaySelected = currentSelected || previousSelected;
   const selectedExiting = !currentSelected && isSelectedExiting;
-  const [reviewStart, setReviewStart] = useState(null);
-  const handleOpenConcert = (concert, tab) => {
+  const handleOpenConcert = (concert) => {
     savedScrollPos.current = document.getElementById('content-scroll')?.scrollTop || 0
-    setLogShowId(tab === 'log' ? concert.id : null)
-    setReviewStart(tab === 'updates' || tab === 'timetable' ? { id: concert.id, tab } : null)
     setSelected(concert)
   }
   useEffect(() => {
@@ -11966,6 +11980,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   }
 
   const handleSave = async (updated, options) => {
+    updated = confirmWishDetails(concerts.find(concert => concert.id === updated.id), updated)
     setNavLoading(true)
     const result = await onSaveConcert(updated, options)
     setNavLoading(false)
@@ -12072,7 +12087,6 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
 
   const filtered = matchingShows.filter(c => !isWish(c))
   const wishlist = matchingShows.filter(isWish)
-  const toLog = filterStatus.length === 0 || filterStatus.includes('past') ? recentShowsToLog(filtered,showDayNow).slice(0,3) : [];
   const upcoming = filtered.filter(c => !isWish(c) && !isPastDate(c.date))
   const past = filtered.filter(c => !isWish(c) && isPastDate(c.date))
   const combinedShows = filterStatus.length === 0
@@ -12298,17 +12312,22 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     </div>
   )
 
+  const dayControls = <DayNotifications todayShows={todaysShows} memories={memoriesCollapsed ? anniversaryMemories : []}
+    settings={settings} ticketAccount={ticketAccount} now={showDayNow} showToday={showToday} setShowToday={setShowToday}
+    onOpen={handleOpenConcert} />;
+
   if (displaySelected) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <div className={selectedExiting ? "slide-out-detail" : "slide-in-detail"} key={displaySelected.id}>
-        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} startLog={logShowId===displaySelected.id} startTab={reviewStart?.id===displaySelected.id ? reviewStart.tab : 'general'} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
         ])].filter(Boolean).sort()} />
         </div>
       </div>
+      {dayControls}
       <ToastHost toast={toast} onDismiss={() => setToast(null)} />
       <BottomNav />
     </div>
@@ -12317,10 +12336,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   return (
     <div data-theme-shell="" style={appShell}>
 
-      {todaysShows.length>0 && <>
-        <button aria-label="Today's shows" title="Today's shows" onClick={()=>setShowToday(true)} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',right:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',height:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer'}}>♫ Today{todaysShows.length>1?' · '+todaysShows.length:''}</button>
-        {showToday && <TodayShowPanel concerts={todaysShows} settings={settings} ticketAccount={ticketAccount} now={showDayNow} onClose={()=>setShowToday(false)} onOpen={handleOpenConcert} />}
-      </>}
+      {dayControls}
 
       {/* Header */}
       {!((view === 'venues' && venueDetailOpen) || (view === 'artists' && artistDetailOpen) || (view === 'songs' && songDetailOpen)) && (
@@ -12356,14 +12372,13 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
           const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;
-          const todayMD = new Date().toISOString().slice(5, 10);
-          const anniversaries = pastAll.filter(c => c.date && c.date.slice(5) === todayMD && c.date.slice(0, 4) !== new Date().getFullYear().toString());
+          const anniversaries = memoriesCollapsed ? [] : anniversaryShows(pastAll, showDayNow);
           return (
             <div style={{ padding: '14px 16px 0' }}>
               {anniversaries.map(c => {
-                const years = new Date().getFullYear() - parseInt(c.date.slice(0, 4));
+                const years = showDayNow.getFullYear() - parseInt(c.date.slice(0, 4));
                 return (
-                  <button key={c.id} onClick={() => handleOpenConcert(c)} style={{ width: '100%', textAlign: 'left', background: 'linear-gradient(135deg, #1a1430, #2a1a40)', border: '1px solid #3a2a5c', borderRadius: 12, padding: '12px 14px', marginBottom: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button key={c.id} onClick={() => { collapseMemories(); handleOpenConcert(c); }} style={{ width: '100%', textAlign: 'left', background: 'linear-gradient(135deg, #1a1430, #2a1a40)', border: '1px solid #3a2a5c', borderRadius: 12, padding: '12px 14px', marginBottom: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ fontSize: 24 }}>✨</div>
                     <div>
                       <div style={{ fontSize: 10, color: 'var(--accent)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase' }}>On this day, {years} year{years !== 1 ? 's' : ''} ago</div>
@@ -12467,7 +12482,6 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
             {concerts.length > 0 && combinedShows.length === 0 && (
               <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
-            <ShowReviewQueue concerts={concerts} settings={settings} toLog={toLog} onOpen={handleOpenConcert} />
             {combinedShows.length > 0 && (
               <div style={{ marginTop: 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (

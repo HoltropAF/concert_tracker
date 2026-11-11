@@ -1,5 +1,9 @@
 export const showTimeFields={doorsTime:'Doors open',vipTime:'VIP starts',showTime:'Show starts',endTime:'Expected end'}
 export const visibleShowTimeFields=(concert,settings={})=>Object.entries(showTimeFields).filter(([key])=>key!=='vipTime'||(concert.showVipTime??settings.showVipTime??true))
+export function needsShowTimes(concert, settings = {}) {
+ return visibleShowTimeFields(concert, settings).some(([key]) => !concert[key] && !concert.scheduleSources?.[key]?.manual)
+   || (concert.support || []).some(act => act?.role !== 'guest' && (typeof act === 'string' ? act : act?.name) && !act?.time && !act?.timeManuallySet)
+}
 export function timetableRows(concert,settings,ordered = true) {
  const acts = (concert.support || []).flatMap((act,index) => {
    const name = typeof act === 'string' ? act : act?.name

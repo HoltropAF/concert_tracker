@@ -1,8 +1,8 @@
 import VenueLookup from './VenueLookup'
-import { sellerLink, ticketSaleOpen, wishStepStates } from '../lib/ticketOptions'
+import { sellerLink, ticketSaleOpen, wishStepStates, needsWishDetails } from '../lib/ticketOptions'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { applyWishUpdates, checkWish, proposedChanges, safeTicketUrl, summarizeWishCheck } from '../lib/wishlistUpdates'
+import { applyWishUpdates, checkWish, confirmWishDetails, proposedChanges, safeTicketUrl, summarizeWishCheck } from '../lib/wishlistUpdates'
 import { savedVenueSources } from '../lib/venueSources'
 import { validDate } from '../lib/calendar'
 import {localDay,readDailyCheck,claimDailyCheck} from '../lib/dailyWishlist'
@@ -16,25 +16,28 @@ export function WishlistUpdateProvider({ children, settings = {}, concerts = [],
   const [sourceStatus, setSourceStatus] = useState({})
   const [progress, setProgress] = useState(null)
   const lock = useRef(false), controller = useRef(null)
+  const latestConcerts = useRef(concerts)
+  latestConcerts.current = concerts
   const dailyKey=account?`settracker:wishlist-daily:${account}`:null
   const dailySession=useRef(null)
   useEffect(() => () => controller.current?.abort(), [])
   useEffect(()=>{
     if(!ready||!dailyKey||!concerts.some(c=>c.wishlist))return
     const timer=setTimeout(()=>{
+      const missing = concerts.filter(needsWishDetails)
       const marker=dailyKey+localDay()
       if(dailySession.current===marker)return
-      dailySession.current=marker
+      dailySession.current=missing.length ? marker : null
       const saved=readDailyCheck(localStorage,dailyKey)
       if(saved?.results)setResults(previous=>({...saved.results,...previous}))
       if(saved?.day===localDay()||!online||navigator.onLine===false){dailySession.current=null;return}
       if(lock.current){dailySession.current=null;return}
-      if(claimDailyCheck(localStorage,dailyKey))check(concerts.filter(c=>c.wishlist))
+      if(missing.length && claimDailyCheck(localStorage,dailyKey))check(missing, {onlyMissing:true})
     },500)
     return ()=>clearTimeout(timer)
   },[ready,dailyKey,concerts,online])
-  const wishIds=concerts.filter(c=>c.wishlist).map(c=>c.id)
-  const check = async concerts => {
+  const wishIds=concerts.filter(needsWishDetails).map(c=>c.id)
+  const check = async (concerts, {onlyMissing = false} = {}) => {
     if (lock.current || !online || navigator.onLine === false) return
     lock.current = true
     if(dailyKey&&wishIds.length&&wishIds.every(id=>concerts.some(c=>c.id===id)))claimDailyCheck(localStorage,dailyKey)
@@ -42,7 +45,8 @@ export function WishlistUpdateProvider({ children, settings = {}, concerts = [],
     controller.current = abort
     try {
       for (let index = 0; index < concerts.length && !abort.signal.aborted; index++) {
-        const concert = concerts[index]
+        const concert = latestConcerts.current.find(current => current.id === concerts[index].id)
+        if (!concert?.wishlist || (onlyMissing && !needsWishDetails(concert))) continue
         setProgress({ done: index, total: concerts.length })
         setResults(previous => ({ ...previous, [concert.id]: { ...previous[concert.id], status: 'checking' } }))
         try {
@@ -65,9 +69,6 @@ export function WishlistUpdateProvider({ children, settings = {}, concerts = [],
   return <Context.Provider value={{ results, sourceStatus, check, progress, online, stop: () => controller.current?.abort(), reviewed: id => setResults(previous => { const result = {...previous[id],status:'saved',unread:false}; if(dailyKey){const saved=readDailyCheck(localStorage,dailyKey);try{localStorage.setItem(dailyKey,JSON.stringify({day:saved?.day||null,results:{...saved?.results,[id]:result}}))}catch{}} return {...previous,[id]:result}; }) }}>{children}</Context.Provider>
 }
 
-export function useWishlistResults() {
-  return useContext(Context)?.results
-}
 function statusText(result) {
   if (!result) return ''
   if (result.status === 'checking') return result.progress ? `Checking sources · ${result.progress.done}/${result.progress.total}${result.progress.found ? ' · '+result.progress.found+' matches found' : ''}` : 'Checking…'
@@ -84,21 +85,23 @@ function statusText(result) {
 export function WishlistUpdateBadge({ concert }) {
   const ctx = useContext(Context)
   const result = ctx?.results[concert.id];
-  const text = result?.unread ? 'New information found · open updates' : statusText(result)
+  const text = result?.status === 'checking' ? 'Checking…' : needsWishDetails(concert) && result?.unread ? 'New details' : ''
   if (!concert.wishlist || !text) return null
-  return <span style={{ display: 'block', color: '#75d9b1', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 400, whiteSpace: 'normal', marginTop: 4 }}>{text}</span>
+  return <span style={{ display: 'block', color: '#75d9b1', fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>{text}</span>
 }
 export function WishlistCheckAll({ concerts }) {
   const ctx = useContext(Context)
-  const wishes = concerts.filter(c => c.wishlist)
-  return <div style={{ marginBottom: 8 }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <span style={muted}>{ctx.progress ? `Checking ${ctx.progress.done + 1} of ${ctx.progress.total}` : ctx.online ? 'Search enabled sources' : 'Connect to check sources'}</span>
-      <button type="button" style={action} disabled={!ctx.online && !ctx.progress} onClick={() => ctx.progress ? ctx.stop() : ctx.check(wishes)}>{ctx.progress ? 'Stop' : 'Check all for updates ↻'}</button>
-    </div>
-    {!ctx.progress && wishes.some(c => ctx.results[c.id]) && <p role="status" style={muted}>Checked {wishes.filter(c => ctx.results[c.id]).length} of {wishes.length} · open a show to review its result.</p>}
+  const wishes = concerts.filter(needsWishDetails)
+  if (!wishes.length && !ctx.progress) return null
+  return <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,marginBottom:4}}>
+    {ctx.progress && <span role="status" style={muted}>{ctx.progress.done + 1}/{ctx.progress.total}</span>}
+    <button type="button" style={action} disabled={!ctx.online && !ctx.progress}
+      onClick={() => ctx.progress ? ctx.stop() : ctx.check(wishes, {onlyMissing:true})}>
+      {ctx.progress ? 'Stop' : ctx.online ? 'Find missing details ↻' : 'Connect to check'}
+    </button>
   </div>
 }
+
 export default function WishlistUpdateDetails({ concert, onSave, onGotTickets }) {
   const ctx = useContext(Context), result = ctx.results[concert.id]
   const [candidate, setCandidate] = useState(null), [selected, setSelected] = useState([])
@@ -140,7 +143,6 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
   const saleTime = new Date(concert.ticketSaleAt || '').getTime()
   const pendingEvents=result?.status==='found'?result.events:[]
   const states=wishStepStates(concert,pendingEvents,proposedChanges)
-  const known=states.map(s=>s==='saved')
   const buyUrl=sellerLink(concert.ticketSaleLink)
   const canBuy=!!buyUrl&&ticketSaleOpen(concert)
   const values = [concert.artist || 'Add artist', [concert.venue,concert.city,concert.country].filter(Boolean).join(' · ') || 'Venue not announced', validDate(concert.date) ? new Date(concert.date+'T12:00:00').toLocaleDateString([], {dateStyle:'medium'}) : 'Date not announced', Number.isFinite(saleTime) ? (saleTime <= Date.now() ? 'Sale started · ' : 'Sale starts · ') + new Date(saleTime).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}) : 'Sale date unknown']
@@ -149,14 +151,15 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
     if(editingStep===0&&!draft.artist?.trim()){setError('Enter an artist.');return}
     if(editingStep===3&&draft.ticketSaleLink){try{const u=new URL(draft.ticketSaleLink);if(!['https:','http:'].includes(u.protocol))throw Error()}catch{setError('Enter a valid ticket website.');return}}
     setBusy(true);setError('')
-    try{const patch=Object.fromEntries(fields[editingStep].map(([key])=>[key,key==='date'&&!draft[key]?'9999-12-31':draft[key]?.trim()||'']));const response=await onSave({...concert,...patch},{notify:true});if(response?.error)throw Error('Could not save this detail.');setEditingStep(null)}catch(e){setError(e.message)}finally{setBusy(false)}
+    try{const patch=Object.fromEntries(fields[editingStep].map(([key])=>[key,key==='date'&&!draft[key]?'9999-12-31':draft[key]?.trim()||'']));const response=await onSave(confirmWishDetails(concert,{...concert,...patch},Object.keys(patch)),{notify:true});if(response?.error)throw Error('Could not save this detail.');setEditingStep(null)}catch(e){setError(e.message)}finally{setBusy(false)}
   }
+  const missingDetails = needsWishDetails(concert)
   const checked = result?.checkedAt || concert.discovery?.checkedAt
   return <div style={{ marginBottom: 16 }}>
     {['Who?','Where?','When?','Tickets?'].map((label,index)=><div key={label} style={section}>
       <button type="button" disabled={busy} onClick={()=>{if(index===3&&canBuy)window.open(buyUrl,'_blank','noopener,noreferrer');else editStep(index)}} style={{...action,display:'flex',alignItems:'center',gap:12,textAlign:'left',width:'100%',color:'#c4c2f0'}}>
         <span aria-label={states[index]==='saved'?'Saved':states[index]==='pending'?'Found · not accepted':'Missing'} style={{background:states[index]==='saved'?'#123c30':states[index]==='pending'?'#493313':'#421f2b',color:states[index]==='saved'?'#6ee7b7':states[index]==='pending'?'#fbbf24':'#fda4af',borderRadius:'50%',width:28,height:28,display:'grid',placeItems:'center',flexShrink:0}}>{states[index]==='saved'?'✓':states[index]==='pending'?'!':index+1}</span>
-        <span style={{flex:1}}><strong>{label}</strong><span style={{...muted,display:'block',marginTop:4}}>{values[index]}</span><span style={{...muted,display:'block',fontSize:11}}>{states[index]==='pending'?'New information · review below':states[index]==='missing'?'Not saved / not found yet':index===3&&canBuy?'Open ticket seller ↗':'Saved'}</span></span><span>›</span>
+        <span style={{flex:1}}><strong>{label}</strong><span style={{...muted,display:'block',marginTop:2}}>{values[index]}</span></span><span>›</span>
       </button>
       {index===3&&<button type="button" disabled={busy} style={action} onClick={()=>editStep(3)}>Edit ticket details</button>}
       {editingStep===index&&<form onSubmit={e=>{e.preventDefault();saveStep()}}>
@@ -178,14 +181,18 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
         <button type="submit" disabled={busy} style={action}>Add ticket option</button>
       </form>
     </details>
-    <button type="button" disabled={!!ctx.progress||busy||!ctx.online} style={{...action,width:'100%',marginTop:16,...(!known.every(Boolean)?{background:'#a78bfa',color:'#0c0c14',borderRadius:9,fontWeight:700}:{})}} onClick={()=>ctx.check([concert])}>{!ctx.online?'Connect to check sources':result?.status==='checking'?'Checking…':known.every(Boolean)?'Check for updates ↻':'Check for missing details'}</button>
+    {missingDetails && <button type="button" disabled={!!ctx.progress||busy||!ctx.online}
+      style={{...action,width:'100%',marginTop:12}} onClick={()=>ctx.check([concert])}>
+      {!ctx.online?'Connect to check':result?.status==='checking'?'Checking…':'Find missing details ↻'}
+    </button>}
+
     {result?.status==='checking'&&<button type="button" style={action} onClick={ctx.stop}>Stop checking</button>}
-    <p style={muted}>{checked?'Last checked '+new Date(checked).toLocaleString():'Not checked yet'}</p>
+    <p style={muted}>{checked?'Last checked '+new Date(checked).toLocaleString():missingDetails?'Not checked yet':'Details confirmed'}</p>
     {result&&<p role="status" style={muted}>{statusText(result)}</p>}
     {!!result?.events?.length&&result.status!=='checking'&&<details open={!result.repeat || result.newCount > 0}><summary style={muted}>{result.repeat && !result.newCount ? 'Previously found details' : 'Review found details'}</summary>{result.events.map(event=><button type="button" key={event.id} style={{...action,display:'block',textAlign:'left',width:'100%',borderBottom:'1px solid #29233c'}} onClick={()=>review(event)}>{event.artist}<span style={{...muted,display:'block'}}>{event.date} · {event.venue} · {event.city}{event.ticketOptions?.length>1?' · '+event.ticketOptions.length+' ticket options':''}</span>{result.exact?'Review found details →':'Choose this show →'}</button>)}</details>}
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginTop:14}}>
       <details style={muted}><summary style={{padding:'12px 0',cursor:'pointer'}}>Your notes</summary><textarea aria-label="Your notes" key={concert.notes||''} defaultValue={concert.notes||''} onChange={e=>setDraft(d=>({...d,notes:e.target.value}))} style={{width:'100%',boxSizing:'border-box',minHeight:90,background:'#13131f',color:'#c4c2f0',fontSize:16}}/><button type="button" disabled={busy} style={action} onClick={async()=>{setBusy(true);setError('');try{const r=await onSave({...concert,notes:draft.notes??concert.notes??''},{notify:true});if(r?.error)throw Error('Could not save notes.')}catch(e){setError(e.message)}finally{setBusy(false)}}}>Save notes</button></details>
-      <details style={muted}><summary style={{padding:'12px 0',cursor:'pointer'}}>Sources checked</summary>{result?.reports?.map((report,i)=><p key={i}>{report.source}: {report.error||report.skipped||(report.count?report.count+' matches':'No matches')}{report.reader?' · '+report.reader:''}{report.cached?' · cached (up to 5 min)':''}{report.reader&&report.checkedAt?' · fetched '+new Date(report.checkedAt).toLocaleTimeString():''}{report.warning?' · '+report.warning:''}</p>)}{result?.message&&!result.reports?.length&&<p>{result.message}</p>}<p>Coverage varies. No results does not mean sold out.</p>{result?.limited&&<p>Other listings may exist beyond the checked pages.</p>}</details>
+      <details style={muted}><summary style={{padding:'12px 0',cursor:'pointer'}}>Sources checked</summary>{result?.reports?.map((report,i)=><p key={i}>{report.source}: {report.error||report.skipped||(report.count?report.count+' matches':'No matches')}{report.reader?' · '+report.reader:''}{report.cached?' · cached (up to 5 min)':''}{report.reader&&report.checkedAt?' · fetched '+new Date(report.checkedAt).toLocaleTimeString():''}{report.warning?' · '+report.warning:''}</p>)}{result?.message&&!result.reports?.length&&<p>{result.message}</p>}<button type="button" disabled={!!ctx.progress||busy||!ctx.online} style={action} onClick={()=>ctx.check([concert])}>Refresh sources ↻</button><p>Coverage varies. No results does not mean sold out.</p>{result?.limited&&<p>Other listings may exist beyond the checked pages.</p>}</details>
     </div>
     {error&&!candidate&&<p role="alert" style={{color:'#fda4af'}}>{error}</p>}
     <button type="button" disabled={busy} style={{...action,width:'100%',marginTop:16,border:'1px solid #3d3564',borderRadius:9}} onClick={()=>onGotTickets(ticketChoice!==''?concert.ticketOptions?.[Number(ticketChoice)]:null)}>I got tickets →</button>

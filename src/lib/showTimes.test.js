@@ -71,3 +71,11 @@ test('automatic lookup finds the exact show without a supplied link, preserves s
  assert.deepEqual(failure.times,{})
  assert.equal(failure.sources[0].status,'Unavailable')
 })
+
+test('complete saved timetables skip automatic searches, respecting optional and manual rows',()=>{
+ const complete={artist:'Artist',date:'2026-11-11',doorsTime:'18:00',showTime:'20:00',endTime:'22:00',showVipTime:false}
+ const now=new Date(2026,10,11)
+ assert.equal(showsDueForSchedule([complete],now).length,0)
+ assert.equal(showsDueForSchedule([{...complete,doorsTime:''}],now).length,1)
+ assert.equal(showsDueForSchedule([{...complete,doorsTime:'',scheduleSources:{doorsTime:{manual:true}}}],now).length,0)
+})

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {groupTicketEvents,groupDiscoveryListings,mergeTicketOptions,sellerLink,ticketSaleOpen,wishStepStates} from './ticketOptions.js'
-import {applyWishUpdates,proposedChanges} from './wishlistUpdates.js'
+import {groupTicketEvents,groupDiscoveryListings,mergeTicketOptions,sellerLink,ticketSaleOpen,wishStepStates,needsWishDetails} from './ticketOptions.js'
+import {applyWishUpdates,proposedChanges,confirmWishDetails} from './wishlistUpdates.js'
 const base={id:'standard',artist:'ENHYPEN',date:'2027-03-20',venue:'Arena',city:'Amsterdam',url:'https://ticketmaster.nl/event/1'}
 test('discovery fills a missing venue from the promoter and groups add-ons under the main concert',()=>{
  const show={...base,artist:'Tove Lo: Estrus',venue:'',source:'Ticketmaster',country:'Netherlands'}
@@ -42,4 +42,16 @@ test('seller links are safe and cancelled or future sales do not open as on sale
  assert.equal(ticketSaleOpen({ticketSaleAt:'2027-01-01'},Date.parse('2026-01-01')),false)
  assert.equal(ticketSaleOpen({ticketSaleAt:'2025-01-01'},Date.parse('2026-01-01')),true)
  assert.equal(ticketSaleOpen({ticketSaleAt:'2025-01-01',discovery:{status:'Cancelled'}}),false)
+})
+
+test('complete manual details stop automatic searches and retain confirmation against old suggestions',()=>{
+ const wish={wishlist:true,artist:'ENHYPEN',venue:'Arena',date:'2027-03-20',ticketSaleLink:'https://seller.example/tickets',discovery:{accepted:true,snapshot:'saved'}}
+ assert.equal(needsWishDetails(wish),false)
+ assert.equal(needsWishDetails({...wish,date:'9999-12-31'}),true)
+ const edited=confirmWishDetails(wish,{...wish,venue:'My venue'})
+ assert.equal(wishStepStates(edited,[base],proposedChanges)[1],'saved')
+ const cleared=confirmWishDetails(edited,{...edited,venue:''})
+ assert.equal(needsWishDetails(cleared),true)
+ const legacy={...wish,discovery:undefined}
+ assert.equal(wishStepStates(legacy,[{...base,venue:'Other venue'}],proposedChanges)[1],'saved')
 })

@@ -1,6 +1,6 @@
 import { validDate } from './calendar.js'
 import { localDay } from './showDay.js'
-import { pendingShowTime, pendingSupportActs, visibleShowTimeFields } from './showTimes.js'
+import { needsShowTimes, pendingShowTime, pendingSupportActs, visibleShowTimeFields } from './showTimes.js'
 
 const storageKey = 'settracker-show-schedule:v1'
 const memory = new Map()
@@ -31,10 +31,6 @@ function storedSchedules() {
 
 export function cachedSchedule(key) {
   return memory.get(key) || storedSchedules()[key]
-}
-
-export function scheduleResults() {
-  return new Map([...Object.entries(storedSchedules()), ...memory])
 }
 
 function remember(key, entry) {
@@ -74,7 +70,7 @@ export function checkShowSchedule(request, automatic = false) {
   return promise
 }
 
-export function showsDueForSchedule(concerts, now = new Date()) {
+export function showsDueForSchedule(concerts, now = new Date(), settings = {}) {
   const today = localDay(now)
   const limit = new Date(now)
   limit.setDate(limit.getDate() + 3)
@@ -82,6 +78,7 @@ export function showsDueForSchedule(concerts, now = new Date()) {
   return concerts.filter(concert => !concert.wishlist && concert.artist && validDate(concert.date)
     && concert.date >= today && concert.date <= latest
     && !/cancelled|postponed/i.test(concert.discovery?.status || '')
+    && needsShowTimes(concert, settings)
     && (concert.attendanceMode !== 'online' || !!scheduleLink(concert.scheduleUrl)))
     .sort((a,b) => a.date.localeCompare(b.date))
 }

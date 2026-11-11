@@ -11,7 +11,7 @@ const Context = createContext(null)
 const action = { background: 'none', border: 0, color: '#a78bfa', cursor: 'pointer', minHeight: 44, padding: '8px 2px', fontSize: 12 }
 const muted = { color: '#9491b8', fontSize: 12, lineHeight: 1.5 }
 const section = { borderBottom: '1px solid #29233c', padding: '12px 0' }
-export function WishlistUpdateProvider({ children, settings = {}, concerts = [], account, ready = true }) {
+export function WishlistUpdateProvider({ children, settings = {}, concerts = [], account, ready = true, online = true }) {
   const [results, setResults] = useState({})
   const [sourceStatus, setSourceStatus] = useState({})
   const [progress, setProgress] = useState(null)
@@ -26,15 +26,16 @@ export function WishlistUpdateProvider({ children, settings = {}, concerts = [],
       if(dailySession.current===marker)return
       dailySession.current=marker
       const saved=readDailyCheck(localStorage,dailyKey)
-      if(saved?.day===localDay()){setResults(saved.results||{});return}
+      if(saved?.results)setResults(previous=>({...saved.results,...previous}))
+      if(saved?.day===localDay()||!online||navigator.onLine===false){dailySession.current=null;return}
       if(lock.current){dailySession.current=null;return}
       if(claimDailyCheck(localStorage,dailyKey))check(concerts.filter(c=>c.wishlist))
     },500)
     return ()=>clearTimeout(timer)
-  },[ready,dailyKey,concerts])
+  },[ready,dailyKey,concerts,online])
   const wishIds=concerts.filter(c=>c.wishlist).map(c=>c.id)
   const check = async concerts => {
-    if (lock.current) return
+    if (lock.current || !online || navigator.onLine === false) return
     lock.current = true
     if(dailyKey&&wishIds.length&&wishIds.every(id=>concerts.some(c=>c.id===id)))claimDailyCheck(localStorage,dailyKey)
     const abort = new AbortController()
@@ -61,7 +62,11 @@ export function WishlistUpdateProvider({ children, settings = {}, concerts = [],
       }
     } finally { lock.current = false; setProgress(null) }
   }
-  return <Context.Provider value={{ results, sourceStatus, check, progress, stop: () => controller.current?.abort(), reviewed: id => setResults(previous => { const result = {...previous[id],status:'saved',unread:false}; if(dailyKey){const saved=readDailyCheck(localStorage,dailyKey);try{localStorage.setItem(dailyKey,JSON.stringify({day:saved?.day||null,results:{...saved?.results,[id]:result}}))}catch{}} return {...previous,[id]:result}; }) }}>{children}</Context.Provider>
+  return <Context.Provider value={{ results, sourceStatus, check, progress, online, stop: () => controller.current?.abort(), reviewed: id => setResults(previous => { const result = {...previous[id],status:'saved',unread:false}; if(dailyKey){const saved=readDailyCheck(localStorage,dailyKey);try{localStorage.setItem(dailyKey,JSON.stringify({day:saved?.day||null,results:{...saved?.results,[id]:result}}))}catch{}} return {...previous,[id]:result}; }) }}>{children}</Context.Provider>
+}
+
+export function useWishlistResults() {
+  return useContext(Context)?.results
 }
 function statusText(result) {
   if (!result) return ''
@@ -88,8 +93,8 @@ export function WishlistCheckAll({ concerts }) {
   const wishes = concerts.filter(c => c.wishlist)
   return <div style={{ marginBottom: 8 }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <span style={muted}>{ctx.progress ? `Checking ${ctx.progress.done + 1} of ${ctx.progress.total}` : 'Search enabled sources'}</span>
-      <button type="button" style={action} onClick={() => ctx.progress ? ctx.stop() : ctx.check(wishes)}>{ctx.progress ? 'Stop' : 'Check all for updates ↻'}</button>
+      <span style={muted}>{ctx.progress ? `Checking ${ctx.progress.done + 1} of ${ctx.progress.total}` : ctx.online ? 'Search enabled sources' : 'Connect to check sources'}</span>
+      <button type="button" style={action} disabled={!ctx.online && !ctx.progress} onClick={() => ctx.progress ? ctx.stop() : ctx.check(wishes)}>{ctx.progress ? 'Stop' : 'Check all for updates ↻'}</button>
     </div>
     {!ctx.progress && wishes.some(c => ctx.results[c.id]) && <p role="status" style={muted}>Checked {wishes.filter(c => ctx.results[c.id]).length} of {wishes.length} · open a show to review its result.</p>}
   </div>
@@ -173,7 +178,7 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
         <button type="submit" disabled={busy} style={action}>Add ticket option</button>
       </form>
     </details>
-    <button type="button" disabled={!!ctx.progress||busy} style={{...action,width:'100%',marginTop:16,...(!known.every(Boolean)?{background:'#a78bfa',color:'#0c0c14',borderRadius:9,fontWeight:700}:{})}} onClick={()=>ctx.check([concert])}>{result?.status==='checking'?'Checking…':known.every(Boolean)?'Check for updates ↻':'Check for missing details'}</button>
+    <button type="button" disabled={!!ctx.progress||busy||!ctx.online} style={{...action,width:'100%',marginTop:16,...(!known.every(Boolean)?{background:'#a78bfa',color:'#0c0c14',borderRadius:9,fontWeight:700}:{})}} onClick={()=>ctx.check([concert])}>{!ctx.online?'Connect to check sources':result?.status==='checking'?'Checking…':known.every(Boolean)?'Check for updates ↻':'Check for missing details'}</button>
     {result?.status==='checking'&&<button type="button" style={action} onClick={ctx.stop}>Stop checking</button>}
     <p style={muted}>{checked?'Last checked '+new Date(checked).toLocaleString():'Not checked yet'}</p>
     {result&&<p role="status" style={muted}>{statusText(result)}</p>}
@@ -208,8 +213,7 @@ export default function WishlistUpdateDetails({ concert, onSave, onGotTickets })
 
 export function ConcertSearchSettings({ settings, onChange }) {
   const ctx=useContext(Context)
-  return <div style={{padding:'14px 16px',borderBottom:'1px solid #29233c'}}>
-    <strong style={{color:'#c4b5fd',fontSize:13}}>Concert search sources</strong>
+  return <div style={{padding:'4px 2px 12px'}}>
     <p style={muted}>Public listings; no account connection needed. Save Settings to apply. Status is from this session.</p>
     <label style={{display:'flex',gap:10,alignItems:'center',minHeight:44,...muted}}><input type="checkbox" checked={settings.concertSearchSources?.venues !== false} onChange={e=>onChange({...settings.concertSearchSources,venues:e.target.checked})}/>Saved venue websites ({savedVenueSources(settings).length})</label>
     <p style={muted}>AFAS Live uses its published agenda, shared across artist checks for 5 minutes. Other saved websites use a limited page check; unsupported sites may still need manual checking.</p>

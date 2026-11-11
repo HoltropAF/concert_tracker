@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listTicketFiles, updateTicketFiles, validateTicketFile } from '../lib/ticketFiles'
+import { listOfflineTickets, readTicketRecord, updateTicketFiles, validateTicketFile } from '../lib/ticketFiles'
 import ShowControlSheet from './ShowControlSheet'
 import PdfTicketPreview from './PdfTicketPreview'
 import './TicketFiles.css'
@@ -61,13 +61,16 @@ function TicketFileViewer({ item, index, total, onStep, onList }) {
 export default function TicketFiles({ account, concert, ticketDate, ticketLabel, price, shopUrl, accessUrl, onEdit, view, onChangeView }) {
   const picker = useRef(null)
   const [files, setFiles] = useState([])
+  const [keep, setKeep] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
     let active = true
-    listTicketFiles(account, concert.id).then(items => {
-      if (active) setFiles(items)
+    readTicketRecord(account, concert.id).then(record => {
+      if (!active) return
+      setFiles(record?.files || [])
+      setKeep(!!record?.keep)
     }).catch(() => {
       if (active) setError('Could not open saved tickets on this device.')
     }).finally(() => {
@@ -76,11 +79,13 @@ export default function TicketFiles({ account, concert, ticketDate, ticketLabel,
     return () => { active = false }
   }, [account, concert.id])
 
-  const save = async update => {
+  const save = async (update, retain) => {
     setBusy(true)
     setError('')
     try {
-      setFiles(await updateTicketFiles(account, concert, update))
+      const next = await updateTicketFiles(account, concert, update, retain)
+      setFiles(next.files)
+      setKeep(next.keep)
     } catch {
       setError('Could not save the change. Check available device storage and try again.')
     } finally {
@@ -96,9 +101,9 @@ export default function TicketFiles({ account, concert, ticketDate, ticketLabel,
     if (!selected.length) return
     const added = selected.map(file => ({ id: window.crypto.randomUUID(), name: file.name, file }))
     save(current => [...current, ...added])
+    navigator.storage?.persist?.().catch(() => {})
   }
 
-  const selected = typeof view === 'number' ? files[view] : null
   const hasDetails = !!(accessUrl || concert.ticketAccessNote)
   const countLabel = files.length === 1 ? (isPdf(files[0]) ? 'Saved PDF' : 'Saved photo') : `${files.length} saved tickets`
   const addButton = <button type="button" disabled={busy} onClick={() => picker.current?.click()}
@@ -133,7 +138,11 @@ export default function TicketFiles({ account, concert, ticketDate, ticketLabel,
       <details style={{ ...small, borderTop: '1px solid #25243a', marginTop: 4 }}>
         <summary style={{ padding: '12px 0', cursor: 'pointer' }}>Ticket details</summary>
         {files.length > 0 && <>
-          <div style={small}>Saved on this device until the show has passed.</div>
+          <div style={small}>Available offline on this device.</div>
+          <label style={{ ...row, minHeight: 44 }}>
+            <input type="checkbox" checked={keep} disabled={busy} onChange={event => save(current => current, event.target.checked)} />
+            Keep files after the show
+          </label>
           {price && <div style={small}>{price}</div>}
           {accessDetails}
         </>}
@@ -148,7 +157,14 @@ export default function TicketFiles({ account, concert, ticketDate, ticketLabel,
       </details>
     )}
     {error && <p role="alert" style={{ color: '#fda4af', fontSize: 12 }}>{error}</p>}
-    {(view === 'list' || selected) && <ShowControlSheet title={view === 'list' ? 'Choose a ticket' : 'Saved ticket'} onClose={() => onChangeView(null)} maxHeight="92dvh" showDone={false}>
+    <TicketFileSheet files={files} view={view} onChangeView={onChangeView} />
+  </section>
+}
+
+export function TicketFileSheet({ files, view, onChangeView }) {
+  const selected = typeof view === 'number' ? files[view] : null
+  if (!files.length || (view !== 'list' && !selected)) return null
+  return <ShowControlSheet title={view === 'list' ? 'Choose a ticket' : 'Saved ticket'} onClose={() => onChangeView(null)} maxHeight="92dvh" showDone={false}>
       {view === 'list' ? files.map((item, index) => (
         <button key={item.id} type="button" onClick={() => onChangeView(index)} style={{ ...buttonStyle, ...row, width: '100%', minHeight: 48, textAlign: 'left' }}>
           <span aria-hidden="true" style={{ background: '#211b33', color: '#a78bfa', borderRadius: 5, padding: '4px 6px', flexShrink: 0 }}>{isPdf(item) ? 'PDF' : 'IMG'}</span>
@@ -156,6 +172,45 @@ export default function TicketFiles({ account, concert, ticketDate, ticketLabel,
         </button>
       )) : <TicketFileViewer key={selected.id} item={selected} index={view} total={files.length}
         onStep={step => onChangeView(Math.min(files.length - 1, Math.max(0, view + step)))} onList={() => onChangeView('list')} />}
-    </ShowControlSheet>}
-  </section>
+  </ShowControlSheet>
+}
+
+export function OfflineTicketLibrary({ account, concerts }) {
+  const [records, setRecords] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [view, setView] = useState(null)
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let active = true
+    listOfflineTickets(account).then(items => {
+      if (active) setRecords(items)
+    }).catch(() => { if (active) setError(true) })
+    return () => { active = false }
+  }, [account])
+  const record = records?.find(item => item.showId === selected)
+  const remove = async item => {
+    if (!window.confirm('Remove these ticket files from this device?')) return
+    try {
+      await updateTicketFiles(account, { id: item.showId }, () => [])
+      setRecords(previous => previous.filter(entry => entry.showId !== item.showId))
+    } catch {
+      setError(true)
+    }
+  }
+  return <>
+    {error && <p role="alert" style={small}>Could not access saved files on this device.</p>}
+    {!records && !error && <p style={small}>Loading saved files…</p>}
+    {records?.length === 0 && <p style={small}>Tickets you add to shows will appear here.</p>}
+    {records?.map(item => <div key={item.showId} style={row}>
+      <button type="button" style={{ ...buttonStyle, flex: 1, textAlign: 'left' }} onClick={() => {
+        setSelected(item.showId)
+        setView(item.files.length === 1 ? 0 : 'list')
+      }}>
+        <strong>{concerts.find(concert => concert.id === item.showId)?.artist || item.showName || 'Show tickets'}</strong>
+        <div style={small}>{[item.expiresOn, `${item.files.length} file${item.files.length === 1 ? '' : 's'}`, item.keep && 'Kept after show'].filter(Boolean).join(' · ')}</div>
+      </button>
+      <button type="button" onClick={() => remove(item)} style={buttonStyle}>Remove files</button>
+    </div>)}
+    {record && <TicketFileSheet files={record.files} view={view} onChangeView={setView} />}
+  </>
 }

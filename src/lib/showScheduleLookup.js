@@ -33,6 +33,10 @@ export function cachedSchedule(key) {
   return memory.get(key) || storedSchedules()[key]
 }
 
+export function scheduleResults() {
+  return new Map([...Object.entries(storedSchedules()), ...memory])
+}
+
 function remember(key, entry) {
   if (memory.size >= 60) memory.delete(memory.keys().next().value)
   memory.set(key, entry)
@@ -45,6 +49,7 @@ function remember(key, entry) {
 }
 
 export function checkShowSchedule(request, automatic = false) {
+  if (navigator.onLine === false) return Promise.reject(Error('Connect to look up timetable updates.'))
   if (request.url && !scheduleLink(request.url)) return Promise.reject(Error('Use a public HTTPS event-page link, or clear it to search automatically.'))
   if (inFlight.has(request.key)) return inFlight.get(request.key)
   const previous = cachedSchedule(request.key)
@@ -58,7 +63,7 @@ export function checkShowSchedule(request, automatic = false) {
       remember(request.key,{ day, at:Date.now(), result })
       return result
     } catch (error) {
-      remember(request.key,{ day, at:Date.now(), result:previous?.result })
+      if (navigator.onLine !== false) remember(request.key,{ day, at:Date.now(), result:previous?.result })
       throw error
     } finally {
       inFlight.delete(request.key)

@@ -57,6 +57,7 @@ export async function deleteConcertPhoto(path) {
   if (!supabase || !path) return
   await supabase.storage.from('photos').remove([path])
   urlCache.delete(path)
+  await removeOfflinePhotos([path]).catch(() => {})
 }
 
 // * Same idea as concert photos, but keyed by a slugified artist name so it's
@@ -77,6 +78,7 @@ export async function uploadArtistPhoto(artistName, file) {
   })
   if (error) throw error
   urlCache.delete(path)
+  await removeOfflinePhotos([path]).catch(() => {})
   return path
 }
 
@@ -84,6 +86,7 @@ export async function deleteArtistPhoto(path) {
   if (!supabase || !path) return
   await supabase.storage.from('photos').remove([path])
   urlCache.delete(path)
+  await removeOfflinePhotos([path]).catch(() => {})
 }
 
 // * Everything this user has in the bucket, with sizes. Used by Settings to report
@@ -111,14 +114,47 @@ export async function listUserPhotos() {
 
 export async function downloadBackupPhoto(path) {
   if (!supabase) throw new Error('Sign in to back up photos')
-  const {data,error} = await supabase.storage.from('photos').download(path)
-  if (error) throw error
+  const data = navigator.onLine === false ? await readOfflinePhoto(path) : await downloadPhotoBlob(path).catch(() => readOfflinePhoto(path))
+  if (!data) throw new Error('This photo has no offline copy.')
   return new Promise((resolve,reject)=>{
     const reader = new FileReader()
     reader.onload = ()=>resolve(reader.result)
     reader.onerror = ()=>reject(new Error('Could not read a backup photo'))
     reader.readAsDataURL(data)
   })
+}
+
+export const offlinePhotoCache = 'settracker-offline-photos'
+const offlinePhotoKey = path => new URL('/offline-photo/' + encodeURIComponent(path), location.origin).href
+
+export async function readOfflinePhoto(path) {
+  if (!path || typeof caches === 'undefined') return null
+  try {
+    const account = JSON.parse(localStorage.getItem('settracker-offline-account'))
+    if (!account?.id || !path.startsWith(account.id + '/')) return null
+    const cache = await caches.open(offlinePhotoCache)
+    return (await cache.match(offlinePhotoKey(path)))?.blob() || null
+  } catch {
+    return null
+  }
+}
+
+async function downloadPhotoBlob(path) {
+  const { data, error } = await supabase.storage.from('photos').download(path)
+  if (error) throw error
+  return data
+}
+
+export async function keepOfflinePhoto(path) {
+  const data = await downloadPhotoBlob(path)
+  const cache = await caches.open(offlinePhotoCache)
+  await cache.put(offlinePhotoKey(path), new Response(data))
+}
+
+export async function removeOfflinePhotos(paths) {
+  if (typeof caches === 'undefined') return
+  const cache = await caches.open(offlinePhotoCache)
+  await Promise.all(paths.map(path => cache.delete(offlinePhotoKey(path))))
 }
 
 export async function uploadBackupPhoto(dataUrl) {
@@ -143,6 +179,7 @@ export async function deletePhotos(paths) {
     const { error } = await supabase.storage.from('photos').remove(batch)
     if (error) return { error }
     batch.forEach(p => urlCache.delete(p))
+    await removeOfflinePhotos(batch).catch(() => {})
   }
   return { error: null }
 }

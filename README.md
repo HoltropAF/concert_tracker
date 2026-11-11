@@ -2,24 +2,24 @@
 
 Track every concert and festival you've ever been to. Rate nights, log setlists, see your stats, remember who you went with.
 
-Built by [@annuhfloor](https://www.threads.com/@annuhfloor) — fork it and make it yours.
+Built by [@annuhfloor](https://www.threads.com/@annuhfloor).
 
-> **Just want to try it?** Open the live app and tap **"or explore it first"** — no account needed, sample concerts already loaded.
+Open [settracker](https://settracker-theta.vercel.app/), enter your email, and tap **Email me a link**. The link opens your personal concert log on the shared app. A browser and an email address are all you need. Tap **Try the demo** to explore with sample concerts first.
 
 ---
 
 ## Table of contents
 
-- [Setup — get the app running](#setup)
+- [Setup — host your own copy](#setup)
 - [Local development — fast edit loop without deploying](#local-development)
 - [Using the app](#using-the-app)
 - [Something went wrong — how to fix it](#something-went-wrong)
 
-> **Prefer a guided walkthrough?** Open the **[Setup Wizard](https://settracker-theta.vercel.app/setup.html)** — a step-by-step page that covers everything below, with copy buttons and direct links to each dashboard.
-
 ---
 
 ## Setup
+
+This section is for hosting a separate copy with your own database and deployment. For a guided walkthrough, open the [Self-hosting wizard](https://settracker-theta.vercel.app/setup.html).
 
 ### What you'll need
 
@@ -161,16 +161,18 @@ Vercel puts your app online for free so you can use it anywhere.
 
 4. Click **Save**
 
+If you want people outside your Supabase team to sign in, enable new user signups and configure [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp) for your project.
+
 ---
 
 ### Step 8 — Sign in
 
 1. Open your Vercel URL in a browser
-2. Enter your email → click **Send magic link**
+2. Enter your email → click **Email me a link**
 3. Check your inbox (and spam!) for an email from Supabase
 4. Click the link in the email → you're in
 
-> Magic links are limited to **twice per hour** on Supabase's free plan. If you see a rate limit error, wait an hour.
+> If you see a rate limit error, wait before trying again and check for an earlier email.
 
 ---
 
@@ -559,7 +561,8 @@ Your Supabase project paused from inactivity. Go to **supabase.com** → your pr
 
 1. Check your spam folder
 2. Make sure you typed your email correctly
-3. Supabase limits magic links to twice per hour — wait an hour if you've tried recently
+3. If you requested several links, wait before trying again
+4. If you host the app, check the project's email delivery and signup settings in Supabase
 
 ---
 

@@ -4,10 +4,10 @@ import {canLogPostShow,recentShowsToLog} from '../lib/postShowLog'
 import {mergeTicketOptions} from '../lib/ticketOptions'
 import {reuseSpotifyLinks} from '../lib/spotifyReuse'
 import {timetableRows,visibleShowTimeFields} from '../lib/showTimes'
-import {cachedSchedule,checkShowSchedule,hasScheduleSuggestions,scheduleRequest,scheduleUpdatedEvent,showsDueForSchedule} from '../lib/showScheduleLookup'
+import {cachedSchedule,checkShowSchedule,hasScheduleSuggestions,scheduleRequest,scheduleResults,scheduleUpdatedEvent,showsDueForSchedule} from '../lib/showScheduleLookup'
 import {showsToday, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
-import TicketFiles from './TicketFiles'
-import {pruneExpiredTickets} from '../lib/ticketFiles'
+import TicketFiles, { OfflineTicketLibrary, TicketFileSheet } from './TicketFiles'
+import {clearOfflineTickets, listTicketFiles, pruneExpiredTickets} from '../lib/ticketFiles'
 import ShowControlSheet from './ShowControlSheet'
 import {yearShowCounts} from '../lib/yearShowCounts'
 import ReferenceComparison from './ReferenceComparison'
@@ -18,7 +18,7 @@ import PerformanceDetails from './PerformanceDetails'
 import {performanceSongs, mapSetlistSongs, releaseNote, matchesSongLinkFilter} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
-import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings } from './WishlistUpdates'
+import WishlistUpdateDetails, { WishlistUpdateProvider, WishlistCheckAll, WishlistUpdateBadge, ConcertSearchSettings, useWishlistResults } from './WishlistUpdates'
 import { withCriedTag } from '../lib/criedTag'
 // * The entire settracker UI lives in this one module. It is deliberately a single
 // * file: every view reads from the same `concerts` array and `settings` object
@@ -45,7 +45,8 @@ import { withCriedTag } from '../lib/criedTag'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ConcertEditorTabs, { editorSectionTab } from './ConcertEditorTabs'
 import { isSectionRow, isSectionEnd, SECTION_END, locationNoteRange, setLocationNoteEnd, normalizeSetlistRows, setlistSongs, moveSetlistRow, placeLegacyGuests, songGuestNames, uniqueGuestNames, filterSetlistPerformers, receiptSetlistRows } from '../lib/setlistRows'
-import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos } from '../lib/photos'
+import { uploadConcertPhoto, deleteConcertPhoto, getPhotoUrl, uploadArtistPhoto, deleteArtistPhoto, listUserPhotos, deletePhotos, readOfflinePhoto } from '../lib/photos'
+import OfflinePhotos from './OfflinePhotos'
 import { startSpotifyAuth, getValidSpotifyToken } from '../lib/spotify'
 import { geocodeVenue } from '../lib/geocode'
 import { supabase } from '../lib/supabase'
@@ -222,11 +223,20 @@ function PhotoImg({ path, style, pos, variant = 'list', eager = false }) {
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let active = true
+    let offlineUrl
     setUrl(null); setLoaded(false); setFailed(false)
-    const load = () => getPhotoUrl(path, attempt > 0).then(u => {
+    const cleanup = () => { active = false; if (offlineUrl) URL.revokeObjectURL(offlineUrl) }
+    const loadOffline = async () => {
+      const photo = await readOfflinePhoto(path)
+      if (!active || !photo) return null
+      offlineUrl = URL.createObjectURL(photo)
+      return offlineUrl
+    }
+    const load = async () => {
+      const u = navigator.onLine === false ? await loadOffline() : await getPhotoUrl(path, attempt > 0) || await loadOffline()
       if (active) { setUrl(u); setFailed(!u) }
-    }).catch(() => { if (active) setFailed(true) })
-    if (eager || attempt > 0 || !('IntersectionObserver' in window)) { load(); return () => { active = false } }
+    }
+    if (eager || attempt > 0 || !('IntersectionObserver' in window)) { load(); return cleanup }
     // Load several screens ahead, including horizontal photo strips. Once a URL
     // is ready, eager image loading starts the actual download immediately.
     let scrollRoot = container.current?.parentElement
@@ -235,7 +245,7 @@ function PhotoImg({ path, style, pos, variant = 'list', eager = false }) {
       if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); load() }
     }, {root:scrollRoot, rootMargin:'1600px 800px'})
     if (container.current) observer.observe(container.current)
-    return () => { active = false; observer.disconnect() }
+    return () => { cleanup(); observer.disconnect() }
   }, [path, attempt, eager])
   const { x, y, zoom } = resolveCropPos(pos, variant)
   return (
@@ -350,7 +360,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.30'
+const APP_VERSION = '1.1.31'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -418,7 +428,8 @@ function scheduleBackPop() {
   if (backPopTimer) return;
   backPopTimer = setTimeout(() => {
     backPopTimer = null;
-    const n = pendingBackPops;
+    const depth = history.state?.appBackDepth ?? (history.state?.appBack ? 1 : 0);
+    const n = Math.min(pendingBackPops, depth);
     pendingBackPops = 0;
     if (n > 0) {
       backStack.discardNextPop();
@@ -444,7 +455,10 @@ function useBackButton(onBack, enabled = true) {
     }
     // * Reuse the entry an overlay unmounting in this same commit was about to give
     // * back, rather than popping it and immediately pushing an identical one.
-    if (!claimPendingBackPop()) history.pushState({ appBack: true }, '');
+    if (!claimPendingBackPop()) {
+      const depth = history.state?.appBackDepth ?? (history.state?.appBack ? 1 : 0);
+      history.pushState({ appBack: true, appBackDepth: depth + 1 }, '');
+    }
     pushed.current = true;
     const handler = () => { pushed.current = false; cb.current(); };
     // Keep one listener so cleanup pops are consumed even after the last overlay closes.
@@ -2116,7 +2130,7 @@ function normalizeConcertForm(concert) {
 // * this artist — which can't be computed from one row.
 // * `onNavigate` / `onOpenOther` hand control back up to ConcertTracker so tapping
 // * an artist, venue or friend here can switch tabs; this component never routes.
-function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, ticketAccount = 'guest', performerScope = 'all', startLog = false, onNavigate = () => {}, onOpenOther = null }) {
+function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {}, onUpdateSetting = null, onUpdateSettings = null, friends = [], onDelete, onNotify = () => {}, allArtists = [], photosEnabled = false, ticketAccount = 'guest', performerScope = 'all', startLog = false, startTab = 'general', onNavigate = () => {}, onOpenOther = null }) {
   useBackButton(onClose);
   const merchCategories = settings.merchCategories || ["T-shirt","Hoodie","Crewneck","Tote bag","Poster","Hat / Cap","Other"];
   const [editing, setEditing] = useState(false);
@@ -2145,11 +2159,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
   const showReceiptPerformers = receiptGroups.length > 1 || receiptGroups[0]?.role === 'support';
   const receiptRef = useRef(null);
   const [headerElevated, setHeaderElevated] = useState(false);
-  const [detailTab, setDetailTab] = useState('general');
+  const [detailTab, setDetailTab] = useState(startTab);
   const [ticketView, setTicketView] = useState(null);
   const [postShowOpen,setPostShowOpen] = useState(startLog);
   useBackButton(() => setPostShowOpen(false),postShowOpen);
-  useEffect(() => { setDetailTab('general'); setTicketView(null); }, [concert.id]);
+  useEffect(() => { setDetailTab(startTab); setTicketView(null); }, [concert.id, startTab]);
   const goBackFromDetail = () => detailTab === 'general' ? onClose() : setDetailTab('general');
   useBackButton(goBackFromDetail, detailTab !== 'general');
   useBackButton(() => setTicketView(null), detailTab === 'tickets' && ticketView !== null && !editing);
@@ -3032,7 +3046,11 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           // * harmless — never worth blocking the save or alarming the user over.
           const toDelete = [...new Set(pendingPhotoDeletes.current)].filter(path => path !== form.photo);
           pendingPhotoDeletes.current = [];
-          toDelete.forEach(path => deleteConcertPhoto(path).catch(() => { /* orphaned file */ }));
+          if (toDelete.length) {
+            Promise.resolve(result?.synced ?? true).then(synced => {
+              if (synced) toDelete.forEach(path => deleteConcertPhoto(path).catch(() => { /* orphaned file */ }));
+            });
+          }
           setEditing(false);
         }} disabled={photoBusy} style={{ background: "#a78bfa", border: "1px solid #a78bfa", color: "#0c0c14", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Mono', monospace" }}>{photoBusy ? "Uploading…" : "Save"}</button>
       </div>
@@ -9459,7 +9477,7 @@ const TagManager = ({ items, onRemove, input, onInput, onAdd, placeholder }) => 
 // ! settings into `next` or they will wipe every unrelated preference.
 // * The XLSX library is imported lazily via loadXlsx() — it is large and most
 // * sessions never open import/export.
-function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSaveConcertQuiet = () => {}, onDeleteConcert, onSignOut, userEmail, onNotify = () => {}, onThemePreview = () => {} }) {
+function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveConcert, onSaveConcertQuiet = () => {}, onDeleteConcert, onSignOut, userEmail, librarySync, onNotify = () => {}, onThemePreview = () => {} }) {
   const [exportData, setExportData] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
   const [importText, setImportText] = useState("");
@@ -9510,7 +9528,9 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const [local, setLocal] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
   const [openSection, setOpenSection] = useState(null);
-  const [activeSettingsTab, setActiveSettingsTab] = useState(null);
+  const [activeSettingsPage, setActiveSettingsPage] = useState(null);
+  const settingsHeading = useRef(null);
+  const previousSettingsPage = useRef(null);
   const sec = id => ({ open: openSection === id, onToggle: () => setOpenSection(s => s === id ? null : id) });
   // Collapsible draws only its own header row, so a section's body brings the card.
   const settingsCard = { background: "#111119", borderRadius: 12, padding: "2px 12px" };
@@ -9681,25 +9701,37 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   // ! then every show, then settings are reset to defaults.
   const handleDeleteEverything = async () => {
     if (deleteConfirm !== 'DELETE') return;
+    if (librarySync && !librarySync.connected) { onNotify('Connect before deleting your library', 'error'); return; }
     setDeleteBusy(true);
     try {
       const files = await listUserPhotos();
-      if (files.length > 0) await deletePhotos(files.map(f => f.path));
+      if (files.length > 0) {
+        const { error } = await deletePhotos(files.map(f => f.path));
+        if (error) throw error;
+      }
 
       // ! Count failures rather than assuming. A half-finished delete that reports
       // ! success is worse than one that says so — you'd think you were done.
       let failed = 0;
+      const pending = [];
       for (const c of concerts) {
         const result = await onDeleteConcert?.(c.id);
         if (result?.error) failed++;
+        if (result?.synced) pending.push(result.synced);
       }
-      if (onUpdateAll) await onUpdateAll({ ...DEFAULT_SETTINGS });
+      const reset = await onUpdateAll?.({ ...DEFAULT_SETTINGS });
+      if (reset?.error) throw reset.error;
+      if (reset?.synced) pending.push(reset.synced);
+      await clearOfflineTickets(userEmail || 'guest');
+      const confirmed = (await Promise.all(pending)).every(Boolean);
 
       setDeleteConfirm('');
       if (failed > 0) {
         onNotify(`${failed} show${failed === 1 ? '' : 's'} could not be deleted — run it again`, 'error');
-      } else {
+      } else if (confirmed) {
         onNotify('Everything deleted');
+      } else {
+        onNotify('Deleted here · cloud changes still syncing');
       }
     } catch (err) {
       onNotify(err?.message || 'Could not finish deleting — run it again', 'error');
@@ -9731,6 +9763,41 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const unseenReleases = (releases || []).filter(
     r => !lastSeenVersion || versionIsNewer(r.version, lastSeenVersion)
   );
+
+  const settingsPages = [
+    { id: 'logging', label: 'Shows & logging', description: 'Show day, setlists, ratings and categories', icon: 'list' },
+    { id: 'appearance', label: 'Appearance & layout', description: 'Theme, opening view, cards and stats', icon: 'layout' },
+    { id: 'connections', label: 'Connections', description: 'Spotify and concert search sources', icon: 'plug' },
+    { id: 'offline', label: 'Offline & data', description: 'Sync, saved tickets, photos and backups', icon: 'data' },
+    { id: 'account', label: 'Account & help', description: 'Profile, support and app updates', icon: 'person' },
+  ];
+  const enabledConcertSources = ['venues', 'ticketmaster', 'mojo'].filter(source => local.concertSearchSources?.[source] !== false).length;
+  const closeSettingsPage = () => {
+    setOpenSection(null);
+    setActiveSettingsPage(null);
+  };
+  const closeWhatsNew = () => {
+    markReleasesSeen();
+    setWhatsNewOpen(false);
+  };
+
+  useBackButton(closeSettingsPage, activeSettingsPage !== null);
+  useBackButton(() => {
+    if (whatsNewOpen) closeWhatsNew();
+    else if (editingInitials) setEditingInitials(false);
+    else {
+      setTagDetail(null);
+      setTagRename('');
+    }
+  }, whatsNewOpen || editingInitials || tagDetail !== null);
+
+  useEffect(() => {
+    const previousPage = previousSettingsPage.current;
+    if (!previousPage) return;
+    document.getElementById('content-scroll')?.scrollTo({ top: 0, behavior: 'instant' });
+    if (activeSettingsPage) settingsHeading.current?.focus({ preventScroll: true });
+    else document.querySelector(`[data-settings-page="${previousPage}"]`)?.focus({ preventScroll: true });
+  }, [activeSettingsPage]);
 
   const dirtyKeys = useRef(new Set());
   useEffect(() => {
@@ -10364,7 +10431,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
 
   return (
     <div style={{ padding: "16px 10px 100px", width: "min(100%, 430px)", margin: "0 auto" }}>
-      <div style={{ minHeight: 30, marginBottom: 14 }} />
       {/* * Nothing on this page reaches the database until this is pressed, so it has
           * to be impossible to miss and easy to reach. It sits above the bottom nav
           * rather than in the top-right corner, which is the worst spot for a thumb,
@@ -10387,7 +10453,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </div>
             {!saved && (
               <div style={{ fontSize: 9.5, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 1 }}>
-                Leaving this page discards them
+                Leaving Settings discards them
               </div>
             )}
           </div>
@@ -10406,310 +10472,71 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       )}
 
-      {/* * Same reasoning as the update row: dismissing the install banner should be
-          * "not now". The browser only ever offers the prompt once per visit, so if
-          * it's available it's offered here until it's used. */}
-      {appInstall.available && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-          background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 10, padding: "11px 13px",
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>Install settracker</div>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Add to your home screen — opens without the browser bar</div>
-          </div>
-          <button
-            onClick={() => appInstall.prompt?.()}
-            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
-          >Install</button>
+      {activeSettingsPage ? (
+        <div style={{ marginBottom: 18 }}>
+          <button type="button" onClick={closeSettingsPage} style={{ minHeight: 44, background: 'none', border: 0, padding: '0 8px', color: 'var(--accent)', fontSize: 13, cursor: 'pointer' }}>
+            <span aria-hidden="true">←</span> Back to Settings
+          </button>
+          <h2 ref={settingsHeading} tabIndex={-1} style={{ margin: '0 8px 4px', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 22 }}>
+            {settingsPages.find(page => page.id === activeSettingsPage)?.label}
+          </h2>
         </div>
+      ) : (
+        <nav aria-label="Settings categories" style={{ display: 'grid', gap: 8 }}>
+          {settingsPages.map(({ id, label, description, icon }) => (
+            <button key={id} type="button" data-settings-page={id} onClick={() => {
+              previousSettingsPage.current = id;
+              setActiveSettingsPage(id);
+            }} style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 62, padding: '10px 12px',
+              background: '#13131f', border: '1px solid #25243a', borderRadius: 12, textAlign: 'left', cursor: 'pointer',
+            }}>
+              <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 34, height: 34, flexShrink: 0, background: 'rgba(167,139,250,0.1)', borderRadius: 9 }}>
+                <SettingsSectionIcon id={icon} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#e2e0ff' }}>{label}</span>
+                <span style={{ display: 'block', marginTop: 3, fontSize: 12, lineHeight: 1.4, color: '#9491b8' }}>{description}</span>
+              </span>
+              <span aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 18 }}>›</span>
+            </button>
+          ))}
+        </nav>
       )}
 
-      {/* * The changelog is something you read once and then never again, so it gets
-          * one quiet line here and opens as a sheet. It used to sit expanded above
-          * every settings tab, which put release notes in front of you every time
-          * you came in to change a colour. */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, padding: "0 2px" }}>
-        <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
-          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
-        </span>
-        <button type="button" disabled={swUpdate.pending ? !swUpdate.apply : swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.pending ? swUpdate.apply?.() : swUpdate.check?.()} style={{ background: 'none', border: 0, color: '#a78bfa', padding: '8px 2px', minHeight: 44, fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', flexShrink: 0, opacity: swUpdate.checking ? 0.5 : 1 }}>
-          {swUpdate.pending ? 'Update now' : swUpdate.checking ? 'Checking…' : 'Check updates'}
-        </button>
-        {releases !== null && releases.length > 0 && (
-          <button onClick={() => { setWhatsNewOpen(true); }} style={{
-            background: unseenReleases.length > 0 ? "#30284d" : "none",
-            border: `1px solid ${unseenReleases.length > 0 ? "#5e4c8f" : "transparent"}`,
-            borderRadius: 99, color: unseenReleases.length > 0 ? "#a78bfa" : "#6b6a8f",
-            fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace",
-            padding: unseenReleases.length > 0 ? "3px 10px" : "3px 2px",
-          }}>
-            What's new
-          </button>
-        )}
-      </div>
-
-      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: '-8px 2px 14px', lineHeight: 1.5 }}>
-        {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
-        {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-      </div>
-
-      {whatsNewOpen && releases !== null && releases.length > 0 && (() => {
-        const shown = releases;
-        const close = () => { markReleasesSeen(); setWhatsNewOpen(false); };
-        return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "#000000cc", display: "flex", alignItems: "flex-end" }} onClick={close}>
-            <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 34px", boxSizing: "border-box", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
-                  What's new
-                </div>
-                <button onClick={close} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
-              </div>
-              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: 1, minHeight: 0 }}>
-                {shown.map(r => (
-                  <div key={r.version} style={{ marginBottom: 14 }}>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
-                      v{r.version}{r.date ? ` · ${r.date}` : ''}
-                    </div>
-                    {r.entries.map((e, i) => (
-                      <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
-                        <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
-                        <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
-                <a href="https://github.com/HoltropAF/concert_tracker/commits/main/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, border: "1px solid #2e2e50", borderRadius: 10, color: "#9491b8", fontSize: 12, padding: "10px", textAlign: "center", textDecoration: "none", fontFamily: "'DM Mono', monospace" }}>Full history on GitHub ↗</a>
-                <button onClick={close} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 13, fontWeight: 700, padding: "10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  Got it
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0, marginBottom: 14, background: "#13131f", border: "1px solid #25243a", borderRadius: 10, padding: 3 }}>
-        {[
-          { id: null, label: 'General' },
-          { id: 'preferences', label: 'Display' },
-          { id: 'tags', label: 'Tags' },
-          { id: 'account', label: 'Account' },
-        ].map(tab => (
-          <button key={String(tab.id)} onClick={() => { setActiveSettingsTab(tab.id); setOpenSection(null); }} style={{
-            minHeight: 34, borderRadius: 7, cursor: "pointer", fontSize: 10,
-            fontFamily: "'DM Mono', monospace", fontWeight: activeSettingsTab === tab.id ? 700 : 400,
-            background: activeSettingsTab === tab.id ? "#30284d" : "transparent",
-            border: `1px solid ${activeSettingsTab === tab.id ? "#5e4c8f" : "transparent"}`,
-            color: activeSettingsTab === tab.id ? "#a78bfa" : "#6b6a8f",
-            padding: "6px 4px", overflow: "hidden", textOverflow: "ellipsis",
-          }}>{tab.label}</button>
-        ))}
-      </div>
-
-      {activeSettingsTab === null && (() => {
-        return (
-          <div>
-            {/* * General used to hold three links and nothing else while Display
-                * carried eight sections. What opens the app and how the app behaves
-                * belong here; Display keeps what things look like. */}
-            <Collapsible title="Opening defaults" icon="eye" defaultOpen={false} {...sec('g-open')}
-              subtitle={{ label: (defaultViewOptions.find(o => o.id === local.defaultTab) || {}).label || 'Shows', color: '#6b6a8f' }}>
-              <div style={settingsCard}>
-                <SettingsRow label="Show past concerts" sub="On by default when opening app">
-                  <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); }} />
-                </SettingsRow>
-                <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
-                  <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); }} />
-                </SettingsRow>
-                <SettingsRow label="Show upcoming" sub="On by default when opening app">
-                  <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); }} />
-                </SettingsRow>
-                <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
-                  <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); }} />
-                </SettingsRow>
-                <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); }} compact />
-                <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); }} isLast compact />
-              </div>
-            </Collapsible>
-
-            <Collapsible title="Show day" icon="sliders" defaultOpen={false} {...sec('g-show-day')}>
-              <div style={settingsCard}>
-                <div style={{padding:'12px 2px 3px',fontSize:13,fontWeight:600,color:'#e2e0ff'}}>Ready to go checklist</div>
-                <div style={{padding:'0 2px 6px',fontSize:11,color:'#9491b8'}}>Choose the items shown on upcoming shows and the Today panel.</div>
-                {[...new Set([...defaultPreparationItems, ...preparationItems({showChecklistText:local.showChecklistText}), ...preparationItems(local)])].map(item => {
-                  const selected = preparationItems(local);
-                  const checked = selected.includes(item);
-                  return (
-                    <label key={item} style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:44,gap:10,padding:'6px 2px',borderBottom:'1px solid #1a1a24',color:'#c4c2f0',fontSize:13,cursor:'pointer'}}>
-                      {item}
-                      <input type="checkbox" role="switch" checked={checked} onChange={e => lUpdate('showChecklistItems', e.target.checked ? [...selected, item] : selected.filter(label => label !== item))} style={{width:18,height:18,accentColor:'#a78bfa'}} />
-                    </label>
-                  );
-                })}
-                <SettingsRow label="VIP time" sub="Show a VIP start row by default. You can override it for a show."><SettingsToggle checked={local.showVipTime!==false} onChange={v=>lUpdate('showVipTime',v)} /></SettingsRow>
-              </div>
-            </Collapsible>
-
-            <Collapsible title="App" icon="sliders" defaultOpen={false} {...sec('g-app')}
-              subtitle={{ label: `${local.ratingSystem || 5} stars`, color: '#6b6a8f' }}>
-              <div style={settingsCard}>
-                <PreferenceBlock label="Rating system" sub="Existing ratings are converted automatically" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={handleRatingSystemChange} />
-                <SettingsRow label="Default country" sub="Pre-filled when adding a show">
-                  <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
-                </SettingsRow>
-                <PreferenceBlock
-                  label="Default map view" sub={local.defaultCountry ? `Where the venues map opens` : 'Set a default country above to enable'}
-                  value={local.mapDefaultRegion === 'country' && local.defaultCountry ? 'country' : 'all'}
-                  options={[{ id: 'all', label: 'All venues' }, { id: 'country', label: local.defaultCountry || 'My country' }]}
-                  onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); }}
-                  isLast
-                />
-              </div>
-            </Collapsible>
-
-            {/* Two rows of breathing room separate app preferences from support. */}
-            <div style={{ height: 32 }} />
-            <SettingsSection title="Help" icon="help">
-              {[
-                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-              ].map(({ svg, label, url }, i, arr) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
-                      <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
-                    </span>
-                    <span>{label}</span>
-                  </span>
-                  <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
-                </a>
-              ))}
-            </SettingsSection>
-
-            {/* Social links — quiet footer credit instead of its own card */}
-            <div style={{ textAlign: "center", padding: "10px 0 4px", fontSize: 9.5, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
-              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
-              <div style={{ whiteSpace: "nowrap" }}>
-                {socialLinks.map(({ href, label }, i) => (
-                  <span key={label}>
-                    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
-                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> · </span>}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {activeSettingsTab === 'preferences' && <>
-        {/* * These were fixed headings with everything expanded at once, which meant
-            * scrolling past six sections to reach the seventh. Same accordion the
-            * Tags tab uses now — one open at a time, closed on arrival, with the
-            * current value on the row so you often don't need to open it at all. */}
-        <Collapsible title="Shows list" icon="card" defaultOpen={false} {...sec('p-cards')}
-          subtitle={{ label: `${[local.showVenueOnCards !== false, local.showGenreTagsOnCards !== false, !!local.groupByYear].filter(Boolean).length} of 3`, color: '#6b6a8f' }}>
+      {activeSettingsPage === 'logging' && <>
+        <Collapsible title="Show defaults" icon="sliders" defaultOpen={false} {...sec('g-app')}
+          subtitle={{ label: `${local.ratingSystem || 5} stars`, color: '#6b6a8f' }}>
           <div style={settingsCard}>
-            <SettingsRow label="Show venue" sub="Display venue name on cards">
-              <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); }} />
+            <PreferenceBlock label="Rating system" sub="Existing ratings are converted automatically" value={String(local.ratingSystem || 5)} options={[{id:"5",label:"5 stars"},{id:"10",label:"10 stars"}]} onChange={handleRatingSystemChange} />
+            <SettingsRow label="Default country" sub="Pre-filled when adding a show">
+              <input value={local.defaultCountry || ''} onChange={e => lUpdate('defaultCountry', e.target.value)} placeholder="e.g. Netherlands" style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid #2e2e50', borderRadius: 8, color: '#c4c2f0', padding: '6px 10px', fontFamily: "'DM Mono', monospace", fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
             </SettingsRow>
-            <SettingsRow label="Show genre tags" sub="Tags visible on concert cards">
-              <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); }} />
-            </SettingsRow>
-            <SettingsRow label="Group by year" sub="Year headers in the list">
-              <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); }} />
-            </SettingsRow>
+            <PreferenceBlock
+              label="Default map view" sub={local.defaultCountry ? `Where the venues map opens` : 'Set a default country above to enable'}
+              value={local.mapDefaultRegion === 'country' && local.defaultCountry ? 'country' : 'all'}
+              options={[{ id: 'all', label: 'All venues' }, { id: 'country', label: local.defaultCountry || 'My country' }]}
+              onChange={v => { if (v === 'country' && !local.defaultCountry) return; lUpdate('mapDefaultRegion', v); }}
+              isLast
+            />
           </div>
         </Collapsible>
 
-        <Collapsible title="Venue details" icon="layout" defaultOpen={false} {...sec('p-venue')}
-          subtitle={{ label: `${[local.showVenueParking !== false, local.showVenueTransit !== false, local.showVenueRooms !== false, local.showVenueTags !== false].filter(Boolean).length} of 4`, color: '#6b6a8f' }}>
+        <Collapsible title="Show day" icon="sliders" defaultOpen={false} {...sec('g-show-day')}>
           <div style={settingsCard}>
-          <SettingsRow label="Parking" sub="Show the parking link on venue pages">
-            <SettingsToggle checked={local.showVenueParking !== false} onChange={checked => { lUpdate("showVenueParking", checked); }} />
-          </SettingsRow>
-          <SettingsRow label="Public transport" sub="Show the transit link on venue pages">
-            <SettingsToggle checked={local.showVenueTransit !== false} onChange={checked => { lUpdate("showVenueTransit", checked); }} />
-          </SettingsRow>
-          <SettingsRow label="Rooms / stages" sub="Show saved rooms on venue pages">
-            <SettingsToggle checked={local.showVenueRooms !== false} onChange={checked => { lUpdate("showVenueRooms", checked); }} />
-          </SettingsRow>
-          <SettingsRow label="Tags" sub='Show venue tags (e.g. "big venue")'>
-            <SettingsToggle checked={local.showVenueTags !== false} onChange={checked => { lUpdate("showVenueTags", checked); }} />
-          </SettingsRow>
-          </div>
-        </Collapsible>
-
-        <Collapsible title="Summary & stats" icon="chart" defaultOpen={false} {...sec('p-stats')}
-          subtitle={{ label: local.summaryYear && local.summaryYear !== 'all' ? String(local.summaryYear) : 'All time', color: '#6b6a8f' }}>
-          <div style={settingsCard}>
-          <PreferenceBlock
-            label="Summary scope" sub="Default time range on summary page"
-            value={local.summaryYear || 'all'}
-            options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
-            onChange={v => { lUpdate('summaryYear', v); }}
-          />
-          <SettingsRow label="Top artists" sub="Rows shown in charts">
-            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); }} max={6} />
-          </SettingsRow>
-          <SettingsSliderRow label="Top friends" sub="Rows shown in charts" value={local.topFriendsRows} min={3} max={20} onChange={v => { lUpdate("topFriendsRows", v); }} />
-          <SettingsSliderRow label="Top venues" sub="Rows shown in charts" value={local.topVenuesRows} min={3} max={20} onChange={v => { lUpdate("topVenuesRows", v); }} />
-          <SettingsSliderRow label="Most expensive" sub="Rows shown in list" value={local.topExpensiveRows} min={3} max={20} onChange={v => { lUpdate("topExpensiveRows", v); }} />
-          <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); }} isLast />
-          </div>
-        </Collapsible>
-
-        <Collapsible title="Colors" icon="sliders" defaultOpen={false} {...sec('p-colors')}
-          subtitle={{ label: local.lightMode ? 'Light' : 'Dark', color: '#6b6a8f' }}>
-          <div style={settingsCard}>
-          <PreferenceBlock
-            label="Appearance" sub="Same colors, flipped background/text"
-            value={local.lightMode ? 'light' : 'dark'}
-            options={[{id:'dark',label:'Dark'},{id:'light',label:'Light'}]}
-            onChange={v => { const val = v === 'light'; lUpdate('lightMode', val); }}
-          />
-          {/* * This used to be two pickers — a highlight color and an app color mode —
-              * whose effects multiply, because the theme is a hue-rotate filter over
-              * the whole app and the accent gets rotated along with everything else.
-              * That's why the second one had to carry a subtitle explaining it wasn't
-              * the first one. One list of looks now; each entry sets both underneath. */}
-          {(() => {
-            const THEMES = [
-              { id: 'violet', label: 'Violet', color: '#a78bfa', theme: 'purple', accent: 'violet' },
-              { id: 'rose',   label: 'Rose',   color: '#fb7185', theme: 'purple', accent: 'rose' },
-              { id: 'amber',  label: 'Amber',  color: '#fb923c', theme: 'purple', accent: 'amber' },
-              { id: 'sky',    label: 'Sky',    color: '#38bdf8', theme: 'blue',   accent: 'violet' },
-              { id: 'green',  label: 'Green',  color: '#34d399', theme: 'green',  accent: 'violet' },
-              { id: 'red',    label: 'Red',    color: '#f87171', theme: 'red',    accent: 'violet' },
-              { id: 'orange', label: 'Orange', color: '#fb923c', theme: 'orange', accent: 'violet' },
-              { id: 'mono',   label: 'Mono',   color: '#9ca3af', theme: 'mono',   accent: 'violet' },
-            ];
-            const curTheme = local.colorTheme || 'purple';
-            const curAccent = local.accentColor || 'violet';
-            // * Exact match first; an old combination that no longer has an entry falls
-            // * back to whatever shares its theme, so nothing reads as unselected.
-            const current = THEMES.find(t => t.theme === curTheme && t.accent === curAccent)
-              || THEMES.find(t => t.theme === curTheme);
-            return (
-              <PreferenceBlock
-                label="Theme" sub="Recolors the whole app"
-                value={current?.id}
-                options={THEMES.map(({ id, label, color }) => ({ id, label, color }))}
-                onChange={v => {
-                  const t = THEMES.find(x => x.id === v);
-                  if (!t) return;
-                  lUpdate('colorTheme', t.theme);
-                  lUpdate('accentColor', t.accent);
-                }}
-                isLast
-              />
-            );
-          })()}
+            <div style={{padding:'12px 2px 3px',fontSize:13,fontWeight:600,color:'#e2e0ff'}}>Ready to go checklist</div>
+            <div style={{padding:'0 2px 6px',fontSize:11,color:'#9491b8'}}>Choose the items shown on upcoming shows and the Today panel.</div>
+            {[...new Set([...defaultPreparationItems, ...preparationItems({showChecklistText:local.showChecklistText}), ...preparationItems(local)])].map(item => {
+              const selected = preparationItems(local);
+              const checked = selected.includes(item);
+              return (
+                <label key={item} style={{display:'flex',alignItems:'center',justifyContent:'space-between',minHeight:44,gap:10,padding:'6px 2px',borderBottom:'1px solid #1a1a24',color:'#c4c2f0',fontSize:13,cursor:'pointer'}}>
+                  {item}
+                  <input type="checkbox" role="switch" checked={checked} onChange={e => lUpdate('showChecklistItems', e.target.checked ? [...selected, item] : selected.filter(label => label !== item))} style={{width:18,height:18,accentColor:'#a78bfa'}} />
+                </label>
+              );
+            })}
+            <SettingsRow label="VIP time" sub="Show a VIP start row by default. You can override it for a show."><SettingsToggle checked={local.showVipTime!==false} onChange={v=>lUpdate('showVipTime',v)} /></SettingsRow>
           </div>
         </Collapsible>
 
@@ -10744,11 +10571,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
           </div>
         </Collapsible>
-      </>}
 
-{activeSettingsTab === 'tags' && (() => {
-        // * Eight separate lists became four groups of related ones — the split was
-        // * by storage key rather than by anything you'd think about at once.
+        <h3 style={{ margin: '20px 4px 10px', color: '#c4c2f0', fontSize: 13 }}>Manage categories</h3>
+
+        {(() => {
         const GROUPS = [
           { id: 'music', label: 'Music', icon: 'tag', lists: [
             { key: 'genres', label: 'Genres', items: genres, onRemove: removeGenre, input: newGenre, onInput: setNewGenre, onAdd: addGenre, placeholder: 'Add genre...' },
@@ -11028,53 +10854,138 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </>
         );
       })()}
-      {activeSettingsTab === 'account' && <>
-        {/* Profile edit bottom sheet */}
-        {editingInitials && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
-            <div style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 40px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Edit profile</div>
-                <button onClick={() => setEditingInitials(false)} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
-                <div style={{ width: 52, height: 52, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 16, letterSpacing: "0.05em", flexShrink: 0 }}>
-                  {initialsInput.slice(0, 3) || "?"}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Initials</div>
-                  <input
-                    value={initialsInput}
-                    onChange={e => setInitialsInput(e.target.value.toUpperCase().slice(0, 3))}
-                    placeholder="e.g. AF"
-                    maxLength={3}
-                    autoFocus
-                    style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 16, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
-                  />
-                </div>
-              </div>
-              <div style={{ marginBottom: 18 }}>
-                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Name</div>
-                <input
-                  value={local.userName || ""}
-                  onChange={e => lUpdate("userName", e.target.value)}
-                  placeholder="e.g. Annuh Floor"
-                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
-                />
-              </div>
-              <button onClick={() => {
-                const val = initialsInput.trim().slice(0, 3);
-                lUpdate("userInitials", val);
-                lUpdate("userName", local.userName || "");
-                setEditingInitials(false);
-              }} style={{ width: "100%", background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 14, fontWeight: 700, padding: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Save</button>
-            </div>
-          </div>
-        )}
+      </>}
 
-        {/* Integrations */}
-        <SettingsSection title="Integrations" icon="plug" collapsible defaultOpen={false} subtitle={{label:'Music & concert sources',color:'#9491b8'}}>
-          <ConcertSearchSettings settings={local} onChange={value => lUpdate("concertSearchSources", value)} />
+      {activeSettingsPage === 'appearance' && <>
+        <Collapsible title="Theme & colors" icon="sliders" defaultOpen={false} {...sec('p-colors')}
+          subtitle={{ label: local.lightMode ? 'Light' : 'Dark', color: '#6b6a8f' }}>
+          <div style={settingsCard}>
+          <PreferenceBlock
+            label="Appearance" sub="Same colors, flipped background/text"
+            value={local.lightMode ? 'light' : 'dark'}
+            options={[{id:'dark',label:'Dark'},{id:'light',label:'Light'}]}
+            onChange={v => { const val = v === 'light'; lUpdate('lightMode', val); }}
+          />
+          {/* * This used to be two pickers — a highlight color and an app color mode —
+              * whose effects multiply, because the theme is a hue-rotate filter over
+              * the whole app and the accent gets rotated along with everything else.
+              * That's why the second one had to carry a subtitle explaining it wasn't
+              * the first one. One list of looks now; each entry sets both underneath. */}
+          {(() => {
+            const THEMES = [
+              { id: 'violet', label: 'Violet', color: '#a78bfa', theme: 'purple', accent: 'violet' },
+              { id: 'rose',   label: 'Rose',   color: '#fb7185', theme: 'purple', accent: 'rose' },
+              { id: 'amber',  label: 'Amber',  color: '#fb923c', theme: 'purple', accent: 'amber' },
+              { id: 'sky',    label: 'Sky',    color: '#38bdf8', theme: 'blue',   accent: 'violet' },
+              { id: 'green',  label: 'Green',  color: '#34d399', theme: 'green',  accent: 'violet' },
+              { id: 'red',    label: 'Red',    color: '#f87171', theme: 'red',    accent: 'violet' },
+              { id: 'orange', label: 'Orange', color: '#fb923c', theme: 'orange', accent: 'violet' },
+              { id: 'mono',   label: 'Mono',   color: '#9ca3af', theme: 'mono',   accent: 'violet' },
+            ];
+            const curTheme = local.colorTheme || 'purple';
+            const curAccent = local.accentColor || 'violet';
+            // * Exact match first; an old combination that no longer has an entry falls
+            // * back to whatever shares its theme, so nothing reads as unselected.
+            const current = THEMES.find(t => t.theme === curTheme && t.accent === curAccent)
+              || THEMES.find(t => t.theme === curTheme);
+            return (
+              <PreferenceBlock
+                label="Theme" sub="Recolors the whole app"
+                value={current?.id}
+                options={THEMES.map(({ id, label, color }) => ({ id, label, color }))}
+                onChange={v => {
+                  const t = THEMES.find(x => x.id === v);
+                  if (!t) return;
+                  lUpdate('colorTheme', t.theme);
+                  lUpdate('accentColor', t.accent);
+                }}
+                isLast
+              />
+            );
+          })()}
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Opening defaults" icon="eye" defaultOpen={false} {...sec('g-open')}
+          subtitle={{ label: (defaultViewOptions.find(o => o.id === local.defaultTab) || {}).label || 'Shows', color: '#6b6a8f' }}>
+          <div style={settingsCard}>
+            <SettingsRow label="Show past concerts" sub="On by default when opening app">
+              <SettingsToggle checked={local.defaultShowPast === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowPast", v); }} />
+            </SettingsRow>
+            <SettingsRow label="Show wishlist" sub="Include want-to-go entries">
+              <SettingsToggle checked={local.defaultShowWishlist === 'open'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowWishlist", v); }} />
+            </SettingsRow>
+            <SettingsRow label="Show upcoming" sub="On by default when opening app">
+              <SettingsToggle checked={local.defaultShowUpcoming !== 'closed'} onChange={checked => { const v = checked ? 'open' : 'closed'; lUpdate("defaultShowUpcoming", v); }} />
+            </SettingsRow>
+            <PreferenceBlock label="Default view" sub="What shows first on open" value={local.defaultTab} options={defaultViewOptions} onChange={v => { lUpdate("defaultTab", v); }} isLast compact />
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Shows list" icon="card" defaultOpen={false} {...sec('p-cards')}
+          subtitle={{ label: `${[local.showVenueOnCards !== false, local.showGenreTagsOnCards !== false, !!local.groupByYear].filter(Boolean).length} of 3`, color: '#6b6a8f' }}>
+          <div style={settingsCard}>
+            <SettingsRow label="Show venue" sub="Display venue name on cards">
+              <SettingsToggle checked={local.showVenueOnCards !== false} onChange={checked => { lUpdate("showVenueOnCards", checked); }} />
+            </SettingsRow>
+            <SettingsRow label="Show genre tags" sub="Tags visible on concert cards">
+              <SettingsToggle checked={local.showGenreTagsOnCards !== false} onChange={checked => { lUpdate("showGenreTagsOnCards", checked); }} />
+            </SettingsRow>
+            <SettingsRow label="Group by year" sub="Year headers in the list">
+              <SettingsToggle checked={!!local.groupByYear} onChange={checked => { lUpdate("groupByYear", checked); }} />
+            </SettingsRow>
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Artist pages" icon="layout" defaultOpen={false} {...sec('p-artist')}>
+          <div style={settingsCard}>
+            <SettingsRow label="Artist page sections" sub="Headliner, support, songs etc. open by default">
+              <SettingsToggle checked={local.artistSectionsDefaultOpen || false} onChange={checked => { lUpdate("artistSectionsDefaultOpen", checked); }} />
+            </SettingsRow>
+            <PreferenceBlock label="Artist photo gallery" sub="How photos show on an artist's page" value={local.artistGalleryStyle || 'strip'} options={[{ id: 'strip', label: 'Strip' }, { id: 'polaroid', label: 'Polaroids' }, { id: 'pinned', label: 'Pinned' }]} onChange={v => { lUpdate("artistGalleryStyle", v); }} isLast compact />
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Venue details" icon="layout" defaultOpen={false} {...sec('p-venue')}
+          subtitle={{ label: `${[local.showVenueParking !== false, local.showVenueTransit !== false, local.showVenueRooms !== false, local.showVenueTags !== false].filter(Boolean).length} of 4`, color: '#6b6a8f' }}>
+          <div style={settingsCard}>
+          <SettingsRow label="Parking" sub="Show the parking link on venue pages">
+            <SettingsToggle checked={local.showVenueParking !== false} onChange={checked => { lUpdate("showVenueParking", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Public transport" sub="Show the transit link on venue pages">
+            <SettingsToggle checked={local.showVenueTransit !== false} onChange={checked => { lUpdate("showVenueTransit", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Rooms / stages" sub="Show saved rooms on venue pages">
+            <SettingsToggle checked={local.showVenueRooms !== false} onChange={checked => { lUpdate("showVenueRooms", checked); }} />
+          </SettingsRow>
+          <SettingsRow label="Tags" sub='Show venue tags (e.g. "big venue")'>
+            <SettingsToggle checked={local.showVenueTags !== false} onChange={checked => { lUpdate("showVenueTags", checked); }} />
+          </SettingsRow>
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Summary & stats" icon="chart" defaultOpen={false} {...sec('p-stats')}
+          subtitle={{ label: local.summaryYear && local.summaryYear !== 'all' ? String(local.summaryYear) : 'All time', color: '#6b6a8f' }}>
+          <div style={settingsCard}>
+          <PreferenceBlock
+            label="Summary scope" sub="Default time range on summary page"
+            value={local.summaryYear || 'all'}
+            options={[{ id: 'all', label: 'All time' }, { id: String(new Date().getFullYear()), label: String(new Date().getFullYear()) }]}
+            onChange={v => { lUpdate('summaryYear', v); }}
+          />
+          <SettingsRow label="Top artists" sub="Rows shown in charts">
+            <SettingsStepper value={local.topArtistsRows} onChange={v => { lUpdate("topArtistsRows", v); }} max={6} />
+          </SettingsRow>
+          <SettingsSliderRow label="Top friends" sub="Rows shown in charts" value={local.topFriendsRows} min={3} max={20} onChange={v => { lUpdate("topFriendsRows", v); }} />
+          <SettingsSliderRow label="Top venues" sub="Rows shown in charts" value={local.topVenuesRows} min={3} max={20} onChange={v => { lUpdate("topVenuesRows", v); }} />
+          <SettingsSliderRow label="Most expensive" sub="Rows shown in list" value={local.topExpensiveRows} min={3} max={20} onChange={v => { lUpdate("topExpensiveRows", v); }} />
+          <SettingsSliderRow label="Songs shown" sub="Default rows in Songs tab" value={local.topSongsRows} min={3} max={50} onChange={v => { lUpdate("topSongsRows", v); }} isLast />
+          </div>
+        </Collapsible>
+      </>}
+
+      {activeSettingsPage === 'connections' && <>
+        <SettingsSection title="Spotify" icon="plug" collapsible defaultOpen={false} subtitle={{label:settings.spotifyAccessToken ? "Connected" : local.spotifyClientId ? "Ready to connect" : "Set up Spotify",color:settings.spotifyAccessToken ? "#4ade80" : "#9491b8"}}>
           <div style={{ padding: "14px 16px" }}>
             {(() => {
               const spotifyConnected = Boolean(settings.spotifyAccessToken)
@@ -11151,8 +11062,92 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </SettingsSection>
 
-        {/* Your data */}
-        <SettingsSection title="Backup" icon="data" collapsible defaultOpen={false} subtitle={backupAge.subtitle}>
+        <SettingsSection title="Concert sources" icon="list" collapsible defaultOpen={false}
+          subtitle={{ label: `${enabledConcertSources} of 3 enabled`, color: '#9491b8' }}>
+          <ConcertSearchSettings settings={local} onChange={value => lUpdate("concertSearchSources", value)} />
+        </SettingsSection>
+      </>}
+
+      {activeSettingsPage === 'offline' && <>
+        <SettingsSection title="Sync & saved tickets" icon="data">
+          {librarySync && <p style={{color:'#9491b8',fontSize:12}}>
+            {librarySync.pending ? `${librarySync.pending} waiting to sync` : !librarySync.online ? 'Offline' : !librarySync.connected ? 'Reconnecting' : librarySync.error ? 'Library refresh unavailable' : librarySync.syncing ? 'Checking for changes…' : 'Library up to date'}
+            {librarySync.connected && (librarySync.pending > 0 || librarySync.error) &&
+              <button type="button" disabled={librarySync.syncing} onClick={librarySync.retry} style={{marginLeft:8}}>Sync now</button>}
+          </p>}
+          <OfflineTicketLibrary account={userEmail || 'guest'} concerts={concerts} />
+        </SettingsSection>
+
+        <SettingsSection title="Photos & storage" icon="data" collapsible defaultOpen={false}>
+          {librarySync && <OfflinePhotos concerts={concerts} settings={settings} online={librarySync.online} />}
+          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
+
+            <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>Photo storage</div>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                    {storageInfo ? `${storageInfo.files.length} files · ${formatBytes(storageInfo.used)}` : 'Not checked yet'}
+                  </div>
+                </div>
+                <button onClick={loadStorageInfo} disabled={storageBusy} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
+                  {storageBusy ? '…' : storageInfo ? 'Refresh' : 'Check'}
+                </button>
+              </div>
+              {storageInfo && (
+                <div style={{ height: 7, borderRadius: 4, background: "#16162a", overflow: "hidden", marginTop: 9 }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, (storageInfo.used / STORAGE_BUDGET) * 100)}%`, background: "var(--accent)" }} />
+                </div>
+              )}
+            </div>
+
+            {/* Files with nothing pointing at them — photos whose show was deleted
+                before photo deletion existed, or uploads abandoned mid-edit. */}
+            {storageInfo && (
+              <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
+                {storageInfo.unsafe ? (
+                  <div style={{ display: "flex", gap: 9 }}>
+                    <span style={{ color: "#facc15", fontFamily: "'DM Mono', monospace", fontSize: 12, lineHeight: 1.4 }}>!</span>
+                    <div style={{ fontSize: 11.5, color: "#e0a35f", lineHeight: 1.55 }}>{storageInfo.unsafe}</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>
+                          {storageInfo.orphans.length === 0 ? 'No unused photos' : `${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}`}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
+                          {storageInfo.orphans.length === 0
+                            ? `All ${storageInfo.files.length} files are still in use`
+                            : `${formatBytes(storageInfo.orphanBytes)} · ${storageInfo.files.length - storageInfo.orphans.length} of ${storageInfo.files.length} files stay`}
+                        </div>
+                      </div>
+                      {storageInfo.orphans.length > 0 && (
+                        <button onClick={cleanUpOrphans} disabled={storageBusy} style={{ background: "none", border: "1px solid #4a2828", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Clean up</button>
+                      )}
+                    </div>
+                    {/* * Name the files. A count can't be checked; a list can — if you
+                        * recognise a photo in here, something is wrong and you'll see
+                        * it before anything is deleted rather than afterwards. */}
+                    {storageInfo.orphans.length > 0 && (
+                      <div style={{ marginTop: 9, maxHeight: 132, overflowY: "auto", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "8px 10px" }}>
+                        {storageInfo.orphans.map(f => (
+                          <div key={f.path} style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#6b6a8f", lineHeight: 1.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f.name} <span style={{ color: "#3a3858" }}>· {formatBytes(f.size)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="Backup & import" icon="data" collapsible defaultOpen={false} subtitle={backupAge.subtitle}>
           <CompleteBackup concerts={concerts} settings={settings} onSaveConcert={onSaveConcertQuiet} onUpdateAll={onUpdateAll} userEmail={userEmail} />
           <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
 
@@ -11327,77 +11322,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </SettingsSection>
 
-        <SettingsSection title="Photo storage" icon="data" collapsible defaultOpen={false}>
-          <div style={{ background: "#13131f", border: "1px solid #1f1f35", borderRadius: 12, overflow: "hidden" }}>
-
-            <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>Photo storage</div>
-                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                    {storageInfo ? `${storageInfo.files.length} files · ${formatBytes(storageInfo.used)}` : 'Not checked yet'}
-                  </div>
-                </div>
-                <button onClick={loadStorageInfo} disabled={storageBusy} style={{ background: "none", border: "1px solid #2e2e50", borderRadius: 8, color: "#6b6a8f", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>
-                  {storageBusy ? '…' : storageInfo ? 'Refresh' : 'Check'}
-                </button>
-              </div>
-              {storageInfo && (
-                <div style={{ height: 7, borderRadius: 4, background: "#16162a", overflow: "hidden", marginTop: 9 }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, (storageInfo.used / STORAGE_BUDGET) * 100)}%`, background: "var(--accent)" }} />
-                </div>
-              )}
-            </div>
-
-            {/* Files with nothing pointing at them — photos whose show was deleted
-                before photo deletion existed, or uploads abandoned mid-edit. */}
-            {storageInfo && (
-              <div style={{ padding: "13px 16px", borderBottom: "1px solid #1f1f35" }}>
-                {storageInfo.unsafe ? (
-                  <div style={{ display: "flex", gap: 9 }}>
-                    <span style={{ color: "#facc15", fontFamily: "'DM Mono', monospace", fontSize: 12, lineHeight: 1.4 }}>!</span>
-                    <div style={{ fontSize: 11.5, color: "#e0a35f", lineHeight: 1.55 }}>{storageInfo.unsafe}</div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: "#e2e0ff", fontWeight: 600 }}>
-                          {storageInfo.orphans.length === 0 ? 'No unused photos' : `${storageInfo.orphans.length} unused photo${storageInfo.orphans.length === 1 ? '' : 's'}`}
-                        </div>
-                        <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>
-                          {storageInfo.orphans.length === 0
-                            ? `All ${storageInfo.files.length} files are still in use`
-                            : `${formatBytes(storageInfo.orphanBytes)} · ${storageInfo.files.length - storageInfo.orphans.length} of ${storageInfo.files.length} files stay`}
-                        </div>
-                      </div>
-                      {storageInfo.orphans.length > 0 && (
-                        <button onClick={cleanUpOrphans} disabled={storageBusy} style={{ background: "none", border: "1px solid #4a2828", borderRadius: 8, color: "#f87171", fontSize: 11, padding: "6px 12px", cursor: storageBusy ? "default" : "pointer", fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>Clean up</button>
-                      )}
-                    </div>
-                    {/* * Name the files. A count can't be checked; a list can — if you
-                        * recognise a photo in here, something is wrong and you'll see
-                        * it before anything is deleted rather than afterwards. */}
-                    {storageInfo.orphans.length > 0 && (
-                      <div style={{ marginTop: 9, maxHeight: 132, overflowY: "auto", background: "#0c0c14", border: "1px solid #1f1f35", borderRadius: 8, padding: "8px 10px" }}>
-                        {storageInfo.orphans.map(f => (
-                          <div key={f.path} style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#6b6a8f", lineHeight: 1.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {f.name} <span style={{ color: "#3a3858" }}>· {formatBytes(f.size)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-          </div>
-        </SettingsSection>
-
-        {/* Kept separate from photo housekeeping so destructive account actions
-            cannot be mistaken for part of storage management. */}
-        <SettingsSection title="Danger zone" icon="data" collapsible defaultOpen={false}>
+        <SettingsSection title="Delete all data" icon="data" collapsible defaultOpen={false}>
           <div style={{ background: "#13131f", border: "1px solid #4a2828", borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "13px 16px", background: "#1a1214" }}>
               <div style={{ fontSize: 11.5, color: "#c4c2f0", lineHeight: 1.55, marginBottom: 10 }}>
@@ -11423,12 +11348,10 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </div>
           </div>
         </SettingsSection>
+      </>}
 
-        {/* Sign out gets its own row — it used to sit among the data actions, which
-            is the one place you might tap it by accident. */}
-        {/* * Who you are and how you're signed in were two sections saying the same
-            * thing. One row now: tap the initials to change them. */}
-        <SettingsSection title="Profile" icon="person" collapsible defaultOpen={false}>
+      {activeSettingsPage === 'account' && <>
+        <SettingsSection title="Profile" icon="person">
           {(() => {
             const openEdit = () => {
               setInitialsInput(local.userInitials || (userEmail === 'guest' ? '' : (userEmail || "ST").slice(0, 2).toUpperCase()));
@@ -11458,6 +11381,169 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             );
           })()}
         </SettingsSection>
+
+        <SettingsSection title="About & updates" icon="help" collapsible defaultOpen={false}
+          subtitle={{ label: swUpdate.pending ? 'Update ready' : 'v' + APP_VERSION, color: '#9491b8' }}>
+      {/* * Same reasoning as the update row: dismissing the install banner should be
+          * "not now". The browser only ever offers the prompt once per visit, so if
+          * it's available it's offered here until it's used. */}
+      {appInstall.available && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 10, padding: "11px 13px",
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>Install settracker</div>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Add to your home screen — opens without the browser bar</div>
+          </div>
+          <button
+            onClick={() => appInstall.prompt?.()}
+            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
+          >Install</button>
+        </div>
+      )}
+
+      {/* * The changelog is something you read once and then never again, so it gets
+          * one quiet line here and opens as a sheet. It used to sit expanded above
+          * every settings tab, which put release notes in front of you every time
+          * you came in to change a colour. */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, padding: "0 2px" }}>
+        <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
+          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
+        </span>
+        <button type="button" disabled={swUpdate.pending ? !swUpdate.apply : swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.pending ? swUpdate.apply?.() : swUpdate.check?.()} style={{ background: 'none', border: 0, color: '#a78bfa', padding: '8px 2px', minHeight: 44, fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', flexShrink: 0, opacity: swUpdate.checking ? 0.5 : 1 }}>
+          {swUpdate.pending ? 'Update now' : swUpdate.checking ? 'Checking…' : 'Check updates'}
+        </button>
+        {releases !== null && releases.length > 0 && (
+          <button onClick={() => { setWhatsNewOpen(true); }} style={{
+            background: unseenReleases.length > 0 ? "#30284d" : "none",
+            border: `1px solid ${unseenReleases.length > 0 ? "#5e4c8f" : "transparent"}`,
+            borderRadius: 99, color: unseenReleases.length > 0 ? "#a78bfa" : "#6b6a8f",
+            fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace",
+            padding: unseenReleases.length > 0 ? "3px 10px" : "3px 2px",
+          }}>
+            What's new
+          </button>
+        )}
+      </div>
+
+      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: '-8px 2px 14px', lineHeight: 1.5 }}>
+        {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
+        {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+      </div>
+        </SettingsSection>
+
+            <SettingsSection title="Help" icon="help">
+              {[
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+              ].map(({ svg, label, url }, i, arr) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
+                      <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
+                    </span>
+                    <span>{label}</span>
+                  </span>
+                  <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
+                </a>
+              ))}
+            </SettingsSection>
+
+            {/* Social links — quiet footer credit instead of its own card */}
+            <div style={{ textAlign: "center", padding: "10px 0 4px", fontSize: 9.5, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
+              <div style={{ whiteSpace: "nowrap" }}>
+                {socialLinks.map(({ href, label }, i) => (
+                  <span key={label}>
+                    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
+                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> · </span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+        {/* Profile edit bottom sheet */}
+        {editingInitials && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
+            <div style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 40px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 800, color: "#e2e0ff" }}>Edit profile</div>
+                <button onClick={() => setEditingInitials(false)} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
+                <div style={{ width: 52, height: 52, borderRadius: 99, background: "#201a34", border: "1px solid #3d2f6b", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 16, letterSpacing: "0.05em", flexShrink: 0 }}>
+                  {initialsInput.slice(0, 3) || "?"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Initials</div>
+                  <input
+                    value={initialsInput}
+                    onChange={e => setInitialsInput(e.target.value.toUpperCase().slice(0, 3))}
+                    placeholder="e.g. AF"
+                    maxLength={3}
+                    autoFocus
+                    style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Mono', monospace", fontSize: 16, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}
+                  />
+                </div>
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Name</div>
+                <input
+                  value={local.userName || ""}
+                  onChange={e => lUpdate("userName", e.target.value)}
+                  placeholder="e.g. Annuh Floor"
+                  style={{ width: "100%", boxSizing: "border-box", background: "#0c0c14", border: "1px solid #2e2e50", borderRadius: 8, color: "#c4c2f0", padding: "9px 12px", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+                />
+              </div>
+              <button onClick={() => {
+                const val = initialsInput.trim().slice(0, 3);
+                lUpdate("userInitials", val);
+                lUpdate("userName", local.userName || "");
+                setEditingInitials(false);
+              }} style={{ width: "100%", background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 14, fontWeight: 700, padding: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Save</button>
+            </div>
+          </div>
+        )}
+
+      {whatsNewOpen && releases !== null && releases.length > 0 && (() => {
+        const shown = releases;
+        const close = closeWhatsNew;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "#000000cc", display: "flex", alignItems: "flex-end" }} onClick={close}>
+            <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 34px", boxSizing: "border-box", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexShrink: 0 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
+                  What's new
+                </div>
+                <button onClick={close} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: 1, minHeight: 0 }}>
+                {shown.map(r => (
+                  <div key={r.version} style={{ marginBottom: 14 }}>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
+                      v{r.version}{r.date ? ` · ${r.date}` : ''}
+                    </div>
+                    {r.entries.map((e, i) => (
+                      <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
+                        <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
+                        <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
+                <a href="https://github.com/HoltropAF/concert_tracker/commits/main/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, border: "1px solid #2e2e50", borderRadius: 10, color: "#9491b8", fontSize: 12, padding: "10px", textAlign: "center", textDecoration: "none", fontFamily: "'DM Mono', monospace" }}>Full history on GitHub ↗</a>
+                <button onClick={close} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 13, fontWeight: 700, padding: "10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       </>}
 
     </div>
@@ -11500,7 +11586,7 @@ function FilterGroup({ id, label, activeLabel, openId, onToggle, children }) {
 // * `settingsLoaded` distinguishes "still defaults" from "really yours" and gates
 // * anything that would be wrong under defaults — currently the onboarding tour.
 export default function ConcertTracker(props) {
-  return <NavigationMemory key={props.userEmail||'local'}><WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded}><ConcertTrackerContent {...props} /></WishlistUpdateProvider></NavigationMemory>
+  return <NavigationMemory key={props.userEmail||'local'}><WishlistUpdateProvider key={props.userEmail||'local'} settings={props.settings} concerts={props.concerts} account={props.userEmail} ready={props.settingsLoaded} online={props.librarySync?.online}><ConcertTrackerContent {...props} /></WishlistUpdateProvider></NavigationMemory>
 }
 
 function safeExternalUrl(value) {
@@ -11597,6 +11683,31 @@ function ScheduleReviewLink({ concert, settings, onOpen }) {
   return <button type="button" onClick={onOpen} style={{ minHeight:44, textAlign:'left', padding:'8px 12px', background:'#13131f', border:'1px solid #2e2e50', borderRadius:8, color:'#a78bfa', cursor:'pointer' }}>Review found times and support acts ›</button>;
 }
 
+function ShowReviewQueue({ concerts, settings, toLog, onOpen }) {
+  const results = useWishlistResults();
+  const [, refresh] = useState(0);
+  useEffect(() => {
+    const changed = () => refresh(value => value + 1);
+    window.addEventListener(scheduleUpdatedEvent, changed);
+    return () => window.removeEventListener(scheduleUpdatedEvent, changed);
+  }, []);
+  const items = toLog.map(concert => ({ concert, tab: 'log', label: 'Log this show' }));
+  const schedules = scheduleResults();
+  const today = localDay();
+  for (const concert of concerts) {
+    if (concert.wishlist && results?.[concert.id]?.unread) items.push({ concert, tab:'updates', label:'Wishlist update' });
+    else if (!concert.wishlist && schedules.size && (concert.endDate || concert.date) >= today) {
+      const schedule = schedules.get(scheduleRequest(concert, settings).key)?.result;
+      if (hasScheduleSuggestions(concert, settings, schedule)) items.push({ concert, tab:'timetable', label:'New timetable details' });
+    }
+  }
+  if (!items.length) return null;
+  return <details style={{marginBottom:10,padding:'0 12px',border:'1px solid #2e2e50',borderRadius:8,background:'#13131f'}}>
+    <summary style={{padding:'12px 0',color:'#e2e0ff',fontSize:13,cursor:'pointer'}}>To review <span style={{color:'#a78bfa',marginLeft:6}}>{items.length}</span></summary>
+    {items.map(({concert,tab,label}) => <button key={concert.id+tab} type="button" onClick={()=>onOpen(concert,tab)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,width:'100%',minHeight:44,textAlign:'left',color:'#c4c2f0',border:0,borderTop:'1px solid #25243a',background:'none',cursor:'pointer'}}><span>{concert.artist}</span><span style={{color:'#a78bfa',flexShrink:0}}>{label} ›</span></button>)}
+  </details>
+}
+
 function ShowPreparationChecklist({concert,settings}) {
   const key='showPreparation:'+concert.id;
   const [checked,setChecked]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'{}')}catch{return {}}});
@@ -11606,15 +11717,27 @@ function ShowPreparationChecklist({concert,settings}) {
   return <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{items.map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecked(old=>({...old,[label]:e.target.checked}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
 }
 
-function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
+function TodayShowPanel({concerts,settings,ticketAccount,onOpen,onClose,now}) {
   useBackButton(onClose,true);
   const [chosenId,setChosenId]=useState(null);
   const concert=concerts.find(c=>c.id===chosenId)||concerts[0];
+  const [tickets,setTickets]=useState(null);
+  const [ticketView,setTicketView]=useState(null);
+  useBackButton(()=>setTicketView(null),ticketView!==null);
+  useEffect(()=>{
+    if(!concert) return;
+    let active=true;
+    listTicketFiles(ticketAccount,concert.id).then(files=>{
+      if(active)setTickets({showId:concert.id,files});
+    }).catch(()=>{});
+    return()=>{active=false};
+  },[ticketAccount,concert?.id]);
   if(!concert)return null;
+  const files=tickets?.showId===concert.id?tickets.files:[];
   const photoKey=Object.keys(settings.artistPhotos||{}).find(name=>name.toLowerCase()===(concert.artist||'').toLowerCase());
   const photo=photoKey && settings.artistPhotos[photoKey];
   const countdown=showCountdown(concert,now);
-  return <ShowControlSheet title="Today’s the day" onClose={onClose}>
+  return <><ShowControlSheet title="Today’s the day" onClose={onClose}>
     {concerts.length>1 && <select aria-label="Today's show" value={String(concert.id)} onChange={e=>setChosenId(concerts.find(c=>String(c.id)===e.target.value)?.id||null)} style={{background:"#13131f",color:"#c4c2f0",border:"1px solid #2e2e50",borderRadius:8,padding:10,width:"100%",marginBottom:12}}>{concerts.map(c=><option key={c.id} value={String(c.id)}>{c.artist}{c.showTime?` · ${c.showTime}`:""}</option>)}</select>}
     {photo && <PhotoImg eager path={photo} pos={settings.artistPhotoPos?.[photoKey]} variant="detail" style={{width:'100%',height:130,borderRadius:10,marginBottom:14}} />}
     <h2 style={{fontFamily:"'Syne', sans-serif",fontSize:24,color:'#e2e0ff',marginBottom:4}}>{concert.artist}</h2>
@@ -11625,10 +11748,11 @@ function TodayShowPanel({concerts,settings,onOpen,onClose,now}) {
     {visibleShowTimeFields(concert,settings).map(([key,label])=>[label,concert[key]]).filter(([,time])=>time).map(([label,time])=><div key={label} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #25243a',fontSize:13,color:'#c4c2f0'}}><span>{label}</span><strong style={{color:'#a78bfa'}}>{time}</strong></div>)}
     <ShowPreparationChecklist key={concert.id} concert={concert} settings={settings} />
     <div style={{display:'flex',gap:8,marginTop:16}}><button onClick={()=>{onClose();onOpen(concert)}} style={{flex:1,minHeight:44,background:'#a78bfa',color:'#0c0c14',border:0,borderRadius:9,fontWeight:700}}>Open show</button>{!isOnline(concert) && concert.venue && <a href={'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([concert.venue,concert.city,concert.country].filter(Boolean).join(', '))} target="_blank" rel="noopener noreferrer" style={{flex:1,display:'grid',placeItems:'center',color:'#a78bfa',border:'1px solid #2e2e50',borderRadius:9,textDecoration:'none'}}>Directions ↗</a>}</div>
-  </ShowControlSheet>
+    {!!files.length && <button type="button" onClick={()=>setTicketView(files.length===1?0:'list')} style={{width:'100%',minHeight:44,marginTop:8,color:'#a78bfa',background:'none',border:'1px solid #2e2e50',borderRadius:9}}>Open {files.length===1?'ticket':'tickets'}</button>}
+  </ShowControlSheet><TicketFileSheet files={files} view={ticketView} onChangeView={setTicketView} /></>
 }
 
-function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true }) {
+function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConcert, onUpdateSetting, onUpdateSettings, onSignOut, userEmail, settingsLoaded = true, librarySync }) {
   const today = new Date()
   const todayDate = localDay(today)
   const isPastDate = (dateStr) => dateStr < todayDate
@@ -11762,8 +11886,9 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const todaysShows=showsToday(concerts,showDayNow);
   const ticketAccount = userEmail || 'guest';
   const ticketDay = localDay(showDayNow);
+  const onlineForLookups = librarySync?.online ?? true;
   useEffect(() => {
-    if (!settingsLoaded) return;
+    if (!settingsLoaded || !onlineForLookups || navigator.onLine === false) return;
     let active = true;
     const check = async () => {
       for (const concert of showsDueForSchedule(concerts)) {
@@ -11773,7 +11898,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     };
     check();
     return () => { active = false; };
-  }, [concerts,settings,settingsLoaded,ticketDay]);
+  }, [concerts,settings,settingsLoaded,ticketDay,onlineForLookups]);
   useEffect(() => {
     pruneExpiredTickets(ticketAccount, ticketDay, concerts).catch(() => {});
   }, [ticketAccount, ticketDay, concerts]);
@@ -11810,10 +11935,15 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   // ! below `if (addFlowStep)` and `if (showAdd) return` — so opening the add flow
   // ! rendered four fewer hooks than the previous pass and React threw "Rendered
   // ! fewer hooks than expected", crashing into the error boundary.
-  const [displaySelected, selectedExiting] = useExitingValue(selected);
-  const handleOpenConcert = (concert) => {
+  const currentSelected = concerts.find(concert => concert.id === selected?.id) || selected;
+  const [previousSelected, isSelectedExiting] = useExitingValue(currentSelected);
+  const displaySelected = currentSelected || previousSelected;
+  const selectedExiting = !currentSelected && isSelectedExiting;
+  const [reviewStart, setReviewStart] = useState(null);
+  const handleOpenConcert = (concert, tab) => {
     savedScrollPos.current = document.getElementById('content-scroll')?.scrollTop || 0
-    setLogShowId(null)
+    setLogShowId(tab === 'log' ? concert.id : null)
+    setReviewStart(tab === 'updates' || tab === 'timetable' ? { id: concert.id, tab } : null)
     setSelected(concert)
   }
   useEffect(() => {
@@ -12188,7 +12318,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto' }}>
         <div className={selectedExiting ? "slide-out-detail" : "slide-in-detail"} key={displaySelected.id}>
-        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} startLog={logShowId===displaySelected.id} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
+        <ConcertDetail concert={displaySelected} concerts={concerts} onClose={() => setSelected(null)} onSave={handleSave} settings={settings} onUpdateSetting={onUpdateSetting} onUpdateSettings={onUpdateSettings} friends={allFriends} onDelete={onDeleteConcert} onNotify={notify} photosEnabled={!!userEmail} ticketAccount={ticketAccount} performerScope={performerScope} startLog={logShowId===displaySelected.id} startTab={reviewStart?.id===displaySelected.id ? reviewStart.tab : 'general'} onOpenOther={c => setSelected(c)} onNavigate={({ view: v, artist: a, venue: ve, friendNames }) => { if (v === 'venues' && ve) setVenueReturnConcert(selected); if (v === 'artists' && a) setArtistReturnConcert(selected); setSelected(null); if (v === 'friends') { setPendingFriendSelect(friendNames?.length === 1 ? {name:friendNames[0]} : {names:friendNames||[]}); setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'venues' && ve) setPendingVenueSelect(ve); if (v === 'artists' && a) setPendingArtistSelect(a); } }} allArtists={[...new Set([
           ...concerts.map(c => c.artist),
           ...concerts.flatMap(c => (c.support || []).map(s => getSupportName(s))),
           ...concerts.flatMap(c => (c.acts || []).map(a => a.name || '').filter(Boolean)),
@@ -12205,7 +12335,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
 
       {todaysShows.length>0 && <>
         <button aria-label="Today's shows" title="Today's shows" onClick={()=>setShowToday(true)} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',right:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',height:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer'}}>♫ Today{todaysShows.length>1?' · '+todaysShows.length:''}</button>
-        {showToday && <TodayShowPanel concerts={todaysShows} settings={settings} now={showDayNow} onClose={()=>setShowToday(false)} onOpen={handleOpenConcert} />}
+        {showToday && <TodayShowPanel concerts={todaysShows} settings={settings} ticketAccount={ticketAccount} now={showDayNow} onClose={()=>setShowToday(false)} onOpen={handleOpenConcert} />}
       </>}
 
       {/* Header */}
@@ -12353,9 +12483,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
             {concerts.length > 0 && combinedShows.length === 0 && (
               <EmptyState icon="🔍" title="No matches" detail="Nothing fits the current search and filters." actionLabel="Clear filters" onAction={() => { setSearch(''); setFilterYears([]); setFilterType('all'); resetFilters(); resetSort(); }} />
             )}
-            {toLog.length > 0 && <div style={{margin:'0 0 10px',padding:'6px 12px',border:'1px solid #2e2e50',borderRadius:8,background:'#13131f'}}>
-              {toLog.map(concert=><button key={concert.id} type="button" onClick={()=>{handleOpenConcert(concert);setLogShowId(concert.id)}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,width:'100%',minHeight:44,textAlign:'left',color:'#c4c2f0',border:0,background:'none',cursor:'pointer'}}><span>{concert.artist}</span><span style={{color:'#a78bfa',flexShrink:0}}>Log this show ›</span></button>)}
-            </div>}
+            <ShowReviewQueue concerts={concerts} settings={settings} toLog={toLog} onOpen={handleOpenConcert} />
             {combinedShows.length > 0 && (
               <div style={{ marginTop: 2 }}>
                 {(filterStatus.length === 0 || filterStatus.includes('want')) && wishlist.length > 0 && (
@@ -12394,7 +12522,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
         {view === 'songs' && <SongsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} saveSettings={onUpdateSettings} onLinkSong={handleLinkSongSpotify} onDetailChange={setSongDetailOpen} initialSearch={pendingSongsSearch} onInitialSearchConsumed={() => setPendingSongsSearch(null)} initialSongSelect={pendingSongSelect} onInitialSongSelectConsumed={() => setPendingSongSelect(null)} onBackToOrigin={songReturnArtist ? () => { setView('artists'); setPendingArtistSelect(songReturnArtist); setSongReturnArtist(null); } : null} />}
         {view === 'artists' && <ArtistsView concerts={concerts} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onUpdateSettings={onUpdateSettings} onSaveConcert={handleSave} onDetailChange={setArtistDetailOpen} initialSelectedArtist={pendingArtistSelect} onInitialArtistConsumed={() => setPendingArtistSelect(null)} onBackToOrigin={artistReturnConcert ? () => { setSelected(artistReturnConcert); setArtistReturnConcert(null); } : null} onNotify={notify} onNavigate={({ view: v, search: s, songSelect: ss, fromArtist: fa }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else { setView(v); if (v === 'songs' && s) setPendingSongsSearch(s); if (v === 'songs' && ss) { setPendingSongSelect(ss); setSongReturnArtist(fa); } } }} />}
         {view === 'venues' && <VenuesView concerts={concerts} onDiscover={openDiscoveryDraft} onOpen={handleOpenConcert} settings={settings} onUpdateSetting={updateSetting} onDetailChange={setVenueDetailOpen} initialSelectedVenue={pendingVenueSelect} onInitialVenueConsumed={() => setPendingVenueSelect(null)} onBackToOrigin={venueReturnConcert ? () => { setSelected(venueReturnConcert); setVenueReturnConcert(null); } : null} onNavigate={({ view: v }) => { if (v === 'friends') { setView('stats'); setStatsTab('friends'); } else setView(v); }} />}
-        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSaveConcertQuiet={onSaveConcert} onDeleteConcert={onDeleteConcert} onSignOut={onSignOut} userEmail={userEmail} onNotify={notify} onThemePreview={setThemePreview} />}
+        {view === 'settings' && <SettingsView settings={settings} onUpdate={updateSetting} onUpdateAll={onUpdateSettings ? updateSettings : null} concerts={concerts} onSaveConcert={onSaveConcert} onSaveConcertQuiet={onSaveConcert} onDeleteConcert={onDeleteConcert} onSignOut={onSignOut} userEmail={userEmail} librarySync={librarySync} onNotify={notify} onThemePreview={setThemePreview} />}
         {view === 'photos' && <PhotoWallView concerts={concerts} onOpen={handleOpenConcert} onBack={() => setView(settings.defaultTab || 'stats')} />}
         </div>
       </div>

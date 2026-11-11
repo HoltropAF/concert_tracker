@@ -1,7 +1,6 @@
 import WelcomeFlow from './WelcomeFlow'
 
-// * The signed-out landing page. WelcomeFlow separates setup from returning login.
-// * Both use email links; account creation is enabled only in the new-user path.
+// * The signed-out landing page. WelcomeFlow uses an email link for both new and returning users.
 // * Installation is optional and uses the prompt captured by App.
 // * `onGuest` is optional — when omitted the "explore it first" link is hidden, so the
 // * same screen works in a deployment where guest mode isn't offered.

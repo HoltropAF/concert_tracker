@@ -36,7 +36,7 @@ function SaveTrackedTracker(props) {
       onUpdateSetting={(key,value) => queue.run(`setting:${key}`, () => props.onUpdateSetting(key,value))}
       onUpdateSettings={(settings,options) => queue.run('settings', () => props.onUpdateSettings(settings), options)}
     />
-    <SaveStatus status={status} onRetry={queue.retry} />
+    <SaveStatus status={status} onRetry={queue.retry} sync={props.librarySync} />
   </>
 }
 
@@ -179,16 +179,26 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
   const [guestMode, setGuestMode] = useState(() => localStorage.getItem('guest_mode') === 'true')
-  const [setupBannerDismissed, setSetupBannerDismissed] = useState(false)
+  const [guestBannerDismissed, setGuestBannerDismissed] = useState(false)
   const [pendingSpotifyExchange, setPendingSpotifyExchange] = useState(null)
 
   // * All custom hooks must be declared before any useEffect that references their
   // * return values in a dependency array — otherwise the dep array is evaluated
   // * while those const bindings are still in TDZ, causing a runtime crash.
   const guest = useGuestMode()
-  const { user, loading: authLoading, signIn, signOut, dbSleeping } = useAuth()
-  const { concerts, loaded, loadError: concertLoadError, reload: reloadConcerts, saveConcert, deleteConcert } = useConcerts(guestMode ? null : user?.id)
-  const { settings, settingsLoaded, loadError: settingsLoadError, reload: reloadSettings, saveSetting, saveSettings } = useSettings(guestMode ? null : user?.id)
+  const { user, loading: authLoading, signIn, signOut, dbSleeping, online, canConnect } = useAuth()
+  const concertLibrary = useConcerts(guestMode ? null : user?.id, canConnect)
+  const settingsLibrary = useSettings(guestMode ? null : user?.id, canConnect)
+  const { concerts, loaded, loadError: concertLoadError, reload: reloadConcerts, saveConcert, deleteConcert } = concertLibrary
+  const { settings, settingsLoaded, loadError: settingsLoadError, reload: reloadSettings, saveSetting, saveSettings } = settingsLibrary
+  const librarySync = {
+    online,
+    connected: canConnect,
+    pending: concertLibrary.pending + settingsLibrary.pending,
+    syncing: concertLibrary.syncing || settingsLibrary.syncing,
+    error: concertLibrary.syncError || settingsLibrary.syncError,
+    retry: () => Promise.all([reloadConcerts(), reloadSettings()]),
+  }
   const [retryingData, setRetryingData] = useState(false)
 
   // * Detect a Spotify OAuth callback (?code=…) on every fresh page load.
@@ -295,7 +305,7 @@ export default function App() {
   // * Everything below renders real UI, so the boot splash comes down as soon as
   // * this flips false. Concerts are served from cache on a repeat visit, which
   // * means `loaded` is already true and there is usually nothing to wait for.
-  const booting = !guestMode && (authLoading || (user && !loaded))
+  const booting = !guestMode && (authLoading || (user && (!loaded || !settingsLoaded)))
 
   useEffect(() => {
     if (!booting) hideBootSplash()
@@ -306,6 +316,7 @@ export default function App() {
     if (!localStorage.getItem('guest_concerts')) {
       guest.initWithSamples(SAMPLE_CONCERTS)
     }
+    setGuestBannerDismissed(false)
     setGuestMode(true)
   }
 
@@ -321,7 +332,7 @@ export default function App() {
 
   if (guestMode) return (
     <>
-      {!setupBannerDismissed && (
+      {!guestBannerDismissed && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 90,
           background: '#13121f', borderBottom: '1px solid #2a2550',
@@ -329,12 +340,14 @@ export default function App() {
           padding: '9px 40px 9px 16px',
           fontFamily: "'DM Sans', sans-serif", fontSize: 13, gap: 6,
         }}>
-          <span style={{ color: '#6b6890' }}>Exploring as guest —</span>
-          <a href="/setup.html" target="_blank" rel="noopener noreferrer"
-            style={{ color: '#a78bfa', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            Set up a separate private copy →
-          </a>
-          <button onClick={() => setSetupBannerDismissed(true)} style={{
+          <span style={{ color: '#9491b8' }}>Guest mode</span>
+          <button type="button" onClick={() => {
+            localStorage.removeItem('guest_mode')
+            setGuestMode(false)
+          }} style={{ color: '#a78bfa', font: 'inherit', fontWeight: 600, whiteSpace: 'nowrap', background: 'none', border: 0, cursor: 'pointer' }}>
+            Continue with email →
+          </button>
+          <button type="button" aria-label="Dismiss guest banner" onClick={() => setGuestBannerDismissed(true)} style={{
             position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
             background: 'none', border: 'none', color: '#4a4870',
             cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 6px',
@@ -417,9 +430,14 @@ export default function App() {
           onDeleteConcert={deleteConcert}
           onUpdateSetting={saveSetting}
           onUpdateSettings={saveSettings}
-          onSignOut={signOut}
+          onSignOut={async () => {
+            if (!online) return window.alert('Go online to sign out. Your changes are still on this device.')
+            const result = await signOut()
+            if (result?.error) window.alert('Could not sign out. Check your connection and try again.')
+          }}
           userEmail={user.email}
           settingsLoaded={settingsLoaded}
+          librarySync={librarySync}
         />
       </AppErrorBoundary>
       {banner}

@@ -1,6 +1,7 @@
 import { Component, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
+import { offlinePhotoCache } from './lib/photos'
 import './index.css'
 
 // * Outermost safety net: catches any crash in App() itself — including hooks that
@@ -32,7 +33,7 @@ class RootErrorBoundary extends Component {
     navigator.serviceWorker.getRegistrations()
       .then(regs => Promise.all(regs.map(r => r.unregister())))
       .then(() => caches.keys())
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(key => key !== offlinePhotoCache).map(key => caches.delete(key))))
       .then(reload)
       .catch(reload)
   }

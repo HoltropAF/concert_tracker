@@ -10,9 +10,11 @@
 // * derived at render time from strings inside the concert blobs. That's why the
 // * normalizers below matter: a blob written by an older version of the app is still
 // * a valid row, so shape has to be enforced on read rather than by the database.
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import { SEED_DATA, DEFAULT_SETTINGS } from '../lib/data'
+import { DEFAULT_SETTINGS } from '../lib/data'
+import { useOfflineLibrary, settingsOperation } from './useOfflineLibrary'
+import { changedFields, clearSyncedLibrary } from '../lib/offlineLibrary'
 
 // ============================================================
 // DATA NORMALIZERS
@@ -25,7 +27,7 @@ const arrayOr = (value, fallback = []) => Array.isArray(value) ? value : fallbac
 const stringList = (value, fallback = []) => arrayOr(value, fallback).map(v => String(v || '').trim()).filter(Boolean)
 const supportList = (value) => arrayOr(value).map(v => {
   if (typeof v === 'string') return v.trim()
-  if (v && typeof v === 'object') return { name: String(v.name || '').trim(), role: v.role === 'guest' ? 'guest' : 'support' }
+  if (v && typeof v === 'object') return { ...v, name: String(v.name || '').trim(), role: v.role === 'guest' ? 'guest' : 'support' }
   return ''
 }).filter(v => typeof v === 'string' ? v : v.name)
 const actsList = (value) => arrayOr(value).map(v => {
@@ -91,6 +93,7 @@ const normalizeSettings = (value) => {
     savedVenues: arrayOr(merged.savedVenues).map(v => {
       const venue = v && typeof v === 'object' ? v : {}
       return {
+        ...venue,
         name: String(venue.name || '').trim(),
         city: String(venue.city || '').trim(),
         country: String(venue.country || '').trim(),
@@ -108,312 +111,128 @@ const normalizeSettings = (value) => {
   }
 }
 
-// ============================================================
-// OFFLINE CACHE
-// * Concerts and settings are mirrored to localStorage per user so a returning
-// * visitor renders their real data on the first frame instead of staring at a
-// * splash until Supabase answers. The DB fetch still runs on every load and
-// * overwrites the cache — this is stale-while-revalidate, not a source of truth.
-// ============================================================
+const accountKey = 'settracker-offline-account'
 
-const cacheKey = (name, userId) => `cache_v1:${name}:${userId}`
-
-function readCache(name, userId) {
-  if (!userId) return null
-  try {
-    const raw = localStorage.getItem(cacheKey(name, userId))
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+function rememberedAccount() {
+  try { return JSON.parse(localStorage.getItem(accountKey)) } catch { return null }
 }
 
-function writeCache(name, userId, value) {
-  if (!userId) return
+function remember(user) {
   try {
-    localStorage.setItem(cacheKey(name, userId), JSON.stringify(value))
-  } catch {
-    // * Quota exceeded (a big library with setlists can outgrow the 5MB budget).
-    // * Drop the stale entry so we don't keep serving something we can't refresh.
-    try { localStorage.removeItem(cacheKey(name, userId)) } catch { /* nothing left to do */ }
-  }
+    if (user) localStorage.setItem(accountKey, JSON.stringify({ id: user.id, email: user.email }))
+    else localStorage.removeItem(accountKey)
+  } catch { /* storage may be disabled */ }
 }
 
-// * Called on sign-out so the next account doesn't inherit anything.
-function clearCaches() {
-  try {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith('cache_v1:'))
-      .forEach(k => localStorage.removeItem(k))
-    localStorage.removeItem('splash_counts')
-  } catch { /* best effort */ }
-}
-
-// ============================================================
-// HOOKS
-// ============================================================
-
-// * Magic-link (OTP) auth only — no passwords, no OAuth provider for app login.
-// * Returns { user, loading, signIn, signOut, dbSleeping }.
-// * `dbSleeping` is a third state beyond signed-in/signed-out: the project itself is
-// * unreachable, which App renders as its own screen rather than as an auth failure.
-// ! signOut clears the localStorage caches before Supabase's own sign-out, so a
-// ! second account signing in on the same device can't be served the first one's data.
 export function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dbSleeping, setDbSleeping] = useState(false)
+  const [offlineAccount, setOfflineAccount] = useState(false)
+  const [online, setOnline] = useState(() => navigator.onLine !== false)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false)
       return
     }
-
-    // ! 9-second timeout triggers the "database is napping" screen.
-    // ! Supabase free projects pause after ~7 days of inactivity.
-    const timeout = setTimeout(() => {
-      setDbSleeping(true)
+    let active = true, checking = false, needsRetry = false, timeout
+    const apply = (account, fallback = false) => {
+      if (!active) return
+      needsRetry = fallback
+      if (!fallback) remember(account)
+      setUser(account)
+      setOfflineAccount(fallback && !!account)
+      setDbSleeping(fallback && !account)
       setLoading(false)
-    }, 9000)
-
-    supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
+    }
+    const check = async () => {
+      if (navigator.onLine === false) {
+        const account = rememberedAccount()
+        apply(account, !!account)
+        return
+      }
+      if (checking) return
+      checking = true
+      timeout = setTimeout(() => apply(rememberedAccount(), true), 9000)
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error && error.name !== 'AuthRetryableFetchError' && error.status >= 400 && error.status < 500) apply(null)
+        else if (error) apply(rememberedAccount(), true)
+        else apply(data.session?.user ?? null)
+      } catch {
+        apply(rememberedAccount(), true)
+      } finally {
         clearTimeout(timeout)
-        if (error) { setDbSleeping(true) }
-        else { setUser(session?.user ?? null) }
-        setLoading(false)
-      })
-      .catch(() => {
-        clearTimeout(timeout)
-        setDbSleeping(true)
-        setLoading(false)
-      })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+        checking = false
+      }
+    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) apply(session.user)
+      else if (event === 'SIGNED_OUT' && navigator.onLine !== false) apply(null)
     })
-    return () => { clearTimeout(timeout); subscription.unsubscribe() }
+    const connected = () => { setOnline(true); check() }
+    const disconnected = () => {
+      setOnline(false)
+      if (checking) apply(rememberedAccount(), true)
+    }
+    window.addEventListener('online', connected)
+    window.addEventListener('offline', disconnected)
+    const retry = setInterval(() => { if (needsRetry && navigator.onLine !== false) check() }, 15000)
+    check()
+    return () => {
+      active = false
+      clearTimeout(timeout)
+      clearInterval(retry)
+      subscription.unsubscribe()
+      window.removeEventListener('online', connected)
+      window.removeEventListener('offline', disconnected)
+    }
   }, [])
 
   const signIn = async (email, { shouldCreateUser = false } = {}) => {
     if (!isSupabaseConfigured) return { error: new Error('Supabase is not configured') }
-    const { error } = await supabase.auth.signInWithOtp({
+    return supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: window.location.origin, shouldCreateUser }
     })
-    return { error }
   }
 
-  const signOut = () => {
-    clearCaches()
-    return isSupabaseConfigured ? supabase.auth.signOut() : Promise.resolve()
+  const signOut = async () => {
+    if (!isSupabaseConfigured) return { error: null }
+    const result = await supabase.auth.signOut()
+    if (!result.error) {
+      remember(null)
+      try {
+        localStorage.removeItem('splash_counts')
+        localStorage.removeItem(`cache_v1:concerts:${user?.id}`)
+        localStorage.removeItem(`cache_v1:settings:${user?.id}`)
+      } catch { /* best effort */ }
+      if (user?.id) await clearSyncedLibrary(user.id).catch(() => {})
+    }
+    return result
   }
 
-  return { user, loading, signIn, signOut, dbSleeping }
+  return { user, loading, signIn, signOut, dbSleeping, online, canConnect: online && !offlineAccount }
 }
 
-// * The whole concert library for one user, held in memory. Returns
-// * { concerts, loaded, saveConcert, deleteConcert, reload }.
-// * Pass `null` as userId to disable the hook entirely — that's how App runs it in
-// * guest mode, where useGuestMode supplies the same shape from localStorage instead.
-// * saveConcert doubles as create and update (it upserts on concert.id), and both
-// * mutations are optimistic with rollback on DB error.
-// ! `loaded` means "we have something to show", not "the DB has answered" — it flips
-// ! true as soon as the localStorage cache is applied. Don't use it to decide whether
-// ! a user genuinely has zero shows.
-export function useConcerts(userId) {
-  const [concerts, setConcerts] = useState([])
-  const [loaded, setLoaded] = useState(false)
-  const [loadError, setLoadError] = useState(null)
-
-  useEffect(() => {
-    if (!isSupabaseConfigured || !userId) return
-    // * Paint whatever we cached last time straight away, then revalidate against
-    // * the DB in the background. Without this, every cold start blocks on a
-    // * network round-trip before a single row can be rendered.
-    const cached = readCache('concerts', userId)
-    if (Array.isArray(cached)) {
-      setConcerts(cached.map(c => normalizeConcert(c)))
-      setLoaded(true)
-    }
-    loadConcerts()
-  }, [userId])
-
-  // * Mirror every state change (load, optimistic save, delete, rollback) into the
-  // * cache, so one write site covers all of them.
-  useEffect(() => {
-    if (!userId || !loaded) return
-    writeCache('concerts', userId, concerts)
-  }, [userId, loaded, concerts])
-
-  const loadConcerts = async () => {
-    if (!isSupabaseConfigured || !userId) return
-    try {
-      const { data, error } = await supabase
-        .from('concerts')
-        .select('id, data')
-        .eq('user_id', userId)
-        .order('id')
-
-      if (error) throw error
-      setLoadError(null)
-
-      if (!data || data.length === 0) {
-        // * First login — seed from built-in data if any exists in src/lib/data.js
-        if (SEED_DATA.length > 0) await seedConcerts(userId)
-        else setConcerts([])
-        setLoaded(true)
-        return
-      }
-
-      if (SEED_DATA.length === 0) {
-        // * No hardcoded seed — concerts are fully self-contained in the DB
-        setConcerts(data.map(r => normalizeConcert(r.data, r.id)).sort((a, b) => b.date.localeCompare(a.date)))
-      } else {
-        // * Merge: SEED_DATA is source of truth for base fields; DB wins for user edits
-        const userFields = ['rating', 'merch', 'notes', 'friends', 'solo']
-        const dbMap = Object.fromEntries(data.map(r => [r.id, r.data]))
-        const merged = SEED_DATA.map(seed => {
-          const saved = dbMap[seed.id]
-          if (!saved) return seed
-          const out = { ...seed }
-          userFields.forEach(f => { if (saved[f] !== undefined) out[f] = saved[f] })
-          return normalizeConcert(out, seed.id)
-        })
-        setConcerts(merged)
-      }
-      setLoaded(true)
-    } catch (error) {
-      setLoadError(error)
-      setLoaded(true)
-    }
-  }
-
-  const seedConcerts = async (uid) => {
-    if (!isSupabaseConfigured) return
-    const rows = SEED_DATA.map(c => ({ id: c.id, user_id: uid, data: c }))
-    // * Insert in batches of 20 to stay within Supabase request size limits
-    for (let i = 0; i < rows.length; i += 20) {
-      await supabase.from('concerts').upsert(rows.slice(i, i + 20))
-    }
-    setConcerts(SEED_DATA)
-  }
-
-  const saveConcert = useCallback(async (concert) => {
-    if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
-    let previousConcerts = []
-    // * Optimistic update: apply locally first, roll back on DB error
-    setConcerts(prev => {
-      previousConcerts = prev
-      const exists = prev.some(c => c.id === concert.id)
-      return exists ? prev.map(c => c.id === concert.id ? concert : c) : [...prev, concert]
-    })
-    const { error } = await supabase
-      .from('concerts')
-      .upsert({ id: concert.id, user_id: userId, data: concert, updated_at: new Date().toISOString() })
-    if (error) {
-      console.error('Error saving concert:', error)
-      setConcerts(previousConcerts)
-      return { error }
-    }
-    return { error: null }
-  }, [userId])
-
-  const deleteConcert = useCallback(async (concertId) => {
-    if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
-    let previousConcerts = []
-    // * Optimistic update: remove locally first, roll back on DB error
-    setConcerts(prev => {
-      previousConcerts = prev
-      return prev.filter(c => c.id !== concertId)
-    })
-    const { error } = await supabase.from('concerts').delete().eq('id', concertId).eq('user_id', userId)
-    if (error) {
-      console.error('Error deleting concert:', error)
-      setConcerts(previousConcerts)
-      return { error }
-    }
-    return { error: null }
-  }, [userId])
-
-  return { concerts, loaded, loadError, saveConcert, deleteConcert, reload: loadConcerts }
+export function useConcerts(userId, canConnect) {
+  const library = useOfflineLibrary(userId, canConnect, 'concerts', normalizeConcert)
+  const { enqueue } = library
+  const saveConcert = useCallback(concert => enqueue(() => {
+    const previous = library.value?.find(item => item.id === concert.id)
+    const changes = previous ? changedFields(previous, concert) : changedFields({}, concert)
+    return changes.length ? { entity: concert.id, changes, initial: previous || {} } : null
+  }), [enqueue, library.value])
+  const deleteConcert = useCallback(id => enqueue(() => ({ entity: id, remove: true })), [enqueue])
+  return { ...library, concerts: library.value || [], saveConcert, deleteConcert }
 }
 
-// * All user preferences as one object. Returns
-// * { settings, settingsLoaded, saveSetting, saveSettings }.
-// * This object is far more than preferences: it also carries derived-entity metadata
-// * that has nowhere else to live — venueInfo (coordinates, parking, transit),
-// * friendProfiles, per-artist page config, savedVenues, friendGroups and the Spotify
-// * tokens. Anything keyed by an artist/venue/friend *name* is in here.
-// ! saveSettings replaces the entire object. Always spread the current settings into
-// ! the argument; passing a partial silently deletes every key you left out.
-// ! saveSetting(key, value) does that spread for you and is the safer default.
-export function useSettings(userId) {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
-  const [loadError, setLoadError] = useState(null)
-  // * Distinguishes "these are still the defaults" from "these are really yours".
-  // * Deliberately NOT used to block rendering — only to defer decisions that
-  // * would be wrong under defaults, like whether to show the onboarding tour.
-  const [loaded, setLoaded] = useState(false)
-  // * settingsRef keeps a sync copy for use inside callbacks without stale-closure issues
-  const settingsRef = useRef(DEFAULT_SETTINGS)
-
-  useEffect(() => {
-    if (!userId) return
-    // * Apply cached settings first — these drive the accent colour and light mode,
-    // * so waiting for the DB means booting in the wrong theme and then flashing.
-    const cached = readCache('settings', userId)
-    if (cached) {
-      const merged = normalizeSettings(cached)
-      settingsRef.current = merged
-      setSettings(merged)
-      setLoaded(true)
-    }
-    loadSettings()
-  }, [userId])
-
-  const loadSettings = async () => {
-    if (!isSupabaseConfigured || !userId) return
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('data')
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (error) throw error
-      const merged = normalizeSettings(data?.data)
-      settingsRef.current = merged
-      setSettings(merged)
-      writeCache('settings', userId, merged)
-      setLoadError(null)
-      setLoaded(true)
-    } catch (error) {
-      setLoadError(error)
-      setLoaded(true)
-    }
-  }
-
-  const saveSettings = useCallback(async (next) => {
-    if (!isSupabaseConfigured || !userId) return { error: new Error('Supabase is not configured') }
-    const previous = settingsRef.current
-    settingsRef.current = next
-    setSettings(next)
-    writeCache('settings', userId, next)
-    const { error } = await supabase.from('settings').upsert({ user_id: userId, data: next, updated_at: new Date().toISOString() })
-    if (error) {
-      console.error('Error saving settings:', error)
-      settingsRef.current = previous
-      setSettings(previous)
-      writeCache('settings', userId, previous)
-      return { error }
-    }
-    return { error: null }
-  }, [userId])
-
-  const saveSetting = useCallback(async (key, value) => {
-    return saveSettings({ ...settingsRef.current, [key]: value })
-  }, [saveSettings])
-
-  return { settings, settingsLoaded: loaded, loadError, reload: loadSettings, saveSetting, saveSettings }
+export function useSettings(userId, canConnect) {
+  const library = useOfflineLibrary(userId, canConnect, 'settings', normalizeSettings)
+  const { enqueue } = library
+  const settings = library.value || DEFAULT_SETTINGS
+  const saveSettings = useCallback(next => enqueue(() => settingsOperation(settings, next)), [enqueue, settings])
+  const saveSetting = useCallback((key, value) => enqueue(() => settingsOperation(settings, { ...settings, [key]: value })), [enqueue, settings])
+  return { ...library, settings, settingsLoaded: library.loaded, saveSetting, saveSettings }
 }

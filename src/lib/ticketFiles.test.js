@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ticketExpiry, ticketFileLimit, validateTicketFile } from './ticketFiles.js'
+import { shouldPruneTickets, ticketExpiry, ticketFileLimit, validateTicketFile } from './ticketFiles.js'
 
 test('ticket attachments accept PDFs and images including mobile files with no MIME type', () => {
   assert.equal(validateTicketFile({ name: 'ticket.pdf', type: 'application/pdf', size: 500 }), '')
@@ -13,4 +13,10 @@ test('ticket attachments accept PDFs and images including mobile files with no M
 test('ticket expiry uses the last day of a multi-day show', () => {
   assert.equal(ticketExpiry({ date: '2026-11-09', endDate: '2026-11-11' }), '2026-11-11')
   assert.equal(ticketExpiry({ date: '2026-11-09' }), '2026-11-09')
+})
+
+test('retained tickets survive the show date, while ordinary tickets expire after it', () => {
+  assert.equal(shouldPruneTickets({ keep: true }, '2026-11-10', '2026-11-11'), false)
+  assert.equal(shouldPruneTickets({}, '2026-11-10', '2026-11-10'), false)
+  assert.equal(shouldPruneTickets({}, '2026-11-10', '2026-11-11'), true)
 })

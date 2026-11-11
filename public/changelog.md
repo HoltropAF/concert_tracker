@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.31 — 11 November 2026
+- Open your concert log with one email form. Installation and the demo are optional.
+- Browse five Settings pages for show preferences, appearance, connections, offline data, and account help.
+- Edit your library offline and sync when you reconnect. Keep tickets and photos on your device.
+- Open saved tickets from Today and see pending concert updates under To review.
+
 ## 1.1.30 — 10 November 2026
 - Upcoming search combines Ticketmaster and MOJO, fills missing details from matching listings, and groups ticket options.
 - Review timetable suggestions from General for shows in the next three days. Add support acts in Edit and see their saved times in order.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>settracker — Setup</title>
+  <title>settracker — Host your own copy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <style>
@@ -305,6 +305,9 @@
       <h1 data-t="s1_h1"></h1>
     </div>
     <p data-t="s1_p"></p>
+    <div class="actions">
+      <a class="btn btn-primary btn-full" href="/" data-t="s1_existing_btn"></a>
+    </div>
     <div class="stat-row">
       <div class="stat-card">
         <div class="stat-num">~10</div>
@@ -325,8 +328,7 @@
     </div>
     <p class="muted" data-t-html="s1_note"></p>
     <div class="actions">
-      <button type="button" class="btn btn-primary btn-full" onclick="goTo(2)" data-t="s1_btn"></button>
-      <a class="btn btn-secondary btn-full" href="/" data-t="s1_existing_btn" title="I already have an account"></a>
+      <button type="button" class="btn btn-secondary btn-full" onclick="goTo(2)" data-t="s1_btn"></button>
     </div>
   </section>
 
@@ -540,15 +542,15 @@
 const T = {
   en: {
     stepOf:          (n, t) => `Step ${n} of ${t}`,
-    s1_h1:           'Set up settracker',
-    s1_p:            'This wizard sets up your own copy of settracker — your own database, your own deployment, installed on your phone. All free, no technical background needed.',
+    s1_h1:           'Host your own copy',
+    s1_p:            'You can use settracker here with just your email. This wizard is for setting up a separate copy with your own database and hosting.',
     s1_stat_minutes: 'minutes',
     s1_stat_accounts:'free accounts',
     s1_stat_cost:    'cost',
     s1_callout:      'You\'ll need accounts on <strong>GitHub</strong>, <strong>Supabase</strong>, and <strong>Vercel</strong>. This wizard links you to each signup as we go — nothing to prepare in advance.',
     s1_note:         'This is a personal hobby project, not an official product. If something doesn\'t work, the easiest way to reach me is to <a href="https://github.com/HoltropAF/concert_tracker/issues/new" target="_blank" rel="noopener">open an issue on GitHub ↗</a> — you\'ll need a GitHub account, which you\'re creating in step 2 anyway. If you\'d rather not, ask the person who shared this with you for my contact info.',
-    s1_btn:          'Let\'s go →',
-    s1_existing_btn: 'I already have an account — sign in →',
+    s1_btn:          'Continue to self-hosting →',
+    s1_existing_btn: 'Use settracker with email →',
     s2_h1:           'Fork the project on GitHub',
     s2_why:          'GitHub hosts the code. You need your own copy (a "fork") so Vercel can deploy it under your account — and so any changes you make stay yours.',
     s2_p1:           '<strong>1.</strong> No GitHub account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Sign up here ↗</a> — then come back.',
@@ -642,15 +644,15 @@ const T = {
   },
   nl: {
     stepOf:          (n, t) => `Stap ${n} van ${t}`,
-    s1_h1:           'Settracker instellen',
-    s1_p:            'Deze wizard helpt je bij het opzetten van je eigen kopie van settracker — je eigen database, je eigen deployment, geïnstalleerd op je telefoon. Helemaal gratis, geen technische kennis nodig.',
+    s1_h1:           'Host je eigen kopie',
+    s1_p:            'Je kunt settracker hier gebruiken met alleen je e-mailadres. Met deze wizard zet je een aparte kopie op met je eigen database en hosting.',
     s1_stat_minutes: 'minuten',
     s1_stat_accounts:'gratis accounts',
     s1_stat_cost:    'kosten',
     s1_callout:      'Je hebt accounts nodig op <strong>GitHub</strong>, <strong>Supabase</strong> en <strong>Vercel</strong>. De wizard linkt je naar elke aanmeldpagina — je hoeft niets van tevoren voor te bereiden.',
     s1_note:         'Dit is een persoonlijk hobbyproject, geen officieel product. Als er iets niet werkt, kun je dat het makkelijkst melden via <a href="https://github.com/HoltropAF/concert_tracker/issues/new" target="_blank" rel="noopener">een issue op GitHub ↗</a> — daarvoor heb je een GitHub-account nodig, die je toch al aanmaakt in stap 2. Wil je dat liever niet, vraag dan de persoon die dit met je gedeeld heeft om mijn contactgegevens.',
-    s1_btn:          'Aan de slag →',
-    s1_existing_btn: 'Ik heb al een account — inloggen →',
+    s1_btn:          'Verder met zelf hosten →',
+    s1_existing_btn: 'Gebruik settracker met e-mail →',
     s2_h1:           'Kopieer het project op GitHub',
     s2_why:          'GitHub bewaart de code. Je hebt een eigen kopie nodig (een "fork") zodat Vercel het onder jouw account kan deployen — en zodat wijzigingen die jij maakt van jou blijven.',
     s2_p1:           '<strong>1.</strong> Nog geen GitHub-account? <a href="https://github.com/signup" target="_blank" rel="noopener">Registreer hier ↗</a> — kom dan terug.',

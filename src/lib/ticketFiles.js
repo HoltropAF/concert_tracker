@@ -12,6 +12,10 @@ export function ticketExpiry(concert) {
   return concert?.endDate || concert?.date || ''
 }
 
+export function shouldPruneTickets(record, expiresOn, today) {
+  return !record.keep && !!expiresOn && expiresOn < today
+}
+
 async function withTickets(mode, run) {
   const db = await new Promise((resolve, reject) => {
     const request = indexedDB.open('settracker-ticket-files', 1)
@@ -36,21 +40,48 @@ async function withTickets(mode, run) {
 }
 
 export function listTicketFiles(account, showId) {
+  return readTicketRecord(account, showId).then(record => record?.files || [])
+}
+
+export function readTicketRecord(account, showId) {
   return withTickets('readonly', (store, finish) => {
     const request = store.get([account, showId])
-    request.onsuccess = () => finish(request.result?.files || [])
+    request.onsuccess = () => finish(request.result)
   })
 }
 
-export function updateTicketFiles(account, concert, update) {
+export function listOfflineTickets(account) {
+  return withTickets('readonly', (store, finish) => {
+    const request = store.index('account').getAll(account)
+    request.onsuccess = () => finish(request.result)
+  })
+}
+
+export function clearOfflineTickets(account) {
+  return withTickets('readwrite', store => {
+    const request = store.index('account').openKeyCursor(account)
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) return
+      store.delete(cursor.primaryKey)
+      cursor.continue()
+    }
+  })
+}
+
+export function updateTicketFiles(account, concert, update, keep) {
   return withTickets('readwrite', (store, finish) => {
     const key = [account, concert.id]
     const request = store.get(key)
     request.onsuccess = () => {
       const files = update(request.result?.files || [])
-      if (files.length) store.put({ account, showId: concert.id, expiresOn: ticketExpiry(concert), files })
+      const retain = keep ?? request.result?.keep ?? false
+      if (files.length) store.put({
+        account, showId: concert.id, expiresOn: ticketExpiry(concert), showName: concert.artist,
+        keep: retain, files,
+      })
       else store.delete(key)
-      finish(files)
+      finish({ files, keep: retain && !!files.length })
     }
   })
 }
@@ -64,7 +95,7 @@ export function pruneExpiredTickets(account, today, concerts) {
       if (!cursor) return
       const record = cursor.value
       const expiresOn = dates.get(record.showId) || record.expiresOn
-      if (expiresOn && expiresOn < today) cursor.delete()
+      if (shouldPruneTickets(record, expiresOn, today)) cursor.delete()
       else if (expiresOn !== record.expiresOn) cursor.update({ ...record, expiresOn })
       cursor.continue()
     }

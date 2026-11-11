@@ -361,7 +361,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.37'
+const APP_VERSION = '1.1.38'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -9329,13 +9329,13 @@ function SettingsSectionIcon({ id }) {
   return <span style={{ width: 14, height: 14, display: "inline-flex", flexShrink: 0 }}>{svg}</span>;
 }
 
-function SettingsSection({ title, icon, children, collapsible = false, defaultOpen = true, subtitle = null }) {
+function SettingsSection({ title, icon, children, collapsible = false, defaultOpen = true, subtitle = null, compact = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const isOpen = !collapsible || open;
   return (
     // * A collapsible section is the same object as a Collapsible, so it wears the
     // * same header — Settings had two accordion styles side by side otherwise.
-    <div style={{ marginBottom: collapsible ? 8 : 22 }}>
+    <div style={{ marginBottom: compact ? 12 : collapsible ? 8 : 22 }}>
       {collapsible ? (
         <button onClick={() => setOpen(o => !o)} style={{
           width: '100%', background: '#111119', border: 'none', borderRadius: 12, cursor: 'pointer',
@@ -9355,7 +9355,7 @@ function SettingsSection({ title, icon, children, collapsible = false, defaultOp
         // * A fixed section reads as a heading, not a control: brighter, no chevron,
         // * no hover affordance. Previously both kinds looked identical and the only
         // * clue was a small chevron you had to notice.
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontWeight: 800, letterSpacing: "0.02em", margin: "0 0 8px 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#c4c2f0", fontFamily: "'Syne', sans-serif", fontWeight: 800, letterSpacing: "0.02em", margin: compact ? "0 0 5px 4px" : "0 0 8px 4px" }}>
           {icon && <SettingsSectionIcon id={icon} />}
           {title}
         </div>
@@ -10431,7 +10431,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   };
 
   return (
-    <div style={{ padding: "16px 10px 100px", width: "min(100%, 430px)", margin: "0 auto" }}>
+    <div style={{ padding: activeSettingsPage || hasChanges || saved ? "16px 10px 100px" : "12px 10px 20px", width: "min(100%, 430px)", margin: "0 auto" }}>
       {/* * Nothing on this page reaches the database until this is pressed, so it has
           * to be impossible to miss and easy to reach. It sits above the bottom nav
           * rather than in the top-right corner, which is the worst spot for a thumb,
@@ -10509,7 +10509,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
         {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
       </div>
-        <SettingsSection title="Preferences" icon="sliders">
+        <SettingsSection title="Preferences" icon="sliders" compact>
           <nav aria-label="Preferences">
             {settingsPages.map(({ id, label, description, icon }, index) => (
               <button key={id} type="button" title={description} data-settings-page={id} onClick={() => {
@@ -10517,12 +10517,12 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
                 setOpenSection(null);
                 setActiveSettingsPage(id);
               }} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minHeight: 44,
-                padding: '11px 2px', background: 'none', border: 0, borderBottom: index < settingsPages.length - 1 ? '1px solid #1a1a24' : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', minHeight: 40, boxSizing: 'border-box',
+                padding: '5px 2px', background: 'none', border: 0, borderBottom: index < settingsPages.length - 1 ? '1px solid #1a1a24' : 'none',
                 color: '#b6b3d7', fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textAlign: 'left', cursor: 'pointer',
               }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                  <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.1)', flexShrink: 0 }}>
+                  <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.1)', flexShrink: 0 }}>
                     <SettingsSectionIcon id={icon} />
                   </span>
                   <span>{label}</span>
@@ -10537,15 +10537,15 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         <div>
 
 
-            <SettingsSection title="Help" icon="help">
+            <SettingsSection title="Help" icon="help" compact>
               {[
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
                 { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
               ].map(({ svg, label, url }, i, arr) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 40, boxSizing: "border-box", color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "5px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
+                    <span style={{ width: 22, height: 22, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
                       <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
                     </span>
                     <span>{label}</span>

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.38 — 11 November 2026
+- Reduce Preferences and Help row heights, icon sizes and section spacing, and trim extra space below the Settings overview.
+
 ## 1.1.37 — 11 November 2026
 - Show Preferences as five rows using the same icon, label and separator layout as Help.
 

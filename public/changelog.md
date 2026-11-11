@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.33 — 11 November 2026
+- Make the General Settings cards compact and place Check updates and What’s new above them.
+
 ## 1.1.32 — 11 November 2026
 - Restore the General Settings overview with help, social links and app updates, alongside the grouped Settings pages.
 

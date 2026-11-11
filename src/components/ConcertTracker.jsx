@@ -360,7 +360,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.32'
+const APP_VERSION = '1.1.33'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -10483,54 +10483,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         </div>
       ) : (
         <>
-        <h2 style={{ margin: '0 4px 14px', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 22 }}>General</h2>
-        <nav aria-label="Settings categories" style={{ display: 'grid', gap: 8 }}>
-          {settingsPages.map(({ id, label, description, icon }) => (
-            <button key={id} type="button" data-settings-page={id} onClick={() => {
-              previousSettingsPage.current = id;
-              setActiveSettingsPage(id);
-            }} style={{
-              display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 62, padding: '10px 12px',
-              background: '#13131f', border: '1px solid #25243a', borderRadius: 12, textAlign: 'left', cursor: 'pointer',
-            }}>
-              <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 34, height: 34, flexShrink: 0, background: 'rgba(167,139,250,0.1)', borderRadius: 9 }}>
-                <SettingsSectionIcon id={icon} />
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#e2e0ff' }}>{label}</span>
-                <span style={{ display: 'block', marginTop: 3, fontSize: 12, lineHeight: 1.4, color: '#9491b8' }}>{description}</span>
-              </span>
-              <span aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 18 }}>›</span>
-            </button>
-          ))}
-        </nav>
-        <div style={{ marginTop: 18 }}>
-        <SettingsSection title="About & updates" icon="help" collapsible defaultOpen={false}
-          subtitle={{ label: swUpdate.pending ? 'Update ready' : 'v' + APP_VERSION, color: '#9491b8' }}>
-      {/* * Same reasoning as the update row: dismissing the install banner should be
-          * "not now". The browser only ever offers the prompt once per visit, so if
-          * it's available it's offered here until it's used. */}
-      {appInstall.available && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-          background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 10, padding: "11px 13px",
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>Install settracker</div>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Add to your home screen — opens without the browser bar</div>
-          </div>
-          <button
-            onClick={() => appInstall.prompt?.()}
-            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
-          >Install</button>
-        </div>
-      )}
-
-      {/* * The changelog is something you read once and then never again, so it gets
-          * one quiet line here and opens as a sheet. It used to sit expanded above
-          * every settings tab, which put release notes in front of you every time
-          * you came in to change a colour. */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, padding: "0 2px" }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4, padding: "0 2px" }}>
         <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
           {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
         </span>
@@ -10550,11 +10503,34 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
         )}
       </div>
 
-      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: '-8px 2px 14px', lineHeight: 1.5 }}>
+      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: swUpdate.pending || swUpdate.checking || swUpdate.result || swUpdate.checkedAt ? '0 2px 12px' : 0, lineHeight: 1.5 }}>
         {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
         {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
       </div>
-        </SettingsSection>
+        <h2 style={{ margin: '0 4px 14px', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 22 }}>General</h2>
+        <nav aria-label="Settings categories" style={{ display: 'grid', gap: 4 }}>
+          {settingsPages.map(({ id, label, description, icon }) => (
+            <button key={id} type="button" title={description} data-settings-page={id} onClick={() => {
+              previousSettingsPage.current = id;
+              setActiveSettingsPage(id);
+            }} style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 48, padding: '6px 10px',
+              background: '#13131f', border: '1px solid #25243a', borderRadius: 12, textAlign: 'left', cursor: 'pointer',
+            }}>
+              <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 26, height: 26, flexShrink: 0, background: 'rgba(167,139,250,0.1)', borderRadius: 7 }}>
+                <SettingsSectionIcon id={icon} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#e2e0ff' }}>{label}</span>
+              </span>
+              <span aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 18 }}>›</span>
+            </button>
+          ))}
+        </nav>
+        {appInstall.available && <button type="button" onClick={() => appInstall.prompt?.()} style={{ minHeight: 44, padding: '6px 2px', marginTop: 6, background: 'none', border: 0, color: 'var(--accent)', fontSize: 12, cursor: 'pointer' }}>Install settracker on your device</button>}
+
+        <div style={{ marginTop: 18 }}>
+
 
             <SettingsSection title="Help" icon="help">
               {[

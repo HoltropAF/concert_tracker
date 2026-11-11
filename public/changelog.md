@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.36 — 11 November 2026
+- Add subtle Settings group headers and compact section tabs, with a clear active-section underline.
+
 ## 1.1.35 — 11 November 2026
 - Make Settings categories plain, compact clickable rows and remove the extra General heading.
 

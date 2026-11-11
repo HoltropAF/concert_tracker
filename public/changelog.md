@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.32 — 11 November 2026
+- Restore the General Settings overview with help, social links and app updates, alongside the grouped Settings pages.
+
 ## 1.1.31 — 11 November 2026
 - Open your concert log with one email form. Installation and the demo are optional.
 - Browse five Settings pages for show preferences, appearance, connections, offline data, and account help.

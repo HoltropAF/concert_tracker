@@ -360,7 +360,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.31'
+const APP_VERSION = '1.1.32'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -9769,7 +9769,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
     { id: 'appearance', label: 'Appearance & layout', description: 'Theme, opening view, cards and stats', icon: 'layout' },
     { id: 'connections', label: 'Connections', description: 'Spotify and concert search sources', icon: 'plug' },
     { id: 'offline', label: 'Offline & data', description: 'Sync, saved tickets, photos and backups', icon: 'data' },
-    { id: 'account', label: 'Account & help', description: 'Profile, support and app updates', icon: 'person' },
+    { id: 'account', label: 'Account', description: 'Profile and sign-in details', icon: 'person' },
   ];
   const enabledConcertSources = ['venues', 'ticketmaster', 'mojo'].filter(source => local.concertSearchSources?.[source] !== false).length;
   const closeSettingsPage = () => {
@@ -10482,6 +10482,8 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </h2>
         </div>
       ) : (
+        <>
+        <h2 style={{ margin: '0 4px 14px', color: '#e2e0ff', fontFamily: "'Syne', sans-serif", fontSize: 22 }}>General</h2>
         <nav aria-label="Settings categories" style={{ display: 'grid', gap: 8 }}>
           {settingsPages.map(({ id, label, description, icon }) => (
             <button key={id} type="button" data-settings-page={id} onClick={() => {
@@ -10502,7 +10504,131 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
             </button>
           ))}
         </nav>
+        <div style={{ marginTop: 18 }}>
+        <SettingsSection title="About & updates" icon="help" collapsible defaultOpen={false}
+          subtitle={{ label: swUpdate.pending ? 'Update ready' : 'v' + APP_VERSION, color: '#9491b8' }}>
+      {/* * Same reasoning as the update row: dismissing the install banner should be
+          * "not now". The browser only ever offers the prompt once per visit, so if
+          * it's available it's offered here until it's used. */}
+      {appInstall.available && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+          background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 10, padding: "11px 13px",
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>Install settracker</div>
+            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Add to your home screen — opens without the browser bar</div>
+          </div>
+          <button
+            onClick={() => appInstall.prompt?.()}
+            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
+          >Install</button>
+        </div>
       )}
+
+      {/* * The changelog is something you read once and then never again, so it gets
+          * one quiet line here and opens as a sheet. It used to sit expanded above
+          * every settings tab, which put release notes in front of you every time
+          * you came in to change a colour. */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, padding: "0 2px" }}>
+        <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
+          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
+        </span>
+        <button type="button" disabled={swUpdate.pending ? !swUpdate.apply : swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.pending ? swUpdate.apply?.() : swUpdate.check?.()} style={{ background: 'none', border: 0, color: '#a78bfa', padding: '8px 2px', minHeight: 44, fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', flexShrink: 0, opacity: swUpdate.checking ? 0.5 : 1 }}>
+          {swUpdate.pending ? 'Update now' : swUpdate.checking ? 'Checking…' : 'Check updates'}
+        </button>
+        {releases !== null && releases.length > 0 && (
+          <button onClick={() => { setWhatsNewOpen(true); }} style={{
+            background: unseenReleases.length > 0 ? "#30284d" : "none",
+            border: `1px solid ${unseenReleases.length > 0 ? "#5e4c8f" : "transparent"}`,
+            borderRadius: 99, color: unseenReleases.length > 0 ? "#a78bfa" : "#6b6a8f",
+            fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace",
+            padding: unseenReleases.length > 0 ? "3px 10px" : "3px 2px",
+          }}>
+            What's new
+          </button>
+        )}
+      </div>
+
+      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: '-8px 2px 14px', lineHeight: 1.5 }}>
+        {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
+        {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+      </div>
+        </SettingsSection>
+
+            <SettingsSection title="Help" icon="help">
+              {[
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
+                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
+              ].map(({ svg, label, url }, i, arr) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
+                      <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
+                    </span>
+                    <span>{label}</span>
+                  </span>
+                  <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
+                </a>
+              ))}
+            </SettingsSection>
+
+            {/* Social links — quiet footer credit instead of its own card */}
+            <div style={{ textAlign: "center", padding: "10px 0 4px", fontSize: 9.5, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
+              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
+              <div style={{ whiteSpace: "nowrap" }}>
+                {socialLinks.map(({ href, label }, i) => (
+                  <span key={label}>
+                    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
+                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> · </span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+        </div>
+        </>
+
+      )}
+
+      {whatsNewOpen && releases !== null && releases.length > 0 && (() => {
+        const shown = releases;
+        const close = closeWhatsNew;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "#000000cc", display: "flex", alignItems: "flex-end" }} onClick={close}>
+            <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 34px", boxSizing: "border-box", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexShrink: 0 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
+                  What's new
+                </div>
+                <button onClick={close} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: 1, minHeight: 0 }}>
+                {shown.map(r => (
+                  <div key={r.version} style={{ marginBottom: 14 }}>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
+                      v{r.version}{r.date ? ` · ${r.date}` : ''}
+                    </div>
+                    {r.entries.map((e, i) => (
+                      <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
+                        <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
+                        <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
+                <a href="https://github.com/HoltropAF/concert_tracker/commits/main/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, border: "1px solid #2e2e50", borderRadius: 10, color: "#9491b8", fontSize: 12, padding: "10px", textAlign: "center", textDecoration: "none", fontFamily: "'DM Mono', monospace" }}>Full history on GitHub ↗</a>
+                <button onClick={close} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 13, fontWeight: 700, padding: "10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {activeSettingsPage === 'logging' && <>
         <Collapsible title="Show defaults" icon="sliders" defaultOpen={false} {...sec('g-app')}
@@ -11382,88 +11508,6 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           })()}
         </SettingsSection>
 
-        <SettingsSection title="About & updates" icon="help" collapsible defaultOpen={false}
-          subtitle={{ label: swUpdate.pending ? 'Update ready' : 'v' + APP_VERSION, color: '#9491b8' }}>
-      {/* * Same reasoning as the update row: dismissing the install banner should be
-          * "not now". The browser only ever offers the prompt once per visit, so if
-          * it's available it's offered here until it's used. */}
-      {appInstall.available && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-          background: "#1a1a30", border: "1px solid #a78bfa", borderRadius: 10, padding: "11px 13px",
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 800, color: "#e2e0ff" }}>Install settracker</div>
-            <div style={{ fontSize: 10, color: "#6b6a8f", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>Add to your home screen — opens without the browser bar</div>
-          </div>
-          <button
-            onClick={() => appInstall.prompt?.()}
-            style={{ background: "#a78bfa", border: "none", borderRadius: 8, color: "#0c0c14", fontSize: 12, fontWeight: 700, padding: "8px 15px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
-          >Install</button>
-        </div>
-      )}
-
-      {/* * The changelog is something you read once and then never again, so it gets
-          * one quiet line here and opens as a sheet. It used to sit expanded above
-          * every settings tab, which put release notes in front of you every time
-          * you came in to change a colour. */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14, padding: "0 2px" }}>
-        <span style={{ fontSize: 10, color: unseenReleases.length > 0 ? "var(--accent)" : "#4a4870", fontFamily: "'DM Mono', monospace", flex: 1 }}>
-          {unseenReleases.length > 0 ? `Updated to v${APP_VERSION}` : `Installed · v${APP_VERSION}`}
-        </span>
-        <button type="button" disabled={swUpdate.pending ? !swUpdate.apply : swUpdate.checking || !swUpdate.check} onClick={() => swUpdate.pending ? swUpdate.apply?.() : swUpdate.check?.()} style={{ background: 'none', border: 0, color: '#a78bfa', padding: '8px 2px', minHeight: 44, fontSize: 11, fontFamily: "'DM Mono', monospace", cursor: 'pointer', flexShrink: 0, opacity: swUpdate.checking ? 0.5 : 1 }}>
-          {swUpdate.pending ? 'Update now' : swUpdate.checking ? 'Checking…' : 'Check updates'}
-        </button>
-        {releases !== null && releases.length > 0 && (
-          <button onClick={() => { setWhatsNewOpen(true); }} style={{
-            background: unseenReleases.length > 0 ? "#30284d" : "none",
-            border: `1px solid ${unseenReleases.length > 0 ? "#5e4c8f" : "transparent"}`,
-            borderRadius: 99, color: unseenReleases.length > 0 ? "#a78bfa" : "#6b6a8f",
-            fontSize: 10, cursor: "pointer", fontFamily: "'DM Mono', monospace",
-            padding: unseenReleases.length > 0 ? "3px 10px" : "3px 2px",
-          }}>
-            What's new
-          </button>
-        )}
-      </div>
-
-      <div role="status" aria-live="polite" style={{ fontSize: 11, color: '#9491b8', margin: '-8px 2px 14px', lineHeight: 1.5 }}>
-        {swUpdate.pending ? 'New version ready · save your edits before updating.' : swUpdate.checking ? 'Checking for updates…' : ({ current: 'You’re up to date.', offline: 'You’re offline. Try again when connected.', failed: 'Check failed. Please try again.', unsupported: 'Update checks aren’t available here yet.' }[swUpdate.result] || '')}
-        {!swUpdate.pending && !swUpdate.checking && swUpdate.checkedAt && <span> · Checked {new Date(swUpdate.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-      </div>
-        </SettingsSection>
-
-            <SettingsSection title="Help" icon="help">
-              {[
-                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>, label: "Report a bug or suggest a feature", url: "https://github.com/HoltropAF/concert_tracker/issues/new" },
-                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>, label: "Releases and changelog", url: "https://github.com/HoltropAF/concert_tracker/releases" },
-                { svg: <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "Documentation", url: "https://github.com/HoltropAF/concert_tracker/wiki" },
-              ].map(({ svg, label, url }, i, arr) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, color: "#b6b3d7", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textDecoration: "none", padding: "11px 2px", borderBottom: i < arr.length - 1 ? "1px solid #1a1a24" : "none" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(167,139,250,0.1)", flexShrink: 0 }}>
-                      <span style={{ width: 15, height: 15, display: "flex" }}>{svg}</span>
-                    </span>
-                    <span>{label}</span>
-                  </span>
-                  <span style={{ color: "#4a4870", fontSize: 13, flexShrink: 0 }}>↗</span>
-                </a>
-              ))}
-            </SettingsSection>
-
-            {/* Social links — quiet footer credit instead of its own card */}
-            <div style={{ textAlign: "center", padding: "10px 0 4px", fontSize: 9.5, color: "#4a4870", fontFamily: "'DM Mono', monospace", lineHeight: 1.5 }}>
-              <div>Built by <span style={{ color: "#6b6a8f" }}>@annuhfloor</span></div>
-              <div style={{ whiteSpace: "nowrap" }}>
-                {socialLinks.map(({ href, label }, i) => (
-                  <span key={label}>
-                    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa", textDecoration: "none" }}>{label}</a>
-                    {i < socialLinks.length - 1 && <span style={{ color: "#3a3858" }}> · </span>}
-                  </span>
-                ))}
-              </div>
-            </div>
-
         {/* Profile edit bottom sheet */}
         {editingInitials && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#000000cc", display: "flex", alignItems: "flex-end" }}>
@@ -11507,43 +11551,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         )}
 
-      {whatsNewOpen && releases !== null && releases.length > 0 && (() => {
-        const shown = releases;
-        const close = closeWhatsNew;
-        return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "#000000cc", display: "flex", alignItems: "flex-end" }} onClick={close}>
-            <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "#13131f", borderRadius: "16px 16px 0 0", padding: "20px 20px 34px", boxSizing: "border-box", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: "#e2e0ff", flex: 1 }}>
-                  What's new
-                </div>
-                <button onClick={close} style={{ background: "none", border: "none", color: "#6b6a8f", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
-              </div>
-              <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", flex: 1, minHeight: 0 }}>
-                {shown.map(r => (
-                  <div key={r.version} style={{ marginBottom: 14 }}>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--accent)", marginBottom: 6 }}>
-                      v{r.version}{r.date ? ` · ${r.date}` : ''}
-                    </div>
-                    {r.entries.map((e, i) => (
-                      <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
-                        <span style={{ color: "var(--accent)", fontSize: 12, lineHeight: "18px", flexShrink: 0 }}>•</span>
-                        <span style={{ fontSize: 12.5, color: "#c4c2f0", lineHeight: 1.5 }}>{e}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
-                <a href="https://github.com/HoltropAF/concert_tracker/commits/main/" target="_blank" rel="noopener noreferrer" style={{ flex: 1, border: "1px solid #2e2e50", borderRadius: 10, color: "#9491b8", fontSize: 12, padding: "10px", textAlign: "center", textDecoration: "none", fontFamily: "'DM Mono', monospace" }}>Full history on GitHub ↗</a>
-                <button onClick={close} style={{ flex: 1, background: "#a78bfa", border: "none", borderRadius: 10, color: "#0c0c14", fontSize: 13, fontWeight: 700, padding: "10px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  Got it
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+
       </>}
 
     </div>

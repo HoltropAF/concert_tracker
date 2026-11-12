@@ -364,7 +364,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.41'
+const APP_VERSION = '1.1.42'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2566,6 +2566,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {getGenres(concert).map(g => <Badge key={g} color="#13131f">{g}</Badge>)}
             {concert.subgenre && <Badge color="#13131f">{concert.subgenre}</Badge>}
           </div>
+          {past && !concert.wishlist && detailTab === 'general' && <ShowMemberLineups concert={concert} settings={settings} />}
           </>
           )}
         </div>
@@ -2573,7 +2574,6 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
-          {detailTab === 'general' && !concert.wishlist && <ShowMemberLineups concert={concert} settings={settings} />}
           {!concert.wishlist && !past && detailTab === 'general' && (
             <>
               <UpcomingEvening concert={concert} online={online} onEdit={editTimetable} />
@@ -2583,6 +2583,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
           )}
           {!concert.wishlist && !past && detailTab === 'timetable' && (
             <>
+              <ShowMemberLineups concert={concert} settings={settings} />
               <ShowSchedule key={concert.id} settings={settings} concert={concert} onSave={onSave} onEdit={editTimetable} />
               <CalendarExport concert={concert} compact />
             </>

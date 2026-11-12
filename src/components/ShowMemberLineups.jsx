@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { artistMemberProfile, memberLineup, memberLineupSummary, normalizeMembers, showMemberPerformers } from '../lib/artistMembers'
+import { artistMemberProfile, memberAttendance, memberLineup, memberLineupSummary, normalizeMembers, showMemberPerformers } from '../lib/artistMembers'
 
 const muted = { color: '#9491b8', fontSize: 12, lineHeight: 1.5 }
 const field = { width: '100%', minWidth: 0, boxSizing: 'border-box', background: '#0c0c14', border: '1px solid #2e2e50', borderRadius: 7, color: '#c4c2f0', padding: 8, fontSize: 16 }
@@ -13,7 +13,7 @@ function MemberLineupEntry({ performer, members, value, editing, onChange }) {
   const mode = value?.mode || 'unrecorded'
   const summary = roster.length && value
     ? mode === 'full' ? 'Full group' : presentIds.length + ' of ' + roster.length + ' members'
-    : 'Not recorded'
+    : roster.length ? 'Full group (assumed)' : 'No members yet'
   const changeMode = event => {
     setError('')
     onChange(memberLineup(event.target.value, members, value))
@@ -46,7 +46,7 @@ function MemberLineupEntry({ performer, members, value, editing, onChange }) {
     {editing ? <>
       <label style={muted}>Who performed?
         <select aria-label={'Lineup for ' + performer.name + (performer.day ? ' day ' + performer.day : '')} value={mode} onChange={changeMode} style={{ ...field, marginTop: 5, marginBottom: 8 }}>
-          <option value="unrecorded">Not recorded</option>
+          <option value="unrecorded">Full group (assumed)</option>
           <option value="full" disabled={!roster.length}>Full group</option>
           <option value="missing" disabled={!roster.length}>Someone missing</option>
           <option value="custom">Custom lineup</option>
@@ -86,6 +86,21 @@ export default function ShowMemberLineups({ concert, settings, editing = false, 
   const entries = showMemberPerformers(concert).map(performer => ({
     performer, profile: artistMemberProfile(settings, performer.name), value: concert.memberLineups?.[performer.key],
   })).filter(({ profile, value }) => value || (profile.actType && profile.actType !== 'solo'))
+  if (!editing) {
+    const exceptions = entries.map(entry => ({ ...entry, attendance: memberAttendance(entry.value, entry.profile.members) }))
+      .filter(entry => entry.attendance.missing.length > 0)
+    if (!exceptions.length) return null
+    return <div aria-label="Members absent from this performance" style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: -8, marginBottom: 8 }}>
+      {exceptions.map(({ performer, attendance, value }) => <details key={performer.key}>
+        <summary style={{ minHeight: 32, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', color: 'var(--accent)', fontSize: 11, listStyle: 'none' }}>
+          {performer.key === 'headliner' ? 'Members' : performer.name + (performer.day ? ' · Day ' + performer.day : '') + ' · Members'} · {attendance.present.length}/{attendance.roster.length} <span aria-hidden="true">⌄</span>
+        </summary>
+        <div style={{ ...muted, padding: '0 0 6px', overflowWrap: 'anywhere' }}>Missing {attendance.missing.map(member => member.name).join(', ')}
+          {value.note?.trim() && <div style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{value.note}</div>}
+        </div>
+      </details>)}
+    </div>
+  }
   if (!entries.length) return null
   return <section aria-label="Members at this performance">
     <h3 style={{ fontSize: 13, color: '#e2e0ff', margin: '0 0 4px' }}>Members</h3>

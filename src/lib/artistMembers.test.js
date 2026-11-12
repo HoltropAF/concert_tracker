@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { artistMemberProfile, memberBirthdays, memberLineup, memberLineupLines, memberLineupSummary, normalizeMembers, showMemberPerformers } from './artistMembers.js'
+import { artistMemberProfile, memberAttendance, memberBirthdays, memberLineup, memberLineupLines, memberLineupSummary, normalizeMembers, showMemberPerformers } from './artistMembers.js'
 
 test('existing birthdays match roster names without copying dates or guessing ambiguous members', () => {
   const roster = [{ id: 'lee', name: 'Leeknow' }, { id: 'felix', name: 'Lee Felix' }, { id: 'in', name: 'I.N.' }]
@@ -15,6 +15,20 @@ test('existing birthdays match roster names without copying dates or guessing am
 })
 
 const members = [{ id: 'alex', name: 'Alex' }, { id: 'sam', name: 'Sam' }, { id: 'robin', name: 'Robin' }]
+
+test('unrecorded attendance assumes the full roster and only exceptions appear in sharing', () => {
+  assert.equal(memberAttendance(undefined, members).present.length, 3)
+  assert.deepEqual(memberAttendance(undefined, members).missing, [])
+  assert.deepEqual(memberAttendance({ mode: 'full', roster: members, presentIds: [] }).missing, [])
+  const full = memberLineup('full', members)
+  assert.deepEqual(memberLineupLines({ artist: 'Group', memberLineups: { headliner: full } }), [])
+  assert.deepEqual(memberLineupLines({ artist: 'Group', memberLineups: { headliner: { ...full, mode: 'missing' } } }), [])
+  const partial = { ...full, mode: 'missing', presentIds: ['alex', 'robin'] }
+  const attendance = memberAttendance(partial, [{ id: 'new', name: 'Replacement' }])
+  assert.equal(attendance.roster.length, 3)
+  assert.deepEqual(attendance.missing.map(m => m.name), ['Sam'])
+  assert.equal(memberAttendance(undefined).present.length, 0)
+})
 
 test('artist member lists tolerate older metadata and normalize names without creating solo memberships', () => {
   assert.deepEqual(normalizeMembers(null), [])

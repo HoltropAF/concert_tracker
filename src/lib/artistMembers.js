@@ -76,10 +76,19 @@ export function memberLineupSummary(lineup) {
     (lineup.mode === 'missing' && missing.length ? ' · Missing ' + missing.map(member => member.name).join(', ') : '')
 }
 
+export function memberAttendance(lineup, members = []) {
+  const roster = normalizeMembers(lineup?.roster ?? members)
+  const assumed = !lineup || lineup.mode === 'unrecorded'
+  const all = assumed || lineup.mode === 'full'
+  const present = roster.filter(member => all || lineup.presentIds?.includes(member.id))
+  const missing = roster.filter(member => !present.some(item => item.id === member.id))
+  return { roster, present, missing, assumed }
+}
+
 export function memberLineupLines(concert) {
   return showMemberPerformers(concert).flatMap(performer => {
     const lineup = concert.memberLineups?.[performer.key]
-    if (!lineup?.roster?.length) return []
+    if (!memberAttendance(lineup).missing.length) return []
     const detail = lineup.mode === 'custom'
       ? ' · Present ' + lineup.roster.filter(member => lineup.presentIds?.includes(member.id)).map(member => member.name).join(', ')
       : ''

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.42 — 12 November 2026
+- Treat unrecorded member attendance as a full group by default, without changing saved lineups.
+- Show only missing-member exceptions as a compact Members X/Y disclosure below past-show tags and in upcoming Timetables.
+- Keep full group rosters on artist pages and omit full-group lines from General sharing.
+
 ## 1.1.41 — 12 November 2026
 - Keep Today’s show in its floating bubble; reopening the app no longer opens the panel automatically.
 - Add birthday bubbles from saved artist and member birthdays, with links to artist pages.

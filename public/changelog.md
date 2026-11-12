@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.40 — 12 November 2026
+- Integrate artist types and compact member rows into the artist Info layout.
+- Show existing birthdays beside matching members without repeating them in Every Year; birthday editing remains available with the other dates.
+
 ## 1.1.39 — 12 November 2026
 - Set artist types and member lists on artist Info pages.
 - Record a full group, missing members or a custom lineup for each headliner, support act and festival performance.

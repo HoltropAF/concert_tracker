@@ -18,7 +18,7 @@ import {NavigationMemory,useRememberedState,useChangedValue} from './NavigationM
 import PerformanceDetails from './PerformanceDetails'
 import ArtistMembers from './ArtistMembers'
 import ShowMemberLineups from './ShowMemberLineups'
-import {memberLineupLines} from '../lib/artistMembers'
+import {memberBirthdays, memberLineupLines} from '../lib/artistMembers'
 import {performanceSongs, mapSetlistSongs, releaseNote, matchesSongLinkFilter} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
@@ -364,7 +364,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.39'
+const APP_VERSION = '1.1.40'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -7095,7 +7095,7 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const setCustomDates = list => onUpdateSetting('artistCustomDates', { ...(settings.artistCustomDates || {}), [selectedArtist]: list });
           return (
             <div style={{ padding: "14px 16px" }}>
-              <ArtistMembers key={selectedArtist} artist={selectedArtist} profile={overrides}
+              <ArtistMembers key={selectedArtist} artist={selectedArtist} profile={overrides} dates={customDates}
                 onSave={details => onUpdateSetting('artistInfoOverrides', {
                   ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, ...details },
                 })} />
@@ -7136,7 +7136,8 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
                 const recurringOther = customDates.filter(d => !isBirthday(d) && isRecurring(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
                 const awards = customDates.filter(d => !isBirthday(d) && !isRecurring(d) && isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
                 const others = customDates.filter(d => !isBirthday(d) && !isRecurring(d) && !isAward(d)).map(d => ({ ...d, i: customDates.indexOf(d) }));
-                const everyYear = [...birthdays, ...recurringOther].sort((a, b) => (a.date || '').slice(5) < (b.date || '').slice(5) ? -1 : 1);
+                const memberDateIndices = overrides.actType && overrides.actType !== 'solo' ? new Set(Object.values(memberBirthdays(overrides.members, customDates)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || '')).map(d => d.index)) : new Set();
+                const everyYear = [...birthdays.filter(d => bannerEditMode || !memberDateIndices.has(d.i)), ...recurringOther].sort((a, b) => (a.date || '').slice(5) < (b.date || '').slice(5) ? -1 : 1);
                 const milestones = [
                   { label: 'Debut', date: debutDate, isDebut: true },
                   ...others,

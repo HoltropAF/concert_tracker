@@ -1,6 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { artistMemberProfile, memberLineup, memberLineupLines, memberLineupSummary, normalizeMembers, showMemberPerformers } from './artistMembers.js'
+import { artistMemberProfile, memberBirthdays, memberLineup, memberLineupLines, memberLineupSummary, normalizeMembers, showMemberPerformers } from './artistMembers.js'
+
+test('existing birthdays match roster names without copying dates or guessing ambiguous members', () => {
+  const roster = [{ id: 'lee', name: 'Leeknow' }, { id: 'felix', name: 'Lee Felix' }, { id: 'in', name: 'I.N.' }]
+  const dates = [{ label: 'Lee Know birthday', date: '1998-10-25' }, { label: 'Felix birthday', date: '2000-09-15' }, { label: 'I.N birthday', date: '2001-02-08' }, { label: 'Debut anniversary', date: '2018-03-25' }]
+  const before = structuredClone(dates)
+  const linked = memberBirthdays(roster, dates)
+  assert.equal(linked.lee.index, 0)
+  assert.equal(linked.felix.index, 1)
+  assert.equal(linked.in.index, 2)
+  assert.deepEqual(dates, before)
+  assert.deepEqual(memberBirthdays([{ id: 'a', name: 'Lee Felix' }, { id: 'b', name: 'Kim Felix' }], dates), {})
+})
 
 const members = [{ id: 'alex', name: 'Alex' }, { id: 'sam', name: 'Sam' }, { id: 'robin', name: 'Robin' }]
 

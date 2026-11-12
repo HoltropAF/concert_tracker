@@ -23,6 +23,21 @@ export function artistMemberProfile(settings, name) {
   return { ...profile, members: normalizeMembers(profile.members) }
 }
 
+// Dates remain in artistCustomDates; the roster only displays the existing entry.
+export function memberBirthdays(members, dates = []) {
+  const compact = value => nameKey(value).replace(/[^\p{L}\p{N}]/gu, '')
+  const roster = normalizeMembers(members)
+  const result = {}
+  for (const [index, date] of dates.entries()) {
+    if (!/birthday/i.test(date.label || '')) continue
+    const name = compact(date.label.replace(/(?:['’]s)?\s*birthday/ig, ''))
+    const exact = roster.filter(member => compact(member.name) === name)
+    const matches = exact.length ? exact : roster.filter(member => name.length >= 3 && compact(member.name).endsWith(name))
+    if (matches.length === 1 && !result[matches[0].id]) result[matches[0].id] = { ...date, index }
+  }
+  return result
+}
+
 export function showMemberPerformers(concert) {
   const performers = concert.type === 'festival'
     ? (concert.acts || []).map(act => ({

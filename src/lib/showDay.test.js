@@ -1,6 +1,16 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {showsToday,anniversaryShows,showCountdown,preparationItems,eveningPlanRows,eveningStops} from './showDay.js'
+import {showsToday,anniversaryShows,birthdaysToday,showCountdown,preparationItems,eveningPlanRows,eveningStops} from './showDay.js'
+
+test('birthday bubbles use saved dates on the local day, deduplicate names and respect the preference', () => {
+ const settings={artistCustomDates:{Group:[{label:'I.N birthday',date:'2001-02-08'},{label:'I.N. birthday',date:'2001-02-08'},{label:'Debut anniversary',date:'2018-02-08'},{label:'Felix birthday',date:'2000-09-15'},{label:'Unknown birthday',date:''},{label:'Future birthday',date:'2030-02-08'}],Solo:[{label:'Birthday',date:'1990-02-08'}]}}
+ const now=new Date(2026,1,8,0,5)
+ assert.deepEqual(birthdaysToday(settings,now).map(b=>[b.artist,b.name]),[['Group','I.N'],['Solo','Solo']])
+ assert.deepEqual(birthdaysToday({...settings,notifyBirthdays:false},now),[])
+ assert.deepEqual(birthdaysToday(settings,new Date(2026,1,9)),[])
+ assert.deepEqual(birthdaysToday({},now),[])
+ assert.deepEqual(birthdaysToday({artistCustomDates:{Group:null}},now),[])
+})
 
 test('evening plans preserve the old meetup and interleave timed rows with the schedule', () => {
  const concert = {venue:'Venue', city:'Amsterdam', meetupTime:'17:00', meetupLocation:'North entrance', doorsTime:'19:00', showTime:'20:00'}

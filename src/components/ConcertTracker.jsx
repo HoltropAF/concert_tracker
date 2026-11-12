@@ -6,7 +6,7 @@ import {confirmWishDetails} from '../lib/wishlistUpdates'
 import {reuseSpotifyLinks} from '../lib/spotifyReuse'
 import {timetableRows,visibleShowTimeFields} from '../lib/showTimes'
 import {cachedSchedule,checkShowSchedule,hasScheduleSuggestions,scheduleRequest,scheduleUpdatedEvent,showsDueForSchedule} from '../lib/showScheduleLookup'
-import {showsToday, anniversaryShows, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
+import {showsToday, anniversaryShows, birthdaysToday, showCountdown, localDay, preparationItems, defaultPreparationItems, eveningPlanRows, eveningStops} from '../lib/showDay'
 import TicketFiles, { OfflineTicketLibrary, TicketFileSheet } from './TicketFiles'
 import {clearOfflineTickets, listTicketFiles, pruneExpiredTickets} from '../lib/ticketFiles'
 import ShowControlSheet from './ShowControlSheet'
@@ -364,7 +364,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.40'
+const APP_VERSION = '1.1.41'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -10646,6 +10646,14 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
           </div>
         </Collapsible>
 
+        <Collapsible title="Notifications" icon="sliders" defaultOpen={false} {...sec('g-notifications')}>
+          <div style={settingsCard}>
+            <SettingsRow label="Today’s shows" sub="A bubble on show days. Opens only when you tap it."><SettingsToggle checked={local.notifyTodayShows !== false} onChange={v => lUpdate('notifyTodayShows', v)} /></SettingsRow>
+            <SettingsRow label="Artist & member birthdays" sub="A bubble for birthdays saved on artist pages."><SettingsToggle checked={local.notifyBirthdays !== false} onChange={v => lUpdate('notifyBirthdays', v)} /></SettingsRow>
+            <SettingsRow label="On this day" sub="Memories of shows you attended on this date."><SettingsToggle checked={local.notifyMemories !== false} onChange={v => lUpdate('notifyMemories', v)} /></SettingsRow>
+          </div>
+        </Collapsible>
+
         <Collapsible title="Show day" icon="sliders" defaultOpen={false} {...sec('g-show-day')}>
           <div style={settingsCard}>
             <div style={{padding:'12px 2px 3px',fontSize:13,fontWeight:600,color:'#e2e0ff'}}>Ready to go checklist</div>
@@ -11698,28 +11706,33 @@ function ShowPreparationChecklist({concert,settings}) {
   return <details style={{marginTop:8,color:'#c4c2f0',fontSize:13}}><summary style={{padding:'10px 0',cursor:'pointer'}}>Ready to go?</summary>{items.map(label=><label key={label} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:'#9491b8'}}><input type="checkbox" checked={!!checked[label]} onChange={e=>setChecked(old=>({...old,[label]:e.target.checked}))} style={{accentColor:'#a78bfa'}} />{label}</label>)}</details>
 }
 
-function DayNotifications({ todayShows, memories, settings, ticketAccount, now, showToday, setShowToday, onOpen }) {
+function DayNotifications({ todayShows, memories, birthdays, settings, ticketAccount, now, showToday, setShowToday, onOpen, onArtist }) {
   const [panel, setPanel] = useState(null);
-  const count = Number(todayShows.length > 0) + Number(memories.length > 0);
+  const count = Number(todayShows.length > 0) + Number(memories.length > 0) + Number(birthdays.length > 0);
   useBackButton(() => setPanel(null), count > 0 && panel !== null);
   useEffect(() => { if (!count) setPanel(null); }, [count]);
   if (!count) return null;
   const openToday = () => { setPanel(null); setShowToday(true); };
   const openMemory = concert => { setPanel(null); onOpen(concert); };
   const choose = () => {
-    if (count === 2) setPanel('choose');
+    if (count > 1) setPanel('choose');
     else if (todayShows.length) openToday();
-    else setPanel('memories');
+    else setPanel(birthdays.length ? 'birthdays' : 'memories');
   };
   return <>
-    <button type="button" aria-label={count === 2 ? 'Today and On this day' : todayShows.length ? "Today's shows" : 'On this day'}
+    <button type="button" aria-label={count > 1 ? 'Today’s notifications' : todayShows.length ? "Today's shows" : birthdays.length ? 'Birthdays today' : 'On this day'}
       onClick={choose} style={{position:'fixed',bottom:'calc(84px + env(safe-area-inset-bottom,0px))',right:'max(16px, calc((100vw - 480px) / 2 + 16px))',zIndex:80,border:'1px solid #bba4ed',borderRadius:99,background:'#a78bfa',color:'#0c0c14',minHeight:52,padding:'0 16px',boxShadow:'0 4px 18px #0005',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
-      {count === 2 ? <><svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span style={{borderRadius:99,background:'#0c0c14',color:'#e2e0ff',fontSize:11,minWidth:20,padding:'2px 4px'}}>2</span></>
-        : todayShows.length ? '♫ Today' : '✧ On this day'}
+      {count > 1 ? <><svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span style={{borderRadius:99,background:'#0c0c14',color:'#e2e0ff',fontSize:11,minWidth:20,padding:'2px 4px'}}>{count}</span></>
+        : todayShows.length ? '♫ Today' : birthdays.length ? '🎂 Birthdays' : '✧ On this day'}
     </button>
-    {panel && <ShowControlSheet title={panel === 'choose' ? 'Today & memories' : 'On this day'} onClose={() => setPanel(null)}>
-      {panel === 'choose' && <button type="button" onClick={openToday} style={{width:'100%',minHeight:48,background:'none',border:0,borderBottom:'1px solid #25243a',color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>♫ Today’s show{todayShows.length > 1 ? 's' : ''} <span style={{float:'right'}}>›</span></button>}
-      {panel === 'choose' && <button type="button" onClick={() => setPanel('memories')} style={{width:'100%',minHeight:48,background:'none',border:0,color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>✧ On this day <span style={{float:'right'}}>›</span></button>}
+    {panel && <ShowControlSheet title={panel === 'choose' ? 'Today’s notifications' : panel === 'birthdays' ? 'Birthdays today' : 'On this day'} onClose={() => setPanel(null)}>
+      {panel === 'choose' && todayShows.length > 0 && <button type="button" onClick={openToday} style={{width:'100%',minHeight:48,background:'none',border:0,borderBottom:'1px solid #25243a',color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>♫ Today’s show{todayShows.length > 1 ? 's' : ''} <span style={{float:'right'}}>›</span></button>}
+      {panel === 'choose' && memories.length > 0 && <button type="button" onClick={() => setPanel('memories')} style={{width:'100%',minHeight:48,background:'none',border:0,color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>✧ On this day <span style={{float:'right'}}>›</span></button>}
+      {panel === 'choose' && birthdays.length > 0 && <button type="button" onClick={() => setPanel('birthdays')} style={{width:'100%',minHeight:48,background:'none',border:0,color:'#c4c2f0',textAlign:'left',fontSize:14,cursor:'pointer'}}>🎂 Birthdays <span style={{float:'right'}}>{birthdays.length} ›</span></button>}
+      {panel === 'birthdays' && birthdays.map(birthday => <button key={birthday.key} type="button" onClick={() => { setPanel(null); onArtist(birthday.artist); }} style={{width:'100%',minHeight:54,background:'none',border:0,borderBottom:'1px solid #25243a',textAlign:'left',color:'#c4c2f0',cursor:'pointer'}}>
+        <strong style={{fontSize:14}}>{birthday.name}’s birthday</strong>
+        <span style={{display:'block',marginTop:3,color:'#9491b8',fontSize:12}}>{birthday.artist} · Open artist ›</span>
+      </button>)}
       {panel === 'memories' && memories.map(concert => <button key={concert.id} type="button" onClick={() => openMemory(concert)} style={{width:'100%',minHeight:54,background:'none',border:0,borderBottom:'1px solid #25243a',textAlign:'left',color:'#c4c2f0',cursor:'pointer'}}>
         <strong style={{fontSize:14}}>{concert.artist}</strong>
         <span style={{display:'block',marginTop:3,color:'#9491b8',fontSize:12}}>{now.getFullYear() - Number(concert.date.slice(0,4))} year{now.getFullYear() - Number(concert.date.slice(0,4)) === 1 ? '' : 's'} ago{concert.venue ? ' · ' + concert.venue : ''}</span>
@@ -11885,23 +11898,23 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   const [songDetailOpen, setSongDetailOpen] = useState(false)
   const [compact, setCompact] = useState(!!settings.compactView)
   const [showDayNow,setShowDayNow]=useState(()=>new Date());
-  const [showToday,setShowToday]=useState(true);
+  const [showToday,setShowToday]=useState(false);
   useEffect(()=>{
-    let hiddenAt=0;
     const refresh=()=>{const now=new Date();setShowDayNow(now);};
-    const visibility=()=>{if(document.hidden)hiddenAt=Date.now();else{refresh();if(hiddenAt && Date.now()-hiddenAt>60000)setShowToday(true)}};
+    const visibility=()=>{if(!document.hidden)refresh();};
     const interval=window.setInterval(refresh,60000);
     document.addEventListener('visibilitychange',visibility);
     return()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',visibility)};
   },[]);
-  const todaysShows=showsToday(concerts,showDayNow);
+  const todaysShows=settings.notifyTodayShows === false ? [] : showsToday(concerts,showDayNow);
+  const todaysBirthdays=birthdaysToday(settings,showDayNow);
   const ticketAccount = userEmail || 'guest';
   const ticketDay = localDay(showDayNow);
   const memoryKey = 'settracker:anniversary-collapsed:' + ticketAccount;
   const [collapsedMemoryDay, setCollapsedMemoryDay] = useState(() => {
     try { return localStorage.getItem(memoryKey) || ''; } catch { return ''; }
   });
-  const anniversaryMemories = anniversaryShows(concerts, showDayNow);
+  const anniversaryMemories = settings.notifyMemories === false ? [] : anniversaryShows(concerts, showDayNow);
   const memoriesCollapsed = collapsedMemoryDay === ticketDay;
   const collapseMemories = () => {
     setCollapsedMemoryDay(ticketDay);
@@ -12333,9 +12346,9 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
     </div>
   )
 
-  const dayControls = <DayNotifications todayShows={todaysShows} memories={memoriesCollapsed ? anniversaryMemories : []}
+  const dayControls = <DayNotifications todayShows={todaysShows} memories={memoriesCollapsed ? anniversaryMemories : []} birthdays={todaysBirthdays}
     settings={settings} ticketAccount={ticketAccount} now={showDayNow} showToday={showToday} setShowToday={setShowToday}
-    onOpen={handleOpenConcert} />;
+    onOpen={handleOpenConcert} onArtist={artist => { setSelected(null); setShowToday(false); setView('artists'); setPendingArtistSelect(artist); }} />;
 
   if (displaySelected) return (
     <div data-theme-shell="" style={appShell}>
@@ -12393,7 +12406,7 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
           const distinctArtists = new Set(pastAll.map(c => c.artist).filter(Boolean)).size;
           const distinctVenues = new Set(pastAll.map(c => c.venue).filter(Boolean)).size;
           const distinctCountries = new Set(pastAll.map(c => c.country).filter(Boolean)).size;
-          const anniversaries = memoriesCollapsed ? [] : anniversaryShows(pastAll, showDayNow);
+          const anniversaries = memoriesCollapsed || settings.notifyMemories === false ? [] : anniversaryShows(pastAll, showDayNow);
           return (
             <div style={{ padding: '14px 16px 0' }}>
               {anniversaries.map(c => {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.41 — 12 November 2026
+- Keep Today’s show in its floating bubble; reopening the app no longer opens the panel automatically.
+- Add birthday bubbles from saved artist and member birthdays, with links to artist pages.
+- Control Today’s shows, birthdays and On this day independently in Settings → Shows & logging → Notifications.
+
 ## 1.1.40 — 12 November 2026
 - Integrate artist types and compact member rows into the artist Info layout.
 - Show existing birthdays beside matching members without repeating them in Every Year; birthday editing remains available with the other dates.

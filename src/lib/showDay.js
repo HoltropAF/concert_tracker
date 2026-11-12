@@ -1,6 +1,20 @@
 export function localDay(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
 }
+export function birthdaysToday(settings = {}, now = new Date()) {
+  if (settings.notifyBirthdays === false) return []
+  const monthDay = localDay(now).slice(5)
+  const seen = new Set()
+  return Object.entries(settings.artistCustomDates || {}).flatMap(([artist, dates]) =>
+    (Array.isArray(dates) ? dates : []).flatMap(date => {
+      if (!/birthday/i.test(date.label || '') || !/^\d{4}-\d{2}-\d{2}$/.test(date.date || '') || date.date.slice(5) !== monthDay || date.date > localDay(now)) return []
+      const name = date.label.replace(/(?:['’]s)?\s*birthday/ig, '').trim() || artist
+      const key = (artist + ':' + name).normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}:]/gu, '')
+      if (seen.has(key)) return []
+      seen.add(key)
+      return [{ key, artist, name }]
+    }))
+}
 export function anniversaryShows(concerts, now = new Date()) {
   const today = localDay(now)
   return concerts.filter(concert => !concert.wishlist && /^\d{4}-\d{2}-\d{2}$/.test(concert.date || '')

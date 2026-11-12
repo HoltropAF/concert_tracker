@@ -16,6 +16,9 @@ import ArtistPhotoSearch from './ArtistPhotoSearch'
 import {createBackStack} from '../lib/backStack'
 import {NavigationMemory,useRememberedState,useChangedValue} from './NavigationMemory'
 import PerformanceDetails from './PerformanceDetails'
+import ArtistMembers from './ArtistMembers'
+import ShowMemberLineups from './ShowMemberLineups'
+import {memberLineupLines} from '../lib/artistMembers'
 import {performanceSongs, mapSetlistSongs, releaseNote, matchesSongLinkFilter} from '../lib/setlistRows'
 import VenueLookup from './VenueLookup'
 import { matchesShowType, visibleSongTotals } from '../lib/filterTotals'
@@ -361,7 +364,7 @@ function ArtistBannerReframe({ path, pos, onChange, onDone }) {
 // ! public/changelog.md in every release. The two are read together: What's new
 // ! shows only the installed release, so a
 // ! mismatch between them means the current release notes cannot be shown.
-const APP_VERSION = '1.1.38'
+const APP_VERSION = '1.1.39'
 const LAST_SEEN_VERSION_KEY = 'last_seen_version'
 // Supabase's free tier gives 1 GB of storage; used only to draw the usage bar.
 const STORAGE_BUDGET = 1024 * 1024 * 1024
@@ -2288,6 +2291,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         : `📍 ${concert.venue}${concert.room ? ` · ${concert.room}` : ''}, ${concert.city}${concert.country ? `, ${concert.country}` : ''}`,
     ];
     const generalLines = [
+      ...memberLineupLines(concert),
       genres.length > 0 ? `🎵 ${genres.join(', ')}` : null,
       getFriends(concert).length > 0 ? `👥 w. ${getFriends(concert).join(', ')}` : '👤 solo',
       concert.rating ? `${'★'.repeat(concert.rating)}${'☆'.repeat((settings.ratingSystem || 5) - concert.rating)}` : null,
@@ -2569,6 +2573,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
         <div style={{ borderTop: "1px solid #1a1a2e" }} />
 
         <div style={{ padding: "16px 20px 100px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {detailTab === 'general' && !concert.wishlist && <ShowMemberLineups concert={concert} settings={settings} />}
           {!concert.wishlist && !past && detailTab === 'general' && (
             <>
               <UpcomingEvening concert={concert} online={online} onEdit={editTimetable} />
@@ -2927,6 +2932,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               {concert.rating > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span>Rating</span><span>{"★".repeat(concert.rating)}</span></div>}
               {receiptSections.includes('financial') && receiptCosts.length===1 && costRows}
               {lineup.length > 0 && <div style={{ marginTop: 6 }}><div style={{ marginBottom: 2 }}>Lineup:</div><div style={{ color: "var(--receipt-muted)" }}>{lineup.join(', ')}</div></div>}
+              {memberLineupLines(concert).map((line, index) => <div key={'members-' + index} style={{ marginTop: 4, overflowWrap: 'anywhere' }}>{line}</div>)}
               {concert.favorite && <div style={{ textAlign: "center", marginTop: 6, fontWeight: 700 }}>★ ALL-TIME FAVE ★</div>}
             </Section>
           );
@@ -3480,6 +3486,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {content}
           </div>
         ))}
+
+        {editorTab === 'show' && !form.wishlist && <ShowMemberLineups concert={form} settings={settings} editing
+          onChange={lineups => update('memberLineups', lineups)} />}
 
         {/* Acts — festivals only */}
         {editorTab === 'setlist' && form.type === 'festival' && (
@@ -7086,6 +7095,10 @@ function ArtistsView({ concerts, onOpen, onNavigate = () => {}, settings = {}, o
           const setCustomDates = list => onUpdateSetting('artistCustomDates', { ...(settings.artistCustomDates || {}), [selectedArtist]: list });
           return (
             <div style={{ padding: "14px 16px" }}>
+              <ArtistMembers key={selectedArtist} artist={selectedArtist} profile={overrides}
+                onSave={details => onUpdateSetting('artistInfoOverrides', {
+                  ...(settings.artistInfoOverrides || {}), [selectedArtist]: { ...overrides, ...details },
+                })} />
               {/* The Numbers */}
               {(() => {
                 const albums = overrides.albumCount ?? mb?.albumCount ?? null;
@@ -9169,6 +9182,9 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
             </>
           );
         })()}
+        {editorTab === 'show' && !form.wishlist && <ShowMemberLineups concert={form} settings={settings} editing
+          onChange={lineups => update('memberLineups', lineups)} />}
+
         </div>
       </div>
       {pendingTag && (

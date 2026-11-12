@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.39 — 12 November 2026
+- Set artist types and member lists on artist Info pages.
+- Record a full group, missing members or a custom lineup for each headliner, support act and festival performance.
+- Keep historical member lists with each show and include recorded lineups in General sharing and backups.
+
 ## 1.1.38 — 11 November 2026
 - Reduce Preferences and Help row heights, icon sizes and section spacing, and trim extra space below the Settings overview.
 

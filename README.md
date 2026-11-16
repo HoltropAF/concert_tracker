@@ -17,7 +17,7 @@
   <img src="docs/readme/shows.png" alt="The Shows tab with a list of concerts" width="190">
   <img src="docs/readme/show-detail.png" alt="A single show with rating, ticket price and friends" width="190">
   <img src="docs/readme/stats.png" alt="Stats with shows per year and genre charts" width="190">
-  <img src="docs/readme/friends.png" alt="The Friends tab" width="190">
+  <img src="docs/readme/venues.png" alt="The Venues tab with a map of everywhere you have been" width="190">
 </p>
 
 ## What it does

@@ -81,18 +81,9 @@ Everything else lives in the [wiki](https://github.com/HoltropAF/concert_tracker
 
 ### Backstage: how it fits together
 
-```mermaid
-flowchart LR
-  App["settracker<br/>on your phone"]
-  Supabase["Supabase<br/>sign-in, shows, photos"]
-  Vercel["Vercel<br/>serves the app, small server functions"]
-  Outside["setlist.fm, Ticketmaster,<br/>venue websites"]
-  Direct["Spotify, MusicBrainz,<br/>OpenStreetMap"]
-  App <--> Supabase
-  App --> Vercel
-  App --> Direct
-  Vercel --> Outside
-```
+<p align="center">
+  <a href="https://github.com/HoltropAF/concert_tracker/wiki/How-it-works"><img src="docs/readme/system-map.png" alt="System map: the settracker app on your device, Supabase, Vercel, GitHub and the outside services each one calls" width="860"></a>
+</p>
 
 The app runs in your browser and keeps a copy of your shows on the device, so it works offline. The full map, with where every kind of data lives, is on the [How it works](https://github.com/HoltropAF/concert_tracker/wiki/How-it-works) page.
 

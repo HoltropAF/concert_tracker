@@ -12,7 +12,7 @@
 // * be handled before any view renders.
 import { Component, Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth, useConcerts, useSettings } from './hooks/useSupabase'
-import { DEFAULT_SETTINGS, SAMPLE_CONCERTS } from './lib/data'
+import { DEFAULT_SETTINGS, SAMPLE_CONCERTS, SAMPLE_SETTINGS } from './lib/data'
 import { exchangeCodeForTokens } from './lib/spotify'
 import { publishInstallState } from './lib/appInstall'
 import AuthScreen from './components/AuthScreen'
@@ -162,11 +162,12 @@ function useGuestMode() {
     localStorage.removeItem('guest_mode')
   }
 
-  const initWithSamples = useCallback((samples) => {
+  const initWithSamples = useCallback((samples, sampleSettings = {}) => {
     localStorage.setItem('guest_concerts', JSON.stringify(samples))
     concertsRef.current = samples
     setConcerts(samples)
-  }, [])
+    saveSettings({ ...settingsRef.current, ...sampleSettings })
+  }, [saveSettings])
 
   return { concerts, settings, saveConcert, deleteConcert, saveSetting, saveSettings, clearGuest, initWithSamples }
 }
@@ -314,7 +315,7 @@ export default function App() {
   const enterGuest = () => {
     localStorage.setItem('guest_mode', 'true')
     if (!localStorage.getItem('guest_concerts')) {
-      guest.initWithSamples(SAMPLE_CONCERTS)
+      guest.initWithSamples(SAMPLE_CONCERTS, SAMPLE_SETTINGS)
     }
     setGuestBannerDismissed(false)
     setGuestMode(true)

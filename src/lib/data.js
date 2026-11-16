@@ -19,6 +19,7 @@ export const SEED_DATA = []
 export const SAMPLE_CONCERTS = [
   {
     id: 'demo-1',
+    setlist: ["Frogs", "Wild God", "O Children", "Jubilee Street", "From Her to Eternity", "Ghosteen Speaks", "Red Right Hand", "The Mercy Seat", "Into My Arms"],
     artist: 'Nick Cave & The Bad Seeds', date: '2023-05-11',
     venue: 'Paradiso', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: 'Wild God Tour', support: [],
@@ -29,6 +30,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-2',
+    setlist: ["Invaincu", "Fils de joie", "Tous les mêmes", "Papaoutai", "Formidable", "L'enfer", "Santé", "Alors on danse"],
     artist: 'Stromae', date: '2022-05-23',
     venue: 'Ziggo Dome', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: 'Multitude Tour', support: [],
@@ -39,6 +41,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-3',
+    setlist: ["Once Upon a Poolside", "Eucalyptus", "Tropic Morning News", "Bloodbuzz Ohio", "I Need My Girl", "Fake Empire", "Mr. November", "Terrible Love", "Vanderlyle Crybaby Geeks"],
     artist: 'The National', date: '2023-10-14',
     venue: 'AFAS Live', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: 'First Two Pages of Frankenstein Tour', support: ['Faye Webster'],
@@ -48,6 +51,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-4',
+    setlist: ["Welcome to My Island", "Pretty in Possible", "Bunny Is a Rider", "Sunset", "Billions", "Ocean of Tears", "So Hot You're Hurting My Feelings", "Door"],
     artist: 'Caroline Polachek', date: '2022-11-08',
     venue: 'Paradiso', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: 'Desire, I Want to Turn Into You Tour', support: ['Yeule'],
@@ -58,6 +62,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-5',
+    setlist: ["Love Me More", "Working for the Knife", "Washing Machine Heart", "Nobody", "First Love / Late Spring", "Your Best American Girl", "Stay Soft", "A Pearl"],
     artist: 'Mitski', date: '2022-09-28',
     venue: 'Paradiso', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: 'Laurel Hell Tour', support: [],
@@ -68,6 +73,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-6',
+    setlist: ["Romance", "Jackie Down the Line", "Televised Mind", "Big", "A Hero's Death", "Boys in the Better Land", "Favourite", "I Love You", "Starburster"],
     artist: 'Fontaines D.C.', date: '2024-03-06',
     venue: 'AFAS Live', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: 'Romance Tour', support: ['Bar Italia'],
@@ -77,6 +83,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-7',
+    setlist: ["wacced out murals", "squabble up", "King Kunta", "HUMBLE.", "DNA.", "Alright", "Money Trees", "Not Like Us", "luther"],
     artist: 'Kendrick Lamar', date: '2025-06-22',
     venue: 'King Baudouin Stadium', room: '', city: 'Brussels', country: 'Belgium',
     type: 'concert', tour: 'Grand National Tour', support: ['SZA'],
@@ -105,6 +112,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-9',
+    setlist: ["Burn the Witch", "Daydreaming", "Pyramid Song", "Everything in Its Right Place", "Idioteque", "Paranoid Android", "Karma Police", "There There"],
     artist: 'Radiohead', date: '2016-07-08',
     venue: 'Rock Werchter', room: '', city: 'Werchter', country: 'Belgium',
     type: 'concert', tour: 'Moon Shaped Pool Tour', support: ['Liars'],
@@ -123,6 +131,19 @@ export const SAMPLE_CONCERTS = [
     genre: 'Rock', subgenre: 'Indie rock', language: ['English'], venueSize: 'Arena', seenAs: 'Headliner',
   },
 ]
+
+// * Settings that go with SAMPLE_CONCERTS on a visitor's first guest session: map
+// * positions for the demo venues, so the Venues map has pins without geocoding.
+export const SAMPLE_SETTINGS = {
+  venueInfo: {
+    'Paradiso': { lat: 52.3623, lng: 4.8839 },
+    'Ziggo Dome': { lat: 52.3134, lng: 4.9371 },
+    'AFAS Live': { lat: 52.3122, lng: 4.9441 },
+    'King Baudouin Stadium': { lat: 50.8958, lng: 4.334 },
+    'Walibi Holland': { lat: 52.438, lng: 5.765 },
+    'Rock Werchter': { lat: 50.967, lng: 4.683 },
+  },
+}
 
 // * Baseline for every user's settings object. normalizeSettings() in useSupabase.js
 // * merges the stored blob over this, so a key added here is picked up automatically

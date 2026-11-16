@@ -61,7 +61,7 @@ Never done anything like this before? Good, this is written for you. All you nee
 
 Use the same email on any other device and your shows are there too.
 
-> **Want your own copy instead?** You can run settracker on your own free database and hosting, with your own name and links on it. The [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) walks through it from zero, no experience needed.
+> **Want your own copy instead?** The [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) gets you your own settracker in three steps and about twenty minutes, with no coding. If you want to tweak the code or help build it, the [Developer guide](https://github.com/HoltropAF/concert_tracker/wiki/Developer-guide) takes it from there.
 
 ## Encore: the wiki
 
@@ -71,12 +71,12 @@ Everything else lives in the [wiki](https://github.com/HoltropAF/concert_tracker
 |---|---|
 | [Features](https://github.com/HoltropAF/concert_tracker/wiki/Features) | see everything the app can do |
 | [Using the app](https://github.com/HoltropAF/concert_tracker/wiki/Using-the-app) | add shows and festivals, import setlists |
-| [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) | run your own copy, step by step |
+| [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) | get your own copy with as little hassle as possible |
 | [How it works](https://github.com/HoltropAF/concert_tracker/wiki/How-it-works) | see the full system map: where your data lives and how the code is organised |
-| [Local development](https://github.com/HoltropAF/concert_tracker/wiki/Local-development) | work on the code in your own copy |
+| [Developer guide](https://github.com/HoltropAF/concert_tracker/wiki/Developer-guide) | change the code or help improve settracker |
 | [Backing up your data](https://github.com/HoltropAF/concert_tracker/wiki/Backing-up-your-data) | export and restore your shows |
 | [Keeping your database alive](https://github.com/HoltropAF/concert_tracker/wiki/Keeping-your-database-alive) | stop a free database from going to sleep |
-| [Personalising your fork](https://github.com/HoltropAF/concert_tracker/wiki/Personalising-your-fork) | change the links and sample data in your own copy |
+| [Personalising your copy](https://github.com/HoltropAF/concert_tracker/wiki/Personalising-your-copy) | change the links and sample data in your own copy |
 | [Troubleshooting](https://github.com/HoltropAF/concert_tracker/wiki/Troubleshooting) | fix something that went wrong |
 
 ### Backstage: how it fits together

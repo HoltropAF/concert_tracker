@@ -70,12 +70,31 @@ Everything else lives in the [wiki](https://github.com/HoltropAF/concert_tracker
 | Page | For when you want to |
 |---|---|
 | [Features](https://github.com/HoltropAF/concert_tracker/wiki/Features) | see everything the app can do |
+| [Using the app](https://github.com/HoltropAF/concert_tracker/wiki/Using-the-app) | add shows and festivals, import setlists |
 | [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) | run your own copy, step by step |
-| [How it works](https://github.com/HoltropAF/concert_tracker/wiki/How-it-works) | know where your data lives and how the code is organised |
+| [How it works](https://github.com/HoltropAF/concert_tracker/wiki/How-it-works) | see the full system map: where your data lives and how the code is organised |
+| [Local development](https://github.com/HoltropAF/concert_tracker/wiki/Local-development) | work on the code in your own copy |
 | [Backing up your data](https://github.com/HoltropAF/concert_tracker/wiki/Backing-up-your-data) | export and restore your shows |
 | [Keeping your database alive](https://github.com/HoltropAF/concert_tracker/wiki/Keeping-your-database-alive) | stop a free database from going to sleep |
 | [Personalising your fork](https://github.com/HoltropAF/concert_tracker/wiki/Personalising-your-fork) | change the links and sample data in your own copy |
 | [Troubleshooting](https://github.com/HoltropAF/concert_tracker/wiki/Troubleshooting) | fix something that went wrong |
+
+### Backstage: how it fits together
+
+```mermaid
+flowchart LR
+  App["settracker<br/>on your phone"]
+  Supabase["Supabase<br/>sign-in, shows, photos"]
+  Vercel["Vercel<br/>serves the app, small server functions"]
+  Outside["setlist.fm, Ticketmaster,<br/>venue websites"]
+  Direct["Spotify, MusicBrainz,<br/>OpenStreetMap"]
+  App <--> Supabase
+  App --> Vercel
+  App --> Direct
+  Vercel --> Outside
+```
+
+The app runs in your browser and keeps a copy of your shows on the device, so it works offline. The full map, with where every kind of data lives, is on the [How it works](https://github.com/HoltropAF/concert_tracker/wiki/How-it-works) page.
 
 Found a bug or have an idea? [Open an issue](https://github.com/HoltropAF/concert_tracker/issues).
 

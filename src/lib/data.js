@@ -1,13 +1,6 @@
 // * Static seed/default data. No logic, no imports — everything here is either
 // * initial content or the baseline shape of the settings object.
 
-// * Optional hardcoded library, written to the DB on a user's very first login.
-// * Empty is the normal case, and useConcerts branches on that: when empty, the DB is
-// * the sole source of truth for concerts; when populated, SEED_DATA wins for base
-// * fields and the DB only wins for the user-editable ones (rating, merch, notes,
-// * friends, solo). Filling this in turns the app into a fixed, curated log.
-export const SEED_DATA = []
-
 // * Demo library loaded into localStorage on a visitor's first guest session, so the
 // * app has something to show instead of empty views. Never touches Supabase, and is
 // * wiped by clearGuest() on exit.
@@ -172,20 +165,14 @@ export const DEFAULT_SETTINGS = {
   showVenueOnCards: true,
   showGenreTagsOnCards: true,
   defaultSort: 'newest',
-  groupByMonth: false,
   hiddenChartGroups: [],
   hiddenCharts: [],
   hiddenSummaryBlocks: [],
   topSongsRows: 5,
   summaryYear: 'all',
   summaryFinType: 'all',
-  setlistfmApiKey: '',
   savedVenues: [],
   friendGroups: [],
   friendProfiles: {},
   defaultCountry: '',
 }
-
-// ! Dead export — nothing imports this. Friends are derived from concert.friends
-// ! strings at render time; there is no canonical friend list anywhere.
-export const FRIENDS = []

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createLibraryRemote } from '../src/lib/libraryRemote.js'
+import { createLibraryRemote } from '../../src/lib/libraryRemote.js'
 
 const user = 'qa'
 const normalize = (value, id) => value ? { ...value, ...(id ? { id } : {}) } : {}

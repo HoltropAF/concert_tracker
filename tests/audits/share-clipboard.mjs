@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
-const source = fs.readFileSync(new URL('../src/components/ConcertTracker.jsx', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../../src/components/ConcertTracker.jsx', import.meta.url), 'utf8');
 const blocks = [...source.matchAll(/try \{\s*if \(!navigator\.clipboard\?\.writeText\)[\s\S]*?onNotify\('Could not copy text\. Allow clipboard access and try again\.'\);\s*\}/g)];
 assert.equal(blocks.length, 2, 'Concert and friend sharing both handle clipboard errors');
 for (const [index, [block]] of blocks.entries()) {

@@ -558,7 +558,6 @@ const getGenres = c => Array.isArray(c?.genre) ? c.genre.filter(Boolean) : (c?.g
 
 // * Songs are stored as a plain string OR { name, info?, cover?, spotifyId? }.
 // * Always use these helpers — never access song fields directly.
-// TODO: add spotifyId support once Spotify matching is built (docs/spotify-integration-plan.md)
 const getSongName = s => typeof s === 'string' ? s : (s?.name || '');
 const getSongInfo = s => typeof s === 'string' || !s ? null : (s.info || null);
 const getSongCover = s => typeof s === 'string' || !s ? null : (s.cover || null);

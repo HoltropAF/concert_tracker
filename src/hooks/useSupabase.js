@@ -46,7 +46,6 @@ const setlistMap = (value) => {
 // * Songs in the setlist can be a plain string OR an object:
 // *   { name: string, info?: string, cover?: string, spotifyId?: string }
 // * Always access them via the getSong* helpers in ConcertTracker — never raw.
-// TODO: add spotifyId to normalizeConcert once Spotify integration is built (docs/spotify-integration-plan.md)
 const normalizeConcert = (value, fallbackId = '') => {
   const concert = value && typeof value === 'object' ? value : {}
   return {

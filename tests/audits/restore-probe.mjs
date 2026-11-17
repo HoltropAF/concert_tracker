@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import assert from 'node:assert/strict'
 
-const source = fs.readFileSync(new URL('../src/components/ConcertTracker.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+const source = fs.readFileSync(new URL('../../src/components/ConcertTracker.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 const start = source.indexOf('  const handleXlsxImport = (e) => {')
 const end = source.indexOf('\n\n  return (', start)
 if (start < 0 || end < 0) throw new Error('Could not locate XLSX import handler')

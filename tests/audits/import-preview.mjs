@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
-const source = fs.readFileSync(new URL('../src/components/ConcertTracker.jsx', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../../src/components/ConcertTracker.jsx', import.meta.url), 'utf8');
 const start = source.indexOf('  const asArray = (value) =>');
 const end = source.indexOf('  const handleImport = async', start);
 assert.ok(start >= 0 && end > start);

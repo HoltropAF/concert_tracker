@@ -2,9 +2,9 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import assert from 'node:assert/strict'
 import XLSX from 'xlsx'
-import { normalizeSetlistRows, isSectionRow } from '../src/lib/setlistRows.js'
+import { normalizeSetlistRows, isSectionRow } from '../../src/lib/setlistRows.js'
 
-const source = fs.readFileSync(new URL('../src/components/ConcertTracker.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+const source = fs.readFileSync(new URL('../../src/components/ConcertTracker.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 const between = (a, b) => source.slice(source.indexOf(a), source.indexOf(b, source.indexOf(a)))
 const fixture = {
   id: 'roundtrip', artist: 'QA Festival', date: '2026-09-20', endDate: '2026-09-22', type: 'festival',

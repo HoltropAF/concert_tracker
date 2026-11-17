@@ -41,7 +41,7 @@ Just looking? Tap **Try the demo** on the first screen instead; no account neede
 
 ## Your own copy
 
-settracker is open source. The [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) gets you your own version, with your own database and web address, in three steps and about twenty minutes, with no coding. If you want to change the code or help build it, continue with the [Developer guide](https://github.com/HoltropAF/concert_tracker/wiki/Developer-guide).
+settracker is open source under the [MIT licence](LICENSE). The [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) gets you your own version, with your own database and web address, in three steps and about twenty minutes, with no coding. If you want to change the code or help build it, continue with the [Developer guide](https://github.com/HoltropAF/concert_tracker/wiki/Developer-guide).
 
 ## Learn more
 

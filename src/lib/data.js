@@ -14,8 +14,8 @@ export const SEED_DATA = []
 // * Chosen to exercise the interesting cases: solo and group shows, a multi-day
 // * festival with an acts list, a support act, a foreign country, and a future date
 // * that renders as upcoming.
-// ! demo-10 is dated 2027 to stay in the future. It will start reading as a past show
-// ! in 2027 and should be pushed forward before then.
+// ! demo-10 is dated October 2027 to stay in the future. It will start reading as a past
+// ! show after that date and should be pushed forward before then.
 export const SAMPLE_CONCERTS = [
   {
     id: 'demo-1',
@@ -123,7 +123,7 @@ export const SAMPLE_CONCERTS = [
   },
   {
     id: 'demo-10',
-    artist: 'Fontaines D.C.', date: '2027-02-14',
+    artist: 'Fontaines D.C.', date: '2027-10-16',
     venue: 'Ziggo Dome', room: '', city: 'Amsterdam', country: 'Netherlands',
     type: 'concert', tour: '', support: [],
     friends: ['Emma'], solo: false, rating: null, ticketPrice: 55,

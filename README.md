@@ -14,10 +14,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/readme/shows.png" alt="The Shows tab with a list of concerts" width="190">
-  <img src="docs/readme/show-detail.png" alt="A single show with rating, ticket price and friends" width="190">
-  <img src="docs/readme/stats.png" alt="Stats with shows per year and genre charts" width="190">
-  <img src="docs/readme/venues.png" alt="The Venues tab with a map of everywhere you have been" width="190">
+  <img src="docs/readme/shows.png" alt="The Shows tab: 57 shows attended, with the next upcoming show on top" width="150">
+  <img src="docs/readme/show-detail.png" alt="A past show with its photo, a five-star rating, the ticket price and an all-time favourite badge" width="150">
+  <img src="docs/readme/upcoming.png" alt="An upcoming show with the plan for the evening and who is coming along" width="150">
+  <img src="docs/readme/stats.png" alt="Stats for 2026: shows and spending per month, genres and venue sizes" width="150">
+  <img src="docs/readme/venues.png" alt="The Venues tab with a map of everywhere you have been" width="150">
 </p>
 
 ## What it does

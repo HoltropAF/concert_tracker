@@ -15,6 +15,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { DEFAULT_SETTINGS } from '../lib/data'
 import { useOfflineLibrary, settingsOperation } from './useOfflineLibrary'
 import { changedFields, clearSyncedLibrary } from '../lib/offlineLibrary'
+import { decodeSetlistNames } from '../lib/setlistRows'
 
 // ============================================================
 // DATA NORMALIZERS
@@ -40,7 +41,7 @@ const merchList = (value) => arrayOr(value).map(v => {
 }).filter(v => v.item || v.price)
 const setlistMap = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(Object.entries(value).map(([artist, songs]) => [String(artist || '').trim(), arrayOr(songs).filter(Boolean)]).filter(([artist]) => artist))
+  return Object.fromEntries(Object.entries(value).map(([artist, songs]) => [String(artist || '').trim(), decodeSetlistNames(arrayOr(songs).filter(Boolean))]).filter(([artist]) => artist))
 }
 
 // * Songs in the setlist can be a plain string OR an object:
@@ -65,7 +66,7 @@ const normalizeConcert = (value, fallbackId = '') => {
     merch: merchList(concert.merch),
     ticketAddons: stringList(concert.ticketAddons),
     language: stringList(concert.language, concert.language ? [concert.language] : []),
-    setlist: arrayOr(concert.setlist).filter(Boolean),
+    setlist: decodeSetlistNames(arrayOr(concert.setlist).filter(Boolean)),
     supportSetlists: setlistMap(concert.supportSetlists),
     notes: String(concert.notes || ''),
   }

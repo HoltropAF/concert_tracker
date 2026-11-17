@@ -133,3 +133,14 @@ test('crying memories survive section moves, serialization and Spotify enrichmen
  assert.equal(enriched[2].cried,undefined)
  assert.equal(setlistSongs(enriched).length,1)
 })
+
+test('song names stored with HTML entities are decoded, other rows untouched', async () => {
+  const {decodeEntities, decodeSetlistNames} = await import('./setlistRows.js')
+  assert.equal(decodeEntities('Ain&#039;t It Fun'), "Ain't It Fun")
+  assert.equal(decodeEntities('Rock &amp; Roll &quot;live&quot; &#x27;99'), `Rock & Roll "live" '99`)
+  assert.equal(decodeEntities('AT&T'), 'AT&T')
+  const section = { type: 'section', label: 'Encore &amp; more' }
+  const rows = decodeSetlistNames(['Don&#039;t Stop', { name: 'Ain&#039;t It Fun', info: 'x' }, section, { type: 'medley', name: 'A &amp; B', parts: ['It&#39;s'] }])
+  assert.deepEqual(rows, ["Don't Stop", { name: "Ain't It Fun", info: 'x' }, section, { type: 'medley', name: 'A & B', parts: ["It's"] }])
+  assert.equal(rows[2], section)
+})

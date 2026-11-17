@@ -177,3 +177,21 @@ export function moveSetlistRow(rows, from, to) {
   next.splice(to, 0, row)
   return next
 }
+
+// Older setlist.fm imports could store HTML entities in song names, e.g. "Ain&#039;t It Fun".
+const NAMED_ENTITIES = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' }
+export const decodeEntities = text => typeof text !== 'string' || !text.includes('&') ? text
+  : text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code) => {
+    if (code[0] !== '#') return NAMED_ENTITIES[code.toLowerCase()] ?? match
+    const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10)
+    return Number.isFinite(n) && n > 0 ? String.fromCodePoint(n) : match
+  })
+export function decodeSetlistNames(rows) {
+  if (!Array.isArray(rows)) return rows
+  return rows.map(row => {
+    if (typeof row === 'string') return decodeEntities(row)
+    if (!row || typeof row !== 'object' || isSectionRow(row)) return row
+    const next = typeof row.name === 'string' && row.name.includes('&') ? { ...row, name: decodeEntities(row.name) } : row
+    return Array.isArray(row.parts) ? { ...next, parts: decodeSetlistNames(row.parts) } : next
+  })
+}

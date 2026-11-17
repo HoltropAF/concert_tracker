@@ -54,7 +54,7 @@ function parseFestivalUrl(rawUrl) {
 }
 
 function strip(s) {
-  return s.replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
+  return s.replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#0*39;/g,"'").replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#(\d+);/g,(_,code)=>String.fromCharCode(code)).replace(/\s+/g,' ').trim();
 }
 
 function parseFestivalDays(html) {

@@ -13,6 +13,13 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   --accent: #a78bfa;
+  /* The app is drawn dark and light mode inverts it with a filter, so native controls
+     (checkboxes, file pickers, date pickers) must render dark too or they invert to black. */
+  color-scheme: dark;
+}
+
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--accent, #a78bfa);
 }
 
 input, textarea, select, button {

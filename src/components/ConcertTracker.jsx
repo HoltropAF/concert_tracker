@@ -2941,7 +2941,9 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
               {moneyLines.length > 0 ? <>{costRows}<div style={{borderTop:'1px dashed var(--receipt-line)',marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontWeight:700}}><span>TOTAL</span><span>€{total.toFixed(2)}</span></div></> : <div>No costs logged</div>}
             </Section>
           ) : <div style={{marginTop:3}}>{costRows}</div>;
-          const setlistTotalMs = songs.reduce((s, song) => s + (typeof song === 'object' && song?.durationMs ? song.durationMs : 0), 0);
+          const timedSongs = songs.filter(song => typeof song === 'object' && song?.durationMs);
+          // Same rule as the Setlist tab: a sum over a few Spotify-matched songs is misleading, so only show it at 60% coverage or more.
+          const setlistTotalMs = songs.length > 0 && timedSongs.length / songs.length >= 0.6 ? timedSongs.reduce((s, song) => s + song.durationMs, 0) : 0;
           const formatSetlistLength = ms => { const mins = Math.round(ms / 60000); const h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `~${h}h ${m}m` : `~${m}m`; };
           const setlistContent = (
             <Section>
@@ -9628,7 +9630,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
   const dataBreakdown = [
     { k: 'shows', n: concerts.length, c: '#a78bfa' },
     { k: 'songs', n: concerts.reduce((s, c) => s + getSongList(c.setlist).length, 0), c: '#818cf8' },
-    { k: 'photos', n: photoCount, c: '#f472b6' },
+    { k: photoCount === 1 ? 'photo' : 'photos', n: photoCount, c: '#f472b6' },
     { k: 'friends', n: new Set(concerts.flatMap(c => getFriends(c))).size, c: '#34d399' },
   ];
 
@@ -11308,7 +11310,7 @@ function SettingsView({ settings, onUpdate, onUpdateAll, concerts = [], onSaveCo
               </div>
               {photoCount > 0 && (
                 <div style={{ marginTop: 9, padding: "8px 10px", background: "#1a1410", border: "1px solid #4a3a28", borderRadius: 8, fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#e0a35f", lineHeight: 1.5 }}>
-                  ! Your {photoCount} photo{photoCount === 1 ? '' : 's'} are stored separately and are <b>not</b> included in an export.
+                  ! {photoCount === 1 ? 'Your photo is' : `Your ${photoCount} photos are`} stored separately and {photoCount === 1 ? 'is' : 'are'} <b>not</b> included in an export.
                 </div>
               )}
             </div>
@@ -12285,9 +12287,8 @@ function ConcertTrackerContent({ concerts, settings, onSaveConcert, onDeleteConc
   if (addFlowStep) return (
     <div data-theme-shell="" style={appShell}>
       <div id="content-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 40px' }}>
-        <button type="button" aria-label="Back to shows" onClick={() => setAddFlowStep(null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 22, cursor: 'pointer', padding: '0 0 18px' }}>←</button>
+        <button type="button" aria-label={addFlowStep === 'discover' ? 'Back to add a show' : 'Back to shows'} onClick={() => setAddFlowStep(addFlowStep === 'discover' ? 'type' : null)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 22, cursor: 'pointer', padding: '0 0 18px' }}>←</button>
         {addFlowStep === 'discover' ? <>
-          <button type="button" onClick={()=>setAddFlowStep('type')} style={{background:'none',border:0,color:'#c4b5fd',cursor:'pointer'}}>← Add a show options</button>
           <UpcomingDiscovery concerts={concerts} onChoose={openDiscoveryDraft} initialCountry={settings.defaultCountry || 'NL'} defaultOpen />
         </> : <QuickShowChoices onDiscover={()=>setAddFlowStep('discover')} onChoose={({ type, attendanceMode, status }) => {
           setShowAdd(type);

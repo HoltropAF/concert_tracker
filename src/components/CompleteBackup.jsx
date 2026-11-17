@@ -47,8 +47,8 @@ export default function CompleteBackup({concerts,settings,onSaveConcert,onUpdate
       <div style={{ fontSize: 10, color: '#4a4870', fontFamily: mono, marginTop: 2, lineHeight: 1.5 }}>Concerts, preferences, friend and venue details, and uploaded photos in one file. Spotify login tokens are excluded; external image links remain links. Up to 200 MB.</div>
     </div>
     <div style={{ display: 'flex', gap: 8 }}>
-      <button type="button" disabled={busy} onClick={download} style={primary}>↓ Download complete backup</button>
-      <label style={secondary}>↑ Restore complete backup<input aria-label="Restore complete backup" type="file" accept=".json,application/json" disabled={busy} onChange={choose} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}/></label>
+      <button type="button" aria-label="Download complete backup" disabled={busy} onClick={download} style={primary}>↓ Download</button>
+      <label style={secondary}>↑ Restore<input aria-label="Restore complete backup" type="file" accept=".json,application/json" disabled={busy} onChange={choose} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}/></label>
     </div>
     {pending && <div style={{ marginTop: 12 }}>
       <div style={note}>{pending.concerts.length} concerts · {pending.photos.length} {pending.photos.length === 1 ? 'photo' : 'photos'}. Matching concert IDs will be updated and backed-up settings applied. Other concerts and existing photo files will be kept. Download your current backup first if needed.</div>

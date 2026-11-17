@@ -45,7 +45,7 @@ settracker is open source. The [Setup guide](https://github.com/HoltropAF/concer
 
 ## Learn more
 
-The [wiki](https://github.com/HoltropAF/concert_tracker/wiki) has the rest: a tour of the [features](https://github.com/HoltropAF/concert_tracker/wiki/Features), everyday [how-tos](https://github.com/HoltropAF/concert_tracker/wiki/Using-the-app), [backups](https://github.com/HoltropAF/concert_tracker/wiki/Backing-up-your-data), [troubleshooting](https://github.com/HoltropAF/concert_tracker/wiki/Troubleshooting), and [how it all works](https://github.com/HoltropAF/concert_tracker/wiki/How-it-works) behind the scenes.
+The [wiki](https://github.com/HoltropAF/concert_tracker/wiki) has the rest: [getting started and backups](https://github.com/HoltropAF/concert_tracker/wiki/Using-the-app), everything the app can do in [Features](https://github.com/HoltropAF/concert_tracker/wiki/Features), and [troubleshooting](https://github.com/HoltropAF/concert_tracker/wiki/Troubleshooting).
 
 Found a bug or have an idea? [Open an issue](https://github.com/HoltropAF/concert_tracker/issues).
 

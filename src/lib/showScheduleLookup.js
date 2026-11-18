@@ -1,3 +1,4 @@
+import { apiFetch } from './api.js'
 import { validDate } from './calendar.js'
 import { localDay } from './showDay.js'
 import { needsShowTimes, pendingShowTime, pendingSupportActs, visibleShowTimeFields } from './showTimes.js'
@@ -53,7 +54,7 @@ export function checkShowSchedule(request, automatic = false) {
   if (automatic && previous?.day === day) return Promise.resolve(previous.result)
   const run = async () => {
     try {
-      const response = await fetch('/api/show-times?' + request.params, { signal:AbortSignal.timeout(30000) })
+      const response = await apiFetch('/api/show-times?' + request.params, { signal:AbortSignal.timeout(30000) })
       const result = await response.json().catch(() => { throw Error('The timetable lookup is unavailable here.') })
       if (!response.ok) throw Error(result.error || 'Could not check this page.')
       remember(request.key,{ day, at:Date.now(), result })

@@ -1,9 +1,12 @@
+import {requireUser,withinUserLimit} from '../server/auth.js'
 import {searchArtistImages,tokenImage,downloadArtistImage} from '../server/artistImages.js'
 const cache=new Map()
 let searches=[]
 export default async function handler(req,res) {
   res.setHeader('Cache-Control','private, no-store')
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'})
+  const user=await requireUser(req,res)
+  if(!user)return
   const key=process.env.SERPAPI_API_KEY
   if(!key)return res.status(503).json({error:'Online photos need setup: add SERPAPI_API_KEY to this project in Vercel, then redeploy.'})
   try {
@@ -17,6 +20,7 @@ export default async function handler(req,res) {
     const normalized=query.trim(),hit=cache.get(normalized.toLowerCase())
     if(hit?.expires>Date.now())return res.status(200).json({images:await hit.promise})
     searches=searches.filter(time=>time>Date.now()-60000)
+    if(!withinUserLimit(user,'artist-images',5))return res.status(429).json({error:'Please wait a minute before searching again.'})
     if(searches.length>=10)return res.status(429).json({error:'Please wait a minute before searching again.'})
     searches.push(Date.now())
     if(cache.size>=100)cache.delete(cache.keys().next().value)

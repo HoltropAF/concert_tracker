@@ -1,7 +1,9 @@
+import {requireUser} from '../server/auth.js'
 import {validDate} from '../src/lib/calendar.js'
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Use GET.' });
+  const user = await requireUser(req, res);
+  if (!user) return;
 
   const apiKey = process.env.SETLISTFM_API_KEY;
   const { url, artist, date, city, country, period, today, search, page = '1' } = req.query;

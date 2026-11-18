@@ -1,3 +1,4 @@
+import {apiFetch} from '../lib/api'
 import {useEffect,useRef,useState} from 'react'
 import {discoveryCountries} from '../lib/discovery'
 export default function VenueLookup({name='',city='',country='',onChoose}){
@@ -11,7 +12,7 @@ export default function VenueLookup({name='',city='',country='',onChoose}){
     try{
       const code=/^[a-z]{2}$/i.test(country)?country.toUpperCase():Object.entries(discoveryCountries).find(([,label])=>label.toLowerCase()===country.trim().toLowerCase())?.[0]||''
       if(country.trim()&&!code)throw Error('Use a two-letter country code, such as NL, BE, DE, GB or US.')
-      const response=await fetch('/api/venues?'+new URLSearchParams({name,city,country:code}),{signal:controller.signal})
+      const response=await apiFetch('/api/venues?'+new URLSearchParams({name,city,country:code}),{signal:controller.signal})
       const data=await response.json()
       if(!response.ok||!Array.isArray(data.venues))throw Error(data.error||'Venue search unavailable.')
       if(request.current!==controller)return

@@ -47,9 +47,12 @@ create policy "Users can manage own settings"
 -- a signed URL, which is why getPhotoUrl exists.
 -- ---------------------------------------------------------------------------
 
-insert into storage.buckets (id, name, public)
-values ('photos', 'photos', false)
-on conflict (id) do nothing;
+-- Photos are resized JPEGs well under 1 MB; the 5 MB cap and image-only types stop
+-- anyone with an account from using the bucket as general file storage.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('photos', 'photos', false, 5242880, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "Users can read own photos" on storage.objects;
 create policy "Users can read own photos"
@@ -66,7 +69,8 @@ create policy "Users can upload own photos"
 drop policy if exists "Users can update own photos" on storage.objects;
 create policy "Users can update own photos"
   on storage.objects for update
-  using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
 
 drop policy if exists "Users can delete own photos" on storage.objects;
 create policy "Users can delete own photos"

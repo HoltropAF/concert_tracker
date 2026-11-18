@@ -1,3 +1,4 @@
+import {apiFetch} from '../lib/api'
 import {useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import './ArtistPhotoSearch.css'
@@ -10,7 +11,7 @@ export default function ArtistPhotoSearch({artist,onChoose,disabled,hasPhoto}) {
     if(!term.trim())return
     setBusy(true);setError('');setSelected(null);setImages(null);setVisibleCount(8)
     try {
-      const response=await fetch('/api/artist-images?q='+encodeURIComponent(term.trim()),{signal:AbortSignal.timeout(20000)})
+      const response=await apiFetch('/api/artist-images?q='+encodeURIComponent(term.trim()),{signal:AbortSignal.timeout(20000)})
       const data=await response.json()
       if(!response.ok)throw Error(data.error||'Search failed.')
       setImages(data.images)
@@ -20,7 +21,7 @@ export default function ArtistPhotoSearch({artist,onChoose,disabled,hasPhoto}) {
   async function importPhoto() {
     setBusy(true);setError('')
     try {
-      const response=await fetch('/api/artist-images?image='+encodeURIComponent(selected.token),{signal:AbortSignal.timeout(20000)})
+      const response=await apiFetch('/api/artist-images?image='+encodeURIComponent(selected.token),{signal:AbortSignal.timeout(20000)})
       if(!response.ok){const data=await response.json();throw Error(data.error||'Photo import failed.')}
       const blob=await response.blob()
       await onChoose(new File([blob],'artist-photo',{type:blob.type}),{source:selected.source,title:selected.title})

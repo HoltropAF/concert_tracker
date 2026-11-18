@@ -1,3 +1,4 @@
+import {apiFetch} from '../lib/api'
 import {useRef,useState} from 'react'
 import {discoveryCountries,discoveryCountry,discoveryDuplicate,discoveryInvite,wishlistDraft} from '../lib/discovery'
 import {groupDiscoveryListings} from '../lib/ticketOptions'
@@ -17,7 +18,7 @@ export default function UpcomingDiscovery({concerts,onChoose,initialVenue='',ini
     const filters=page===1?{artist:artist.trim(),venue:venue.trim(),city:city.trim(),country,today}:query.current
     query.current=filters
     try {
-      const response=await fetch(`/api/upcoming?${new URLSearchParams({...filters,source:'combined',page:String(page)})}`,{signal:AbortSignal.timeout(15000)})
+      const response=await apiFetch(`/api/upcoming?${new URLSearchParams({...filters,source:'combined',page:String(page)})}`,{signal:AbortSignal.timeout(15000)})
       const data=await response.json().catch(()=>null)
       if(!response.ok || !Array.isArray(data?.events))throw Error(data?.error || 'Upcoming search is unavailable here. Try again later.')
       setEvents(previous=>page===1?data.events:[...new Map([...previous,...data.events].map(e=>[e.id,e])).values()]);setReport(data)

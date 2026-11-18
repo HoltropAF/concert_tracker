@@ -1,3 +1,4 @@
+import {apiFetch} from '../lib/api'
 import { useEffect, useState } from 'react'
 import ShowControlSheet from './ShowControlSheet'
 import { matchesPostShowSetlist } from '../lib/postShowLog'
@@ -26,7 +27,7 @@ export default function PostShowLog({ concert, concerts, ratingMax, onSave, onCl
     const run = async () => {
       try {
         const params = new URLSearchParams({artist:concert.artist,date:concert.date,city:concert.city||'',search:'1',period:'past',today:localDay()})
-        const response = await fetch('/api/setlist?' + params,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
+        const response = await apiFetch('/api/setlist?' + params,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
         if (!response.ok && response.status !== 404) throw Error('Setlist search is unavailable here.')
         const result = response.ok ? await response.json() : {results:[]}
         if (!Array.isArray(result.results)) throw Error('Setlist search is unavailable here.')

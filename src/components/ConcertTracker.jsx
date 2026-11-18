@@ -1,3 +1,4 @@
+import {apiFetch} from '../lib/api'
 import ShowSchedule from './ShowSchedule'
 import PostShowLog from './PostShowLog'
 import {canLogPostShow} from '../lib/postShowLog'
@@ -1111,7 +1112,7 @@ function FestivalActsSection({ acts = [], onChange, startDate, endDate, readOnly
     if (!url.includes('setlist.fm/festival/')) { setImportError('Paste a setlist.fm/festival/ URL'); setImportState('error'); return; }
     setImportState('loading'); setImportError('');
     try {
-      const r = await fetch(`/api/festival?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      const r = await apiFetch(`/api/festival?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { setImportError(data.error || 'Could not load the page'); setImportState('error'); return; }
 
@@ -1815,7 +1816,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
     setFetchState('loading');
     setFetchError('');
     try {
-      const r = await fetch(`/api/setlist?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      const r = await apiFetch(`/api/setlist?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
       const data = await r.json().catch(() => ({}));
       if (r.status === 422) { if (data.debug) console.warn('[setlist] parse failed:', data.debug); throw new Error('parse_error'); }
       if (!r.ok) throw new Error('fetch_error');
@@ -2456,7 +2457,7 @@ function ConcertDetail({ concert, concerts = [], onClose, onSave, settings = {},
             {saleDate.toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' })} · {saleDate.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}
           </div>
           {concert.ticketSaleNote && <div style={{ fontSize: 11, color: '#6b6a8f', marginTop: 3 }}>{concert.ticketSaleNote}</div>}
-          {concert.ticketSaleLink && <a href={concert.ticketSaleLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 11, color: '#a78bfa', marginTop: 4, wordBreak: 'break-all' }}>↗ {concert.ticketSaleLink}</a>}
+          {safeExternalUrl(concert.ticketSaleLink) && <a href={safeExternalUrl(concert.ticketSaleLink)} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 11, color: '#a78bfa', marginTop: 4, wordBreak: 'break-all' }}>↗ {concert.ticketSaleLink}</a>}
         </div>
       );
     })() : null;
@@ -8049,7 +8050,8 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
         {venueDetailTab === 'overview' && <div style={{ padding: '14px 16px 0' }}>
           {(() => {
             const vInfo = (settings.venueInfo || {})[selectedVenue] || {};
-            const websiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || '';
+            const savedWebsiteUrl = vInfo.url || (settings.venueUrls || {})[selectedVenue] || "";
+            const websiteUrl = safeExternalUrl(savedWebsiteUrl);
             const mapsQuery = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedVenue, q, v.city, v.country].filter(Boolean).join(' '))}`;
             const iconStroke = { stroke: '#9d9bc0', strokeWidth: 1.6, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' };
             const ICONS = {
@@ -8076,7 +8078,7 @@ function VenuesView({ concerts, onOpen, settings, onDiscover, onUpdateSetting = 
                   {vInfo.parking && settings.showVenueParking !== false && <InfoChip id="parking" icon={ICONS.car} label="Parking" text={vInfo.parking} />}
                   {vInfo.transit && settings.showVenueTransit !== false && <InfoChip id="transit" icon={ICONS.transit} label="Transit" text={vInfo.transit} />}
                   <button onClick={() => {
-                    setVenueEditInput({ url: websiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
+                    setVenueEditInput({ url: savedWebsiteUrl, parking: vInfo.parking || '', transit: vInfo.transit || '', rooms: vInfo.rooms && vInfo.rooms.length > 0 ? vInfo.rooms : rooms, tags: vInfo.tags || [] });
                     setEditingVenueInfo(true);
                   }} aria-label="Edit venue" style={{ ...chipStyle, flexShrink: 0, width: 26, height: 26, padding: 0, justifyContent: 'center' }}>{ICONS.edit}</button>
                 </div>
@@ -8625,7 +8627,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
     if (!sfUrl.trim()) return;
     setSfStatus('loading'); setSfMsg('');
     try {
-      const r = await fetch(`/api/setlist?url=${encodeURIComponent(sfUrl.trim())}`, { signal: AbortSignal.timeout(15000) });
+      const r = await apiFetch(`/api/setlist?url=${encodeURIComponent(sfUrl.trim())}`, { signal: AbortSignal.timeout(15000) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { setSfStatus('error'); setSfMsg('Could not read that link — is it a setlist.fm setlist URL?'); return; }
       setForm(f => ({
@@ -8649,7 +8651,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
   const autoFillFromSearch = async () => {
     setSfStatus('loading'); setSfMsg('');
     try {
-      const r = await fetch(`/api/setlist?artist=${encodeURIComponent(form.artist)}&date=${form.date}`, { signal: AbortSignal.timeout(15000) });
+      const r = await apiFetch(`/api/setlist?artist=${encodeURIComponent(form.artist)}&date=${form.date}`, { signal: AbortSignal.timeout(15000) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         setSfStatus('error');

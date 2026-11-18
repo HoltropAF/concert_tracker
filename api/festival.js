@@ -1,6 +1,8 @@
+import {requireUser} from '../server/auth.js'
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Use GET.' });
+  const user = await requireUser(req, res);
+  if (!user) return;
 
   const { url } = req.query;
   const parsedUrl = parseFestivalUrl(url);

@@ -1,3 +1,4 @@
+import { apiFetch } from './api.js'
 import { groupTicketEvents, mergeTicketOptions } from './ticketOptions.js'
 import { discoveryCountry, wishlistDraft } from './discovery.js'
 import { validDate } from './calendar.js'
@@ -76,7 +77,7 @@ export function summarizeWishCheck(concert, result, previous) {
     events: result.events.length ? result.events : unread ? previous?.events || [] : [],
   };
 }
-export async function checkWish(concert, { fetcher = fetch, signal, sources = ['ticketmaster', 'mojo'], venues = [], now = new Date(), budgetMs = 15000, sourceMs = 10000, onProgress = () => {} } = {}) {
+export async function checkWish(concert, { fetcher = apiFetch, signal, sources = ['ticketmaster', 'mojo'], venues = [], now = new Date(), budgetMs = 15000, sourceMs = 10000, onProgress = () => {} } = {}) {
   if (!String(concert.artist || '').trim()) throw Error('Add an artist before checking.')
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
   const locked = !!concert.discovery?.id;

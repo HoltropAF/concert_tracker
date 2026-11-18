@@ -1,8 +1,11 @@
+import {requireUser} from '../server/auth.js'
 import {venueUrl} from '../server/venueWebsites.js'
 import {lookupShowTimes} from '../server/showTimes.js'
 import {validDate} from '../src/lib/calendar.js'
 export default async function handler(req,res){
  if(req.method!=='GET')return res.status(405).json({error:'Use GET.'})
+  const user=await requireUser(req,res)
+  if(!user)return
  const {url='',website='',artist,date,venue='',country=''}=req.query
  if(typeof artist!=='string'||!artist.trim()||artist.length>160||!validDate(date)||[venue,country].some(v=>typeof v!=='string'||v.length>160)||[url,website].some(v=>typeof v!=='string'||v.length>2000))return res.status(400).json({error:'Choose an artist and show date first.'})
  try{for(const value of [url,website])if(value)venueUrl(value)}catch{return res.status(400).json({error:'Use public HTTPS event links.'})}

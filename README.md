@@ -40,9 +40,13 @@ All you need is a browser and an email address.
 
 Just looking? Tap **Try the demo** on the first screen instead; no account needed. To keep the app on your phone, choose **Add to Home screen** from your browser's menu.
 
-## Your own copy
+## How much control do you want?
 
-settracker is open source under the [MIT licence](LICENSE). The [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) gets you your own version, with your own database and web address, in three steps and about twenty minutes, with no coding. If you want to change the code or help build it, continue with the [Developer guide](https://github.com/HoltropAF/concert_tracker/wiki/Developer-guide).
+1. **Use the shared app.** Sign in and go; I look after the hosting, the database and the updates. The catch: if the shared database is asleep or I stop running it, you can't get in until it's back.
+2. **Run your own copy.** One button puts the app on your own free Vercel and Supabase accounts, so it keeps working whatever happens to mine. You keep your own database awake, and my later updates don't reach it.
+3. **Run your own fork.** The same, but linked to this repository: pull in updates with one click and change the code as you like.
+
+You can move between them at any time with a complete backup from one and a restore in the other. The [Setup guide](https://github.com/HoltropAF/concert_tracker/wiki/Setup-guide) walks through levels 2 and 3 in about twenty minutes, with no coding, and the [Developer guide](https://github.com/HoltropAF/concert_tracker/wiki/Developer-guide) takes it from there. settracker is open source under the [MIT licence](LICENSE).
 
 ## Learn more
 

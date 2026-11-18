@@ -1,5 +1,5 @@
 // Calls this app's own /api functions with the signed-in user's Supabase token.
-// Demo visitors (no token) may try each feature DEMO_TRIES times; after that this
+// Demo visitors (no token) may try setlist search and show discovery DEMO_TRIES times; after that this
 // answers locally with a "Sign in" message instead of calling the server. The
 // server has its own caps as well (server/auth.js), so this is only the friendly part.
 export const DEMO_TRIES = 3
@@ -10,6 +10,13 @@ const sameTryMs = 20000
 export const demoFeatureNames = {
   setlist: 'setlist search', 'artist-images': 'photo search', festival: 'festival import',
   upcoming: 'show discovery', venues: 'venue search', 'show-times': 'show times', 'venue-updates': 'venue checks',
+}
+
+// Not part of the demo: these need an account straight away.
+export const signInOnlyFeatures = new Set(['artist-images', 'show-times', 'venue-updates', 'festival', 'venues'])
+export function signInOnlyMessage(feature) {
+  const name = demoFeatureNames[feature] || 'This feature'
+  return `${name[0].toUpperCase() + name.slice(1)} needs an account. Sign in (it is free) to use it.`
 }
 
 export function takeDemoTry(feature, storage = globalThis.localStorage, now = Date.now()) {
@@ -38,9 +45,10 @@ export async function apiFetch(url, options = {}) {
   if (token) headers.set('Authorization', 'Bearer ' + token)
   else {
     const feature = /^\/api\/([a-z-]+)/.exec(url)?.[1]
-    // Importing a photo you just found belongs to that photo search try.
-    const followUp = feature === 'artist-images' && /[?&]image=/.test(url)
-    if (feature && !followUp && !takeDemoTry(feature)) {
+    if (feature && signInOnlyFeatures.has(feature)) {
+      return new Response(JSON.stringify({ error: signInOnlyMessage(feature) }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (feature && !takeDemoTry(feature)) {
       return new Response(JSON.stringify({ error: demoLimitMessage(feature) }), { status: 429, headers: { 'Content-Type': 'application/json' } })
     }
   }

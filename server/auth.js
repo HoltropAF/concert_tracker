@@ -45,10 +45,11 @@ export function withinUserLimit(user, bucket, limit, windowMs = 60000, now = Dat
 // Demo visitors can try each feature a few times. The browser stops them after 3
 // tries (src/lib/api.js); these server caps are the backstop against scripts. One
 // try can take a few requests (a wishlist check asks several sources), hence 15.
-// The shared caps bound what all guests together can spend per day; photo search
-// is lowest because SerpApi's free allowance is the smallest.
+// The shared caps bound what all guests together can spend per day. Only setlist
+// search and show discovery are open to the demo; the other endpoints use
+// requireUser and are for signed-in users only.
 export const GUEST_PER_IP = 15
-export const GUEST_TOTAL = { 'artist-images': 15, setlist: 150, festival: 50, upcoming: 150, venues: 100, 'show-times': 50, 'venue-updates': 100 }
+export const GUEST_TOTAL = { setlist: 150, upcoming: 150 }
 export const DEMO_LIMIT_MESSAGE = 'You have used your demo tries for this feature. Sign in (it is free) to keep using it.'
 const day = 86400000
 // Kept apart from perUser so many guest addresses can never push these out.
@@ -61,7 +62,7 @@ export async function requireUserOrGuest(req, res, feature, options = {}) {
   if (!withinUserLimit('ip:' + ip, 'guest-' + feature, GUEST_PER_IP, day, now)) return deny(res, 429, DEMO_LIMIT_MESSAGE)
   const shared = (guestTotals.get(feature) || []).filter(time => time > now - day)
   guestTotals.set(feature, shared)
-  if (shared.length >= (GUEST_TOTAL[feature] ?? 50)) return deny(res, 429, "The demo has used up today's tries for this feature. Sign in (it is free) to keep using it.")
+  if (shared.length >= (GUEST_TOTAL[feature] ?? 0)) return deny(res, 429, "The demo has used up today's tries for this feature. Sign in (it is free) to keep using it.")
   shared.push(now)
   return 'guest'
 }

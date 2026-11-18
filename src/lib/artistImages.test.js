@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {imageToken,tokenImage,searchArtistImages,downloadArtistImage} from '../../server/artistImages.js'
 import handler from '../../api/artist-images.js'
+import {rememberVerifiedToken} from '../../server/auth.js'
+const signedIn={authorization:'Bearer test-token-for-handler-tests'};rememberVerifiedToken('test-token-for-handler-tests','test-user',Date.now()+3600000)
 
 test('image import requires an unmodified, unexpired signed public HTTPS URL',async()=>{
   const token=imageToken('https://images.example/photo.jpg','secret')
@@ -27,7 +29,7 @@ test('unconfigured photo search gives an actionable setup message',async()=>{
   const original=process.env.SERPAPI_API_KEY;delete process.env.SERPAPI_API_KEY
   try {
     const res={setHeader(){},status(code){this.code=code;return this},json(body){this.body=body;return this}}
-    await handler({method:'GET',query:{q:'Artist'}},res)
+    await handler({method:'GET',headers:signedIn,query:{q:'Artist'}},res)
     assert.equal(res.code,503);assert.match(res.body.error,/SERPAPI_API_KEY/)
   }finally{if(original!==undefined)process.env.SERPAPI_API_KEY=original}
 })

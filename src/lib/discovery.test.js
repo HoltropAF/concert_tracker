@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {parseUpcomingPage,searchUpcoming} from '../../server/upcoming.js'
 import handler from '../../api/upcoming.js'
 import {discoveryDuplicate,wishlistDraft,discoveryInvite} from './discovery.js'
+import {rememberVerifiedToken} from '../../server/auth.js'
+const signedIn={authorization:'Bearer test-token-for-handler-tests'};rememberVerifiedToken('test-token-for-handler-tests','test-user',Date.now()+3600000)
 
 const event={id:'1',title:'Test band',url:'/event/1',timeZone:'Europe/Amsterdam',venue:{name:'Paradiso',city:'Amsterdam',countryCode:'NL'},dates:{startDate:'2027-03-20T19:00:00Z',onsaleDate:'2026-11-01T09:00:00Z'}}
 const page=events=>`<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({props:{pageProps:{initialReduxState:{api:{queries:{search:{endpointName:'searchEvents',data:{events,total:events.length}}}}}}}})}</script></html>`
@@ -42,6 +44,6 @@ test('HTTP boundary reads provider response, reports failure and rejects invalid
   assert.equal(result.events.length,1)
   await assert.rejects(searchUpcoming(query,async()=>new Response('',{status:403})),/HTTP 403/)
   let status,body
-  await handler({method:'GET',query:{artist:['bad'],today:'2026-10-13'}},{status(n){status=n;return this},json(v){body=v}})
+  await handler({method:'GET',headers:signedIn,query:{artist:['bad'],today:'2026-10-13'}},{status(n){status=n;return this},json(v){body=v}})
   assert.equal(status,400);assert.match(body.error,/Invalid/)
 })

@@ -8,10 +8,10 @@ const deny = (res, status, error) => { res.status(status).json({ error }); retur
 export async function requireUser(req, res, { fetcher = fetch, env = process.env, now = Date.now() } = {}) {
   const token = /^Bearer ([A-Za-z0-9._-]{20,4096})$/.exec(req.headers?.authorization || '')?.[1]
   if (!token) return deny(res, 401, 'Sign in to use online lookups.')
-  const url = env.VITE_SUPABASE_URL || env.SUPABASE_URL, key = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY
-  if (!url || !key) return deny(res, 503, 'Online lookups need the Supabase settings in this Vercel project.')
   const hit = verified.get(token)
   if (hit && hit.expires > now) return hit.user
+  const url = env.VITE_SUPABASE_URL || env.SUPABASE_URL, key = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY
+  if (!url || !key) return deny(res, 503, 'Online lookups need the Supabase settings in this Vercel project.')
   let response
   try {
     response = await fetcher(url.replace(/\/+$/, '') + '/auth/v1/user', { headers: { apikey: key, Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(5000) })
@@ -26,6 +26,9 @@ export async function requireUser(req, res, { fetcher = fetch, env = process.env
   verified.set(token, { user: user.id, expires: now + 300000 })
   return user.id
 }
+
+// Tests call the handlers directly; this marks a token as already checked.
+export function rememberVerifiedToken(token, user, now = Date.now()) { verified.set(token, { user, expires: now + 300000 }) }
 
 // Per-user allowance on top of sign-in, so one account cannot drain a shared quota.
 export function withinUserLimit(user, bucket, limit, windowMs = 60000, now = Date.now()) {

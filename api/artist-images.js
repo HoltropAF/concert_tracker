@@ -1,11 +1,11 @@
-import {requireUser,withinUserLimit} from '../server/auth.js'
+import {requireUserOrGuest,withinUserLimit} from '../server/auth.js'
 import {searchArtistImages,tokenImage,downloadArtistImage} from '../server/artistImages.js'
 const cache=new Map()
 let searches=[]
 export default async function handler(req,res) {
   res.setHeader('Cache-Control','private, no-store')
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'})
-  const user=await requireUser(req,res)
+  const user=await requireUserOrGuest(req,res,'artist-images')
   if(!user)return
   const key=process.env.SERPAPI_API_KEY
   if(!key)return res.status(503).json({error:'Online photos need setup: add SERPAPI_API_KEY to this project in Vercel, then redeploy.'})

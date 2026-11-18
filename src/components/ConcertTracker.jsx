@@ -1819,7 +1819,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
       const r = await apiFetch(`/api/setlist?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
       const data = await r.json().catch(() => ({}));
       if (r.status === 422) { if (data.debug) console.warn('[setlist] parse failed:', data.debug); throw new Error('parse_error'); }
-      if (!r.ok) throw new Error('fetch_error');
+      if (!r.ok) throw new Error([401,429].includes(r.status) && data.error ? data.error : 'fetch_error');
       if (!data.songs?.length) throw new Error('parse_error');
       save(data.songs);
       setUrlInput('');
@@ -2069,7 +2069,7 @@ function SetlistSection({ concert, settings, onSaveSetlist, overrideSongs = null
         <>
           {fetchState === 'error' && (
             <div style={{ marginBottom: 8, fontSize: 11, color: '#f472b6', fontFamily: "'DM Mono', monospace" }}>
-              {errorMsg[fetchError] || 'Something went wrong.'}
+              {errorMsg[fetchError] || fetchError || 'Something went wrong.'}
               <button onClick={() => setFetchState('idle')} style={{ marginLeft: 8, background: 'none', border: 'none', color: '#4a4870', fontSize: 11, cursor: 'pointer' }}>dismiss</button>
             </div>
           )}
@@ -8629,7 +8629,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
     try {
       const r = await apiFetch(`/api/setlist?url=${encodeURIComponent(sfUrl.trim())}`, { signal: AbortSignal.timeout(15000) });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) { setSfStatus('error'); setSfMsg('Could not read that link — is it a setlist.fm setlist URL?'); return; }
+      if (!r.ok) { setSfStatus('error'); setSfMsg([401,429].includes(r.status) && data.error ? data.error : 'Could not read that link — is it a setlist.fm setlist URL?'); return; }
       setForm(f => ({
         ...f,
         artist: f.artist || data.artist || f.artist,
@@ -8655,7 +8655,7 @@ function AddConcertForm({ onSave, onClose, settings = {}, onUpdateSetting = null
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         setSfStatus('error');
-        setSfMsg(r.status === 404 ? 'No setlist found for that artist + date' : r.status === 501 ? 'Search not available (no API key configured)' : 'Fetch failed — try again');
+        setSfMsg([401,429].includes(r.status) && data.error ? data.error : r.status === 404 ? 'No setlist found for that artist + date' : r.status === 501 ? 'Search not available (no API key configured)' : 'Fetch failed — try again');
         return;
       }
       setForm(f => ({

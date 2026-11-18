@@ -1,7 +1,7 @@
-import {requireUser} from '../server/auth.js'
+import {requireUserOrGuest} from '../server/auth.js'
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Use GET.' });
-  const user = await requireUser(req, res);
+  const user = await requireUserOrGuest(req, res, 'festival');
   if (!user) return;
 
   const { url } = req.query;

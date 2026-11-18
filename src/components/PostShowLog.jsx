@@ -28,7 +28,7 @@ export default function PostShowLog({ concert, concerts, ratingMax, onSave, onCl
       try {
         const params = new URLSearchParams({artist:concert.artist,date:concert.date,city:concert.city||'',search:'1',period:'past',today:localDay()})
         const response = await apiFetch('/api/setlist?' + params,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
-        if (!response.ok && response.status !== 404) throw Error('Setlist search is unavailable here.')
+        if (!response.ok && response.status !== 404) throw Error([401,429].includes(response.status) && (await response.json().catch(()=>({}))).error || 'Setlist search is unavailable here.')
         const result = response.ok ? await response.json() : {results:[]}
         if (!Array.isArray(result.results)) throw Error('Setlist search is unavailable here.')
         const matching = result.results.filter(item => matchesPostShowSetlist(concert,item))

@@ -1,9 +1,9 @@
-import {requireUser} from '../server/auth.js'
+import {requireUserOrGuest} from '../server/auth.js'
 import {searchVenues} from '../server/venueSearch.js'
 const cache=new Map()
 export default async function handler(req,res){
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'})
-  const user=await requireUser(req,res)
+  const user=await requireUserOrGuest(req,res,'venues')
   if(!user)return
   const query={}
   for(const field of ['name','city','country']){

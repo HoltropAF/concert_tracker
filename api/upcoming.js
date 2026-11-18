@@ -1,4 +1,4 @@
-import {requireUser} from '../server/auth.js'
+import {requireUserOrGuest} from '../server/auth.js'
 import {searchTicketmasterApi} from '../server/ticketmasterApi.js'
 import {searchMojo} from '../server/mojo.js'
 import {searchUpcoming} from '../server/upcoming.js'
@@ -9,7 +9,7 @@ import {validDate} from '../src/lib/calendar.js'
 const cache=new Map()
 export default async function handler(req,res) {
   if(req.method!=='GET')return res.status(405).json({error:'Use GET to search.'})
-  const user=await requireUser(req,res)
+  const user=await requireUserOrGuest(req,res,'upcoming')
   if(!user)return
   const source=req.query.source || 'ticketmaster'
   if(!['ticketmaster','mojo','combined'].includes(source))return res.status(400).json({error:'Unknown source.'})

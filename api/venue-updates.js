@@ -1,10 +1,10 @@
-import {requireUser} from '../server/auth.js'
+import {requireUserOrGuest} from '../server/auth.js'
 import {searchVenueWebsite,venueUrl} from '../server/venueWebsites.js'
 import {validDate} from '../src/lib/calendar.js'
 export const config={maxDuration:60}
 export default async function handler(req,res){
   if(req.method!=='GET')return res.status(405).json({error:'Use GET.'})
-  const user=await requireUser(req,res)
+  const user=await requireUserOrGuest(req,res,'venue-updates')
   if(!user)return
   const {website,artist,today,venueName=''}=req.query
   if(typeof website!=='string'||website.length>2000||typeof artist!=='string'||!artist.trim()||artist.length>160||typeof venueName!=='string'||venueName.length>160||!validDate(today))return res.status(400).json({error:'Invalid venue search.'})

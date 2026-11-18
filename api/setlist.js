@@ -1,8 +1,8 @@
-import {requireUser} from '../server/auth.js'
+import {requireUserOrGuest} from '../server/auth.js'
 import {validDate} from '../src/lib/calendar.js'
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Use GET.' });
-  const user = await requireUser(req, res);
+  const user = await requireUserOrGuest(req, res, 'setlist');
   if (!user) return;
 
   const apiKey = process.env.SETLISTFM_API_KEY;

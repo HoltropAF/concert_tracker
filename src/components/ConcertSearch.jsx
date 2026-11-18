@@ -18,7 +18,7 @@ export default function ConcertSearch({concerts,onChoose,mode='past',initialCoun
     try {
       const response=await apiFetch(`/api/setlist?${new URLSearchParams({...q,search:'1',page:String(next)})}`,{signal:AbortSignal.timeout(15000)})
       const data=await response.json().catch(()=>({}))
-      if(!response.ok)throw Error(response.status===501?'Concert search needs the app owner’s setlist.fm API key. Manual entry is still available.':response.status===404?'No matching concerts. Try fewer filters.':response.status===429?'Search is busy. Please try again later.':'Could not search. Please try again.')
+      if(!response.ok)throw Error([401,429].includes(response.status)&&data.error?data.error:response.status===501?'Concert search needs the app owner’s setlist.fm API key. Manual entry is still available.':response.status===404?'No matching concerts. Try fewer filters.':response.status===429?'Search is busy. Please try again later.':'Could not search. Please try again.')
       if(!Array.isArray(data.results))throw Error('Concert search is unavailable on this preview. Try the deployed app or enter details manually.')
       setResults(next===1?data.results:old=>[...old,...data.results]);setPage(next);setMore(next*data.itemsPerPage<data.total)
       if(!data.results.length)setMessage(next*data.itemsPerPage<data.total?'No past shows on this page. Try more results or narrow the date.':'No matching past concerts. Try fewer filters.')

@@ -1,8 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {requireUser,withinUserLimit} from '../../server/auth.js'
-import setlist from '../../api/setlist.js'
-import artistImages from '../../api/artist-images.js'
+import {requireUser,requireUserOrGuest,withinUserLimit,GUEST_PER_IP,GUEST_TOTAL} from '../../server/auth.js'
+import {DEMO_TRIES,takeDemoTry,demoLimitMessage} from './api.js'
 
 const env={VITE_SUPABASE_URL:'https://demo.supabase.co/',VITE_SUPABASE_ANON_KEY:'anon'}
 const response=()=>{const res={status(code){res.code=code;return res},json(body){res.body=body;return res}};return res}
@@ -35,11 +34,32 @@ test('each user has their own allowance',()=>{
   assert.equal(withinUserLimit('u2','t',3,60000,now),true)
   assert.equal(withinUserLimit('u1','t',3,60000,now+61000),true)
 })
-test('the quota-spending endpoints refuse callers who are not signed in',async()=>{
-  for(const handler of [setlist,artistImages]){
-    const res=response();res.setHeader=()=>{};let called=false;const original=global.fetch
-    global.fetch=async()=>{called=true;throw Error('no network in tests')}
-    try{await handler({method:'GET',headers:{},query:{artist:'Band',search:'1',q:'Band'}},res)}finally{global.fetch=original}
-    assert.equal(res.code,401);assert.equal(called,false)
-  }
+test('demo visitors get a small daily allowance per feature and IP',async()=>{
+  const now=5e9,req=ip=>({headers:{'x-forwarded-for':ip+', 10.0.0.1'}})
+  for(let i=0;i<GUEST_PER_IP;i++)assert.equal(await requireUserOrGuest(req('1.1.1.1'),response(),'venues',{now}),'guest')
+  const res=response()
+  assert.equal(await requireUserOrGuest(req('1.1.1.1'),res,'venues',{now}),null)
+  assert.equal(res.code,429);assert.match(res.body.error,/Sign in/)
+  assert.equal(await requireUserOrGuest(req('1.1.1.1'),response(),'setlist',{now}),'guest')
+  assert.equal(await requireUserOrGuest(req('2.2.2.2'),response(),'venues',{now}),'guest')
+  assert.equal(await requireUserOrGuest(req('1.1.1.1'),response(),'venues',{now:now+86400001}),'guest')
+})
+test('all demo visitors together cannot exceed the shared photo search cap',async()=>{
+  const now=6e9
+  let allowed=0
+  for(let i=0;i<GUEST_TOTAL['artist-images']+5;i++)if(await requireUserOrGuest({headers:{'x-real-ip':'9.9.9.'+i}},response(),'artist-images',{now}))allowed++
+  assert.equal(allowed,GUEST_TOTAL['artist-images'])
+})
+test('a signed-in header is always checked, never treated as a guest',async()=>{
+  const res=response()
+  assert.equal(await requireUserOrGuest({headers:{authorization:'Bearer short'}},res,'venues',{env}),null)
+  assert.equal(res.code,401)
+})
+test('the browser allows 3 demo tries per feature, counting quick repeats as one',()=>{
+  const store=new Map(),storage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)}
+  let t=1e6
+  for(let i=0;i<DEMO_TRIES;i++){assert.equal(takeDemoTry('setlist',storage,t),true);assert.equal(takeDemoTry('setlist',storage,t+5000),true);t+=60000}
+  assert.equal(takeDemoTry('setlist',storage,t),false)
+  assert.equal(takeDemoTry('venues',storage,t),true)
+  assert.match(demoLimitMessage('setlist'),/3 demo tries of setlist search/)
 })
